@@ -1,4 +1,4 @@
-FROM node:22-bookworm-slim AS dependencies
+FROM node:26-bookworm-slim AS dependencies
 
 WORKDIR /app
 RUN apt-get update \
@@ -18,7 +18,7 @@ ENV DEPLOYMENT_MODE=self-hosted
 ENV PATIENT_FILE_STORAGE_DRIVER=local
 RUN npm run build
 
-FROM node:22-bookworm-slim AS runner
+FROM node:26-bookworm-slim AS runner
 
 WORKDIR /app
 RUN apt-get update \
