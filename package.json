@@ -60,16 +60,16 @@
     "db:seed:schedule": "node scripts/seed-schedule-demo.mjs"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.1040.0",
-    "@prisma/adapter-pg": "^7.8.0",
+    "@aws-sdk/client-s3": "^3.1093.0",
+    "@prisma/adapter-pg": "^7.9.0",
     "@prisma/client": "7.9.0",
     "lucide-react": "latest",
     "next": "16.2.11",
-    "pg": "^8.20.0",
+    "pg": "^8.22.0",
     "react": "latest",
-    "react-day-picker": "^9.14.0",
+    "react-day-picker": "^10.0.1",
     "react-dom": "latest",
-    "react-odontogram": "^0.5.5",
+    "react-odontogram": "^0.5.6",
     "sharp": "0.35.3"
   },
   "devDependencies": {
