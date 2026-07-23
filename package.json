@@ -73,15 +73,15 @@
     "sharp": "0.35.3"
   },
   "devDependencies": {
-    "@capacitor/android": "8.3.1",
-    "@capacitor/cli": "8.3.1",
-    "@capacitor/core": "8.3.1",
-    "@types/node": "25.6.0",
+    "@capacitor/android": "8.4.2",
+    "@capacitor/cli": "8.4.2",
+    "@capacitor/core": "8.4.2",
+    "@types/node": "25.9.5",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
-    "eslint": "9.39.4",
-    "eslint-config-next": "16.2.4",
-    "playwright": "1.60.0",
+    "eslint": "9.39.5",
+    "eslint-config-next": "16.2.11",
+    "playwright": "1.61.1",
     "prisma": "7.9.0",
     "typescript": "6.0.3"
   },
