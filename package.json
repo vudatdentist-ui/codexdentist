@@ -73,15 +73,15 @@
     "sharp": "0.35.3"
   },
   "devDependencies": {
-    "@capacitor/android": "^8.3.1",
-    "@capacitor/cli": "^8.3.1",
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/cli": "^8.4.2",
     "@capacitor/core": "^8.3.1",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "eslint": "latest",
     "eslint-config-next": "latest",
-    "playwright": "^1.60.0",
+    "playwright": "^1.61.1",
     "prisma": "7.9.0",
     "typescript": "latest"
   },
