@@ -97,13 +97,20 @@ function ensureSelfHostEnv() {
     return;
   }
 
+  const requestedPort = process.env.CODEXDENTIST_PORT?.trim() || "3000";
+  const port = Number(requestedPort);
+
+  if (!/^\d{1,5}$/.test(requestedPort) || port < 1 || port > 65535) {
+    throw new Error("CODEXDENTIST_PORT phải là một cổng hợp lệ từ 1 đến 65535.");
+  }
+
   const secret = () => randomBytes(48).toString("base64url");
   const content = [
     `POSTGRES_PASSWORD="${secret()}"`,
     `AUTH_SECRET="${secret()}"`,
     `JOB_SECRET="${secret()}"`,
-    'CODEXDENTIST_PORT="3000"',
-    'APP_BASE_URL="http://127.0.0.1:3000"',
+    `CODEXDENTIST_PORT="${requestedPort}"`,
+    `APP_BASE_URL="http://127.0.0.1:${requestedPort}"`,
     'APP_ROOT_DOMAIN="codexdentist.local"',
     'SESSION_COOKIE_SECURE="false"',
     'NOTIFICATION_DELIVERY_MODE="disabled"',
@@ -166,6 +173,7 @@ function backup() {
   const backupDir = join(projectRoot, "backups", `codexdentist-${timestamp}`);
   const databasePath = join(backupDir, "postgres.dump");
   const filesPath = join(backupDir, "patient-files.tar.gz");
+  const containerFilesPath = `/tmp/patient-files-${timestamp}.tar.gz`;
   mkdirSync(backupDir, { recursive: true });
 
   const databaseFd = openSync(databasePath, "wx");
@@ -206,17 +214,17 @@ function backup() {
     "app",
     "tar",
     "-czf",
-    "/tmp/patient-files.tar.gz",
+    containerFilesPath,
     "-C",
     "/data",
     "patient-files",
   ]);
   compose([
     "cp",
-    "app:/tmp/patient-files.tar.gz",
+    `app:${containerFilesPath}`,
     relative(projectRoot, filesPath),
   ]);
-  compose(["exec", "-T", "app", "rm", "-f", "/tmp/patient-files.tar.gz"]);
+  compose(["exec", "-T", "app", "rm", "-f", containerFilesPath]);
   console.log(`Backup hoàn tất: ${backupDir}`);
 
   return backupDir;
@@ -271,21 +279,20 @@ function restore(restoreArgs) {
     throw new Error("Khôi phục PostgreSQL thất bại; ứng dụng vẫn đang dừng.");
   }
 
-  compose(["start", "app"]);
+  const filesMount = `./${relative(projectRoot, filesPath).replaceAll("\\", "/")}:/tmp/patient-files.tar.gz:ro`;
   compose([
-    "cp",
-    relative(projectRoot, filesPath),
-    "app:/tmp/patient-files.tar.gz",
-  ]);
-  compose([
-    "exec",
-    "-T",
-    "app",
+    "run",
+    "--rm",
+    "--no-deps",
+    "--volume",
+    filesMount,
+    "--entrypoint",
     "sh",
+    "app",
     "-c",
-    "rm -rf /data/patient-files && tar -xzf /tmp/patient-files.tar.gz -C /data && rm -f /tmp/patient-files.tar.gz",
+    "find /data/patient-files -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + && tar -xzf /tmp/patient-files.tar.gz -C /data",
   ]);
-  compose(["restart", "app"]);
+  compose(["start", "app"]);
   console.log(`Đã khôi phục backup: ${basename(backupDir)}`);
 }
 

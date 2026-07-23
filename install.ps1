@@ -12,3 +12,7 @@ if ($nodeMajor -ne 22) {
 }
 
 node scripts/codexdentist.mjs install
+
+if ($LASTEXITCODE -ne 0) {
+  exit $LASTEXITCODE
+}

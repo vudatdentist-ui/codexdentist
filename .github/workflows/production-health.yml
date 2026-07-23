@@ -1,0 +1,48 @@
+name: Production health
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 * * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-health
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check public pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          for url in \
+            "https://codexdentist.com/" \
+            "https://codexdentist.com/features" \
+            "https://demo.codexdentist.com/"; do
+            curl --fail --silent --show-error \
+              --location --max-time 20 --retry 2 --retry-all-errors \
+              --output /dev/null "$url"
+          done
+
+      - name: Check application and database health
+        shell: bash
+        run: |
+          set -euo pipefail
+          response="$(
+            curl --fail --silent --show-error \
+              --max-time 20 --retry 2 --retry-all-errors \
+              "https://codexdentist.com/api/health"
+          )"
+          HEALTH_RESPONSE="$response" node <<'NODE'
+          const health = JSON.parse(process.env.HEALTH_RESPONSE);
+          if (health.status !== "ok" || health.database !== "ok") {
+            throw new Error(`Unhealthy production response: ${JSON.stringify(health)}`);
+          }
+          console.log("Production application and database are healthy.");
+          NODE

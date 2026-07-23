@@ -38,6 +38,8 @@ npm run codexdentist -- update
 
 Linux/NAS uses `./install.sh`. The installer creates `.env.selfhost` with random secrets and starts `compose.selfhost.yml`. First-run configuration is available at `/setup` only while no organization exists.
 
+To install on a non-default port, set `CODEXDENTIST_PORT` before running the installer. The value must be between 1 and 65535.
+
 Self-host storage:
 
 - PostgreSQL: named volume `codexdentist-postgres`.
@@ -131,6 +133,10 @@ Public host routing:
 - `docs`: redirects to `/docs`;
 - `app`/`admin`: neutral application entry;
 - other supported subdomains: tenant application.
+
+Production availability is checked hourly by `.github/workflows/production-health.yml`. It verifies the product page, feature guide, demo entry, application health, and database health. A failed run is an operational alert and must be investigated before release or onboarding.
+
+GitHub health checks do not expose cPanel resource exhaustion. Review CPU, memory, process, disk, PostgreSQL size, and error logs in cPanel at least weekly during the public beta.
 
 ## Production Environment
 

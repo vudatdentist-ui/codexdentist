@@ -1,22 +1,31 @@
 # Codexdentist
 
-Codexdentist is an open-source dental clinic operating system for Viet Nam. It combines scheduling, patient records, clinical journeys, billing, inventory, pharmacy, staff operations, CRM, forms, and reporting in one multi-tenant application.
+[Tiếng Việt](#tiếng-việt) | [English](#english)
 
-## Try It
+Codexdentist là phần mềm mã nguồn mở để vận hành phòng khám nha khoa vừa và nhỏ. Hệ thống tập trung lịch hẹn, hồ sơ bệnh nhân, điều trị, thanh toán, kho, nhân sự, CRM, biểu mẫu và báo cáo trong một ứng dụng đa phòng khám.
 
-- Product website: `https://codexdentist.com`
-- 24-hour isolated demo: `https://demo.codexdentist.com`
-- Installation guide: `https://codexdentist.com/docs`
+![Bảng điều khiển Codexdentist](public/marketing/dashboard-hero.png)
 
-The public demo stores changes temporarily inside a separate organization and automatically expires it. Do not enter real patient information into the demo.
+## Tiếng Việt
 
-## Self-Host
+### Dùng thử và tìm hiểu
 
-Requirements:
+- Website: [codexdentist.com](https://codexdentist.com)
+- Demo đầy đủ trong 24 giờ: [demo.codexdentist.com](https://demo.codexdentist.com)
+- Hướng dẫn tính năng: [codexdentist.com/features](https://codexdentist.com/features)
+- Hướng dẫn cài đặt: [codexdentist.com/docs](https://codexdentist.com/docs)
 
-- Node.js 22 LTS
-- Docker Desktop or Docker Engine with Compose
-- At least 4 GB RAM and 10 GB free disk space for a small clinic
+Mỗi lượt demo dùng một phòng khám tách biệt và sẽ tự hết hạn. Không nhập dữ liệu bệnh nhân thật vào bản demo.
+
+| Lịch hẹn | Hồ sơ bệnh nhân |
+| --- | --- |
+| ![Lịch hẹn](public/marketing/feature-schedule.png) | ![Hồ sơ bệnh nhân](public/marketing/feature-patients.png) |
+
+![Quản lý tồn kho](public/marketing/feature-inventory.png)
+
+### Tự cài đặt
+
+Yêu cầu: Node.js 22 LTS, Docker Desktop hoặc Docker Engine có Compose, tối thiểu 4 GB RAM và 10 GB dung lượng trống.
 
 Windows:
 
@@ -26,7 +35,7 @@ cd codexdentist
 .\install.ps1
 ```
 
-Linux or macOS:
+Linux hoặc macOS:
 
 ```bash
 git clone https://github.com/vudatdentist-ui/codexdentist.git
@@ -35,9 +44,11 @@ chmod +x install.sh
 ./install.sh
 ```
 
-The installer creates `.env.selfhost` with random secrets, builds the application, starts PostgreSQL, applies migrations, and prints LAN addresses. Open `http://127.0.0.1:3000/setup` to create the first clinic and owner account.
+Installer tự tạo `.env.selfhost` với khóa ngẫu nhiên, build ứng dụng, chạy PostgreSQL, áp dụng migration và in địa chỉ truy cập trong mạng LAN. Mở `http://127.0.0.1:3000/setup` trên máy chủ để tạo phòng khám và tài khoản Chủ hệ thống đầu tiên.
 
-## Operations
+Nếu cổng 3000 đã được dùng, đặt cổng khác trước khi cài: `$env:CODEXDENTIST_PORT="3317"` trên PowerShell hoặc `CODEXDENTIST_PORT=3317 ./install.sh` trên Linux/macOS.
+
+### Vận hành
 
 ```bash
 npm run codexdentist -- start
@@ -49,57 +60,60 @@ npm run codexdentist -- restore backups/<folder> --confirm
 npm run codexdentist -- update
 ```
 
-Backups contain a PostgreSQL custom dump and a patient-file archive. Keep a copy outside the clinic server and test a restore before using the system with real patients.
+Backup gồm bản sao PostgreSQL và kho tệp bệnh nhân. Luôn giữ thêm một bản ngoài máy chủ phòng khám và thử khôi phục trước khi dùng dữ liệu thật. Cấu hình chi tiết nằm trong [docs/OPERATIONS.md](docs/OPERATIONS.md).
 
-## Development
+### Phát triển và đóng góp
 
 ```bash
 docker compose up -d
 npm install
 npm run prisma:generate
 npm run prisma:migrate
-npm run test:seed-users
 npm run dev
 ```
 
-Open `http://127.0.0.1:3000`.
-
-Verification:
+Mở `http://127.0.0.1:3000`. Trước khi gửi thay đổi:
 
 ```bash
 npm run encoding:check
 npm run typecheck
 npm run build
-npm run test:smoke
-npm run test:tenant
-npm run test:hardening
-npm run browser:qa
 ```
 
-## Deployment Modes
+Đọc [CONTRIBUTING.md](CONTRIBUTING.md) trước khi tạo pull request. Không đưa thông tin đăng nhập, database dump, dữ liệu bệnh nhân thật hoặc ảnh chụp phòng khám thật lên issue hay pull request.
 
-- `self-hosted`: local patient-file volume is allowed and `/setup` is available only while the database has no organization.
-- `hosted`: HTTPS, private R2 storage, tenant subdomains, strong secrets, and external backup are required.
-- `demo`: enabled only with `DEMO_WORKSPACE_ENABLED=true`; each workspace is an expiring tenant and outbound delivery/file upload are disabled.
+## English
 
-Optional providers for AI, email, SMS, Zalo, and R2 are configured through environment variables. They are disabled by default in self-host installations.
+Codexdentist is an open-source operating system for small and medium dental clinics in Viet Nam. It combines scheduling, patient records, clinical journeys, billing, inventory, staff operations, CRM, forms, and reporting in one multi-tenant application.
 
-## Project Rules
+### Try it
 
-- PostgreSQL is canonical.
-- Operational records are scoped by `organizationId`.
-- Clinic records also respect accessible clinic ids.
-- Permissions are enforced in loaders and actions.
-- Vietnamese UI text is UTF-8.
-- Patient files are protected records and never public assets.
-- Migrations and backups must preserve existing data.
+- Product: [codexdentist.com](https://codexdentist.com)
+- Isolated 24-hour demo: [demo.codexdentist.com](https://demo.codexdentist.com)
+- Feature guide: [codexdentist.com/features](https://codexdentist.com/features)
+- Installation guide: [codexdentist.com/docs](https://codexdentist.com/docs)
 
-See `AGENTS.md`, `docs/PROJECT_CONTEXT.md`, `docs/QA_PLAYBOOK.md`, and `docs/OPERATIONS.md` for the active engineering and operations context.
+Do not enter real patient information into the public demo.
 
-## Contributing
+### Self-host
 
-Read `CONTRIBUTING.md` before submitting a change. Never place credentials, database dumps, real patient data, or real clinic screenshots in an issue or pull request.
+Requirements: Node.js 22 LTS, Docker Desktop or Docker Engine with Compose, 4 GB RAM, and 10 GB of free disk space.
+
+Use `.\install.ps1` on Windows or `./install.sh` on Linux/macOS. The installer generates random secrets, builds the application, starts PostgreSQL, applies migrations, and prints local and LAN addresses. Open `/setup` to create the first clinic and owner.
+
+See [docs/OPERATIONS.md](docs/OPERATIONS.md) for backup, restore, update, production, and go-live procedures.
+
+### Architecture and safety
+
+- PostgreSQL is the canonical data store.
+- Operational data is scoped by `organizationId`; clinic data also respects accessible clinic IDs.
+- Permissions are enforced in server loaders and actions.
+- Patient files are protected records, never public assets.
+- Hosted deployments require HTTPS, private R2 storage, strong secrets, and external backups.
+- Self-hosted deployments may use protected local volumes.
+
+Engineering context is kept in [AGENTS.md](AGENTS.md), [docs/PROJECT_CONTEXT.md](docs/PROJECT_CONTEXT.md), and [docs/QA_PLAYBOOK.md](docs/QA_PLAYBOOK.md).
 
 ## License
 
-Codexdentist is licensed under the GNU Affero General Public License v3.0 or later (`AGPL-3.0-or-later`). See `LICENSE`.
+Codexdentist is licensed under the GNU Affero General Public License v3.0 or later (`AGPL-3.0-or-later`). See [LICENSE](LICENSE).

@@ -7,7 +7,6 @@ This repo intentionally keeps active documentation small. Read only these files 
 1. `docs/PROJECT_CONTEXT.md`
 2. `docs/QA_PLAYBOOK.md`
 3. `docs/OPERATIONS.md` when deploy, backup, S22U, go-live, or production config is involved
-4. `docs/WORK_LOG.md` for recent changes
 
 Repo code plus these docs beats chat history. Do not recreate long refactor logs, session handoffs, CLI continuation plans, or audit dumps.
 
@@ -43,6 +42,6 @@ Smoke owner after seeding: `owner@nhavista.vn / CodexSmoke2026!`
 
 - Keep active Markdown under 8 files.
 - Prefer updating one of the active docs over adding a new file.
-- Use `docs/WORK_LOG.md` for short recent history.
 - If a product or safety rule changes, update `docs/PROJECT_CONTEXT.md`.
 - If a verification or release rule changes, update `docs/QA_PLAYBOOK.md` or `docs/OPERATIONS.md`.
+- Use Git history for change history; do not create a separate work log.
