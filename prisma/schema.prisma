@@ -1,0 +1,2301 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  OWNER
+  AREA_MANAGER
+  CLINIC_MANAGER
+  DENTIST
+  HYGIENIST
+  FRONT_DESK
+  BILLING
+  PATIENT
+}
+
+enum AppointmentStatus {
+  REQUESTED
+  CONFIRMED
+  ARRIVED
+  IN_CHAIR
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+enum TreatmentStatus {
+  DRAFT
+  PRESENTED
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED
+  DECLINED
+}
+
+enum InvoiceStatus {
+  DRAFT
+  OPEN
+  PARTIAL
+  PAID
+  OVERDUE
+  VOID
+}
+
+enum ConsentStatus {
+  GRANTED
+  REVOKED
+  EXPIRED
+}
+
+enum PostType {
+  ANNOUNCEMENT
+  CASE_DISCUSSION
+  SHIFT_HANDOFF
+  TRAINING
+  POLICY
+}
+
+enum StaffShiftStatus {
+  SCHEDULED
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum LeaveStatus {
+  REQUESTED
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+enum PayrollStatus {
+  DRAFT
+  APPROVED
+  PAID
+  VOID
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  CONSULT_BOOKED
+  VISITED
+  CONVERTED
+  LOST
+  RECALL
+}
+
+enum CrmActivityType {
+  CALL
+  ZALO
+  SMS
+  EMAIL
+  NOTE
+  TASK
+  VISIT
+  FOLLOW_UP
+}
+
+enum InventoryMovementType {
+  PURCHASE
+  TRANSFER_IN
+  TRANSFER_OUT
+  CONSUMPTION
+  ADJUSTMENT
+  WASTE
+  RETURN
+}
+
+enum AssetStatus {
+  ACTIVE
+  MAINTENANCE
+  RETIRED
+  LOST
+}
+
+enum PrescriptionStatus {
+  DRAFT
+  SIGNED
+  DISPENSED
+  CANCELLED
+}
+
+enum FormTemplateType {
+  CONSENT
+  INTAKE
+  MEDICAL_HISTORY
+  POST_OP
+  FINANCIAL_POLICY
+  CUSTOM
+}
+
+enum PatientFormStatus {
+  DRAFT
+  SENT
+  COMPLETED
+  EXPIRED
+  VOID
+}
+
+enum LearningContentType {
+  BOOK
+  ARTICLE
+  VIDEO
+  COURSE
+  CHECKLIST
+  POLICY
+}
+
+enum LearningEnrollmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  COMPLETED
+  EXPIRED
+}
+
+enum MobileAppType {
+  PATIENT
+  STAFF
+}
+
+enum MobilePlatform {
+  IOS
+  ANDROID
+  WEB
+}
+
+enum NotificationChannel {
+  EMAIL
+  SMS
+  ZALO
+  PUSH
+  IN_APP
+  PHONE
+}
+
+enum NotificationStatus {
+  DRAFT
+  SCHEDULED
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum ServiceCatalogStatus {
+  DRAFT
+  ACTIVE
+  RETIRED
+}
+
+enum TreatmentServiceStatus {
+  PLANNED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum ServiceCompensationPool {
+  DOCTOR
+  ASSISTANT
+}
+
+enum ServiceCompensationRole {
+  CONSULTANT
+  OPERATOR
+  CLINICAL_SUPPORT
+  ASSISTANT_PRIMARY
+  ASSISTANT_SECONDARY
+}
+
+enum CompensationAccrualStatus {
+  EARNED
+  APPROVED
+  PAID
+  VOID
+}
+
+model Organization {
+  id                             String                          @id @default(cuid())
+  name                           String
+  slug                           String?                         @unique
+  primaryDomain                  String?                         @unique
+  legalName                      String?
+  taxCode                        String?
+  locale                         String                          @default("vi-VN")
+  isDemo                         Boolean                         @default(false)
+  demoExpiresAt                  DateTime?
+  chains                         Chain[]
+  clinics                        Clinic[]
+  users                          User[]
+  userRoleAssignments            UserRoleAssignment[]
+  passwordResetTokens            PasswordResetToken[]
+  patients                       Patient[]
+  posts                          CommunityPost[]
+  staffProfiles                  StaffProfile[]
+  staffShifts                    StaffShift[]
+  attendanceLogs                 AttendanceLog[]
+  leaveRequests                  LeaveRequest[]
+  payrollRuns                    PayrollRun[]
+  payrollPolicies                PayrollPolicy[]
+  crmLeads                       CrmLead[]
+  crmCampaigns                   CrmCampaign[]
+  crmActivities                  CrmActivity[]
+  communicationThreads           CommunicationThread[]
+  inventoryItemGroups            InventoryItemGroup[]
+  inventoryTags                  InventoryTag[]
+  inventoryItemTags              InventoryItemTag[]
+  inventorySuppliers             InventorySupplier[]
+  inventoryItems                 InventoryItem[]
+  inventoryLots                  InventoryLot[]
+  inventoryMovements             InventoryMovement[]
+  purchaseOrders                 PurchaseOrder[]
+  equipmentAssets                EquipmentAsset[]
+  maintenanceTasks               MaintenanceTask[]
+  serviceCategories              ServiceCategory[]
+  serviceCatalogItems            ServiceCatalogItem[]
+  servicePrices                  ServicePrice[]
+  serviceSteps                   ServiceStep[]
+  serviceMaterials               ServiceMaterial[]
+  serviceMedications             ServiceMedication[]
+  serviceCompensationRules       ServiceCompensationRule[]
+  treatmentServices              TreatmentService[]
+  treatmentServiceProgressEvents TreatmentServiceProgressEvent[]
+  receipts                       Receipt[]
+  invoices                       Invoice[]
+  receiptAllocations             ReceiptAllocation[]
+  invoiceItems                   InvoiceItem[]
+  patientCreditBalances          PatientCreditBalance[]
+  paymentPlans                   PaymentPlan[]
+  compensationAccruals           CompensationAccrual[]
+  compensationAccrualLines       CompensationAccrualLine[]
+  medicationCatalog              MedicationCatalogItem[]
+  prescriptionTemplates          PrescriptionTemplate[]
+  prescriptions                  Prescription[]
+  formTemplates                  FormTemplate[]
+  patientForms                   PatientForm[]
+  patientFiles                   PatientFile[]
+  patientJourneyStates           PatientJourneyState[]
+  journeyComments                JourneyComment[]
+  workItems                      WorkItem[]
+  learningContents               LearningContent[]
+  learningEnrollments            LearningEnrollment[]
+  learningAssets                 LearningAsset[]
+  mobileDevices                  MobileDevice[]
+  notifications                  Notification[]
+  sourceCommissionPolicies       SourceCommissionPolicy[]
+  sourceCommissionAccruals       SourceCommissionAccrual[]
+  aiRuns                         AiRun[]
+  accountingCategories           AccountingCategory[]
+  accountingEntries              AccountingEntry[]
+  accountingBudgetTargets        AccountingBudgetTarget[]
+  documentSequences              DocumentSequence[]
+  auditLogs                      AuditLog[]
+  createdAt                      DateTime                        @default(now())
+  updatedAt                      DateTime                        @updatedAt
+
+  @@index([isDemo, demoExpiresAt])
+}
+
+model Chain {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  ownerId        String?
+  owner          User?        @relation("ChainOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  name           String
+  legalName      String?
+  brandName      String?
+  taxCode        String?
+  phone          String?
+  email          String?
+  website        String?
+  specialty      String       @default("DENTAL")
+  primaryColor   String?
+  logoUrl        String?
+  active         Boolean      @default(true)
+  clinics        Clinic[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([organizationId, active])
+  @@index([ownerId])
+}
+
+model Clinic {
+  id                             String                          @id @default(cuid())
+  organizationId                 String
+  organization                   Organization                    @relation(fields: [organizationId], references: [id])
+  chainId                        String?
+  chain                          Chain?                          @relation(fields: [chainId], references: [id])
+  name                           String
+  city                           String
+  address                        String
+  phone                          String?
+  active                         Boolean                         @default(true)
+  chairs                         Chair[]
+  users                          UserClinic[]
+  roleAssignments                UserRoleAssignment[]
+  patients                       Patient[]
+  appointments                   Appointment[]
+  invoices                       Invoice[]
+  posts                          CommunityPost[]
+  staffProfiles                  StaffProfile[]
+  staffShifts                    StaffShift[]
+  attendanceLogs                 AttendanceLog[]
+  leaveRequests                  LeaveRequest[]
+  payrollRuns                    PayrollRun[]
+  payrollPolicies                PayrollPolicy[]
+  crmLeads                       CrmLead[]
+  crmCampaigns                   CrmCampaign[]
+  crmActivities                  CrmActivity[]
+  communicationThreads           CommunicationThread[]
+  inventoryItems                 InventoryItem[]
+  inventoryLots                  InventoryLot[]
+  inventoryMovements             InventoryMovement[]
+  purchaseOrders                 PurchaseOrder[]
+  equipmentAssets                EquipmentAsset[]
+  maintenanceTasks               MaintenanceTask[]
+  servicePrices                  ServicePrice[]
+  treatmentServices              TreatmentService[]
+  treatmentServiceProgressEvents TreatmentServiceProgressEvent[]
+  receipts                       Receipt[]
+  receiptAllocations             ReceiptAllocation[]
+  invoiceItems                   InvoiceItem[]
+  patientCreditBalances          PatientCreditBalance[]
+  paymentPlans                   PaymentPlan[]
+  compensationAccruals           CompensationAccrual[]
+  compensationAccrualLines       CompensationAccrualLine[]
+  prescriptionTemplates          PrescriptionTemplate[]
+  prescriptions                  Prescription[]
+  formTemplates                  FormTemplate[]
+  patientForms                   PatientForm[]
+  patientFiles                   PatientFile[]
+  patientJourneyStates           PatientJourneyState[]
+  journeyComments                JourneyComment[]
+  workItems                      WorkItem[]
+  learningContents               LearningContent[]
+  learningEnrollments            LearningEnrollment[]
+  learningAssets                 LearningAsset[]
+  notifications                  Notification[]
+  sourceCommissionAccruals       SourceCommissionAccrual[]
+  aiRuns                         AiRun[]
+  accountingEntries              AccountingEntry[]
+  accountingBudgetTargets        AccountingBudgetTarget[]
+  documentSequences              DocumentSequence[]
+  createdAt                      DateTime                        @default(now())
+  updatedAt                      DateTime                        @updatedAt
+
+  @@unique([organizationId, name])
+  @@index([chainId])
+}
+
+model User {
+  id                                String                          @id @default(cuid())
+  organizationId                    String
+  organization                      Organization                    @relation(fields: [organizationId], references: [id])
+  email                             String                          @unique
+  fullName                          String
+  passwordHash                      String
+  role                              UserRole
+  phone                             String?
+  active                            Boolean                         @default(true)
+  operationalStatus                 String                          @default("READY")
+  operationalStatusUpdatedAt        DateTime?
+  mustChangePassword                Boolean                         @default(false)
+  passwordChangedAt                 DateTime?
+  lastLoginAt                       DateTime?
+  clinics                           UserClinic[]
+  roleAssignments                   UserRoleAssignment[]
+  sessions                          Session[]
+  passwordResetTokens               PasswordResetToken[]            @relation("UserPasswordResetTokens")
+  createdPasswordResetTokens        PasswordResetToken[]            @relation("PasswordResetTokenCreator")
+  appointments                      Appointment[]                   @relation("ProviderAppointments")
+  notes                             ClinicalNote[]
+  posts                             CommunityPost[]
+  comments                          PostComment[]
+  staffProfile                      StaffProfile?
+  createdTreatmentServices          TreatmentService[]              @relation("TreatmentServiceCreator")
+  performedTreatmentEvents          TreatmentServiceProgressEvent[] @relation("TreatmentProgressPerformer")
+  clinicalSupportTreatmentEvents    TreatmentServiceProgressEvent[] @relation("TreatmentProgressClinicalSupport")
+  primaryAssistantTreatmentEvents   TreatmentServiceProgressEvent[] @relation("TreatmentProgressAssistantPrimary")
+  secondaryAssistantTreatmentEvents TreatmentServiceProgressEvent[] @relation("TreatmentProgressAssistantSecondary")
+  ownedLeads                        CrmLead[]                       @relation("CrmLeadOwner")
+  crmActivities                     CrmActivity[]                   @relation("CrmActivityActor")
+  communicationMessages             CommunicationMessage[]          @relation("CommunicationMessageSender")
+  inventoryMovements                InventoryMovement[]             @relation("InventoryMovementUser")
+  prescriptionTemplates             PrescriptionTemplate[]          @relation("PrescriptionTemplateAuthor")
+  prescriptions                     Prescription[]                  @relation("PrescriptionPrescriber")
+  createdFormTemplates              FormTemplate[]                  @relation("FormTemplateCreator")
+  requestedPatientForms             PatientForm[]                   @relation("PatientFormRequester")
+  uploadedPatientFiles              PatientFile[]                   @relation("PatientFileUploader")
+  createdPaymentPlans               PaymentPlan[]                   @relation("PaymentPlanCreator")
+  updatedJourneyStates              PatientJourneyState[]           @relation("PatientJourneyStateUpdater")
+  authoredJourneyComments           JourneyComment[]                @relation("JourneyCommentAuthor")
+  assignedWorkItems                 WorkItem[]                      @relation("WorkItemAssignee")
+  createdWorkItems                  WorkItem[]                      @relation("WorkItemCreator")
+  completedWorkItems                WorkItem[]                      @relation("WorkItemCompleter")
+  authoredLearningContents          LearningContent[]               @relation("LearningContentAuthor")
+  learningEnrollments               LearningEnrollment[]            @relation("LearningEnrollmentUser")
+  assignedLearningEnrollments       LearningEnrollment[]            @relation("LearningEnrollmentAssigner")
+  uploadedLearningAssets            LearningAsset[]                 @relation("LearningAssetUploader")
+  compensationAccrualLines          CompensationAccrualLine[]       @relation("CompensationLineUser")
+  mobileDevices                     MobileDevice[]                  @relation("UserMobileDevices")
+  notifications                     Notification[]                  @relation("UserNotifications")
+  createdAiRuns                     AiRun[]                         @relation("AiRunActor")
+  createdAccountingEntries          AccountingEntry[]               @relation("AccountingEntryCreator")
+  ownedChains                       Chain[]                         @relation("ChainOwner")
+  auditLogs                         AuditLog[]
+  createdAt                         DateTime                        @default(now())
+  updatedAt                         DateTime                        @updatedAt
+}
+
+model UserRoleAssignment {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  clinicId       String?
+  clinic         Clinic?      @relation(fields: [clinicId], references: [id], onDelete: Cascade)
+  scopeKey       String       @default("GLOBAL")
+  role           UserRole
+  active         Boolean      @default(true)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([userId, role, scopeKey])
+  @@index([organizationId, role, active])
+  @@index([clinicId, role, active])
+}
+
+model PasswordResetToken {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  userId         String
+  user           User         @relation("UserPasswordResetTokens", fields: [userId], references: [id], onDelete: Cascade)
+  createdById    String?
+  createdBy      User?        @relation("PasswordResetTokenCreator", fields: [createdById], references: [id])
+  tokenHash      String       @unique
+  purpose        String       @default("PASSWORD_RESET")
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+  @@index([userId, expiresAt])
+}
+
+model Session {
+  id             String   @id @default(cuid())
+  userId         String
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash      String   @unique
+  activeClinicId String?
+  expiresAt      DateTime
+  createdAt      DateTime @default(now())
+  lastSeenAt     DateTime @default(now())
+
+  @@index([userId, expiresAt])
+}
+
+model UserClinic {
+  userId   String
+  clinicId String
+  user     User   @relation(fields: [userId], references: [id])
+  clinic   Clinic @relation(fields: [clinicId], references: [id])
+
+  @@id([userId, clinicId])
+}
+
+model Chair {
+  id                         String        @id @default(cuid())
+  clinicId                   String
+  clinic                     Clinic        @relation(fields: [clinicId], references: [id])
+  name                       String
+  specialty                  String?
+  active                     Boolean       @default(true)
+  operationalStatus          String        @default("READY")
+  operationalStatusUpdatedAt DateTime?
+  appointments               Appointment[]
+
+  @@unique([clinicId, name])
+}
+
+model Patient {
+  id                       String                    @id @default(cuid())
+  organizationId           String
+  organization             Organization              @relation(fields: [organizationId], references: [id])
+  clinicId                 String
+  clinic                   Clinic                    @relation(fields: [clinicId], references: [id])
+  fullName                 String
+  dateOfBirth              DateTime?
+  phone                    String
+  email                    String?
+  gender                   String?
+  visitReason              String?
+  leadSource               String                    @default("WALK_IN")
+  nationalId               String?
+  address                  String?
+  guardianName             String?
+  medicalAlerts            String[]
+  appointments             Appointment[]
+  consents                 PatientConsent[]
+  notes                    ClinicalNote[]
+  treatmentPlans           TreatmentPlan[]
+  treatmentServices        TreatmentService[]
+  invoices                 Invoice[]
+  receipts                 Receipt[]
+  receiptAllocations       ReceiptAllocation[]
+  invoiceItems             InvoiceItem[]
+  creditBalance            PatientCreditBalance?
+  paymentPlans             PaymentPlan[]
+  crmLeads                 CrmLead[]
+  crmActivities            CrmActivity[]
+  communicationThreads     CommunicationThread[]
+  prescriptions            Prescription[]
+  forms                    PatientForm[]
+  files                    PatientFile[]
+  journeyState             PatientJourneyState?
+  journeyComments          JourneyComment[]
+  workItems                WorkItem[]
+  mobileDevices            MobileDevice[]            @relation("PatientMobileDevices")
+  notifications            Notification[]            @relation("PatientNotifications")
+  sourceCommissionAccruals SourceCommissionAccrual[]
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+
+  @@unique([organizationId, phone])
+}
+
+model PatientConsent {
+  id        String        @id @default(cuid())
+  patientId String
+  patient   Patient       @relation(fields: [patientId], references: [id])
+  status    ConsentStatus
+  purpose   String
+  channel   String
+  signedAt  DateTime?
+  expiresAt DateTime?
+  version   String
+  createdAt DateTime      @default(now())
+}
+
+model Appointment {
+  id         String            @id @default(cuid())
+  clinicId   String
+  clinic     Clinic            @relation(fields: [clinicId], references: [id])
+  patientId  String
+  patient    Patient           @relation(fields: [patientId], references: [id])
+  providerId String
+  provider   User              @relation("ProviderAppointments", fields: [providerId], references: [id])
+  chairId    String?
+  chair      Chair?            @relation(fields: [chairId], references: [id])
+  status     AppointmentStatus @default(REQUESTED)
+  startsAt   DateTime
+  endsAt     DateTime
+  reason     String
+  source     String            @default("staff")
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  @@index([clinicId, startsAt])
+}
+
+model ClinicalNote {
+  id         String    @id @default(cuid())
+  patientId  String
+  patient    Patient   @relation(fields: [patientId], references: [id])
+  authorId   String
+  author     User      @relation(fields: [authorId], references: [id])
+  subjective String?
+  objective  String?
+  assessment String?
+  plan       String?
+  lockedAt   DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+}
+
+model TreatmentPlan {
+  id          String             @id @default(cuid())
+  patientId   String
+  patient     Patient            @relation(fields: [patientId], references: [id])
+  title       String
+  status      TreatmentStatus    @default(DRAFT)
+  totalAmount Decimal            @db.Decimal(12, 2)
+  patientDue  Decimal            @db.Decimal(12, 2)
+  phases      TreatmentPhase[]
+  services    TreatmentService[]
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+}
+
+model TreatmentPhase {
+  id              String        @id @default(cuid())
+  treatmentPlanId String
+  treatmentPlan   TreatmentPlan @relation(fields: [treatmentPlanId], references: [id])
+  name            String
+  sequence        Int
+  procedures      String[]
+  estimatedAmount Decimal       @db.Decimal(12, 2)
+  completedAt     DateTime?
+}
+
+model Invoice {
+  id                 String              @id @default(cuid())
+  organizationId     String
+  organization       Organization        @relation(fields: [organizationId], references: [id])
+  clinicId           String
+  clinic             Clinic              @relation(fields: [clinicId], references: [id])
+  patientId          String
+  patient            Patient             @relation(fields: [patientId], references: [id])
+  invoiceNo          String
+  status             InvoiceStatus       @default(OPEN)
+  amount             Decimal             @db.Decimal(12, 2)
+  paidAmount         Decimal             @db.Decimal(12, 2)
+  dueDate            DateTime
+  payments           Payment[]
+  items              InvoiceItem[]
+  receiptAllocations ReceiptAllocation[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@unique([organizationId, invoiceNo])
+  @@index([organizationId, clinicId])
+}
+
+model Payment {
+  id        String   @id @default(cuid())
+  invoiceId String
+  invoice   Invoice  @relation(fields: [invoiceId], references: [id])
+  amount    Decimal  @db.Decimal(12, 2)
+  method    String
+  reference String?
+  paidAt    DateTime @default(now())
+}
+
+model InvoiceItem {
+  id                 String              @id @default(cuid())
+  organizationId     String
+  organization       Organization        @relation(fields: [organizationId], references: [id])
+  clinicId           String
+  clinic             Clinic              @relation(fields: [clinicId], references: [id])
+  patientId          String
+  patient            Patient             @relation(fields: [patientId], references: [id])
+  invoiceId          String
+  invoice            Invoice             @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  treatmentServiceId String?
+  treatmentService   TreatmentService?   @relation(fields: [treatmentServiceId], references: [id])
+  description        String
+  quantity           Decimal             @default(1) @db.Decimal(8, 2)
+  unitPrice          Decimal             @db.Decimal(12, 2)
+  amount             Decimal             @db.Decimal(12, 2)
+  receiptAllocations ReceiptAllocation[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@index([invoiceId])
+  @@index([treatmentServiceId])
+  @@index([patientId, createdAt])
+  @@index([clinicId, createdAt])
+}
+
+model Receipt {
+  id                       String                    @id @default(cuid())
+  organizationId           String
+  organization             Organization              @relation(fields: [organizationId], references: [id])
+  clinicId                 String
+  clinic                   Clinic                    @relation(fields: [clinicId], references: [id])
+  patientId                String
+  patient                  Patient                   @relation(fields: [patientId], references: [id])
+  receiptNo                String
+  amount                   Decimal                   @db.Decimal(12, 2)
+  allocatedAmount          Decimal                   @default(0) @db.Decimal(12, 2)
+  unallocatedAmount        Decimal                   @default(0) @db.Decimal(12, 2)
+  method                   String
+  reference                String?
+  note                     String?
+  receivedAt               DateTime                  @default(now())
+  allocations              ReceiptAllocation[]
+  sourceCommissionAccruals SourceCommissionAccrual[]
+  createdAt                DateTime                  @default(now())
+  updatedAt                DateTime                  @updatedAt
+
+  @@unique([organizationId, receiptNo])
+  @@index([clinicId, receivedAt])
+  @@index([patientId, receivedAt])
+}
+
+model ReceiptAllocation {
+  id                 String            @id @default(cuid())
+  organizationId     String
+  organization       Organization      @relation(fields: [organizationId], references: [id])
+  clinicId           String
+  clinic             Clinic            @relation(fields: [clinicId], references: [id])
+  patientId          String
+  patient            Patient           @relation(fields: [patientId], references: [id])
+  receiptId          String
+  receipt            Receipt           @relation(fields: [receiptId], references: [id], onDelete: Cascade)
+  invoiceId          String?
+  invoice            Invoice?          @relation(fields: [invoiceId], references: [id])
+  invoiceItemId      String?
+  invoiceItem        InvoiceItem?      @relation(fields: [invoiceItemId], references: [id])
+  treatmentServiceId String?
+  treatmentService   TreatmentService? @relation(fields: [treatmentServiceId], references: [id])
+  amount             Decimal           @db.Decimal(12, 2)
+  note               String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@index([receiptId])
+  @@index([invoiceId])
+  @@index([invoiceItemId])
+  @@index([treatmentServiceId])
+  @@index([patientId, createdAt])
+}
+
+model PatientCreditBalance {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  clinicId       String
+  clinic         Clinic       @relation(fields: [clinicId], references: [id])
+  patientId      String       @unique
+  patient        Patient      @relation(fields: [patientId], references: [id])
+  amount         Decimal      @default(0) @db.Decimal(12, 2)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([clinicId])
+}
+
+model PaymentPlan {
+  id             String                   @id @default(cuid())
+  organizationId String
+  organization   Organization             @relation(fields: [organizationId], references: [id])
+  clinicId       String
+  clinic         Clinic                   @relation(fields: [clinicId], references: [id])
+  patientId      String
+  patient        Patient                  @relation(fields: [patientId], references: [id])
+  createdById    String?
+  createdBy      User?                    @relation("PaymentPlanCreator", fields: [createdById], references: [id])
+  planNo         String
+  status         String                   @default("ACTIVE")
+  totalAmount    Decimal                  @db.Decimal(12, 2)
+  note           String?
+  installments   PaymentPlanInstallment[]
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  @@unique([organizationId, planNo])
+  @@index([clinicId, status])
+  @@index([patientId, status])
+}
+
+model PaymentPlanInstallment {
+  id             String      @id @default(cuid())
+  paymentPlanId  String
+  paymentPlan    PaymentPlan @relation(fields: [paymentPlanId], references: [id], onDelete: Cascade)
+  sequence       Int
+  amount         Decimal     @db.Decimal(12, 2)
+  dueAt          DateTime
+  status         String      @default("SCHEDULED")
+  paidAt         DateTime?
+  notificationId String?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  @@unique([paymentPlanId, sequence])
+  @@index([dueAt, status])
+}
+
+model CommunityPost {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?       @relation(fields: [clinicId], references: [id])
+  authorId       String
+  author         User          @relation(fields: [authorId], references: [id])
+  type           PostType
+  title          String
+  body           String
+  tags           String[]
+  comments       PostComment[]
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+}
+
+model PostComment {
+  id        String        @id @default(cuid())
+  postId    String
+  post      CommunityPost @relation(fields: [postId], references: [id])
+  authorId  String
+  author    User          @relation(fields: [authorId], references: [id])
+  body      String
+  createdAt DateTime      @default(now())
+}
+
+model StaffProfile {
+  id                        String          @id @default(cuid())
+  organizationId            String
+  organization              Organization    @relation(fields: [organizationId], references: [id])
+  userId                    String          @unique
+  user                      User            @relation(fields: [userId], references: [id])
+  clinicId                  String?
+  clinic                    Clinic?         @relation(fields: [clinicId], references: [id])
+  employeeCode              String
+  title                     String?
+  department                String?
+  contractType              String          @default("FULL_TIME")
+  baseSalary                Decimal?        @db.Decimal(12, 2)
+  commissionRate            Decimal?        @db.Decimal(5, 2)
+  hireDate                  DateTime?
+  dateOfBirth               DateTime?
+  gender                    String?
+  avatarFileName            String?
+  avatarMimeType            String?
+  avatarSizeBytes           Int?
+  avatarStorageProvider     String?
+  avatarStorageKey          String?
+  avatarThumbnailMimeType   String?
+  avatarThumbnailStorageKey String?
+  active                    Boolean         @default(true)
+  shifts                    StaffShift[]
+  attendanceLogs            AttendanceLog[]
+  leaveRequests             LeaveRequest[]
+  payrollLines              PayrollLine[]
+  createdAt                 DateTime        @default(now())
+  updatedAt                 DateTime        @updatedAt
+
+  @@unique([organizationId, employeeCode])
+  @@index([clinicId])
+}
+
+model StaffShift {
+  id             String           @id @default(cuid())
+  organizationId String
+  organization   Organization     @relation(fields: [organizationId], references: [id])
+  clinicId       String
+  clinic         Clinic           @relation(fields: [clinicId], references: [id])
+  staffProfileId String
+  staffProfile   StaffProfile     @relation(fields: [staffProfileId], references: [id])
+  status         StaffShiftStatus @default(SCHEDULED)
+  roleOnShift    String?
+  startsAt       DateTime
+  endsAt         DateTime
+  notes          String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  @@index([clinicId, startsAt])
+  @@index([staffProfileId, startsAt])
+}
+
+model AttendanceLog {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  clinicId       String
+  clinic         Clinic        @relation(fields: [clinicId], references: [id])
+  staffProfileId String
+  staffProfile   StaffProfile  @relation(fields: [staffProfileId], references: [id])
+  clockInAt      DateTime
+  clockOutAt     DateTime?
+  outStatus      String?
+  source         MobileAppType @default(STAFF)
+  note           String?
+  adjusted       Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  @@index([clinicId, clockInAt])
+  @@index([staffProfileId, clockInAt])
+}
+
+model LeaveRequest {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?      @relation(fields: [clinicId], references: [id])
+  staffProfileId String
+  staffProfile   StaffProfile @relation(fields: [staffProfileId], references: [id])
+  leaveType      String
+  status         LeaveStatus  @default(REQUESTED)
+  startsAt       DateTime
+  endsAt         DateTime
+  hours          Decimal?     @db.Decimal(8, 2)
+  reason         String?
+  decisionNote   String?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, status])
+  @@index([staffProfileId, startsAt])
+}
+
+model PayrollRun {
+  id                   String                @id @default(cuid())
+  organizationId       String
+  organization         Organization          @relation(fields: [organizationId], references: [id])
+  clinicId             String?
+  clinic               Clinic?               @relation(fields: [clinicId], references: [id])
+  status               PayrollStatus         @default(DRAFT)
+  periodStart          DateTime
+  periodEnd            DateTime
+  grossAmount          Decimal               @default(0) @db.Decimal(12, 2)
+  deductionAmount      Decimal               @default(0) @db.Decimal(12, 2)
+  netAmount            Decimal               @default(0) @db.Decimal(12, 2)
+  generatedAt          DateTime              @default(now())
+  approvedAt           DateTime?
+  paidAt               DateTime?
+  lines                PayrollLine[]
+  compensationAccruals CompensationAccrual[]
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  @@index([organizationId, periodStart, periodEnd])
+  @@index([clinicId, periodStart])
+}
+
+model PayrollLine {
+  id                String                    @id @default(cuid())
+  payrollRunId      String
+  payrollRun        PayrollRun                @relation(fields: [payrollRunId], references: [id], onDelete: Cascade)
+  staffProfileId    String
+  staffProfile      StaffProfile              @relation(fields: [staffProfileId], references: [id])
+  employeeCode      String
+  baseAmount        Decimal                   @default(0) @db.Decimal(12, 2)
+  commissionAmount  Decimal                   @default(0) @db.Decimal(12, 2)
+  bonusAmount       Decimal                   @default(0) @db.Decimal(12, 2)
+  deductionAmount   Decimal                   @default(0) @db.Decimal(12, 2)
+  netAmount         Decimal                   @default(0) @db.Decimal(12, 2)
+  metrics           Json?
+  compensationLines CompensationAccrualLine[]
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  @@unique([payrollRunId, staffProfileId])
+}
+
+model PayrollPolicy {
+  id                   String       @id @default(cuid())
+  organizationId       String
+  organization         Organization @relation(fields: [organizationId], references: [id])
+  clinicId             String?
+  clinic               Clinic?      @relation(fields: [clinicId], references: [id])
+  scopeKey             String
+  name                 String
+  includeBaseSalary    Boolean      @default(true)
+  standardWorkdays     Int          @default(26)
+  taxPercent           Decimal      @default(0) @db.Decimal(5, 2)
+  insurancePercent     Decimal      @default(0) @db.Decimal(5, 2)
+  otherDeductionAmount Decimal      @default(0) @db.Decimal(12, 2)
+  roleOverrides        Json?
+  staffOverrides       Json?
+  active               Boolean      @default(true)
+  createdAt            DateTime     @default(now())
+  updatedAt            DateTime     @updatedAt
+
+  @@unique([organizationId, scopeKey])
+  @@index([clinicId])
+  @@index([organizationId, active])
+}
+
+model CrmLead {
+  id             String                @id @default(cuid())
+  organizationId String
+  organization   Organization          @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?               @relation(fields: [clinicId], references: [id])
+  patientId      String?
+  patient        Patient?              @relation(fields: [patientId], references: [id])
+  ownerId        String?
+  owner          User?                 @relation("CrmLeadOwner", fields: [ownerId], references: [id])
+  status         LeadStatus            @default(NEW)
+  source         String?
+  name           String
+  phone          String?
+  email          String?
+  campaignName   String?
+  nextFollowUpAt DateTime?
+  convertedAt    DateTime?
+  lostReason     String?
+  note           String?
+  activities     CrmActivity[]
+  threads        CommunicationThread[]
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+
+  @@index([organizationId, status])
+  @@index([clinicId, nextFollowUpAt])
+  @@index([patientId])
+}
+
+model SourceCommissionPolicy {
+  id             String                    @id @default(cuid())
+  organizationId String
+  organization   Organization              @relation(fields: [organizationId], references: [id])
+  source         String
+  name           String
+  ownerLabel     String?
+  ratePercent    Decimal                   @default(0) @db.Decimal(5, 2)
+  fixedAmount    Decimal                   @default(0) @db.Decimal(12, 2)
+  monthlyBudget  Decimal?                  @db.Decimal(12, 2)
+  trigger        String                    @default("COLLECTION_RECEIVED")
+  active         Boolean                   @default(true)
+  notes          String?
+  accruals       SourceCommissionAccrual[]
+  createdAt      DateTime                  @default(now())
+  updatedAt      DateTime                  @updatedAt
+
+  @@unique([organizationId, source])
+  @@index([organizationId, active])
+}
+
+model SourceCommissionAccrual {
+  id               String                 @id @default(cuid())
+  organizationId   String
+  organization     Organization           @relation(fields: [organizationId], references: [id])
+  clinicId         String
+  clinic           Clinic                 @relation(fields: [clinicId], references: [id])
+  patientId        String
+  patient          Patient                @relation(fields: [patientId], references: [id])
+  receiptId        String
+  receipt          Receipt                @relation(fields: [receiptId], references: [id])
+  policyId         String
+  policy           SourceCommissionPolicy @relation(fields: [policyId], references: [id])
+  source           String
+  baseAmount       Decimal                @db.Decimal(12, 2)
+  ratePercent      Decimal                @db.Decimal(5, 2)
+  fixedAmount      Decimal                @default(0) @db.Decimal(12, 2)
+  commissionAmount Decimal                @db.Decimal(12, 2)
+  status           String                 @default("EARNED")
+  earnedAt         DateTime               @default(now())
+  paidAt           DateTime?
+  notes            String?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@unique([receiptId, policyId])
+  @@index([organizationId, source, status])
+  @@index([clinicId, earnedAt])
+  @@index([patientId])
+}
+
+model CrmCampaign {
+  id             String              @id @default(cuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?             @relation(fields: [clinicId], references: [id])
+  code           String
+  name           String
+  channel        NotificationChannel
+  audience       String
+  status         String              @default("DRAFT")
+  scheduledAt    DateTime?
+  startedAt      DateTime?
+  endedAt        DateTime?
+  budgetAmount   Decimal?            @db.Decimal(12, 2)
+  metrics        Json?
+  activities     CrmActivity[]
+  notifications  Notification[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status])
+}
+
+model CrmActivity {
+  id             String               @id @default(cuid())
+  organizationId String
+  organization   Organization         @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?              @relation(fields: [clinicId], references: [id])
+  patientId      String?
+  patient        Patient?             @relation(fields: [patientId], references: [id])
+  leadId         String?
+  lead           CrmLead?             @relation(fields: [leadId], references: [id])
+  campaignId     String?
+  campaign       CrmCampaign?         @relation(fields: [campaignId], references: [id])
+  actorId        String?
+  actor          User?                @relation("CrmActivityActor", fields: [actorId], references: [id])
+  type           CrmActivityType
+  channel        NotificationChannel?
+  subject        String
+  body           String?
+  dueAt          DateTime?
+  completedAt    DateTime?
+  metadata       Json?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([organizationId, dueAt])
+  @@index([patientId])
+  @@index([leadId])
+}
+
+model CommunicationThread {
+  id             String                 @id @default(cuid())
+  organizationId String
+  organization   Organization           @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?                @relation(fields: [clinicId], references: [id])
+  patientId      String?
+  patient        Patient?               @relation(fields: [patientId], references: [id])
+  leadId         String?
+  lead           CrmLead?               @relation(fields: [leadId], references: [id])
+  channel        NotificationChannel
+  subject        String?
+  status         String                 @default("OPEN")
+  messages       CommunicationMessage[]
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([organizationId, updatedAt])
+  @@index([patientId])
+  @@index([leadId])
+}
+
+model CommunicationMessage {
+  id           String              @id @default(cuid())
+  threadId     String
+  thread       CommunicationThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  senderUserId String?
+  senderUser   User?               @relation("CommunicationMessageSender", fields: [senderUserId], references: [id])
+  direction    String
+  channel      NotificationChannel
+  body         String
+  attachments  String[]
+  externalId   String?
+  sentAt       DateTime?
+  readAt       DateTime?
+  createdAt    DateTime            @default(now())
+
+  @@index([threadId, createdAt])
+}
+
+model InventorySupplier {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  code           String
+  name           String
+  taxCode        String?
+  phone          String?
+  email          String?
+  address        String?
+  active         Boolean         @default(true)
+  items          InventoryItem[]
+  purchaseOrders PurchaseOrder[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([organizationId, code])
+}
+
+model InventoryItem {
+  id                 String              @id @default(cuid())
+  organizationId     String
+  organization       Organization        @relation(fields: [organizationId], references: [id])
+  clinicId           String?
+  clinic             Clinic?             @relation(fields: [clinicId], references: [id])
+  supplierId         String?
+  supplier           InventorySupplier?  @relation(fields: [supplierId], references: [id])
+  groupId            String?
+  group              InventoryItemGroup? @relation(fields: [groupId], references: [id])
+  code               String
+  sku                String?
+  name               String
+  category           String
+  unit               String
+  minimumStock       Decimal             @default(0) @db.Decimal(12, 2)
+  onHandQuantity     Decimal             @default(0) @db.Decimal(12, 2)
+  averageUnitCost    Decimal?            @db.Decimal(12, 2)
+  lotTracked         Boolean             @default(false)
+  active             Boolean             @default(true)
+  lots               InventoryLot[]
+  movements          InventoryMovement[]
+  tagLinks           InventoryItemTag[]
+  purchaseOrderLines PurchaseOrderLine[]
+  serviceMaterials   ServiceMaterial[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([clinicId, category])
+  @@index([supplierId])
+  @@index([groupId])
+}
+
+model InventoryItemGroup {
+  id             String          @id @default(cuid())
+  organizationId String
+  organization   Organization    @relation(fields: [organizationId], references: [id])
+  code           String
+  name           String
+  sortOrder      Int             @default(0)
+  active         Boolean         @default(true)
+  items          InventoryItem[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([organizationId, active, sortOrder])
+}
+
+model InventoryTag {
+  id             String             @id @default(cuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  code           String
+  name           String
+  color          String?
+  sortOrder      Int                @default(0)
+  active         Boolean            @default(true)
+  itemLinks      InventoryItemTag[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([organizationId, code])
+  @@unique([organizationId, name])
+  @@index([organizationId, active, sortOrder])
+}
+
+model InventoryItemTag {
+  id             String        @id @default(cuid())
+  organizationId String
+  organization   Organization  @relation(fields: [organizationId], references: [id])
+  itemId         String
+  item           InventoryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  tagId          String
+  tag            InventoryTag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  createdAt      DateTime      @default(now())
+
+  @@unique([itemId, tagId])
+  @@index([organizationId, tagId])
+  @@index([organizationId, itemId])
+}
+
+model InventoryLot {
+  id             String              @id @default(cuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?             @relation(fields: [clinicId], references: [id])
+  itemId         String
+  item           InventoryItem       @relation(fields: [itemId], references: [id])
+  lotNo          String
+  expiresAt      DateTime?
+  receivedAt     DateTime            @default(now())
+  quantityOnHand Decimal             @default(0) @db.Decimal(12, 2)
+  movements      InventoryMovement[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([itemId, lotNo])
+  @@index([clinicId, expiresAt])
+}
+
+model InventoryMovement {
+  id             String                @id @default(cuid())
+  organizationId String
+  organization   Organization          @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?               @relation(fields: [clinicId], references: [id])
+  itemId         String
+  item           InventoryItem         @relation(fields: [itemId], references: [id])
+  lotId          String?
+  lot            InventoryLot?         @relation(fields: [lotId], references: [id])
+  performedById  String?
+  performedBy    User?                 @relation("InventoryMovementUser", fields: [performedById], references: [id])
+  type           InventoryMovementType
+  quantity       Decimal               @db.Decimal(12, 2)
+  unitCost       Decimal?              @db.Decimal(12, 2)
+  referenceType  String?
+  referenceId    String?
+  note           String?
+  createdAt      DateTime              @default(now())
+
+  @@index([clinicId, createdAt])
+  @@index([itemId, createdAt])
+}
+
+model PurchaseOrder {
+  id             String              @id @default(cuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?             @relation(fields: [clinicId], references: [id])
+  supplierId     String
+  supplier       InventorySupplier   @relation(fields: [supplierId], references: [id])
+  poNo           String
+  status         String              @default("DRAFT")
+  orderedAt      DateTime?
+  expectedAt     DateTime?
+  receivedAt     DateTime?
+  totalAmount    Decimal             @default(0) @db.Decimal(12, 2)
+  lines          PurchaseOrderLine[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([organizationId, poNo])
+  @@index([clinicId, status])
+}
+
+model PurchaseOrderLine {
+  id               String        @id @default(cuid())
+  purchaseOrderId  String
+  purchaseOrder    PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+  itemId           String
+  item             InventoryItem @relation(fields: [itemId], references: [id])
+  quantity         Decimal       @db.Decimal(12, 2)
+  unitCost         Decimal       @db.Decimal(12, 2)
+  receivedQuantity Decimal       @default(0) @db.Decimal(12, 2)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  @@unique([purchaseOrderId, itemId])
+}
+
+model EquipmentAsset {
+  id               String            @id @default(cuid())
+  organizationId   String
+  organization     Organization      @relation(fields: [organizationId], references: [id])
+  clinicId         String?
+  clinic           Clinic?           @relation(fields: [clinicId], references: [id])
+  code             String
+  name             String
+  category         String
+  serialNo         String?
+  purchasedAt      DateTime?
+  cost             Decimal?          @db.Decimal(12, 2)
+  warrantyEndsAt   DateTime?
+  status           AssetStatus       @default(ACTIVE)
+  maintenanceTasks MaintenanceTask[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([clinicId, status])
+}
+
+model MaintenanceTask {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?        @relation(fields: [clinicId], references: [id])
+  assetId        String
+  asset          EquipmentAsset @relation(fields: [assetId], references: [id])
+  title          String
+  dueAt          DateTime
+  completedAt    DateTime?
+  cost           Decimal?       @db.Decimal(12, 2)
+  notes          String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@index([clinicId, dueAt])
+  @@index([assetId, dueAt])
+}
+
+model ServiceCategory {
+  id             String               @id @default(cuid())
+  organizationId String
+  organization   Organization         @relation(fields: [organizationId], references: [id])
+  code           String
+  name           String
+  nameEn         String?
+  description    String?
+  sortOrder      Int                  @default(0)
+  active         Boolean              @default(true)
+  services       ServiceCatalogItem[]
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([organizationId, active])
+}
+
+model ServiceCatalogItem {
+  id                        String                    @id @default(cuid())
+  organizationId            String
+  organization              Organization              @relation(fields: [organizationId], references: [id])
+  categoryId                String?
+  category                  ServiceCategory?          @relation(fields: [categoryId], references: [id])
+  code                      String
+  name                      String
+  nameEn                    String?
+  description               String?
+  defaultCompensationRuleId String?
+  defaultCompensationRule   ServiceCompensationRule?  @relation("DefaultServiceCompensationRule", fields: [defaultCompensationRuleId], references: [id])
+  status                    ServiceCatalogStatus      @default(ACTIVE)
+  defaultPrice              Decimal                   @default(0) @db.Decimal(12, 2)
+  defaultDurationMinutes    Int?
+  targetMode                String                    @default("TOOTH")
+  billable                  Boolean                   @default(true)
+  taxable                   Boolean                   @default(false)
+  consentRequired           Boolean                   @default(false)
+  clinicalTemplate          String?
+  version                   String                    @default("1")
+  steps                     ServiceStep[]
+  prices                    ServicePrice[]
+  materials                 ServiceMaterial[]
+  medications               ServiceMedication[]
+  compensationRules         ServiceCompensationRule[] @relation("ServiceSpecificCompensationRules")
+  treatmentServices         TreatmentService[]
+  createdAt                 DateTime                  @default(now())
+  updatedAt                 DateTime                  @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([organizationId, status])
+  @@index([categoryId])
+  @@index([defaultCompensationRuleId])
+}
+
+model ServiceStep {
+  id              String             @id @default(cuid())
+  organizationId  String
+  organization    Organization       @relation(fields: [organizationId], references: [id])
+  serviceId       String
+  service         ServiceCatalogItem @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  sequence        Int
+  name            String
+  description     String?
+  expectedMinutes Int?
+  defaultProgress Int?
+  roleHint        String?
+  required        Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@unique([serviceId, sequence])
+  @@index([organizationId])
+}
+
+model ServicePrice {
+  id             String             @id @default(cuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?            @relation(fields: [clinicId], references: [id])
+  serviceId      String
+  service        ServiceCatalogItem @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  price          Decimal            @db.Decimal(12, 2)
+  currency       String             @default("VND")
+  version        String             @default("1")
+  effectiveFrom  DateTime           @default(now())
+  effectiveTo    DateTime?
+  active         Boolean            @default(true)
+  note           String?
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([clinicId, active])
+  @@index([serviceId, active])
+  @@index([organizationId, effectiveFrom])
+}
+
+model ServiceMaterial {
+  id              String             @id @default(cuid())
+  organizationId  String
+  organization    Organization       @relation(fields: [organizationId], references: [id])
+  serviceId       String
+  service         ServiceCatalogItem @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  inventoryItemId String?
+  inventoryItem   InventoryItem?     @relation(fields: [inventoryItemId], references: [id])
+  itemCode        String?
+  name            String
+  quantity        Decimal?           @db.Decimal(12, 2)
+  unit            String?
+  required        Boolean            @default(false)
+  note            String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@index([serviceId])
+  @@index([inventoryItemId])
+}
+
+model ServiceMedication {
+  id             String                 @id @default(cuid())
+  organizationId String
+  organization   Organization           @relation(fields: [organizationId], references: [id])
+  serviceId      String
+  service        ServiceCatalogItem     @relation(fields: [serviceId], references: [id], onDelete: Cascade)
+  medicationId   String?
+  medication     MedicationCatalogItem? @relation(fields: [medicationId], references: [id])
+  drugName       String
+  timing         String?
+  instructions   String?
+  required       Boolean                @default(false)
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  @@index([serviceId])
+  @@index([medicationId])
+}
+
+model ServiceCompensationRule {
+  id                 String                        @id @default(cuid())
+  organizationId     String
+  organization       Organization                  @relation(fields: [organizationId], references: [id])
+  serviceId          String?
+  service            ServiceCatalogItem?           @relation("ServiceSpecificCompensationRules", fields: [serviceId], references: [id], onDelete: Cascade)
+  code               String
+  name               String
+  description        String?
+  version            String                        @default("1")
+  active             Boolean                       @default(true)
+  effectiveFrom      DateTime                      @default(now())
+  effectiveTo        DateTime?
+  defaultForServices ServiceCatalogItem[]          @relation("DefaultServiceCompensationRule")
+  treatmentServices  TreatmentService[]            @relation("TreatmentServiceCompensationRule")
+  pools              ServiceCompensationPoolRule[]
+  accruals           CompensationAccrual[]
+  createdAt          DateTime                      @default(now())
+  updatedAt          DateTime                      @updatedAt
+
+  @@unique([organizationId, code, version])
+  @@index([organizationId, active])
+  @@index([serviceId, active])
+}
+
+model ServiceCompensationPoolRule {
+  id               String                     @id @default(cuid())
+  ruleId           String
+  rule             ServiceCompensationRule    @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  pool             ServiceCompensationPool
+  percentOfService Decimal                    @default(0) @db.Decimal(5, 2)
+  shares           ServiceCompensationShare[]
+  createdAt        DateTime                   @default(now())
+  updatedAt        DateTime                   @updatedAt
+
+  @@unique([ruleId, pool])
+}
+
+model ServiceCompensationShare {
+  id           String                      @id @default(cuid())
+  poolRuleId   String
+  poolRule     ServiceCompensationPoolRule @relation(fields: [poolRuleId], references: [id], onDelete: Cascade)
+  role         ServiceCompensationRole
+  sharePercent Decimal                     @default(0) @db.Decimal(5, 2)
+  fallbackRole ServiceCompensationRole?
+  required     Boolean                     @default(false)
+  createdAt    DateTime                    @default(now())
+  updatedAt    DateTime                    @updatedAt
+
+  @@unique([poolRuleId, role])
+}
+
+model TreatmentService {
+  id                      String                          @id @default(cuid())
+  organizationId          String
+  organization            Organization                    @relation(fields: [organizationId], references: [id])
+  clinicId                String
+  clinic                  Clinic                          @relation(fields: [clinicId], references: [id])
+  patientId               String
+  patient                 Patient                         @relation(fields: [patientId], references: [id])
+  treatmentPlanId         String?
+  treatmentPlan           TreatmentPlan?                  @relation(fields: [treatmentPlanId], references: [id])
+  serviceCatalogItemId    String?
+  serviceCatalogItem      ServiceCatalogItem?             @relation(fields: [serviceCatalogItemId], references: [id])
+  compensationRuleId      String?
+  compensationRule        ServiceCompensationRule?        @relation("TreatmentServiceCompensationRule", fields: [compensationRuleId], references: [id])
+  compensationRuleCode    String?
+  compensationRuleName    String?
+  compensationRuleVersion String?
+  createdById             String
+  createdBy               User                            @relation("TreatmentServiceCreator", fields: [createdById], references: [id])
+  serviceCode             String
+  serviceName             String
+  targetSummary           String?
+  teeth                   String[]
+  status                  TreatmentServiceStatus          @default(PLANNED)
+  finalPrice              Decimal                         @db.Decimal(12, 2)
+  currentProgressPercent  Decimal                         @default(0) @db.Decimal(5, 2)
+  currentStepSequence     Int?
+  progressEvents          TreatmentServiceProgressEvent[]
+  invoiceItems            InvoiceItem[]
+  receiptAllocations      ReceiptAllocation[]
+  compensationAccruals    CompensationAccrual[]
+  createdAt               DateTime                        @default(now())
+  updatedAt               DateTime                        @updatedAt
+
+  @@index([clinicId, status])
+  @@index([patientId, createdAt])
+  @@index([serviceCatalogItemId])
+  @@index([compensationRuleId])
+  @@index([createdById])
+}
+
+model TreatmentServiceProgressEvent {
+  id                   String               @id @default(cuid())
+  organizationId       String
+  organization         Organization         @relation(fields: [organizationId], references: [id])
+  clinicId             String
+  clinic               Clinic               @relation(fields: [clinicId], references: [id])
+  treatmentServiceId   String
+  treatmentService     TreatmentService     @relation(fields: [treatmentServiceId], references: [id], onDelete: Cascade)
+  performedById        String
+  performedBy          User                 @relation("TreatmentProgressPerformer", fields: [performedById], references: [id])
+  clinicalSupportId    String?
+  clinicalSupport      User?                @relation("TreatmentProgressClinicalSupport", fields: [clinicalSupportId], references: [id])
+  assistantPrimaryId   String?
+  assistantPrimary     User?                @relation("TreatmentProgressAssistantPrimary", fields: [assistantPrimaryId], references: [id])
+  assistantSecondaryId String?
+  assistantSecondary   User?                @relation("TreatmentProgressAssistantSecondary", fields: [assistantSecondaryId], references: [id])
+  fromProgressPercent  Decimal              @db.Decimal(5, 2)
+  toProgressPercent    Decimal              @db.Decimal(5, 2)
+  progressDeltaPercent Decimal              @db.Decimal(5, 2)
+  fromStepSequence     Int?
+  toStepSequence       Int?
+  note                 String?
+  occurredAt           DateTime             @default(now())
+  compensationAccrual  CompensationAccrual?
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  @@index([clinicId, occurredAt])
+  @@index([treatmentServiceId, occurredAt])
+  @@index([performedById, occurredAt])
+}
+
+model CompensationAccrual {
+  id                    String                        @id @default(cuid())
+  organizationId        String
+  organization          Organization                  @relation(fields: [organizationId], references: [id])
+  clinicId              String
+  clinic                Clinic                        @relation(fields: [clinicId], references: [id])
+  treatmentServiceId    String
+  treatmentService      TreatmentService              @relation(fields: [treatmentServiceId], references: [id], onDelete: Cascade)
+  progressEventId       String                        @unique
+  progressEvent         TreatmentServiceProgressEvent @relation(fields: [progressEventId], references: [id], onDelete: Cascade)
+  ruleId                String?
+  rule                  ServiceCompensationRule?      @relation(fields: [ruleId], references: [id])
+  ruleCode              String?
+  ruleName              String?
+  ruleVersion           String?
+  ruleSnapshot          Json?
+  payrollRunId          String?
+  payrollRun            PayrollRun?                   @relation(fields: [payrollRunId], references: [id])
+  status                CompensationAccrualStatus     @default(EARNED)
+  serviceAmount         Decimal                       @db.Decimal(12, 2)
+  earnedProgressPercent Decimal                       @db.Decimal(5, 2)
+  doctorPoolAmount      Decimal                       @default(0) @db.Decimal(12, 2)
+  assistantPoolAmount   Decimal                       @default(0) @db.Decimal(12, 2)
+  totalAmount           Decimal                       @default(0) @db.Decimal(12, 2)
+  lines                 CompensationAccrualLine[]
+  createdAt             DateTime                      @default(now())
+  updatedAt             DateTime                      @updatedAt
+
+  @@index([clinicId, status])
+  @@index([treatmentServiceId])
+  @@index([payrollRunId])
+}
+
+model CompensationAccrualLine {
+  id                   String                   @id @default(cuid())
+  organizationId       String
+  organization         Organization             @relation(fields: [organizationId], references: [id])
+  clinicId             String
+  clinic               Clinic                   @relation(fields: [clinicId], references: [id])
+  accrualId            String
+  accrual              CompensationAccrual      @relation(fields: [accrualId], references: [id], onDelete: Cascade)
+  userId               String
+  user                 User                     @relation("CompensationLineUser", fields: [userId], references: [id])
+  payrollLineId        String?
+  payrollLine          PayrollLine?             @relation(fields: [payrollLineId], references: [id])
+  pool                 ServiceCompensationPool
+  role                 ServiceCompensationRole
+  sharePercent         Decimal                  @db.Decimal(5, 2)
+  amount               Decimal                  @db.Decimal(12, 2)
+  resolvedFromFallback Boolean                  @default(false)
+  sourceRole           ServiceCompensationRole?
+  note                 String?
+  createdAt            DateTime                 @default(now())
+  updatedAt            DateTime                 @updatedAt
+
+  @@index([clinicId, createdAt])
+  @@index([userId, createdAt])
+  @@index([payrollLineId])
+}
+
+model MedicationCatalogItem {
+  id                 String                     @id @default(cuid())
+  organizationId     String
+  organization       Organization               @relation(fields: [organizationId], references: [id])
+  code               String
+  genericName        String
+  brandName          String?
+  strength           String?
+  form               String?
+  defaultSig         String?
+  defaultDose        String?
+  route              String?
+  frequency          String?
+  warnings           String[]
+  active             Boolean                    @default(true)
+  serviceMedications ServiceMedication[]
+  templateItems      PrescriptionTemplateItem[]
+  prescriptionItems  PrescriptionItem[]
+  createdAt          DateTime                   @default(now())
+  updatedAt          DateTime                   @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([organizationId, genericName])
+}
+
+model PrescriptionTemplate {
+  id             String                     @id @default(cuid())
+  organizationId String
+  organization   Organization               @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?                    @relation(fields: [clinicId], references: [id])
+  createdById    String?
+  createdBy      User?                      @relation("PrescriptionTemplateAuthor", fields: [createdById], references: [id])
+  code           String
+  name           String
+  diagnosis      String?
+  instructions   String?
+  active         Boolean                    @default(true)
+  items          PrescriptionTemplateItem[]
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([clinicId])
+}
+
+model PrescriptionTemplateItem {
+  id           String                 @id @default(cuid())
+  templateId   String
+  template     PrescriptionTemplate   @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  medicationId String?
+  medication   MedicationCatalogItem? @relation(fields: [medicationId], references: [id])
+  drugName     String
+  sig          String
+  quantity     String?
+  refills      Int                    @default(0)
+  durationDays Int?
+  instructions String?
+
+  @@index([templateId])
+}
+
+model Prescription {
+  id             String             @id @default(cuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  clinicId       String
+  clinic         Clinic             @relation(fields: [clinicId], references: [id])
+  patientId      String
+  patient        Patient            @relation(fields: [patientId], references: [id])
+  prescriberId   String
+  prescriber     User               @relation("PrescriptionPrescriber", fields: [prescriberId], references: [id])
+  prescriptionNo String             @unique
+  status         PrescriptionStatus @default(DRAFT)
+  diagnosis      String?
+  notes          String?
+  signedAt       DateTime?
+  printedAt      DateTime?
+  cancelledAt    DateTime?
+  items          PrescriptionItem[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@index([clinicId, createdAt])
+  @@index([patientId, createdAt])
+}
+
+model PrescriptionItem {
+  id             String                 @id @default(cuid())
+  prescriptionId String
+  prescription   Prescription           @relation(fields: [prescriptionId], references: [id], onDelete: Cascade)
+  medicationId   String?
+  medication     MedicationCatalogItem? @relation(fields: [medicationId], references: [id])
+  drugName       String
+  strength       String?
+  sig            String
+  quantity       String?
+  refills        Int                    @default(0)
+  durationDays   Int?
+  instructions   String?
+
+  @@index([prescriptionId])
+}
+
+model FormTemplate {
+  id                String           @id @default(cuid())
+  organizationId    String
+  organization      Organization     @relation(fields: [organizationId], references: [id])
+  clinicId          String?
+  clinic            Clinic?          @relation(fields: [clinicId], references: [id])
+  createdById       String?
+  createdBy         User?            @relation("FormTemplateCreator", fields: [createdById], references: [id])
+  type              FormTemplateType
+  code              String
+  name              String
+  version           String
+  schema            Json
+  body              String?
+  requiresSignature Boolean          @default(false)
+  active            Boolean          @default(true)
+  forms             PatientForm[]
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@unique([organizationId, code, version])
+  @@index([clinicId, type])
+}
+
+model PatientForm {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?           @relation(fields: [clinicId], references: [id])
+  patientId      String
+  patient        Patient           @relation(fields: [patientId], references: [id])
+  templateId     String
+  template       FormTemplate      @relation(fields: [templateId], references: [id])
+  requestedById  String?
+  requestedBy    User?             @relation("PatientFormRequester", fields: [requestedById], references: [id])
+  formNo         String            @unique
+  status         PatientFormStatus @default(DRAFT)
+  responses      Json?
+  signatureUrl   String?
+  attachments    String[]
+  sentAt         DateTime?
+  completedAt    DateTime?
+  expiresAt      DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  @@index([patientId, status])
+  @@index([clinicId, status])
+}
+
+model PatientFile {
+  id                  String       @id @default(cuid())
+  organizationId      String
+  organization        Organization @relation(fields: [organizationId], references: [id])
+  clinicId            String
+  clinic              Clinic       @relation(fields: [clinicId], references: [id])
+  patientId           String
+  patient             Patient      @relation(fields: [patientId], references: [id])
+  uploadedById        String?
+  uploadedBy          User?        @relation("PatientFileUploader", fields: [uploadedById], references: [id])
+  category            String       @default("CLINICAL_IMAGE")
+  title               String
+  fileName            String?
+  mimeType            String?
+  url                 String
+  sizeBytes           Int?
+  sourceType          String?
+  sourceId            String?
+  storageProvider     String?
+  storageBucket       String?
+  storageKey          String?
+  checksumSha256      String?
+  previewUrl          String?
+  previewMimeType     String?
+  previewSizeBytes    Int?
+  previewStorageKey   String?
+  thumbnailUrl        String?
+  thumbnailMimeType   String?
+  thumbnailSizeBytes  Int?
+  thumbnailStorageKey String?
+  virusScanStatus     String       @default("NOT_SCANNED")
+  retentionUntil      DateTime?
+  notes               String?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+
+  @@index([patientId, createdAt])
+  @@index([clinicId, createdAt])
+  @@index([organizationId, category])
+  @@index([organizationId, retentionUntil])
+}
+
+model PatientJourneyState {
+  id                 String       @id @default(cuid())
+  organizationId     String
+  organization       Organization @relation(fields: [organizationId], references: [id])
+  clinicId           String
+  clinic             Clinic       @relation(fields: [clinicId], references: [id])
+  patientId          String       @unique
+  patient            Patient      @relation(fields: [patientId], references: [id])
+  treatmentGoal      String?
+  treatmentPlan      String?
+  odontogramTeeth    String[]
+  odontogramSnapshot Json?
+  updatedById        String?
+  updatedBy          User?        @relation("PatientJourneyStateUpdater", fields: [updatedById], references: [id])
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
+
+  @@index([clinicId, updatedAt])
+  @@index([organizationId, updatedAt])
+}
+
+model JourneyComment {
+  id             String                     @id @default(cuid())
+  organizationId String
+  organization   Organization               @relation(fields: [organizationId], references: [id])
+  clinicId       String
+  clinic         Clinic                     @relation(fields: [clinicId], references: [id])
+  patientId      String
+  patient        Patient                    @relation(fields: [patientId], references: [id])
+  authorId       String?
+  author         User?                      @relation("JourneyCommentAuthor", fields: [authorId], references: [id])
+  body           String
+  attachmentUrl  String?
+  attachmentName String?
+  attachmentMime String?
+  patientFileId  String?
+  attachments    JourneyCommentAttachment[]
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  @@index([patientId, createdAt])
+  @@index([clinicId, createdAt])
+  @@index([organizationId, createdAt])
+}
+
+model JourneyCommentAttachment {
+  id            String         @id @default(cuid())
+  commentId     String
+  comment       JourneyComment @relation(fields: [commentId], references: [id], onDelete: Cascade)
+  patientFileId String?
+  url           String
+  name          String?
+  mimeType      String?
+  fileKind      String?
+  sizeBytes     Int?
+  previewUrl    String?
+  thumbnailUrl  String?
+  sortOrder     Int            @default(0)
+  createdAt     DateTime       @default(now())
+
+  @@index([commentId, sortOrder])
+  @@index([patientFileId])
+}
+
+model WorkItem {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?      @relation(fields: [clinicId], references: [id])
+  patientId      String?
+  patient        Patient?     @relation(fields: [patientId], references: [id])
+  assignedToId   String?
+  assignedTo     User?        @relation("WorkItemAssignee", fields: [assignedToId], references: [id])
+  createdById    String?
+  createdBy      User?        @relation("WorkItemCreator", fields: [createdById], references: [id])
+  completedById  String?
+  completedBy    User?        @relation("WorkItemCompleter", fields: [completedById], references: [id])
+  sourceKind     String
+  sourceId       String?
+  priority       String       @default("medium")
+  status         String       @default("OPEN")
+  title          String
+  detail         String?
+  dueAt          DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([organizationId, status, dueAt])
+  @@index([clinicId, status, dueAt])
+  @@index([assignedToId, status, dueAt])
+  @@index([patientId, createdAt])
+  @@index([sourceKind, sourceId])
+}
+
+model LearningContent {
+  id              String               @id @default(cuid())
+  organizationId  String
+  organization    Organization         @relation(fields: [organizationId], references: [id])
+  clinicId        String?
+  clinic          Clinic?              @relation(fields: [clinicId], references: [id])
+  authorId        String?
+  author          User?                @relation("LearningContentAuthor", fields: [authorId], references: [id])
+  code            String
+  type            LearningContentType
+  title           String
+  summary         String?
+  body            String?
+  mediaUrl        String?
+  durationMinutes Int?
+  publishedAt     DateTime?
+  active          Boolean              @default(true)
+  assets          LearningAsset[]
+  enrollments     LearningEnrollment[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([clinicId, type])
+}
+
+model LearningAsset {
+  id                  String          @id @default(cuid())
+  organizationId      String
+  organization        Organization    @relation(fields: [organizationId], references: [id])
+  clinicId            String?
+  clinic              Clinic?         @relation(fields: [clinicId], references: [id])
+  contentId           String
+  content             LearningContent @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  uploadedById        String?
+  uploadedBy          User?           @relation("LearningAssetUploader", fields: [uploadedById], references: [id])
+  kind                String
+  title               String
+  fileName            String?
+  mimeType            String?
+  url                 String
+  sizeBytes           Int?
+  storageProvider     String?
+  storageBucket       String?
+  storageKey          String?
+  checksumSha256      String?
+  previewUrl          String?
+  previewMimeType     String?
+  previewSizeBytes    Int?
+  previewStorageKey   String?
+  thumbnailUrl        String?
+  thumbnailMimeType   String?
+  thumbnailSizeBytes  Int?
+  thumbnailStorageKey String?
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+
+  @@index([contentId, createdAt])
+  @@index([clinicId, createdAt])
+  @@index([organizationId, kind])
+}
+
+model LearningEnrollment {
+  id             String                   @id @default(cuid())
+  organizationId String
+  organization   Organization             @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?                  @relation(fields: [clinicId], references: [id])
+  contentId      String
+  content        LearningContent          @relation(fields: [contentId], references: [id])
+  userId         String
+  user           User                     @relation("LearningEnrollmentUser", fields: [userId], references: [id])
+  assignedById   String?
+  assignedBy     User?                    @relation("LearningEnrollmentAssigner", fields: [assignedById], references: [id])
+  status         LearningEnrollmentStatus @default(ASSIGNED)
+  assignedAt     DateTime                 @default(now())
+  startedAt      DateTime?
+  completedAt    DateTime?
+  score          Decimal?                 @db.Decimal(5, 2)
+
+  @@unique([contentId, userId])
+  @@index([clinicId, status])
+  @@index([userId, status])
+}
+
+model MobileDevice {
+  id             String         @id @default(cuid())
+  organizationId String
+  organization   Organization   @relation(fields: [organizationId], references: [id])
+  userId         String?
+  user           User?          @relation("UserMobileDevices", fields: [userId], references: [id])
+  patientId      String?
+  patient        Patient?       @relation("PatientMobileDevices", fields: [patientId], references: [id])
+  appType        MobileAppType
+  platform       MobilePlatform
+  deviceId       String
+  pushToken      String?
+  enabled        Boolean        @default(true)
+  lastSeenAt     DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([organizationId, deviceId])
+  @@index([userId, appType])
+  @@index([patientId, appType])
+}
+
+model Notification {
+  id             String              @id @default(cuid())
+  organizationId String
+  organization   Organization        @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?             @relation(fields: [clinicId], references: [id])
+  patientId      String?
+  patient        Patient?            @relation("PatientNotifications", fields: [patientId], references: [id])
+  userId         String?
+  user           User?               @relation("UserNotifications", fields: [userId], references: [id])
+  campaignId     String?
+  campaign       CrmCampaign?        @relation(fields: [campaignId], references: [id])
+  channel        NotificationChannel
+  status         NotificationStatus  @default(DRAFT)
+  templateKey    String?
+  recipient      String
+  subject        String?
+  body           String
+  scheduledAt    DateTime?
+  sentAt         DateTime?
+  failedReason   String?
+  metadata       Json?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@index([organizationId, status])
+  @@index([patientId, createdAt])
+  @@index([userId, createdAt])
+}
+
+model AiRun {
+  id               String       @id @default(cuid())
+  organizationId   String
+  organization     Organization @relation(fields: [organizationId], references: [id])
+  clinicId         String?
+  clinic           Clinic?      @relation(fields: [clinicId], references: [id])
+  actorId          String?
+  actor            User?        @relation("AiRunActor", fields: [actorId], references: [id])
+  module           String
+  action           String
+  provider         String
+  model            String
+  baseUrl          String?
+  status           String       @default("PENDING")
+  input            Json?
+  output           Json?
+  rawOutput        String?
+  error            String?
+  promptTokens     Int?
+  completionTokens Int?
+  totalTokens      Int?
+  createdAt        DateTime     @default(now())
+  completedAt      DateTime?
+
+  @@index([organizationId, module, createdAt])
+  @@index([clinicId, createdAt])
+  @@index([actorId, createdAt])
+  @@index([status, createdAt])
+}
+
+model AccountingCategory {
+  id             String                   @id @default(cuid())
+  organizationId String
+  organization   Organization             @relation(fields: [organizationId], references: [id])
+  code           String
+  name           String
+  nameEn         String?
+  kind           String
+  targetPercent  Decimal?                 @db.Decimal(5, 2)
+  warningPercent Decimal?                 @db.Decimal(5, 2)
+  sortOrder      Int                      @default(0)
+  active         Boolean                  @default(true)
+  entries        AccountingEntry[]
+  budgetTargets  AccountingBudgetTarget[]
+  createdAt      DateTime                 @default(now())
+  updatedAt      DateTime                 @updatedAt
+
+  @@unique([organizationId, code])
+  @@index([organizationId, kind, active])
+}
+
+model AccountingEntry {
+  id                            String             @id @default(cuid())
+  organizationId                String
+  organization                  Organization       @relation(fields: [organizationId], references: [id])
+  clinicId                      String?
+  clinic                        Clinic?            @relation(fields: [clinicId], references: [id])
+  categoryId                    String
+  category                      AccountingCategory @relation(fields: [categoryId], references: [id])
+  kind                          String
+  amount                        Decimal            @db.Decimal(12, 2)
+  occurredAt                    DateTime
+  vendor                        String?
+  description                   String
+  paymentMethod                 String?
+  reference                     String?
+  attachmentFileName            String?
+  attachmentMimeType            String?
+  attachmentSizeBytes           Int?
+  attachmentStorageProvider     String?
+  attachmentStorageKey          String?
+  attachmentThumbnailMimeType   String?
+  attachmentThumbnailStorageKey String?
+  sourceType                    String             @default("manual")
+  sourceId                      String?
+  locked                        Boolean            @default(false)
+  createdById                   String?
+  createdBy                     User?              @relation("AccountingEntryCreator", fields: [createdById], references: [id])
+  createdAt                     DateTime           @default(now())
+  updatedAt                     DateTime           @updatedAt
+
+  @@index([organizationId, occurredAt])
+  @@index([clinicId, occurredAt])
+  @@index([categoryId, occurredAt])
+  @@index([sourceType, sourceId])
+}
+
+model AccountingBudgetTarget {
+  id             String             @id @default(cuid())
+  organizationId String
+  organization   Organization       @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?            @relation(fields: [clinicId], references: [id])
+  categoryId     String
+  category       AccountingCategory @relation(fields: [categoryId], references: [id])
+  periodMonth    String
+  targetPercent  Decimal            @db.Decimal(5, 2)
+  warningPercent Decimal?           @db.Decimal(5, 2)
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  @@unique([organizationId, clinicId, categoryId, periodMonth])
+  @@index([organizationId, periodMonth])
+}
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  actorId        String?
+  actor          User?        @relation(fields: [actorId], references: [id])
+  action         String
+  entityType     String
+  entityId       String?
+  ipAddress      String?
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+
+  @@index([organizationId, createdAt])
+}
+
+model DocumentSequence {
+  id             String       @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id])
+  clinicId       String?
+  clinic         Clinic?      @relation(fields: [clinicId], references: [id])
+  scopeKey       String       @default("organization")
+  type           String
+  year           Int
+  currentValue   Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@unique([organizationId, scopeKey, type, year])
+  @@index([clinicId, type, year])
+}

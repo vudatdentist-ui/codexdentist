@@ -1,0 +1,49 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: codexdentist
+      POSTGRES_USER: codexdentist
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U codexdentist -d codexdentist"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    volumes:
+      - codexdentist-postgres:/var/lib/postgresql/data
+
+  app:
+    image: ${CODEXDENTIST_IMAGE:-codexdentist:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DEPLOYMENT_MODE: self-hosted
+      DATABASE_URL: postgresql://codexdentist:${POSTGRES_PASSWORD}@postgres:5432/codexdentist?schema=public
+      APP_BASE_URL: ${APP_BASE_URL:-http://127.0.0.1:3000}
+      APP_ROOT_DOMAIN: ${APP_ROOT_DOMAIN:-codexdentist.local}
+      AUTH_SECRET: ${AUTH_SECRET}
+      JOB_SECRET: ${JOB_SECRET}
+      SESSION_COOKIE_SECURE: ${SESSION_COOKIE_SECURE:-false}
+      DEMO_AUTH_ENABLED: "false"
+      DEMO_WORKSPACE_ENABLED: "false"
+      DEFAULT_DATA_SEED_ENABLED: "false"
+      NOTIFICATION_DELIVERY_MODE: ${NOTIFICATION_DELIVERY_MODE:-disabled}
+      PATIENT_FILE_STORAGE_DRIVER: local
+      PATIENT_FILE_STORAGE_ROOT: /data/patient-files
+      CODEXMED_AI_ENABLED: ${CODEXMED_AI_ENABLED:-false}
+    ports:
+      - "${CODEXDENTIST_PORT:-3000}:3000"
+    volumes:
+      - codexdentist-files:/data/patient-files
+
+volumes:
+  codexdentist-postgres:
+  codexdentist-files:

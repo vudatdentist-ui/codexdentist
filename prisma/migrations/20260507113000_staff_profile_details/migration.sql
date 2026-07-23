@@ -1,0 +1,10 @@
+ALTER TABLE "StaffProfile"
+  ADD COLUMN IF NOT EXISTS "dateOfBirth" TIMESTAMP(3),
+  ADD COLUMN IF NOT EXISTS "gender" TEXT,
+  ADD COLUMN IF NOT EXISTS "avatarFileName" TEXT,
+  ADD COLUMN IF NOT EXISTS "avatarMimeType" TEXT,
+  ADD COLUMN IF NOT EXISTS "avatarSizeBytes" INTEGER,
+  ADD COLUMN IF NOT EXISTS "avatarStorageProvider" TEXT,
+  ADD COLUMN IF NOT EXISTS "avatarStorageKey" TEXT,
+  ADD COLUMN IF NOT EXISTS "avatarThumbnailMimeType" TEXT,
+  ADD COLUMN IF NOT EXISTS "avatarThumbnailStorageKey" TEXT;

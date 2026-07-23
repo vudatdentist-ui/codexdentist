@@ -1,0 +1,2 @@
+-- RenameIndex
+ALTER INDEX "AccountingBudgetTarget_organizationId_clinicId_categoryId_perio" RENAME TO "AccountingBudgetTarget_organizationId_clinicId_categoryId_p_key";

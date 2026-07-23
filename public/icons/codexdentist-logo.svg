@@ -1,0 +1,14 @@
+<svg width="1024" height="280" viewBox="0 0 1024 280" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1024" height="280" rx="36" fill="#FAFAF4"/>
+  <g transform="translate(54 48)">
+    <path d="M68 76 12 105l56 29" stroke="#087586" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M216 76 272 105l-56 29" stroke="#087586" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M78 28c17-22 44-23 64-7 20-16 47-15 64 7 21 28 8 75-2 109-11 41-15 73-40 73-21 0-19-59-26-59s-5 59-26 59c-25 0-29-32-40-73-10-34-23-81-2-109Z" fill="#FAFAF4" stroke="#087586" stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M113 14c15 14 36 18 63 10" stroke="#087586" stroke-width="17" stroke-linecap="round"/>
+    <path d="M105 128c14 0 25 9 32 26" stroke="#087586" stroke-width="17" stroke-linecap="round"/>
+    <path d="M131 108 154 184" stroke="#087586" stroke-width="17" stroke-linecap="round"/>
+  </g>
+  <text x="378" y="126" fill="#071F3B" font-family="Inter, Arial, sans-serif" font-size="64" font-weight="800">Codex</text>
+  <text x="590" y="126" fill="#071F3B" font-family="Inter, Arial, sans-serif" font-size="64" font-weight="500">dentist</text>
+  <text x="382" y="174" fill="#071F3B" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="500" letter-spacing="6">SMART DENTAL SOLUTIONS</text>
+</svg>

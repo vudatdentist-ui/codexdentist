@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [master, main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NODE_ENV: production
+      DEPLOYMENT_MODE: self-hosted
+      DATABASE_URL: postgresql://codexdentist:codexdentist@127.0.0.1:5432/codexdentist?schema=public
+      APP_BASE_URL: http://127.0.0.1:3000
+      AUTH_SECRET: ci-only-auth-secret-with-at-least-32-characters
+      JOB_SECRET: ci-only-job-secret-with-at-least-32-characters
+      PATIENT_FILE_STORAGE_DRIVER: local
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --include=dev --no-audit --no-fund
+      - run: npm run encoding:check
+      - run: npm run typecheck
+      - run: npm run build
+      - run: docker build -t codexdentist:ci .
