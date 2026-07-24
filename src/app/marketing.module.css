@@ -592,11 +592,11 @@ button.primaryCta {
 
 .docsLayout {
   display: grid;
-  grid-template-columns: 230px minmax(0, 760px);
+  grid-template-columns: 230px minmax(0, 900px);
   gap: 68px;
   justify-content: center;
   margin: 0 auto;
-  max-width: 1180px;
+  max-width: 1260px;
   padding: 64px 24px 110px;
   width: 100%;
 }
@@ -642,10 +642,56 @@ button.primaryCta {
   padding: 0;
 }
 
+.docsHeroFacts {
+  border-bottom: 1px solid var(--public-line);
+  border-top: 1px solid var(--public-line);
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-top: 34px;
+}
+
+.docsHeroFacts span {
+  align-items: center;
+  color: var(--public-ink);
+  display: flex;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 9px;
+  min-height: 72px;
+  padding: 14px 18px;
+}
+
+.docsHeroFacts span + span {
+  border-left: 1px solid var(--public-line);
+}
+
+.docsHeroFacts svg {
+  color: var(--public-teal);
+  flex: 0 0 auto;
+}
+
+.docsPrimaryActions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
 .docsArticle section {
   border-top: 1px solid var(--public-line);
   padding: 44px 0;
   position: relative;
+}
+
+.docsSectionLabel {
+  color: var(--public-coral) !important;
+  font-size: 12px !important;
+  font-weight: 900;
+  letter-spacing: 0;
+  margin: 0 0 7px;
+  text-transform: uppercase;
 }
 
 .docsArticle section h2 {
@@ -665,6 +711,7 @@ button.primaryCta {
   color: #d9ebe7;
   margin: 22px 0;
   max-width: 100%;
+  overflow-x: auto;
 }
 
 .docsArticle code {
@@ -689,6 +736,326 @@ button.primaryCta {
   align-items: center;
   display: flex;
   gap: 9px;
+}
+
+.requirementsList {
+  border-bottom: 1px solid var(--public-line);
+  border-top: 1px solid var(--public-line);
+  margin-top: 26px;
+}
+
+.requirementsList > div {
+  align-items: start;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 140px minmax(0, 1fr);
+  padding: 16px 0;
+}
+
+.requirementsList > div + div {
+  border-top: 1px solid var(--public-line);
+}
+
+.requirementsList strong,
+.downloadBody > strong {
+  color: var(--public-ink);
+  font-size: 14px;
+}
+
+.requirementsList span {
+  color: var(--public-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.docsCallout {
+  align-items: flex-start;
+  background: #edf8f5;
+  border-left: 4px solid var(--public-teal);
+  display: flex;
+  gap: 13px;
+  margin-top: 26px;
+  padding: 18px 20px;
+}
+
+.docsCalloutWarning {
+  background: #fff5ed;
+  border-color: var(--public-coral);
+}
+
+.docsCallout > svg {
+  color: var(--public-teal);
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.docsCalloutWarning > svg {
+  color: var(--public-coral);
+}
+
+.docsCallout strong,
+.expectedResult strong {
+  color: var(--public-ink);
+  font-size: 14px;
+}
+
+.docsCallout p,
+.expectedResult p {
+  color: var(--public-muted);
+  font-size: 14px;
+  line-height: 1.65;
+  margin: 5px 0 0;
+}
+
+.downloadList {
+  border-top: 1px solid var(--public-line);
+  margin-top: 28px;
+}
+
+.downloadRow {
+  align-items: start;
+  border-bottom: 1px solid var(--public-line);
+  display: grid;
+  gap: 18px;
+  grid-template-columns: 42px minmax(0, 1fr) 190px;
+  padding: 24px 0;
+}
+
+.downloadIndex,
+.installStep > span {
+  align-items: center;
+  background: var(--public-ink);
+  color: #fff;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.downloadBody p {
+  color: var(--public-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 7px 0;
+}
+
+.downloadBody > span {
+  color: #637779;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.downloadActions {
+  align-items: stretch;
+  display: grid;
+  gap: 8px;
+}
+
+.downloadActions a,
+.docsSourceList a {
+  align-items: center;
+  color: var(--public-teal);
+  display: flex;
+  font-size: 13px;
+  font-weight: 900;
+  gap: 7px;
+  justify-content: space-between;
+  text-decoration: none;
+}
+
+.downloadActions > a:first-child {
+  border: 1px solid var(--public-ink);
+  color: var(--public-ink);
+  min-height: 40px;
+  padding: 8px 11px;
+}
+
+.downloadActions > a:first-child:hover {
+  background: var(--public-ink);
+  color: #fff;
+}
+
+.downloadActions .docsSourceLink,
+.docsSourceLink {
+  align-items: center;
+  color: var(--public-teal);
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 800;
+  gap: 6px;
+  justify-content: flex-start;
+  text-decoration: none;
+}
+
+.installSteps {
+  counter-reset: none;
+  display: grid !important;
+  gap: 0 !important;
+  list-style: none;
+  margin: 26px 0 0;
+  padding: 0;
+}
+
+.installStep {
+  align-items: start !important;
+  border-top: 1px solid var(--public-line);
+  display: grid !important;
+  gap: 18px !important;
+  grid-template-columns: 42px minmax(0, 1fr);
+  padding: 28px 0;
+}
+
+.installStep:last-child {
+  border-bottom: 1px solid var(--public-line);
+}
+
+.installStep h3 {
+  color: var(--public-ink);
+  font-size: 19px;
+  margin: 4px 0 12px;
+}
+
+.installStep p {
+  color: var(--public-muted);
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 10px 0;
+}
+
+.commandBlock {
+  border: 1px solid #274247;
+  margin: 16px 0;
+}
+
+.commandBlock > div {
+  align-items: center;
+  background: #0f2326;
+  border-bottom: 1px solid #274247;
+  color: #afc9c4;
+  display: flex;
+  font-size: 11px;
+  font-weight: 900;
+  justify-content: space-between;
+  min-height: 40px;
+  padding: 5px 7px 5px 14px;
+  text-transform: uppercase;
+}
+
+.commandBlock pre {
+  border-radius: 0;
+  margin: 0;
+  padding: 20px;
+}
+
+.publicShell :global(.docs-copy-command) {
+  align-items: center;
+  background: transparent;
+  border: 1px solid #3c595d;
+  color: #d9ebe7;
+  cursor: pointer;
+  display: inline-flex;
+  font: inherit;
+  gap: 6px;
+  min-height: 30px;
+  padding: 5px 8px;
+  text-transform: none;
+}
+
+.publicShell :global(.docs-copy-command:hover) {
+  background: #203b3f;
+}
+
+.expectedResult {
+  align-items: flex-start;
+  background: #f3f8f6;
+  display: flex;
+  gap: 11px;
+  margin: 14px 0;
+  padding: 14px 16px;
+}
+
+.expectedResult > svg {
+  color: var(--public-teal);
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.docsFinePrint {
+  border-left: 2px solid var(--public-line);
+  font-size: 13px !important;
+  padding-left: 13px;
+}
+
+.plainSteps {
+  display: block !important;
+  list-style: decimal !important;
+  margin: 24px 0;
+  padding-left: 24px !important;
+}
+
+.plainSteps li {
+  display: list-item;
+  padding: 5px 0 5px 7px;
+}
+
+.docsSubheading {
+  color: var(--public-ink);
+  font-size: 19px;
+  margin: 34px 0 10px;
+}
+
+.troubleshootingList {
+  border-top: 1px solid var(--public-line);
+  margin-top: 26px;
+}
+
+.troubleshootingList > div {
+  border-bottom: 1px solid var(--public-line);
+  display: grid;
+  gap: 22px;
+  grid-template-columns: 260px minmax(0, 1fr);
+  padding: 20px 0;
+}
+
+.troubleshootingList strong {
+  color: var(--public-ink);
+  font-size: 14px;
+}
+
+.troubleshootingList p {
+  color: var(--public-muted);
+  font-size: 14px;
+  line-height: 1.65;
+  margin: 0;
+}
+
+.docsSourceList {
+  border-bottom: 1px solid var(--public-line);
+  border-top: 1px solid var(--public-line);
+  display: grid;
+  gap: 0;
+  margin: 24px 0;
+}
+
+.docsSourceList a {
+  justify-content: flex-start;
+  min-height: 50px;
+}
+
+.docsSourceList a + a {
+  border-top: 1px solid var(--public-line);
+}
+
+.securityChecklist li {
+  align-items: flex-start;
+}
+
+.securityChecklist svg {
+  color: var(--public-teal);
+  flex: 0 0 auto;
+  margin-top: 4px;
 }
 
 .commandTable {
@@ -1064,6 +1431,15 @@ button.primaryCta {
     grid-template-columns: 1fr;
   }
 
+  .docsHeroFacts {
+    grid-template-columns: 1fr;
+  }
+
+  .docsHeroFacts span + span {
+    border-left: 0;
+    border-top: 1px solid var(--public-line);
+  }
+
   .docsLayout .docsNav,
   .featureGuideLayout .docsNav {
     display: none;
@@ -1241,6 +1617,60 @@ button.primaryCta {
 
   .docsLayout {
     padding: 48px 18px 80px;
+  }
+
+  .docsIcon {
+    display: none;
+  }
+
+  .docsPrimaryActions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .docsPrimaryActions a {
+    width: 100%;
+  }
+
+  .requirementsList > div,
+  .downloadRow,
+  .troubleshootingList > div {
+    grid-template-columns: 1fr;
+  }
+
+  .downloadRow {
+    gap: 12px;
+  }
+
+  .downloadIndex {
+    margin-bottom: 2px;
+  }
+
+  .downloadActions {
+    margin-top: 4px;
+  }
+
+  .installStep {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 10px !important;
+  }
+
+  .installStep > span {
+    height: 28px;
+    width: 28px;
+  }
+
+  .commandBlock > div {
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .publicShell :global(.docs-copy-command) span {
+    display: none;
+  }
+
+  .docsCallout {
+    padding: 16px;
   }
 
   .commandTable div {

@@ -25,7 +25,7 @@ Mỗi lượt demo dùng một phòng khám tách biệt và sẽ tự hết h�
 
 ### Tự cài đặt
 
-Yêu cầu: Node.js 22 LTS, Docker Desktop hoặc Docker Engine có Compose, tối thiểu 4 GB RAM và 10 GB dung lượng trống.
+Windows cần Windows 10/11 64-bit, WSL 2, Node.js 22 LTS, Docker Desktop có Compose, tối thiểu 8 GB RAM và 20 GB dung lượng trống. Linux/NAS có thể bắt đầu từ 4 GB RAM và 10 GB trống, nhưng khuyến nghị 8 GB RAM.
 
 Windows:
 
@@ -97,7 +97,7 @@ Do not enter real patient information into the public demo.
 
 ### Self-host
 
-Requirements: Node.js 22 LTS, Docker Desktop or Docker Engine with Compose, 4 GB RAM, and 10 GB of free disk space.
+Windows requires 64-bit Windows 10/11, WSL 2, Node.js 22 LTS, Docker Desktop with Compose, at least 8 GB RAM, and 20 GB of free disk space. Linux/NAS can start with 4 GB RAM and 10 GB free, but 8 GB RAM is recommended.
 
 Use `.\install.ps1` on Windows or `./install.sh` on Linux/macOS. The installer generates random secrets, builds the application, starts PostgreSQL, applies migrations, and prints local and LAN addresses. Open `/setup` to create the first clinic and owner.
 

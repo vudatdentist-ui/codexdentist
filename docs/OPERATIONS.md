@@ -1,6 +1,6 @@
 # Operations
 
-Last updated: 2026-07-23
+Last updated: 2026-07-24
 
 ## Local PC
 
@@ -27,7 +27,7 @@ If port `3000` is busy, stop only this repo's Next process. Do not kill unrelate
 
 ## Community Self-Host
 
-Requirements: Node.js 22 LTS, Docker Engine/Desktop with Compose, 4 GB RAM, and 10 GB free disk for a small clinic.
+Windows requirements: Windows 10/11 64-bit, WSL 2, Node.js 22 LTS, Docker Desktop with Compose, 8 GB RAM, and 20 GB free disk. Linux/NAS may start at 4 GB RAM and 10 GB free disk, but 8 GB RAM is recommended.
 
 ```powershell
 .\install.ps1
@@ -112,6 +112,10 @@ Current cPanel deployment:
 - Runtime: Node.js 22, production mode
 - Startup file: `server.cjs`
 - Database: account-local PostgreSQL; keep credentials only in `.env` and `.env.production`
+
+Authoritative DNS is Cloudflare, using `kanye.ns.cloudflare.com` and `tara.ns.cloudflare.com`. Edit public DNS in Cloudflare, not the cPanel zone or Namecheap Advanced DNS. Root, `www`, and `*` are proxied to the shared-hosting origin; mail and cPanel service hosts remain DNS-only. Preserve the Jellyfish MX records and the existing hosting SPF/DKIM/DMARC records when changing DNS.
+
+Cloudflare SSL mode is currently `Full`. The cPanel origin has valid certificates for the root and `demo`, but not an installed certificate for the wildcard virtual host. Do not switch to `Full (strict)` until `codexdentist.com` plus `*.codexdentist.com` are covered by an origin certificate and a direct-origin wildcard check succeeds.
 
 Stellar Plus limits process creation during builds. Set `CODEXMED_SHARED_HOST_BUILD=true` so Next.js uses one build/static-generation worker, then deploy with:
 

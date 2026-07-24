@@ -48,7 +48,7 @@ npm run pilot:qa
 
 - `/` shows the product site on the root domain and redirects tenant/app hosts to the application.
 - `/features` presents the feature guide and links to the public demo and installation docs.
-- `/docs` renders installation, LAN, backup, restore, update, and security guidance.
+- `/docs` renders a Windows-first beginner flow with official download sources, expected results, LAN/firewall setup, backup, restore, update, troubleshooting, and security guidance.
 - `https://demo.codexdentist.com/` creates an isolated expiring organization, signs in, and displays the expiry banner; `/demo` on that host redirects to `/`.
 - Demo sessions stop working after expiry; cleanup removes only expired demo organizations.
 - Demo mode blocks patient-file uploads and outbound notification delivery.
