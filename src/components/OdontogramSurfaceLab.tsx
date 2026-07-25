@@ -11,14 +11,29 @@ import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import styles from "@/app/odontogram/odontogram.module.css";
 
-const upperTeeth = [
+const adultUpperTeeth = [
   "18", "17", "16", "15", "14", "13", "12", "11",
   "21", "22", "23", "24", "25", "26", "27", "28",
 ] as const;
 
-const lowerTeeth = [
+const adultLowerTeeth = [
   "48", "47", "46", "45", "44", "43", "42", "41",
   "31", "32", "33", "34", "35", "36", "37", "38",
+] as const;
+
+const primaryUpperTeeth = [
+  "55", "54", "53", "52", "51", "61", "62", "63", "64", "65",
+] as const;
+
+const primaryLowerTeeth = [
+  "85", "84", "83", "82", "81", "71", "72", "73", "74", "75",
+] as const;
+
+const allTeeth = [
+  ...adultUpperTeeth,
+  ...adultLowerTeeth,
+  ...primaryUpperTeeth,
+  ...primaryLowerTeeth,
 ] as const;
 
 const conditionOptions = [
@@ -28,7 +43,8 @@ const conditionOptions = [
   { id: "watch", label: "Theo dõi", shortLabel: "Theo dõi", color: "#14866d" },
 ] as const;
 
-type ToothId = (typeof upperTeeth)[number] | (typeof lowerTeeth)[number];
+type ToothId = (typeof allTeeth)[number];
+type Dentition = "adult" | "primary";
 type SurfaceCode = "M" | "D" | "B" | "L" | "O" | "I";
 type ConditionId = (typeof conditionOptions)[number]["id"];
 type SurfaceState = Record<string, ConditionId>;
@@ -50,7 +66,7 @@ const surfaceNames: Record<SurfaceCode, string> = {
 const storageKey = "codexdentist-odontogram-5-surface-v1";
 
 function isToothId(value: string): value is ToothId {
-  return [...upperTeeth, ...lowerTeeth].includes(value as ToothId);
+  return allTeeth.includes(value as ToothId);
 }
 
 function isConditionId(value: unknown): value is ConditionId {
@@ -108,12 +124,34 @@ function toothPosition(tooth: ToothId) {
   return Number(tooth[1]);
 }
 
+function isPrimaryTooth(tooth: ToothId) {
+  return Number(tooth[0]) >= 5;
+}
+
+function isUpperTooth(tooth: ToothId) {
+  return [1, 2, 5, 6].includes(Number(tooth[0]));
+}
+
+function isRightQuadrant(tooth: ToothId) {
+  return [1, 4, 5, 8].includes(Number(tooth[0]));
+}
+
+function isPatientLeft(tooth: ToothId) {
+  return [2, 3, 6, 7].includes(Number(tooth[0]));
+}
+
 function isAnterior(tooth: ToothId) {
   return toothPosition(tooth) <= 3;
 }
 
 function toothType(tooth: ToothId) {
   const position = toothPosition(tooth);
+
+  if (isPrimaryTooth(tooth)) {
+    if (position <= 2) return "Răng cửa sữa";
+    if (position === 3) return "Răng nanh sữa";
+    return "Răng hàm sữa";
+  }
 
   if (position <= 2) return "Răng cửa";
   if (position === 3) return "Răng nanh";
@@ -128,6 +166,7 @@ function toothKind(tooth: ToothId): ToothKind {
 
   if (position <= 2) return "incisor";
   if (position === 3) return "canine";
+  if (isPrimaryTooth(tooth)) return "molar";
   if (position <= 5) return "premolar";
   return "molar";
 }
@@ -137,9 +176,8 @@ function toothSurfaces(tooth: ToothId): SurfaceCode[] {
 }
 
 function surfaceLayout(tooth: ToothId) {
-  const quadrant = Number(tooth[0]);
-  const upper = quadrant <= 2;
-  const rightQuadrant = quadrant === 1 || quadrant === 4;
+  const upper = isUpperTooth(tooth);
+  const rightQuadrant = isRightQuadrant(tooth);
 
   return {
     top: upper ? "B" : "L",
@@ -154,24 +192,26 @@ function conditionFor(id?: ConditionId) {
   return conditionOptions.find((condition) => condition.id === id);
 }
 
-function downloadJson(state: SurfaceState) {
+function downloadJson(state: SurfaceState, dentition: Dentition) {
   const rows = Object.entries(state).map(([key, condition]) => {
     const [tooth, surface] = key.split(".");
     return {
       tooth,
+      dentition,
       surface,
       surfaceName: surfaceNames[surface as SurfaceCode],
       condition,
       conditionName: conditionFor(condition)?.label ?? condition,
     };
   });
-  const blob = new Blob([JSON.stringify({ notation: "FDI", surfaces: rows }, null, 2)], {
-    type: "application/json",
-  });
+  const blob = new Blob(
+    [JSON.stringify({ notation: "FDI", dentition, surfaces: rows }, null, 2)],
+    { type: "application/json" },
+  );
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = "codexdentist-odontogram.json";
+  anchor.download = `codexdentist-odontogram-${dentition}.json`;
   anchor.click();
   URL.revokeObjectURL(url);
 }
@@ -180,6 +220,7 @@ export function OdontogramSurfaceLab() {
   const [surfaceState, setSurfaceState] = useState<SurfaceState>({});
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [condition, setCondition] = useState<ConditionId>("caries");
+  const [dentition, setDentition] = useState<Dentition>("adult");
   const [selectedTooth, setSelectedTooth] = useState<ToothId>("16");
   const [copied, setCopied] = useState(false);
 
@@ -197,9 +238,26 @@ export function OdontogramSurfaceLab() {
     });
   };
 
-  const markedSurfaceCount = Object.keys(surfaceState).length;
+  const upperTeeth =
+    dentition === "adult" ? adultUpperTeeth : primaryUpperTeeth;
+  const lowerTeeth =
+    dentition === "adult" ? adultLowerTeeth : primaryLowerTeeth;
+  const activeToothSet = useMemo(
+    () => new Set<ToothId>([...upperTeeth, ...lowerTeeth]),
+    [upperTeeth, lowerTeeth],
+  );
+  const activeSurfaceState = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(surfaceState).filter(([key]) =>
+          activeToothSet.has(key.split(".")[0] as ToothId),
+        ),
+      ) as SurfaceState,
+    [activeToothSet, surfaceState],
+  );
+  const markedSurfaceCount = Object.keys(activeSurfaceState).length;
   const markedToothCount = new Set(
-    Object.keys(surfaceState).map((key) => key.split(".")[0]),
+    Object.keys(activeSurfaceState).map((key) => key.split(".")[0]),
   ).size;
 
   const selectedRows = useMemo(
@@ -257,10 +315,20 @@ export function OdontogramSurfaceLab() {
   };
 
   const reset = () => {
-    if (markedSurfaceCount === 0 || !window.confirm("Xóa toàn bộ đánh dấu trên odontogram?")) {
+    const label = dentition === "adult" ? "răng vĩnh viễn" : "răng sữa";
+    if (
+      markedSurfaceCount === 0 ||
+      !window.confirm(`Xóa toàn bộ đánh dấu của bộ ${label}?`)
+    ) {
       return;
     }
-    commitSurfaceState(() => ({}));
+    commitSurfaceState((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(
+          ([key]) => !activeToothSet.has(key.split(".")[0] as ToothId),
+        ),
+      ) as SurfaceState,
+    );
     setHistory([]);
   };
 
@@ -268,7 +336,8 @@ export function OdontogramSurfaceLab() {
     const payload = JSON.stringify(
       {
         notation: "FDI",
-        surfaces: Object.entries(surfaceState).map(([key, value]) => {
+        dentition,
+        surfaces: Object.entries(activeSurfaceState).map(([key, value]) => {
           const [tooth, surface] = key.split(".");
           return { tooth, surface, condition: value };
         }),
@@ -279,6 +348,17 @@ export function OdontogramSurfaceLab() {
     await navigator.clipboard.writeText(payload);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 1600);
+  };
+
+  const selectDentition = (nextDentition: Dentition) => {
+    if (nextDentition === dentition) {
+      return;
+    }
+
+    setDentition(nextDentition);
+    setSelectedTooth(nextDentition === "adult" ? "16" : "55");
+    setHistory([]);
+    setCopied(false);
   };
 
   return (
@@ -295,7 +375,9 @@ export function OdontogramSurfaceLab() {
           <span className={styles.statusDot} />
           <div>
             <h1>Odontogram 5 mặt</h1>
-            <p>FDI · Răng vĩnh viễn</p>
+            <p>
+              FDI · {dentition === "adult" ? "Răng vĩnh viễn" : "Răng sữa"}
+            </p>
           </div>
         </div>
         <div className={styles.headerActions}>
@@ -327,20 +409,42 @@ export function OdontogramSurfaceLab() {
       </header>
 
       <section className={styles.toolbar} aria-label="Trạng thái bề mặt">
-        <div className={styles.conditionControl}>
-          {conditionOptions.map((option) => (
+        <div className={styles.toolbarControls}>
+          <div className={styles.dentitionControl} aria-label="Loại bộ răng">
             <button
-              key={option.id}
               type="button"
-              className={condition === option.id ? styles.conditionActive : undefined}
-              onClick={() => setCondition(option.id)}
-              aria-pressed={condition === option.id}
+              className={dentition === "adult" ? styles.dentitionActive : undefined}
+              onClick={() => selectDentition("adult")}
+              aria-pressed={dentition === "adult"}
             >
-              <span style={{ backgroundColor: option.color }} />
-              <span className={styles.fullLabel}>{option.label}</span>
-              <span className={styles.shortLabel}>{option.shortLabel}</span>
+              Răng vĩnh viễn
             </button>
-          ))}
+            <button
+              type="button"
+              className={dentition === "primary" ? styles.dentitionActive : undefined}
+              onClick={() => selectDentition("primary")}
+              aria-pressed={dentition === "primary"}
+            >
+              Răng sữa
+            </button>
+          </div>
+          <div className={styles.conditionControl}>
+            {conditionOptions.map((option) => (
+              <button
+                key={option.id}
+                type="button"
+                className={
+                  condition === option.id ? styles.conditionActive : undefined
+                }
+                onClick={() => setCondition(option.id)}
+                aria-pressed={condition === option.id}
+              >
+                <span style={{ backgroundColor: option.color }} />
+                <span className={styles.fullLabel}>{option.label}</span>
+                <span className={styles.shortLabel}>{option.shortLabel}</span>
+              </button>
+            ))}
+          </div>
         </div>
         <div className={styles.toolbarStats}>
           <span><strong>{markedToothCount}</strong> răng</span>
@@ -433,7 +537,7 @@ export function OdontogramSurfaceLab() {
             </button>
             <button
               type="button"
-              onClick={() => downloadJson(surfaceState)}
+              onClick={() => downloadJson(activeSurfaceState, dentition)}
               disabled={markedSurfaceCount === 0}
             >
               <Download size={17} />
@@ -470,12 +574,17 @@ function Arch({
   onSetSurface: (tooth: ToothId, surface: SurfaceCode) => void;
   onClearSurface: (tooth: ToothId, surface: SurfaceCode) => void;
 }) {
-  const upper = Number(teeth[0][0]) <= 2;
+  const upper = isUpperTooth(teeth[0]);
+  const primary = isPrimaryTooth(teeth[0]);
 
   return (
-    <section className={`${styles.arch} ${upper ? "" : styles.lowerArch}`}>
+    <section className={upper ? styles.arch : `${styles.arch} ${styles.lowerArch}`}>
       <div className={styles.archLabel}>{label}</div>
-      <div className={styles.teethRow}>
+      <div
+        className={`${styles.teethRow} ${
+          primary ? styles.teethRowPrimary : ""
+        }`}
+      >
         {teeth.map((tooth, index) => {
           const figure = (
             <button
@@ -512,7 +621,9 @@ function Arch({
             <div
               className={`${styles.toothCell} ${
                 selectedTooth === tooth ? styles.toothSelected : ""
-              } ${index === 7 ? styles.beforeMidline : ""}`}
+              } ${
+                index === teeth.length / 2 - 1 ? styles.beforeMidline : ""
+              }`}
               key={tooth}
             >
               {upper ? (
@@ -576,13 +687,14 @@ const anatomyPaths: Record<
 
 function ToothIllustration({ tooth }: { tooth: ToothId }) {
   const anatomy = anatomyPaths[toothKind(tooth)];
-  const quadrant = Number(tooth[0]);
-  const lower = quadrant >= 3;
-  const patientLeft = quadrant === 2 || quadrant === 3;
+  const lower = !isUpperTooth(tooth);
+  const patientLeft = isPatientLeft(tooth);
 
   return (
     <svg
-      className={styles.toothIllustration}
+      className={`${styles.toothIllustration} ${
+        isPrimaryTooth(tooth) ? styles.primaryToothIllustration : ""
+      }`}
       viewBox="0 0 70 100"
       aria-hidden="true"
     >
