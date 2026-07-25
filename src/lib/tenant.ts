@@ -13,6 +13,7 @@ export const reservedTenantSlugs = new Set([
   "demo",
   "docs",
   "mail",
+  "odontogram",
   "status",
   "static",
   "support",
@@ -95,7 +96,15 @@ export function isNeutralAppHostname(hostname: string) {
 export function systemSubdomainFromHostname(hostname: string) {
   const host = normalizeHostname(hostname);
   const rootDomain = appRootDomain();
-  const systemSubdomains = ["admin", "app", "demo", "docs", "status", "www"];
+  const systemSubdomains = [
+    "admin",
+    "app",
+    "demo",
+    "docs",
+    "odontogram",
+    "status",
+    "www",
+  ];
 
   return systemSubdomains.find((subdomain) => host === `${subdomain}.${rootDomain}`) ?? null;
 }

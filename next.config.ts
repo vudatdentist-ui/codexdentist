@@ -20,6 +20,8 @@ const serverActionAllowedOrigins = hostedDeployment
         .filter(Boolean),
     ]
   : undefined;
+const developmentEvalSource =
+  process.env.NODE_ENV === "production" ? "" : ` '${["unsafe", "eval"].join("-")}'`;
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -31,7 +33,7 @@ const contentSecurityPolicy = [
   "media-src 'self' blob:",
   "font-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
-  "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
+  `script-src 'self' 'unsafe-inline'${developmentEvalSource} https://static.cloudflareinsights.com`,
   "connect-src 'self' https://cloudflareinsights.com https://*.cloudflareinsights.com",
 ].join("; ");
 

@@ -51,6 +51,7 @@ npm run pilot:qa
 - `/features` presents the feature guide and links to the public demo and installation docs.
 - `/docs` renders a Windows-first beginner flow with official download sources, expected results, LAN/firewall setup, backup, restore, update, troubleshooting, and security guidance.
 - `https://demo.codexdentist.com/` creates an isolated expiring organization, signs in, and displays the expiry banner; `/demo` on that host redirects to `/`.
+- `https://odontogram.codexdentist.com/` keeps the root URL, renders 32 permanent FDI teeth, exposes five keyboard-accessible surfaces per tooth, persists prototype marks locally, and has no horizontal overflow at `390x844`.
 - Demo sessions stop working after expiry; cleanup removes only expired demo organizations.
 - Demo mode blocks patient-file uploads and outbound notification delivery.
 - A clean `docker build` succeeds without a local `.env` or database.

@@ -17,6 +17,7 @@ Last updated: 2026-07-25
 - Self-host distribution: `compose.selfhost.yml`, `install.ps1`, `install.sh`, and `scripts/codexdentist.mjs`.
 - Public product/docs: `https://codexdentist.com`, `https://codexdentist.com/features`, and `https://codexdentist.com/docs`.
 - Public demo: `https://demo.codexdentist.com`; each workspace is isolated and expires after 24 hours. Root-domain `/demo` remains a compatibility entry.
+- Public odontogram prototype: `https://odontogram.codexdentist.com`; it provides an adult FDI chart with five independently selectable surfaces per tooth. Prototype state is browser-local and is not yet a patient clinical record.
 - Public S22U tunnel target: `https://app.codexdentist.com`.
 - S22U deploy uses `scripts/deploy-to-s22.ps1` and must preserve `.env`, database, and storage.
 - Check `adb devices -l` before S22U work.
@@ -25,7 +26,7 @@ Last updated: 2026-07-25
 
 - `Organization` is the canonical tenant/system/chain model. Legacy `Chain` is backward compatibility only.
 - `app.codexdentist.com` is the neutral/super-admin host.
-- `demo.codexdentist.com` and `docs.codexdentist.com` remain reserved system hosts. The demo host has its own TLS certificate and renders the demo entry directly at `/`.
+- `demo.codexdentist.com`, `docs.codexdentist.com`, and `odontogram.codexdentist.com` remain reserved system hosts. The demo and odontogram hosts render their dedicated entry directly at `/`.
 - Tenant staff should use tenant subdomains such as `bsthinh.codexdentist.com`.
 - Super admin is an `OWNER` email in `SUPER_ADMIN_EMAILS`.
 - Tenant-host login/reset must never authenticate or reset another tenant.

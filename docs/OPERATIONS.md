@@ -148,6 +148,7 @@ Public host routing:
 - root/`www`: product site, feature guide at `/features`, and compatibility demo entry at `/demo`;
 - `demo`: 24-hour demo entry directly at `/`;
 - `docs`: redirects to `/docs`;
+- `odontogram`: rewrites `/` internally to the standalone five-surface odontogram prototype;
 - `app`/`admin`: neutral application entry;
 - other supported subdomains: tenant application.
 
