@@ -115,7 +115,7 @@ Current cPanel deployment:
 
 Authoritative DNS is Cloudflare, using `kanye.ns.cloudflare.com` and `tara.ns.cloudflare.com`. Edit public DNS in Cloudflare, not the cPanel zone or Namecheap Advanced DNS. Root, `www`, and `*` are proxied to the shared-hosting origin; mail and cPanel service hosts remain DNS-only. Preserve the Jellyfish MX records and the existing hosting SPF/DKIM/DMARC records when changing DNS.
 
-Cloudflare SSL mode is currently `Full`. The cPanel origin has valid certificates for the root and `demo`, but not an installed certificate for the wildcard virtual host. Do not switch to `Full (strict)` until `codexdentist.com` plus `*.codexdentist.com` are covered by an origin certificate and a direct-origin wildcard check succeeds.
+Cloudflare SSL mode is `Full (strict)`. cPanel has a Cloudflare Origin CA certificate covering `codexdentist.com` and `*.codexdentist.com`; keep the wildcard certificate installed before changing TLS settings or moving the origin. Cloudflare also has one active rate-limiting rule named `Protect authentication endpoints`: requests from the same IP exceeding 30 `POST` requests in 10 seconds to `/login`, `/reset-password`, or `/demo` are blocked for 10 seconds. Application-level persistent rate limits remain authoritative for credential abuse.
 
 Stellar Plus limits process creation during builds. Set `CODEXMED_SHARED_HOST_BUILD=true` so Next.js uses one build/static-generation worker, then deploy with:
 
