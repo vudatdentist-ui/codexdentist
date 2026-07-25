@@ -117,18 +117,22 @@ Authoritative DNS is Cloudflare, using `kanye.ns.cloudflare.com` and `tara.ns.cl
 
 Cloudflare SSL mode is `Full (strict)`. cPanel has a Cloudflare Origin CA certificate covering `codexdentist.com` and `*.codexdentist.com`; keep the wildcard certificate installed before changing TLS settings or moving the origin. Cloudflare also has one active rate-limiting rule named `Protect authentication endpoints`: requests from the same IP exceeding 30 `POST` requests in 10 seconds to `/login`, `/reset-password`, or `/demo` are blocked for 10 seconds. Application-level persistent rate limits remain authoritative for credential abuse.
 
-Stellar Plus limits process creation during builds. Set `CODEXMED_SHARED_HOST_BUILD=true` so Next.js uses one build/static-generation worker, then deploy with:
+Stellar Plus limits memory and process creation during builds. Stop only this Node.js app before installing dependencies, use one Next.js worker, and prune development dependencies before starting it again:
 
 ```sh
+cloudlinux-selector stop --json --interpreter nodejs --domain codexdentist.com --app-root codexdentist-app
 source /home/CPANEL_USER/nodevenv/codexdentist-app/22/bin/activate
 cd /home/CPANEL_USER/codexdentist-app
-npm ci --include=dev --no-audit --no-fund
-npm run build
+npm ci --include=dev --ignore-scripts --no-audit --no-fund
+npm run prisma:generate
+CODEXMED_SHARED_HOST_BUILD=true npm run build
 set -a && source .env && set +a
 npx prisma migrate deploy
+npm prune --omit=dev --ignore-scripts --no-audit --no-fund
+cloudlinux-selector start --json --interpreter nodejs --domain codexdentist.com --app-root codexdentist-app
 ```
 
-Restart the app from cPanel `Setup Node.js App`, then verify `https://codexdentist.com/api/health`. Do not enable notification cron jobs until the delivery provider and recipient data have been verified. Shared hosting remains a pilot/community-test target; monitor cPanel resource usage before placing real clinic workloads on it.
+If the CLI start fails, start the app from cPanel `Setup Node.js App`. Then verify `https://codexdentist.com/api/health`. Do not enable notification cron jobs until the delivery provider and recipient data have been verified. Shared hosting remains a pilot/community-test target; monitor cPanel resource usage before placing real clinic workloads on it.
 
 After dependency changes, verify the installed runtime rather than only `package.json`:
 
