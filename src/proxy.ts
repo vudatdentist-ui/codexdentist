@@ -27,6 +27,8 @@ export function proxy(request: NextRequest) {
 
   if (isOdontogramHostname(host) && request.nextUrl.pathname === "/") {
     const url = request.nextUrl.clone();
+    url.hostname = host;
+    url.port = "";
     url.pathname = "/odontogram";
     return NextResponse.rewrite(url);
   }
