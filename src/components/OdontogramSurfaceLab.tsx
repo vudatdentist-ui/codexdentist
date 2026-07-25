@@ -473,9 +473,7 @@ function Arch({
   const upper = Number(teeth[0][0]) <= 2;
 
   return (
-    <section
-      className={`${styles.arch} ${upper ? styles.upperArch : styles.lowerArch}`}
-    >
+    <section className={`${styles.arch} ${upper ? "" : styles.lowerArch}`}>
       <div className={styles.archLabel}>{label}</div>
       <div className={styles.teethRow}>
         {teeth.map((tooth, index) => {
