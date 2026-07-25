@@ -121,6 +121,17 @@ function toothType(tooth: ToothId) {
   return "Răng hàm lớn";
 }
 
+type ToothKind = "incisor" | "canine" | "premolar" | "molar";
+
+function toothKind(tooth: ToothId): ToothKind {
+  const position = toothPosition(tooth);
+
+  if (position <= 2) return "incisor";
+  if (position === 3) return "canine";
+  if (position <= 5) return "premolar";
+  return "molar";
+}
+
 function toothSurfaces(tooth: ToothId): SurfaceCode[] {
   return ["M", "D", "B", "L", isAnterior(tooth) ? "I" : "O"];
 }
@@ -459,17 +470,27 @@ function Arch({
   onSetSurface: (tooth: ToothId, surface: SurfaceCode) => void;
   onClearSurface: (tooth: ToothId, surface: SurfaceCode) => void;
 }) {
+  const upper = Number(teeth[0][0]) <= 2;
+
   return (
-    <section className={styles.arch}>
+    <section
+      className={`${styles.arch} ${upper ? styles.upperArch : styles.lowerArch}`}
+    >
       <div className={styles.archLabel}>{label}</div>
       <div className={styles.teethRow}>
-        {teeth.map((tooth, index) => (
-          <div
-            className={`${styles.toothCell} ${
-              selectedTooth === tooth ? styles.toothSelected : ""
-            } ${index === 7 ? styles.beforeMidline : ""}`}
-            key={tooth}
-          >
+        {teeth.map((tooth, index) => {
+          const figure = (
+            <button
+              className={styles.toothFigureButton}
+              type="button"
+              onClick={() => onSelectTooth(tooth)}
+              aria-label={`Xem răng ${tooth}`}
+              title={`${toothType(tooth)} ${tooth}`}
+            >
+              <ToothIllustration tooth={tooth} />
+            </button>
+          );
+          const number = (
             <button
               className={styles.toothNumber}
               type="button"
@@ -478,6 +499,8 @@ function Arch({
             >
               {tooth}
             </button>
+          );
+          const surfaceMap = (
             <SurfaceMap
               tooth={tooth}
               state={state}
@@ -485,10 +508,104 @@ function Arch({
               onSetSurface={onSetSurface}
               onClearSurface={onClearSurface}
             />
-          </div>
-        ))}
+          );
+
+          return (
+            <div
+              className={`${styles.toothCell} ${
+                selectedTooth === tooth ? styles.toothSelected : ""
+              } ${index === 7 ? styles.beforeMidline : ""}`}
+              key={tooth}
+            >
+              {upper ? (
+                <>
+                  {figure}
+                  {number}
+                  {surfaceMap}
+                </>
+              ) : (
+                <>
+                  {surfaceMap}
+                  {number}
+                  {figure}
+                </>
+              )}
+            </div>
+          );
+        })}
       </div>
     </section>
+  );
+}
+
+const anatomyPaths: Record<
+  ToothKind,
+  { crown: string; root: string; details: string[] }
+> = {
+  incisor: {
+    root:
+      "M27 61 C27 48 28 28 32 9 C33 4 37 4 39 9 C43 28 44 48 43 61 Z",
+    crown:
+      "M24 58 C27 55 43 55 46 58 L47 79 C46 87 41 91 35 91 C29 91 24 87 23 79 Z",
+    details: ["M28 63 C31 66 39 66 43 63"],
+  },
+  canine: {
+    root:
+      "M27 62 C27 47 29 24 34 5 C35 2 38 2 39 6 C43 28 43 48 42 62 Z",
+    crown:
+      "M25 59 C29 56 40 55 44 59 L47 76 C44 80 40 87 35 92 C30 87 26 81 23 76 Z",
+    details: ["M28 63 C31 66 39 66 42 63"],
+  },
+  premolar: {
+    root:
+      "M22 61 C22 48 19 24 23 9 C24 5 28 5 30 10 L35 40 L40 10 C42 5 46 5 47 10 C50 26 47 48 47 61 Z",
+    crown:
+      "M19 59 C21 54 28 54 35 58 C42 54 49 54 51 59 L53 76 C50 85 44 90 35 90 C26 90 20 85 17 76 Z",
+    details: ["M22 64 C28 68 42 68 48 64", "M35 59 V83"],
+  },
+  molar: {
+    root:
+      "M13 61 C14 47 11 24 16 10 C17 6 22 6 24 11 L29 40 L33 9 C34 5 38 5 40 10 L43 41 L48 12 C50 7 55 8 56 13 C59 28 55 49 56 61 Z",
+    crown:
+      "M10 59 C13 53 21 53 27 57 C32 53 38 53 43 57 C49 53 57 54 60 60 L62 76 C59 85 50 90 35 90 C20 90 11 85 8 76 Z",
+    details: [
+      "M14 64 C23 69 47 69 56 64",
+      "M23 59 C25 66 24 78 22 84",
+      "M46 59 C44 66 45 78 48 84",
+    ],
+  },
+};
+
+function ToothIllustration({ tooth }: { tooth: ToothId }) {
+  const anatomy = anatomyPaths[toothKind(tooth)];
+  const quadrant = Number(tooth[0]);
+  const lower = quadrant >= 3;
+  const patientLeft = quadrant === 2 || quadrant === 3;
+
+  return (
+    <svg
+      className={styles.toothIllustration}
+      viewBox="0 0 70 100"
+      aria-hidden="true"
+    >
+      <g transform={lower ? "translate(0 100) scale(1 -1)" : undefined}>
+        <path
+          className={styles.gumWash}
+          d="M0 54 C18 50 52 50 70 54 V70 C51 67 18 67 0 70 Z"
+        />
+        <g transform={patientLeft ? "translate(70 0) scale(-1 1)" : undefined}>
+          <path className={styles.toothRoot} d={anatomy.root} />
+          <path className={styles.toothCrown} d={anatomy.crown} />
+          {anatomy.details.map((detail, index) => (
+            <path
+              className={styles.toothDetail}
+              d={detail}
+              key={`${tooth}-detail-${index}`}
+            />
+          ))}
+        </g>
+      </g>
+    </svg>
   );
 }
 
