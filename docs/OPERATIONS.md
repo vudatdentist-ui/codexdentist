@@ -1,6 +1,6 @@
 # Operations
 
-Last updated: 2026-07-24
+Last updated: 2026-07-25
 
 ## Local PC
 
@@ -129,6 +129,15 @@ npx prisma migrate deploy
 ```
 
 Restart the app from cPanel `Setup Node.js App`, then verify `https://codexdentist.com/api/health`. Do not enable notification cron jobs until the delivery provider and recipient data have been verified. Shared hosting remains a pilot/community-test target; monitor cPanel resource usage before placing real clinic workloads on it.
+
+After dependency changes, verify the installed runtime rather than only `package.json`:
+
+```sh
+npm ls next sharp --depth=0
+npm audit --omit=dev
+```
+
+Production `/api/readiness` requires `x-job-secret: <JOB_SECRET>` or a Bearer token. Do not put this secret in public uptime monitors.
 
 Public host routing:
 

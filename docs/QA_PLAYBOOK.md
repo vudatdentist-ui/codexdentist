@@ -1,12 +1,13 @@
 # QA Playbook
 
-Last updated: 2026-07-23
+Last updated: 2026-07-25
 
 ## Fast Check
 
 ```powershell
 npm run encoding:check
 npm run typecheck
+npm run test:security
 node scripts/agent-health-check.mjs
 node scripts/agent-module-audit.mjs
 ```
@@ -74,6 +75,10 @@ docker build -t codexdentist:qa .
 - Export routes check role and resource access.
 - Patient portal is self-only.
 - Uploads enforce size, MIME, extension, storage, and unsafe scan status rules.
+- Upload content signatures match declared image/PDF/video/Office types before storage.
+- Production readiness rejects requests without `JOB_SECRET`.
+- Unsupported HTTP methods and untrusted Host headers are rejected before route handling.
+- Login throttling persists across application restarts.
 - Billing void/refund requires role, reason, and audit.
 
 Tenant negative tests to preserve:

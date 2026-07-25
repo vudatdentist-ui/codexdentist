@@ -30,6 +30,7 @@
     "test:settings-forms": "node scripts/settings-form-action-smoke.mjs",
     "test:patient-files": "node scripts/patient-file-protected-smoke.mjs",
     "test:hardening": "node scripts/hardening-smoke.mjs",
+    "test:security": "node scripts/security-hardening-check.mjs",
     "test:tenant": "node scripts/tenant-isolation-smoke.mjs",
     "test:pilot-workflows": "node scripts/pilot-workflow-smoke.mjs",
     "test:data-integrity": "node scripts/data-integrity-smoke.mjs",

@@ -5,6 +5,7 @@ import {
   patientFileStorageDriver,
   resendEmailConfig,
 } from "@/lib/env";
+import { verifyJobRequest } from "@/lib/job-auth";
 import { prisma } from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
@@ -15,17 +16,30 @@ type ReadinessCheck = {
   status: "ok" | "warn" | "fail";
 };
 
-export async function GET() {
+export async function GET(request: Request) {
+  if (process.env.NODE_ENV === "production" && !verifyJobRequest(request)) {
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      {
+        status: 401,
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      },
+    );
+  }
+
   const checks: ReadinessCheck[] = [];
 
   try {
     await prisma.$queryRaw`SELECT 1`;
     checks.push({ name: "database", status: "ok" });
   } catch (error) {
+    console.error("readiness.database_failed", error);
     checks.push({
       name: "database",
       status: "fail",
-      details: error instanceof Error ? error.message : "Database unavailable",
+      details: "Database unavailable",
     });
   }
 
@@ -39,10 +53,11 @@ export async function GET() {
       details: `${Number(migrations[0]?.count ?? 0)} migrations recorded`,
     });
   } catch (error) {
+    console.error("readiness.migrations_failed", error);
     checks.push({
       name: "migrations",
       status: "fail",
-      details: error instanceof Error ? error.message : "Migration table unavailable",
+      details: "Migration table unavailable",
     });
   }
 
@@ -53,10 +68,11 @@ export async function GET() {
       details: patientFileStorageDriver(),
     });
   } catch (error) {
+    console.error("readiness.storage_failed", error);
     checks.push({
       name: "patient-file-storage",
       status: "fail",
-      details: error instanceof Error ? error.message : "Storage config invalid",
+      details: "Storage config invalid",
     });
   }
 
@@ -69,10 +85,11 @@ export async function GET() {
       details: resend ? "resend configured" : mode,
     });
   } catch (error) {
+    console.error("readiness.notifications_failed", error);
     checks.push({
       name: "notifications",
       status: "fail",
-      details: error instanceof Error ? error.message : "Notification config invalid",
+      details: "Notification config invalid",
     });
   }
 
@@ -84,10 +101,11 @@ export async function GET() {
       details: ai.enabled ? `${ai.provider}:${ai.model}` : "disabled",
     });
   } catch (error) {
+    console.error("readiness.ai_failed", error);
     checks.push({
       name: "ai",
       status: "fail",
-      details: error instanceof Error ? error.message : "AI config invalid",
+      details: "AI config invalid",
     });
   }
 
@@ -100,6 +118,11 @@ export async function GET() {
       checks,
       timestamp: new Date().toISOString(),
     },
-    { status: hasFailure ? 503 : 200 },
+    {
+      status: hasFailure ? 503 : 200,
+      headers: {
+        "Cache-Control": "no-store",
+      },
+    },
   );
 }

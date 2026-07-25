@@ -505,6 +505,16 @@ model Session {
   @@index([userId, expiresAt])
 }
 
+model SecurityRateLimitBucket {
+  keyHash   String   @id
+  count     Int
+  resetAt   DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([resetAt])
+}
+
 model UserClinic {
   userId   String
   clinicId String

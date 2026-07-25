@@ -52,6 +52,13 @@ const extensionByMimeType: Record<string, string> = {
   "video/mp4": ".mp4",
   "video/quicktime": ".mov",
 };
+const allowedImageMimeTypes = new Set([
+  "image/gif",
+  "image/heic",
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+]);
 const imageMimeTypesWithVariants = new Set([
   "image/jpeg",
   "image/png",
@@ -128,7 +135,7 @@ export function classifyPatientFile(input: {
   const mimeType = (input.mimeType ?? "").toLowerCase();
   const extension = extensionFromName(input.fileName ?? "");
 
-  if (mimeType.startsWith("image/") && mimeType !== "image/svg+xml") {
+  if (allowedImageMimeTypes.has(mimeType)) {
     return { extension, kind: "image" };
   }
 
@@ -261,7 +268,7 @@ async function storeUpload({
 
   const storageProvider = patientFileStorageDriver();
   const originalName = sanitizeFileName(file.name || fallbackFileName);
-  const mimeType = file.type || "application/octet-stream";
+  const mimeType = (file.type || "application/octet-stream").toLowerCase();
   const { kind: fileKind } = classifyPatientFile({
     fileName: originalName,
     mimeType,
@@ -270,6 +277,18 @@ async function storeUpload({
   if (fileKind === "unsupported") {
     throw new Error("Unsupported file type");
   }
+
+  if (file.size > PATIENT_FILE_SIZE_LIMITS[fileKind]) {
+    throw new Error("File exceeds the allowed size");
+  }
+
+  const bytes = Buffer.from(await file.arrayBuffer());
+  validateUploadContent({
+    bytes,
+    fileKind,
+    fileName: originalName,
+    mimeType,
+  });
 
   const extension = extensionFor(originalName, mimeType);
   const safeOrganizationId = sanitizePathSegment(organizationId);
@@ -281,7 +300,6 @@ async function storeUpload({
     safeOwnerId,
     storageName,
   );
-  const bytes = Buffer.from(await file.arrayBuffer());
   const checksumSha256 = createHash("sha256").update(bytes).digest("hex");
   const variants = await createImageVariants({
     bytes,
@@ -370,6 +388,12 @@ async function resolveStoredPatientFilePath(relativePath: string) {
 }
 
 function extensionFor(fileName: string, mimeType: string) {
+  const mapped = extensionByMimeType[mimeType];
+
+  if (mapped) {
+    return mapped;
+  }
+
   const parsed = extensionFromName(fileName);
 
   if (/^\.[a-z0-9]{1,8}$/.test(parsed)) {
@@ -377,6 +401,139 @@ function extensionFor(fileName: string, mimeType: string) {
   }
 
   return extensionByMimeType[mimeType] ?? "";
+}
+
+function validateUploadContent(input: {
+  bytes: Buffer;
+  fileKind: Exclude<PatientFileKind, "unsupported">;
+  fileName: string;
+  mimeType: string;
+}) {
+  if (input.bytes.length === 0) {
+    throw new Error("Empty file");
+  }
+
+  const leadingText = input.bytes
+    .subarray(0, Math.min(input.bytes.length, 512))
+    .toString("utf8")
+    .trimStart()
+    .toLowerCase();
+
+  if (
+    leadingText.startsWith("<svg") ||
+    leadingText.startsWith("<!doctype html") ||
+    leadingText.startsWith("<html") ||
+    leadingText.startsWith("<script")
+  ) {
+    throw new Error("Active web content is not allowed");
+  }
+
+  if (input.fileKind === "image") {
+    const detectedMimeType = detectImageMimeType(input.bytes);
+
+    if (!detectedMimeType || detectedMimeType !== input.mimeType) {
+      throw new Error("Image content does not match its declared type");
+    }
+
+    return;
+  }
+
+  if (
+    input.fileKind === "pdf" &&
+    !input.bytes.subarray(0, 5).equals(Buffer.from("%PDF-"))
+  ) {
+    throw new Error("Invalid PDF signature");
+  }
+
+  if (input.fileKind === "video" && !hasIsoBaseMediaSignature(input.bytes)) {
+    throw new Error("Invalid video signature");
+  }
+
+  if (input.fileKind === "document") {
+    const extension = extensionFromName(input.fileName);
+    const isOpenXml = [".docx", ".pptx", ".xlsx"].includes(extension);
+    const isLegacyOffice = [".doc", ".ppt", ".xls"].includes(extension);
+
+    if (isOpenXml && !hasZipSignature(input.bytes)) {
+      throw new Error("Invalid Open XML document signature");
+    }
+
+    if (isLegacyOffice && !hasOleCompoundSignature(input.bytes)) {
+      throw new Error("Invalid legacy Office document signature");
+    }
+  }
+}
+
+function detectImageMimeType(bytes: Buffer) {
+  if (
+    bytes.length >= 3 &&
+    bytes[0] === 0xff &&
+    bytes[1] === 0xd8 &&
+    bytes[2] === 0xff
+  ) {
+    return "image/jpeg";
+  }
+
+  if (
+    bytes.length >= 8 &&
+    bytes.subarray(0, 8).equals(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    )
+  ) {
+    return "image/png";
+  }
+
+  const gifHeader = bytes.subarray(0, 6).toString("ascii");
+
+  if (gifHeader === "GIF87a" || gifHeader === "GIF89a") {
+    return "image/gif";
+  }
+
+  if (
+    bytes.length >= 12 &&
+    bytes.subarray(0, 4).toString("ascii") === "RIFF" &&
+    bytes.subarray(8, 12).toString("ascii") === "WEBP"
+  ) {
+    return "image/webp";
+  }
+
+  if (hasIsoBaseMediaSignature(bytes)) {
+    const brand = bytes.subarray(8, 12).toString("ascii").toLowerCase();
+
+    if (
+      ["heic", "heix", "hevc", "hevx", "mif1", "msf1"].includes(brand)
+    ) {
+      return "image/heic";
+    }
+  }
+
+  return null;
+}
+
+function hasIsoBaseMediaSignature(bytes: Buffer) {
+  return (
+    bytes.length >= 12 &&
+    bytes.subarray(4, 8).toString("ascii") === "ftyp"
+  );
+}
+
+function hasZipSignature(bytes: Buffer) {
+  return (
+    bytes.length >= 4 &&
+    bytes[0] === 0x50 &&
+    bytes[1] === 0x4b &&
+    [0x03, 0x05, 0x07].includes(bytes[2] ?? -1) &&
+    [0x04, 0x06, 0x08].includes(bytes[3] ?? -1)
+  );
+}
+
+function hasOleCompoundSignature(bytes: Buffer) {
+  return (
+    bytes.length >= 8 &&
+    bytes
+      .subarray(0, 8)
+      .equals(Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]))
+  );
 }
 
 function extensionFromName(fileName: string) {
@@ -437,12 +594,23 @@ async function createImageVariants(input: {
     const sharpPackageName = "sharp";
     const sharpModule = await import(sharpPackageName);
     sharp = sharpModule.default;
+    sharp.block({
+      operation: [
+        "VipsForeignLoadNsgif",
+        "VipsForeignLoadTiff",
+        "VipsForeignLoadVips",
+      ],
+    });
   } catch {
     return {};
   }
 
   const [previewBytes, thumbnailBytes] = await Promise.all([
-    sharp(input.bytes)
+    sharp(input.bytes, {
+      failOn: "warning",
+      limitInputPixels: 40_000_000,
+      sequentialRead: true,
+    })
       .rotate()
       .resize({
         fit: "inside",
@@ -452,7 +620,11 @@ async function createImageVariants(input: {
       })
       .webp({ quality: 82 })
       .toBuffer(),
-    sharp(input.bytes)
+    sharp(input.bytes, {
+      failOn: "warning",
+      limitInputPixels: 40_000_000,
+      sequentialRead: true,
+    })
       .rotate()
       .resize({
         fit: "inside",

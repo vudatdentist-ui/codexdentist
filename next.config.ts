@@ -7,6 +7,19 @@ type ServerActionBodySizeLimit = NonNullable<
 const serverActionBodySizeLimit = (process.env.SERVER_ACTION_BODY_SIZE_LIMIT ??
   "64mb") as ServerActionBodySizeLimit;
 const sharedHostBuild = process.env.CODEXMED_SHARED_HOST_BUILD === "true";
+const hostedDeployment = process.env.DEPLOYMENT_MODE !== "self-hosted";
+const appRootDomain =
+  process.env.APP_ROOT_DOMAIN?.trim().toLowerCase() || "codexdentist.com";
+const serverActionAllowedOrigins = hostedDeployment
+  ? [
+      appRootDomain,
+      `*.${appRootDomain}`,
+      ...(process.env.TRUSTED_APP_HOSTS ?? "")
+        .split(",")
+        .map((host) => host.trim().toLowerCase())
+        .filter(Boolean),
+    ]
+  : undefined;
 
 const contentSecurityPolicy = [
   "default-src 'self'",
@@ -18,7 +31,7 @@ const contentSecurityPolicy = [
   "media-src 'self' blob:",
   "font-src 'self' data:",
   "style-src 'self' 'unsafe-inline'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com",
+  "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
   "connect-src 'self' https://cloudflareinsights.com https://*.cloudflareinsights.com",
 ].join("; ");
 
@@ -67,6 +80,7 @@ const nextConfig: NextConfig = {
     staticGenerationMaxConcurrency: sharedHostBuild ? 1 : undefined,
     staticGenerationMinPagesPerWorker: sharedHostBuild ? 100 : undefined,
     serverActions: {
+      allowedOrigins: serverActionAllowedOrigins,
       bodySizeLimit: serverActionBodySizeLimit,
     },
   },

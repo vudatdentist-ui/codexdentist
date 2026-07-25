@@ -39,6 +39,7 @@
   ],
   "exclude": [
     "node_modules",
+    "output",
     "selfhost-notes",
     "storage",
     "backups"

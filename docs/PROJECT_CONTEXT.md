@@ -1,6 +1,6 @@
 # Project Context
 
-Last updated: 2026-07-23
+Last updated: 2026-07-25
 
 ## Product Direction
 
@@ -87,8 +87,17 @@ Route access lives in `src/lib/permissions.ts`. Mutation permissions live in `sr
 - Patient files are protected records, not public assets.
 - Hosted production uses private Cloudflare R2. Self-host mode may use the private local volume mounted at `/data/patient-files`.
 - Files are served through `/patient-files/[fileId]` with session, role, organization, clinic, and linked-patient checks.
+- Upload storage validates size, declared type, file extension, and content signature before writing or image processing. Active HTML/SVG payloads are rejected.
 - Demo workspaces cannot upload patient files or send outbound notifications.
 - Virus scanning is a governance status until a provider/scanner is connected.
+
+## Security Baseline
+
+- Hosted production accepts only the configured root domain and one-level subdomains; self-host deployments additionally accept local/LAN hosts.
+- Server Actions restrict allowed origins on hosted deployments.
+- Login, password reset, and demo creation rate limits are stored in PostgreSQL and keyed by a hash; Cloudflare's verified client IP header takes precedence.
+- Production `/api/readiness` requires `JOB_SECRET`. Public monitoring uses `/api/health`.
+- Production CSP must not allow `unsafe-eval`.
 
 ## Services, Inventory, Payroll
 

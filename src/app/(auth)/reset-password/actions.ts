@@ -4,12 +4,13 @@ import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { resetPasswordWithToken } from "@/lib/password-reset";
 import { consumePasswordResetAttempt } from "@/lib/rate-limit";
+import { clientIpFromHeaders } from "@/lib/request-ip";
 
 export async function resetPasswordAction(formData: FormData) {
   const token = String(formData.get("token") ?? "");
   const password = String(formData.get("password") ?? "");
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
-  const limit = consumePasswordResetAttempt(await resetRateLimitKey(token));
+  const limit = await consumePasswordResetAttempt(await resetRateLimitKey(token));
 
   if (!limit.allowed) {
     redirect(`/reset-password?token=${encodeURIComponent(token)}&error=rate-limited`);
@@ -30,9 +31,7 @@ export async function resetPasswordAction(formData: FormData) {
 
 async function resetRateLimitKey(token: string) {
   const headerStore = await headers();
-  const forwardedFor = headerStore.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const realIp = headerStore.get("x-real-ip")?.trim();
-  const ip = forwardedFor || realIp || "unknown";
+  const ip = clientIpFromHeaders(headerStore);
 
   return `${ip}:reset:${token.slice(0, 16)}`;
 }

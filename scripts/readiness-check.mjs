@@ -1,7 +1,14 @@
 const target = process.env.READINESS_URL || "http://127.0.0.1:3000/api/readiness";
 
 try {
-  const response = await fetch(target, { cache: "no-store" });
+  const response = await fetch(target, {
+    cache: "no-store",
+    headers: process.env.JOB_SECRET
+      ? {
+          "x-job-secret": process.env.JOB_SECRET,
+        }
+      : undefined,
+  });
   const body = await response.json().catch(() => null);
 
   if (!response.ok || !body || body.status === "fail") {

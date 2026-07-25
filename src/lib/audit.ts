@@ -4,6 +4,7 @@ import type { Prisma } from "@prisma/client";
 import { headers } from "next/headers";
 import { databaseActorId } from "@/lib/form-validation";
 import { prisma } from "@/lib/prisma";
+import { clientIpFromHeaders } from "@/lib/request-ip";
 import type { AppSession } from "@/lib/session";
 
 export async function writeAuditLog(input: {
@@ -28,7 +29,7 @@ export async function writeAuditLog(input: {
         action: input.action,
         entityType: input.entityType,
         entityId: input.entityId ?? null,
-        ipAddress: requestHeaders?.get("x-forwarded-for")?.split(",")[0]?.trim() ?? null,
+        ipAddress: requestHeaders ? clientIpFromHeaders(requestHeaders) : null,
         metadata: {
           ...metadata,
           actorEmail: input.session?.email ?? null,

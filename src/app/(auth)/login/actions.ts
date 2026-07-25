@@ -19,12 +19,13 @@ import {
   consumeLoginAttempt,
   consumePasswordResetAttempt,
 } from "@/lib/rate-limit";
+import { clientIpFromHeaders } from "@/lib/request-ip";
 
 export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
   const key = await loginRateLimitKey(email);
-  const limit = consumeLoginAttempt(key);
+  const limit = await consumeLoginAttempt(key);
 
   if (!limit.allowed) {
     redirect("/login?error=rate-limited");
@@ -36,14 +37,14 @@ export async function loginAction(formData: FormData) {
     redirect(`/login?error=${result.reason}`);
   }
 
-  clearLoginAttempts(key);
+  await clearLoginAttempts(key);
   redirect("/dashboard");
 }
 
 export async function forgotPasswordAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const key = await loginRateLimitKey(`forgot:${email}`);
-  const limit = consumePasswordResetAttempt(key);
+  const limit = await consumePasswordResetAttempt(key);
 
   if (!limit.allowed) {
     redirect("/login?forgot=sent");
@@ -138,9 +139,7 @@ export async function forgotPasswordAction(formData: FormData) {
 
 async function loginRateLimitKey(email: string) {
   const headerStore = await headers();
-  const forwardedFor = headerStore.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const realIp = headerStore.get("x-real-ip")?.trim();
-  const ip = forwardedFor || realIp || "unknown";
+  const ip = clientIpFromHeaders(headerStore);
 
   return `${ip}:${email}`;
 }

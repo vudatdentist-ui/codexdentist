@@ -5,16 +5,15 @@ import { redirect } from "next/navigation";
 import { signIn } from "@/lib/auth";
 import { createDemoWorkspace } from "@/lib/demo-workspaces";
 import { consumeDemoWorkspaceAttempt } from "@/lib/rate-limit";
+import { clientIpFromHeaders } from "@/lib/request-ip";
 import { currentHostname, systemSubdomainFromHostname } from "@/lib/tenant";
 
 export async function startDemoWorkspaceAction() {
   const headerStore = await headers();
   const demoEntryPath =
     systemSubdomainFromHostname(await currentHostname()) === "demo" ? "/" : "/demo";
-  const forwardedFor = headerStore.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const realIp = headerStore.get("x-real-ip")?.trim();
-  const key = forwardedFor || realIp || "unknown";
-  const limit = consumeDemoWorkspaceAttempt(key);
+  const key = clientIpFromHeaders(headerStore);
+  const limit = await consumeDemoWorkspaceAttempt(key);
 
   if (!limit.allowed) {
     redirect(`${demoEntryPath}?error=rate-limited`);
