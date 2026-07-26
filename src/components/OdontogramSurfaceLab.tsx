@@ -354,7 +354,10 @@ function toothArtworkPath(
 ) {
   const dentition = isPrimaryTooth(tooth) ? "primary" : "adult";
   const suffix = variant ? `-${variant}` : "";
-  return `/odontogram-assets/${toothTemplate(tooth)}-${dentition}${suffix}.svg`;
+  const fileName = `${toothTemplate(tooth)}-${dentition}${suffix}.svg`;
+  return variant
+    ? `/api/odontogram-assets/${fileName}`
+    : `/odontogram-assets/${fileName}`;
 }
 
 function toothSurfaces(tooth: ToothId): SurfaceCode[] {

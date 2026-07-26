@@ -137,6 +137,8 @@ The current app root uses a physical `node_modules` directory. Do not activate t
 
 If the CLI start fails, start the app from cPanel `Setup Node.js App`. Then verify `https://codexdentist.com/api/health`. Do not enable notification cron jobs until the delivery provider and recipient data have been verified. Shared hosting remains a pilot/community-test target; monitor cPanel resource usage before placing real clinic workloads on it.
 
+LiteSpeed/Passenger can retain a stale public-file index after deployment. Generated odontogram variants therefore use the allowlisted `/api/odontogram-assets/[fileName]` route; keep base tooth SVGs in `public/odontogram-assets` and verify one variant URL after each release.
+
 After dependency changes, verify the installed runtime rather than only `package.json`:
 
 ```sh
