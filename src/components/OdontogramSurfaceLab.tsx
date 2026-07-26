@@ -80,19 +80,48 @@ type Dentition = "adult" | "primary";
 type SurfaceCode = "M" | "D" | "B" | "L" | "O" | "I";
 type ConditionId = (typeof conditionOptions)[number]["id"];
 type ClinicalMarkerId = (typeof clinicalMarkerOptions)[number]["id"];
+type NativeMarkerId =
+  | "pulpitis"
+  | "periodontitis"
+  | "periapical"
+  | "rootCanal"
+  | "crown"
+  | "extraction";
 type SurfaceState = Record<string, ConditionId>;
 type MarkerState = Record<string, true>;
-type HistoryEntry =
-  | {
-      target: "surface";
-      key: string;
-      previous?: ConditionId;
-    }
-  | {
-      target: "marker";
-      key: string;
-      previous: boolean;
-    };
+type HistoryEntry = {
+  surfaceState: SurfaceState;
+  markerState: MarkerState;
+};
+
+const nativeMarkerIds = new Set<ClinicalMarkerId>([
+  "pulpitis",
+  "periodontitis",
+  "periapical",
+  "rootCanal",
+  "crown",
+  "extraction",
+]);
+
+const markerConflicts: Record<ClinicalMarkerId, ClinicalMarkerId[]> = {
+  missing: clinicalMarkerOptions.map((marker) => marker.id),
+  implant: [
+    "missing",
+    "pulpitis",
+    "rootCanal",
+    "periapical",
+    "crown",
+    "fracture",
+    "extraction",
+  ],
+  pulpitis: ["missing", "implant", "rootCanal"],
+  rootCanal: ["missing", "implant", "pulpitis"],
+  crown: ["missing", "implant", "fracture"],
+  fracture: ["missing", "implant", "crown"],
+  extraction: ["missing", "implant"],
+  periodontitis: ["missing"],
+  periapical: ["missing", "implant"],
+};
 
 const surfaceNames: Record<SurfaceCode, string> = {
   M: "Mesial",
@@ -186,6 +215,53 @@ function readStoredMarkerState() {
   }
 }
 
+function normalizeStoredState(
+  surfaceState: SurfaceState,
+  markerState: MarkerState,
+) {
+  const nextSurfaces = { ...surfaceState };
+  const nextMarkers = { ...markerState };
+
+  for (const tooth of allTeeth) {
+    if (hasMarker(nextMarkers, tooth, "missing")) {
+      for (const marker of clinicalMarkerOptions) {
+        if (marker.id !== "missing") {
+          delete nextMarkers[markerKey(tooth, marker.id)];
+        }
+      }
+      for (const surface of toothSurfaces(tooth)) {
+        delete nextSurfaces[surfaceKey(tooth, surface)];
+      }
+      continue;
+    }
+
+    if (hasMarker(nextMarkers, tooth, "implant")) {
+      for (const conflict of markerConflicts.implant) {
+        delete nextMarkers[markerKey(tooth, conflict)];
+      }
+      for (const surface of toothSurfaces(tooth)) {
+        delete nextSurfaces[surfaceKey(tooth, surface)];
+      }
+    }
+
+    if (
+      hasMarker(nextMarkers, tooth, "pulpitis") &&
+      hasMarker(nextMarkers, tooth, "rootCanal")
+    ) {
+      delete nextMarkers[markerKey(tooth, "pulpitis")];
+    }
+
+    if (
+      hasMarker(nextMarkers, tooth, "crown") &&
+      hasMarker(nextMarkers, tooth, "fracture")
+    ) {
+      delete nextMarkers[markerKey(tooth, "fracture")];
+    }
+  }
+
+  return { surfaceState: nextSurfaces, markerState: nextMarkers };
+}
+
 function persistStoredState(state: SurfaceState) {
   try {
     window.localStorage.setItem(storageKey, JSON.stringify(state));
@@ -208,6 +284,18 @@ function surfaceKey(tooth: ToothId, surface: SurfaceCode) {
 
 function markerKey(tooth: ToothId, marker: ClinicalMarkerId) {
   return `${tooth}.${marker}`;
+}
+
+function hasMarker(
+  state: MarkerState,
+  tooth: ToothId,
+  marker: ClinicalMarkerId,
+) {
+  return state[markerKey(tooth, marker)] === true;
+}
+
+function isToothUnavailable(state: MarkerState, tooth: ToothId) {
+  return hasMarker(state, tooth, "missing") || hasMarker(state, tooth, "implant");
 }
 
 function toothPosition(tooth: ToothId) {
@@ -249,18 +337,7 @@ function toothType(tooth: ToothId) {
   return "Răng hàm lớn";
 }
 
-type ToothKind = "incisor" | "canine" | "premolar" | "molar";
 type ToothTemplate = "11" | "13" | "14" | "16";
-
-function toothKind(tooth: ToothId): ToothKind {
-  const position = toothPosition(tooth);
-
-  if (position <= 2) return "incisor";
-  if (position === 3) return "canine";
-  if (isPrimaryTooth(tooth)) return "molar";
-  if (position <= 5) return "premolar";
-  return "molar";
-}
 
 function toothTemplate(tooth: ToothId): ToothTemplate {
   const position = toothPosition(tooth);
@@ -271,9 +348,13 @@ function toothTemplate(tooth: ToothId): ToothTemplate {
   return "16";
 }
 
-function toothArtworkPath(tooth: ToothId) {
+function toothArtworkPath(
+  tooth: ToothId,
+  variant?: "implant" | NativeMarkerId,
+) {
   const dentition = isPrimaryTooth(tooth) ? "primary" : "adult";
-  return `/odontogram-assets/${toothTemplate(tooth)}-${dentition}.svg`;
+  const suffix = variant ? `-${variant}` : "";
+  return `/odontogram-assets/${toothTemplate(tooth)}-${dentition}${suffix}.svg`;
 }
 
 function toothSurfaces(tooth: ToothId): SurfaceCode[] {
@@ -363,8 +444,14 @@ export function OdontogramSurfaceLab() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    setSurfaceState(readStoredState());
-    setMarkerState(readStoredMarkerState());
+    const normalized = normalizeStoredState(
+      readStoredState(),
+      readStoredMarkerState(),
+    );
+    setSurfaceState(normalized.surfaceState);
+    setMarkerState(normalized.markerState);
+    persistStoredState(normalized.surfaceState);
+    persistStoredMarkerState(normalized.markerState);
   }, []);
 
   const commitSurfaceState = (
@@ -385,6 +472,14 @@ export function OdontogramSurfaceLab() {
       persistStoredMarkerState(next);
       return next;
     });
+  };
+
+  const saveHistory = () => {
+    const snapshot = {
+      surfaceState: { ...surfaceState },
+      markerState: { ...markerState },
+    };
+    setHistory((current) => [...current.slice(-49), snapshot]);
   };
 
   const upperTeeth =
@@ -430,7 +525,15 @@ export function OdontogramSurfaceLab() {
       })),
     [selectedTooth, surfaceState],
   );
+  const selectedToothUnavailable = isToothUnavailable(
+    markerState,
+    selectedTooth,
+  );
   const setSurface = (tooth: ToothId, surface: SurfaceCode) => {
+    if (isToothUnavailable(markerState, tooth)) {
+      return;
+    }
+
     const key = surfaceKey(tooth, surface);
     const previous = surfaceState[key];
 
@@ -439,14 +542,15 @@ export function OdontogramSurfaceLab() {
     }
 
     setSelectedTooth(tooth);
-    setHistory((current) => [
-      ...current,
-      { target: "surface", key, previous },
-    ]);
+    saveHistory();
     commitSurfaceState((current) => ({ ...current, [key]: condition }));
   };
 
   const clearSurface = (tooth: ToothId, surface: SurfaceCode) => {
+    if (isToothUnavailable(markerState, tooth)) {
+      return;
+    }
+
     const key = surfaceKey(tooth, surface);
     const previous = surfaceState[key];
 
@@ -454,10 +558,7 @@ export function OdontogramSurfaceLab() {
       return;
     }
 
-    setHistory((current) => [
-      ...current,
-      { target: "surface", key, previous },
-    ]);
+    saveHistory();
     commitSurfaceState((current) => {
       const next = { ...current };
       delete next[key];
@@ -467,53 +568,39 @@ export function OdontogramSurfaceLab() {
 
   const toggleMarker = (tooth: ToothId, marker: ClinicalMarkerId) => {
     const key = markerKey(tooth, marker);
-    const previous = markerState[key] === true;
+    const active = markerState[key] === true;
 
     setSelectedTooth(tooth);
-    setHistory((current) => [
-      ...current,
-      { target: "marker", key, previous },
-    ]);
-    commitMarkerState((current) => {
-      const next = { ...current };
-      if (previous) {
-        delete next[key];
-      } else {
-        next[key] = true;
+    saveHistory();
+
+    const nextMarkers = { ...markerState };
+    const nextSurfaces = { ...surfaceState };
+
+    if (active) {
+      delete nextMarkers[key];
+    } else {
+      for (const conflict of markerConflicts[marker]) {
+        delete nextMarkers[markerKey(tooth, conflict)];
       }
-      return next;
-    });
+      nextMarkers[key] = true;
+
+      if (marker === "missing" || marker === "implant") {
+        for (const surface of toothSurfaces(tooth)) {
+          delete nextSurfaces[surfaceKey(tooth, surface)];
+        }
+      }
+    }
+
+    commitMarkerState(() => nextMarkers);
+    commitSurfaceState(() => nextSurfaces);
   };
 
   const undo = () => {
     const last = history.at(-1);
     if (!last) return;
 
-    if (last.target === "marker") {
-      commitMarkerState((current) => {
-        const next = { ...current };
-        if (last.previous) {
-          next[last.key] = true;
-        } else {
-          delete next[last.key];
-        }
-        return next;
-      });
-      setHistory((current) => current.slice(0, -1));
-      return;
-    }
-
-    const restore = (current: Record<string, ConditionId>) => {
-      const next = { ...current };
-      if (last.previous) {
-        next[last.key] = last.previous;
-      } else {
-        delete next[last.key];
-      }
-      return next;
-    };
-
-    commitSurfaceState(restore);
+    commitSurfaceState(() => last.surfaceState);
+    commitMarkerState(() => last.markerState);
     setHistory((current) => current.slice(0, -1));
   };
 
@@ -525,6 +612,7 @@ export function OdontogramSurfaceLab() {
     ) {
       return;
     }
+    saveHistory();
     commitSurfaceState((current) =>
       Object.fromEntries(
         Object.entries(current).filter(
@@ -539,7 +627,6 @@ export function OdontogramSurfaceLab() {
         ),
       ) as MarkerState,
     );
-    setHistory([]);
   };
 
   const copyData = async () => {
@@ -701,7 +788,13 @@ export function OdontogramSurfaceLab() {
               <span>Răng đang chọn</span>
               <h2>R{selectedTooth}</h2>
             </div>
-            <strong>{toothType(selectedTooth)}</strong>
+            <strong>
+              {hasMarker(markerState, selectedTooth, "missing")
+                ? "Mất răng"
+                : hasMarker(markerState, selectedTooth, "implant")
+                  ? "Implant"
+                  : toothType(selectedTooth)}
+            </strong>
           </div>
 
           <div className={styles.focusTooth}>
@@ -710,6 +803,7 @@ export function OdontogramSurfaceLab() {
               state={surfaceState}
               condition={condition}
               large
+              disabled={selectedToothUnavailable}
               onSetSurface={setSurface}
               onClearSurface={clearSurface}
             />
@@ -720,6 +814,7 @@ export function OdontogramSurfaceLab() {
               <button
                 key={surface}
                 type="button"
+                disabled={selectedToothUnavailable}
                 onClick={() => setSurface(selectedTooth, surface)}
               >
                 <span className={styles.surfaceCode}>{surface}</span>
@@ -761,7 +856,11 @@ export function OdontogramSurfaceLab() {
                     onClick={() => toggleMarker(selectedTooth, marker.id)}
                     aria-pressed={active}
                   >
-                    <ClinicalMarkerIcon marker={marker.id} color={marker.color} />
+                    <ClinicalMarkerPreview
+                      tooth={selectedTooth}
+                      marker={marker.id}
+                      color={marker.color}
+                    />
                     <span>{marker.label}</span>
                   </button>
                 );
@@ -858,6 +957,7 @@ function Arch({
               tooth={tooth}
               state={state}
               condition={condition}
+              disabled={isToothUnavailable(markerState, tooth)}
               onSetSurface={onSetSurface}
               onClearSurface={onClearSurface}
             />
@@ -893,17 +993,6 @@ function Arch({
   );
 }
 
-const crownMarkerPaths: Record<ToothKind, string> = {
-  incisor:
-    "M24 58 C27 55 43 55 46 58 L47 79 C46 87 41 91 35 91 C29 91 24 87 23 79 Z",
-  canine:
-    "M25 59 C29 56 40 55 44 59 L47 76 C44 80 40 87 35 92 C30 87 26 81 23 76 Z",
-  premolar:
-    "M19 59 C21 54 28 54 35 58 C42 54 49 54 51 59 L53 76 C50 85 44 90 35 90 C26 90 20 85 17 76 Z",
-  molar:
-    "M10 59 C13 53 21 53 27 57 C32 53 38 53 43 57 C49 53 57 54 60 60 L62 76 C59 85 50 90 35 90 C20 90 11 85 8 76 Z",
-};
-
 function ToothIllustration({
   tooth,
   markerState,
@@ -911,7 +1000,6 @@ function ToothIllustration({
   tooth: ToothId;
   markerState: MarkerState;
 }) {
-  const crownMarkerPath = crownMarkerPaths[toothKind(tooth)];
   const lower = !isUpperTooth(tooth);
   const patientLeft = isPatientLeft(tooth);
   const artworkTransform = `scale(${patientLeft ? -1 : 1}, ${
@@ -920,6 +1008,11 @@ function ToothIllustration({
   const activeMarkers = clinicalMarkerOptions
     .filter((marker) => markerState[markerKey(tooth, marker.id)] === true)
     .map((marker) => marker.id);
+  const missing = activeMarkers.includes("missing");
+  const implant = activeMarkers.includes("implant");
+  const nativeMarkers = activeMarkers.filter(
+    (marker): marker is NativeMarkerId => nativeMarkerIds.has(marker),
+  );
 
   return (
     <div
@@ -936,204 +1029,119 @@ function ToothIllustration({
           : ""
       }`}
     >
-      <img
-        className={styles.toothArtwork}
-        src={toothArtworkPath(tooth)}
-        alt=""
-        aria-hidden="true"
-        draggable={false}
-        style={{ transform: artworkTransform }}
-      />
-      <svg
-        className={styles.toothInteractionOverlay}
-        viewBox="0 0 70 100"
-        aria-hidden="true"
-      >
-        <g transform={lower ? "translate(0 100) scale(1 -1)" : undefined}>
-          <g transform={patientLeft ? "translate(70 0) scale(-1 1)" : undefined}>
-            <ClinicalMarkerOverlay
-              tooth={tooth}
-              crownPath={crownMarkerPath}
-              markers={activeMarkers}
+      {!missing ? (
+        <img
+          className={styles.toothArtwork}
+          src={toothArtworkPath(tooth, implant ? "implant" : undefined)}
+          alt=""
+          aria-hidden="true"
+          draggable={false}
+          style={{ transform: artworkTransform }}
+        />
+      ) : null}
+      {!missing
+        ? nativeMarkers.map((marker) => (
+            <img
+              className={styles.toothClinicalArtwork}
+              src={toothArtworkPath(tooth, marker)}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              key={marker}
+              style={{ transform: artworkTransform }}
             />
+          ))
+        : null}
+      {!missing && activeMarkers.includes("fracture") ? (
+        <svg
+          className={styles.toothInteractionOverlay}
+          viewBox="0 0 70 100"
+          aria-hidden="true"
+        >
+          <g transform={lower ? "translate(0 100) scale(1 -1)" : undefined}>
+            <g
+              transform={patientLeft ? "translate(70 0) scale(-1 1)" : undefined}
+            >
+              <path
+                className={styles.markerFracture}
+                d="M17 67 L28 70 L23 76 L38 73 L34 81 L52 78"
+              />
+            </g>
           </g>
-        </g>
-      </svg>
+        </svg>
+      ) : null}
     </div>
   );
 }
 
-function ClinicalMarkerOverlay({
+function ClinicalMarkerPreview({
   tooth,
-  crownPath,
-  markers,
-}: {
-  tooth: ToothId;
-  crownPath: string;
-  markers: ClinicalMarkerId[];
-}) {
-  if (markers.length === 0) {
-    return null;
-  }
-
-  const has = (marker: ClinicalMarkerId) => markers.includes(marker);
-  const crownPatternId = `clinical-crown-${tooth}`;
-
-  return (
-    <g className={styles.clinicalMarkerOverlay} aria-hidden="true">
-      {has("crown") ? (
-        <>
-          <defs>
-            <pattern
-              id={crownPatternId}
-              width="5"
-              height="5"
-              patternUnits="userSpaceOnUse"
-              patternTransform="rotate(30)"
-            >
-              <rect width="5" height="5" fill="#d18a1220" />
-              <line
-                x1="0"
-                y1="0"
-                x2="0"
-                y2="5"
-                stroke="#d18a12"
-                strokeWidth="2"
-              />
-            </pattern>
-          </defs>
-          <path
-            className={styles.markerCrown}
-            d={crownPath}
-            fill={`url(#${crownPatternId})`}
-          />
-        </>
-      ) : null}
-
-      {has("implant") ? (
-        <g className={styles.markerImplant}>
-          <path d="M27 16 L30 57 H40 L43 16 Z" />
-          {[22, 29, 36, 43, 50].map((y) => (
-            <path d={`M28 ${y} H42`} key={y} />
-          ))}
-          <path d="M31 57 H39 V65 H31 Z" />
-        </g>
-      ) : null}
-
-      {has("rootCanal") ? (
-        <g className={styles.markerRootCanal}>
-          <path d="M32 13 C31 30 32 48 33 66" />
-          <path d="M38 13 C39 30 38 48 37 66" />
-        </g>
-      ) : null}
-
-      {has("pulpitis") ? (
-        <g className={styles.markerPulpitis}>
-          <path d="M35 13 C34 31 35 48 35 64" />
-          <circle cx="35" cy="70" r="5" />
-        </g>
-      ) : null}
-
-      {has("periodontitis") ? (
-        <path
-          className={styles.markerPeriodontitis}
-          d="M4 57 C10 51 16 63 22 57 C28 51 34 63 40 57 C46 51 52 63 58 57 C62 54 65 54 68 57"
-        />
-      ) : null}
-
-      {has("periapical") ? (
-        <g className={styles.markerPeriapical}>
-          <circle cx="35" cy="11" r="8" />
-          <circle cx="35" cy="11" r="3" />
-        </g>
-      ) : null}
-
-      {has("fracture") ? (
-        <path
-          className={styles.markerFracture}
-          d="M17 67 L28 70 L23 76 L38 73 L34 81 L52 78"
-        />
-      ) : null}
-
-      {has("missing") ? (
-        <g className={styles.markerMissing}>
-          <path d="M12 10 L58 90" />
-          <path d="M58 10 L12 90" />
-        </g>
-      ) : null}
-
-      {has("extraction") ? (
-        <g className={styles.markerExtraction}>
-          <path d="M18 18 L52 84" />
-          <path d="M52 18 L18 84" />
-        </g>
-      ) : null}
-    </g>
-  );
-}
-
-function ClinicalMarkerIcon({
   marker,
   color,
 }: {
+  tooth: ToothId;
   marker: ClinicalMarkerId;
   color: string;
 }) {
-  if (marker === "implant") {
+  const lower = !isUpperTooth(tooth);
+  const patientLeft = isPatientLeft(tooth);
+  const artworkTransform = `scale(${patientLeft ? -1 : 1}, ${
+    lower ? -1 : 1
+  })`;
+
+  if (marker === "missing" || marker === "fracture") {
     return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M8 3 H16 L15 18 H9 Z M8.5 7 H15.5 M9 11 H15 M9 15 H15" />
-      </svg>
+      <span className={styles.clinicalMarkerPreview} aria-hidden="true">
+        <svg viewBox="0 0 32 38">
+          {marker === "missing" ? (
+            <>
+              <path
+                className={styles.markerPreviewTooth}
+                d="M8 5 C10 2 13 4 16 5 C19 4 22 2 24 5 C27 9 24 16 22 22 C20 29 19 34 16 35 C13 34 12 29 10 22 C8 16 5 9 8 5 Z"
+              />
+              <path
+                className={styles.markerPreviewAccent}
+                d="M6 7 L26 31 M26 7 L6 31"
+                style={{ stroke: color }}
+              />
+            </>
+          ) : (
+            <>
+              <path
+                className={styles.markerPreviewTooth}
+                d="M8 5 C10 2 13 4 16 5 C19 4 22 2 24 5 C27 9 24 16 22 22 C20 29 19 34 16 35 C13 34 12 29 10 22 C8 16 5 9 8 5 Z"
+              />
+              <path
+                className={styles.markerPreviewAccent}
+                d="M7 19 H13 L10 25 L21 13 L18 21 H25"
+                style={{ stroke: color }}
+              />
+            </>
+          )}
+        </svg>
+      </span>
     );
   }
 
-  if (marker === "pulpitis" || marker === "rootCanal") {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M8 4 C9 8 9 18 12 21 C15 18 15 8 16 4" />
-        <path d="M12 5 V17" style={{ stroke: color }} />
-      </svg>
-    );
-  }
-
-  if (marker === "periodontitis") {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M4 7 C7 3 9 11 12 7 C15 3 17 11 20 7" style={{ stroke: color }} />
-        <path d="M8 8 C9 12 9 18 12 21 C15 18 15 12 16 8" />
-      </svg>
-    );
-  }
-
-  if (marker === "periapical") {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M9 3 C9 10 10 15 12 17 C14 15 15 10 15 3" />
-        <circle cx="12" cy="19" r="3" style={{ stroke: color }} />
-      </svg>
-    );
-  }
-
-  if (marker === "crown") {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M5 5 L8 9 L12 4 L16 9 L19 5 L18 18 H6 Z" style={{ stroke: color }} />
-      </svg>
-    );
-  }
-
-  if (marker === "fracture") {
-    return (
-      <svg viewBox="0 0 24 24" aria-hidden="true">
-        <path d="M5 12 H10 L8 17 L16 9 L14 14 H20" style={{ stroke: color }} />
-      </svg>
-    );
-  }
+  const variant = marker === "implant" ? "implant" : marker;
 
   return (
-    <svg viewBox="0 0 24 24" aria-hidden="true">
-      <path d="M6 5 L18 19 M18 5 L6 19" style={{ stroke: color }} />
-    </svg>
+    <span className={styles.clinicalMarkerPreview} aria-hidden="true">
+      {marker !== "implant" ? (
+        <img
+          src={toothArtworkPath(tooth)}
+          alt=""
+          draggable={false}
+          style={{ transform: artworkTransform }}
+        />
+      ) : null}
+      <img
+        src={toothArtworkPath(tooth, variant)}
+        alt=""
+        draggable={false}
+        style={{ transform: artworkTransform }}
+      />
+    </span>
   );
 }
 
@@ -1142,6 +1150,7 @@ function SurfaceMap({
   state,
   condition,
   large = false,
+  disabled = false,
   onSetSurface,
   onClearSurface,
 }: {
@@ -1149,6 +1158,7 @@ function SurfaceMap({
   state: SurfaceState;
   condition: ConditionId;
   large?: boolean;
+  disabled?: boolean;
   onSetSurface: (tooth: ToothId, surface: SurfaceCode) => void;
   onClearSurface: (tooth: ToothId, surface: SurfaceCode) => void;
 }) {
@@ -1165,7 +1175,7 @@ function SurfaceMap({
     <svg
       className={`${styles.surfaceMap} ${large ? styles.surfaceMapLarge : ""} ${
         isAnterior(tooth) ? styles.anteriorMap : ""
-      }`}
+      } ${disabled ? styles.surfaceMapDisabled : ""}`}
       viewBox="0 0 100 100"
       aria-label={`Răng ${tooth}, năm mặt răng`}
     >
@@ -1185,10 +1195,12 @@ function SurfaceMap({
             fill={currentCondition?.color ?? "#ffffff"}
             key={`${position}-${code}`}
             role="button"
-            tabIndex={0}
+            tabIndex={disabled ? -1 : 0}
+            aria-disabled={disabled}
             aria-label={label}
             onClick={(event) => {
               event.stopPropagation();
+              if (disabled) return;
               if (event.shiftKey || event.altKey) {
                 onClearSurface(tooth, code);
               } else {
@@ -1197,9 +1209,11 @@ function SurfaceMap({
             }}
             onContextMenu={(event) => {
               event.preventDefault();
+              if (disabled) return;
               onClearSurface(tooth, code);
             }}
             onKeyDown={(event) => {
+              if (disabled) return;
               if (event.key === "Enter" || event.key === " ") {
                 event.preventDefault();
                 onSetSurface(tooth, code);

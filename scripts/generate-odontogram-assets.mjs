@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -12,6 +12,14 @@ const packageRoot = path.join(
 const sourceDirectory = path.join(packageRoot, "assets", "teeth-svgs");
 const outputDirectory = path.join(repoRoot, "public", "odontogram-assets");
 const templates = ["11", "13", "14", "16"];
+const markerLayers = {
+  pulpitis: ["tooth-inflam-pulp", "milktooth-inflam-pulp"],
+  rootCanal: ["endo-filling"],
+  periodontitis: ["parodontal"],
+  periapical: ["inflammation"],
+  crown: ["zircon-crown"],
+  extraction: ["extraction-plan"],
+};
 
 const primaryDentitionStyles = `
   <style id="codexdentist-primary-dentition">
@@ -37,6 +45,64 @@ const primaryDentitionStyles = `
   </style>
 `;
 
+const implantStyles = `
+  <style id="codexdentist-implant">
+    #tooth,
+    #milktooth,
+    #endos,
+    #surfaces,
+    #restorations > * {
+      display: none !important;
+    }
+
+    #implant,
+    #implant-base,
+    #implant-base *,
+    #implant-healing-abutment,
+    #implant-healing-abutment * {
+      display: inline !important;
+    }
+
+    #implant > :not(#implant-base):not(#implant-healing-abutment) {
+      display: none !important;
+    }
+  </style>
+`;
+
+function markerLayerStyles(marker, ids) {
+  const selectors = ids.map((id) => `#${id}`).join(",\n    ");
+  const descendantSelectors = ids
+    .map((id) => `#${id} *`)
+    .join(",\n    ");
+
+  return `
+  <style id="codexdentist-marker-${marker}">
+    #base,
+    #tooth,
+    #endos,
+    #surfaces,
+    #restorations {
+      visibility: hidden !important;
+    }
+
+    ${selectors},
+    ${descendantSelectors} {
+      display: inline !important;
+      visibility: visible !important;
+    }
+  </style>
+`;
+}
+
+function injectStyles(svg, styles) {
+  if (styles.length === 0) {
+    return svg;
+  }
+
+  return svg.replace("<defs>", `${styles.join("\n")}\n  <defs>`);
+}
+
+await rm(outputDirectory, { recursive: true, force: true });
 await mkdir(outputDirectory, { recursive: true });
 
 for (const template of templates) {
@@ -47,23 +113,41 @@ for (const template of templates) {
     throw new Error(`Unexpected SVG structure: ${sourcePath}`);
   }
 
-  const primarySvg = svg.replace(
-    "<defs>",
-    `${primaryDentitionStyles}\n  <defs>`,
-  );
+  const variants = [];
 
-  await Promise.all([
-    writeFile(
-      path.join(outputDirectory, `${template}-adult.svg`),
-      svg,
-      "utf8",
-    ),
-    writeFile(
-      path.join(outputDirectory, `${template}-primary.svg`),
-      primarySvg,
-      "utf8",
-    ),
-  ]);
+  for (const dentition of ["adult", "primary"]) {
+    const dentitionStyles =
+      dentition === "primary" ? [primaryDentitionStyles] : [];
+    const baseName = `${template}-${dentition}`;
+
+    variants.push(
+      writeFile(
+        path.join(outputDirectory, `${baseName}.svg`),
+        injectStyles(svg, dentitionStyles),
+        "utf8",
+      ),
+      writeFile(
+        path.join(outputDirectory, `${baseName}-implant.svg`),
+        injectStyles(svg, [...dentitionStyles, implantStyles]),
+        "utf8",
+      ),
+    );
+
+    for (const [marker, ids] of Object.entries(markerLayers)) {
+      variants.push(
+        writeFile(
+          path.join(outputDirectory, `${baseName}-${marker}.svg`),
+          injectStyles(svg, [
+            ...dentitionStyles,
+            markerLayerStyles(marker, ids),
+          ]),
+          "utf8",
+        ),
+      );
+    }
+  }
+
+  await Promise.all(variants);
 }
 
 const license = await readFile(path.join(packageRoot, "LICENSE"), "utf8");
