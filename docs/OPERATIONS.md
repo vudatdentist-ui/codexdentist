@@ -127,6 +127,10 @@ export PATH="$NODE_BIN:$PATH"
 "$NODE_BIN/npm" ci --include=dev --ignore-scripts --no-audit --no-fund
 "$NODE_BIN/npm" run prisma:generate
 CODEXMED_SHARED_HOST_BUILD=true "$NODE_BIN/npm" run build
+PUBLIC_ROOT=/home/CPANEL_USER/codexdentist.com
+mkdir -p "$PUBLIC_ROOT/odontogram-assets" "$PUBLIC_ROOT/api/odontogram-assets"
+cp -a public/odontogram-assets/. "$PUBLIC_ROOT/odontogram-assets"/
+cp -a public/odontogram-assets/*.svg "$PUBLIC_ROOT/api/odontogram-assets"/
 set -a && source .env && set +a
 "$NODE_BIN/npx" prisma migrate deploy
 "$NODE_BIN/npm" prune --omit=dev --ignore-scripts --no-audit --no-fund
@@ -137,7 +141,7 @@ The current app root uses a physical `node_modules` directory. Do not activate t
 
 If the CLI start fails, start the app from cPanel `Setup Node.js App`. Then verify `https://codexdentist.com/api/health`. Do not enable notification cron jobs until the delivery provider and recipient data have been verified. Shared hosting remains a pilot/community-test target; monitor cPanel resource usage before placing real clinic workloads on it.
 
-LiteSpeed/Passenger can retain a stale public-file index after deployment. Generated odontogram variants therefore use the allowlisted `/api/odontogram-assets/[fileName]` route; keep base tooth SVGs in `public/odontogram-assets` and verify one variant URL after each release.
+LiteSpeed/Passenger can retain a stale public-file index and old `lsnode` workers after deployment. Generated odontogram variants use the allowlisted `/api/odontogram-assets/[fileName]` route, and the release procedure also copies public SVGs into the domain document root so LiteSpeed can serve either path. Verify one base and one variant URL after each release. If a build stalls at `Collecting page data` with `fork: Resource temporarily unavailable`, close the build terminal to release its process tree before retrying; do not start another concurrent build.
 
 After dependency changes, verify the installed runtime rather than only `package.json`:
 
