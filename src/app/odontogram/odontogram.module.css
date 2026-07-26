@@ -396,6 +396,76 @@
   filter: brightness(0.94);
 }
 
+.clinicalMarkerOverlay {
+  pointer-events: none;
+}
+
+.markerCrown {
+  stroke: #d18a12;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.markerImplant {
+  fill: #edf5f8;
+  stroke: #2878b5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.markerRootCanal {
+  fill: none;
+  stroke: #7256a8;
+  stroke-linecap: round;
+  stroke-width: 2.7;
+}
+
+.markerPulpitis {
+  fill: #d6404540;
+  stroke: #d64045;
+  stroke-linecap: round;
+  stroke-width: 3;
+}
+
+.markerPeriodontitis {
+  fill: none;
+  stroke: #c0363c;
+  stroke-linecap: round;
+  stroke-width: 3.2;
+}
+
+.markerPeriapical {
+  fill: #b8323a24;
+  stroke: #b8323a;
+  stroke-width: 2.2;
+}
+
+.markerFracture {
+  fill: none;
+  stroke: #d36b28;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 3.2;
+}
+
+.markerMissing,
+.markerExtraction {
+  fill: none;
+  stroke-linecap: round;
+}
+
+.markerMissing {
+  stroke: #68777c;
+  stroke-width: 4;
+}
+
+.markerExtraction {
+  stroke: #d64045;
+  stroke-dasharray: 5 3;
+  stroke-width: 3;
+}
+
 .surfaceMap {
   width: 100%;
   max-width: 58px;
@@ -640,6 +710,90 @@
   border-radius: 2px;
 }
 
+.clinicalMarkers {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--od-line);
+}
+
+.clinicalMarkersHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.clinicalMarkersHeading span {
+  color: var(--od-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.clinicalMarkersHeading strong {
+  min-width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #edf3f3;
+  color: #4a5a60;
+  font-size: 10px;
+}
+
+.clinicalMarkerGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.clinicalMarkerGrid button {
+  min-width: 0;
+  min-height: 46px;
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  align-items: center;
+  gap: 7px;
+  padding: 6px 7px;
+  border: 1px solid var(--od-line);
+  border-radius: 6px;
+  background: #f8fafb;
+  color: #405056;
+  font: inherit;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
+}
+
+.clinicalMarkerGrid button:hover {
+  border-color: #7da8a4;
+  background: #eef6f5;
+}
+
+.clinicalMarkerGrid button.clinicalMarkerActive {
+  border-color: #438c86;
+  background: #e2f1ef;
+  color: #164f4b;
+  box-shadow: inset 3px 0 #147b72;
+}
+
+.clinicalMarkerGrid svg {
+  width: 26px;
+  height: 26px;
+  fill: none;
+  stroke: #718186;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.clinicalMarkerGrid span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 .inspectorActions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -693,6 +847,7 @@
 .toothNumber:focus-visible,
 .surfaceList button:focus-visible,
 .anatomyList button:focus-visible,
+.clinicalMarkerGrid button:focus-visible,
 .inspectorActions button:focus-visible,
 .brand:focus-visible {
   outline: 2px solid #0b8177;
@@ -706,14 +861,16 @@
 
   .inspector {
     display: grid;
-    grid-template-columns: 150px 190px 1fr auto;
-    align-items: center;
+    grid-template-columns: 150px 190px minmax(0, 1fr);
+    align-items: start;
     gap: 18px;
     border-top: 1px solid var(--od-line);
     border-left: 0;
   }
 
   .focusTooth {
+    grid-column: 2;
+    grid-row: 1 / span 2;
     min-height: 150px;
     margin: 0;
     border: 1px solid var(--od-line);
@@ -723,13 +880,32 @@
     width: 120px;
   }
 
+  .surfaceList {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+
+  .anatomyList {
+    grid-column: 1;
+    margin-top: 0;
+  }
+
+  .clinicalMarkers,
+  .inspectorActions {
+    grid-column: 1 / -1;
+  }
+
+  .clinicalMarkerGrid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
   .toolbarControls {
     flex-wrap: wrap;
   }
 
   .inspectorActions {
-    grid-template-columns: 1fr;
-    margin: 0;
+    grid-template-columns: 1fr 1fr;
+    margin-top: 0;
   }
 }
 
@@ -811,6 +987,15 @@
   .surfaceList {
     grid-column: 1 / -1;
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .anatomyList,
+  .clinicalMarkers {
+    grid-column: 1 / -1;
+  }
+
+  .clinicalMarkerGrid {
+    grid-template-columns: repeat(3, 1fr);
   }
 
   .inspectorActions {
@@ -900,11 +1085,24 @@
   }
 
   .focusTooth {
+    grid-column: 1;
+    grid-row: auto;
     min-height: 170px;
+  }
+
+  .surfaceList,
+  .anatomyList,
+  .clinicalMarkers,
+  .inspectorActions {
+    grid-column: 1;
   }
 
   .surfaceList {
     grid-template-columns: 1fr;
+  }
+
+  .clinicalMarkerGrid {
+    grid-template-columns: 1fr 1fr;
   }
 
   .footer {

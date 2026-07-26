@@ -17,7 +17,7 @@ Last updated: 2026-07-25
 - Self-host distribution: `compose.selfhost.yml`, `install.ps1`, `install.sh`, and `scripts/codexdentist.mjs`.
 - Public product/docs: `https://codexdentist.com`, `https://codexdentist.com/features`, and `https://codexdentist.com/docs`.
 - Public demo: `https://demo.codexdentist.com`; each workspace is isolated and expires after 24 hours. Root-domain `/demo` remains a compatibility entry.
-- Public odontogram prototype: `https://odontogram.codexdentist.com`; it provides separate FDI charts for 32 permanent teeth and 20 primary teeth, with mirrored anatomical silhouettes, five independently selectable surfaces, and separate crown/root marking per tooth. Prototype state is browser-local and is not yet a patient clinical record.
+- Public odontogram prototype: `https://odontogram.codexdentist.com`; it provides separate FDI charts for 32 permanent teeth and 20 primary teeth, with mirrored anatomical silhouettes, five independently selectable surfaces, separate crown/root marking, and stackable clinical symbols for pulpal, periodontal, implant, endodontic, restorative, missing/extraction, and fracture findings. Prototype state is browser-local and is not yet a patient clinical record.
 - Public S22U tunnel target: `https://app.codexdentist.com`.
 - S22U deploy uses `scripts/deploy-to-s22.ps1` and must preserve `.env`, database, and storage.
 - Check `adb devices -l` before S22U work.

@@ -43,19 +43,58 @@ const conditionOptions = [
   { id: "watch", label: "Theo dõi", shortLabel: "Theo dõi", color: "#14866d" },
 ] as const;
 
+const clinicalMarkerOptions = [
+  { id: "pulpitis", label: "Viêm tủy", shortLabel: "VT", color: "#d64045" },
+  {
+    id: "periodontitis",
+    label: "Viêm quanh răng",
+    shortLabel: "QR",
+    color: "#c0363c",
+  },
+  {
+    id: "periapical",
+    label: "Tổn thương quanh chóp",
+    shortLabel: "QC",
+    color: "#b8323a",
+  },
+  { id: "implant", label: "Implant", shortLabel: "IM", color: "#2878b5" },
+  {
+    id: "rootCanal",
+    label: "Đã điều trị tủy",
+    shortLabel: "TT",
+    color: "#7256a8",
+  },
+  { id: "crown", label: "Mão răng", shortLabel: "MR", color: "#d18a12" },
+  { id: "missing", label: "Mất răng", shortLabel: "MT", color: "#68777c" },
+  {
+    id: "extraction",
+    label: "Chỉ định nhổ",
+    shortLabel: "CN",
+    color: "#d64045",
+  },
+  { id: "fracture", label: "Nứt / gãy", shortLabel: "NG", color: "#d36b28" },
+] as const;
+
 type ToothId = (typeof allTeeth)[number];
 type Dentition = "adult" | "primary";
 type SurfaceCode = "M" | "D" | "B" | "L" | "O" | "I";
 type AnatomyZone = "crown" | "root";
 type ConditionId = (typeof conditionOptions)[number]["id"];
+type ClinicalMarkerId = (typeof clinicalMarkerOptions)[number]["id"];
 type SurfaceState = Record<string, ConditionId>;
 type AnatomyState = Record<string, ConditionId>;
-type HistoryEntry = {
-  target: "surface" | "anatomy";
-  key: string;
-  previous?: ConditionId;
-  next?: ConditionId;
-};
+type MarkerState = Record<string, true>;
+type HistoryEntry =
+  | {
+      target: "surface" | "anatomy";
+      key: string;
+      previous?: ConditionId;
+    }
+  | {
+      target: "marker";
+      key: string;
+      previous: boolean;
+    };
 
 const surfaceNames: Record<SurfaceCode, string> = {
   M: "Mesial",
@@ -73,6 +112,7 @@ const anatomyNames: Record<AnatomyZone, string> = {
 
 const storageKey = "codexdentist-odontogram-5-surface-v1";
 const anatomyStorageKey = "codexdentist-odontogram-anatomy-v1";
+const markerStorageKey = "codexdentist-odontogram-clinical-markers-v1";
 
 function isToothId(value: string): value is ToothId {
   return allTeeth.includes(value as ToothId);
@@ -80,6 +120,10 @@ function isToothId(value: string): value is ToothId {
 
 function isConditionId(value: unknown): value is ConditionId {
   return conditionOptions.some((condition) => condition.id === value);
+}
+
+function isClinicalMarkerId(value: unknown): value is ClinicalMarkerId {
+  return clinicalMarkerOptions.some((marker) => marker.id === value);
 }
 
 function parseStoredState(value: string | null): SurfaceState {
@@ -136,6 +180,29 @@ function parseStoredAnatomyState(value: string | null): AnatomyState {
   }
 }
 
+function parseStoredMarkerState(value: string | null): MarkerState {
+  if (!value) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return {};
+    }
+
+    return Object.fromEntries(
+      Object.entries(parsed).filter(([key, enabled]) => {
+        const [tooth, marker] = key.split(".");
+        return isToothId(tooth) && isClinicalMarkerId(marker) && enabled === true;
+      }),
+    ) as MarkerState;
+  } catch {
+    return {};
+  }
+}
+
 function readStoredState() {
   try {
     return parseStoredState(window.localStorage.getItem(storageKey));
@@ -148,6 +215,16 @@ function readStoredAnatomyState() {
   try {
     return parseStoredAnatomyState(
       window.localStorage.getItem(anatomyStorageKey),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function readStoredMarkerState() {
+  try {
+    return parseStoredMarkerState(
+      window.localStorage.getItem(markerStorageKey),
     );
   } catch {
     return {};
@@ -170,12 +247,24 @@ function persistStoredAnatomyState(state: AnatomyState) {
   }
 }
 
+function persistStoredMarkerState(state: MarkerState) {
+  try {
+    window.localStorage.setItem(markerStorageKey, JSON.stringify(state));
+  } catch {
+    // The odontogram remains usable when browser storage is unavailable.
+  }
+}
+
 function surfaceKey(tooth: ToothId, surface: SurfaceCode) {
   return `${tooth}.${surface}`;
 }
 
 function anatomyKey(tooth: ToothId, zone: AnatomyZone) {
   return `${tooth}.${zone}`;
+}
+
+function markerKey(tooth: ToothId, marker: ClinicalMarkerId) {
+  return `${tooth}.${marker}`;
 }
 
 function toothPosition(tooth: ToothId) {
@@ -250,9 +339,14 @@ function conditionFor(id?: ConditionId) {
   return conditionOptions.find((condition) => condition.id === id);
 }
 
+function markerFor(id: ClinicalMarkerId) {
+  return clinicalMarkerOptions.find((marker) => marker.id === id);
+}
+
 function buildExportData(
   surfaceState: SurfaceState,
   anatomyState: AnatomyState,
+  markerState: MarkerState,
   dentition: Dentition,
 ) {
   const surfaces = Object.entries(surfaceState).map(([key, condition]) => {
@@ -277,17 +371,33 @@ function buildExportData(
       conditionName: conditionFor(condition)?.label ?? condition,
     };
   });
+  const markers = Object.keys(markerState).map((key) => {
+    const [tooth, marker] = key.split(".");
+    return {
+      tooth,
+      dentition,
+      marker,
+      markerName: markerFor(marker as ClinicalMarkerId)?.label ?? marker,
+    };
+  });
 
-  return { notation: "FDI", dentition, surfaces, anatomy };
+  return { notation: "FDI", dentition, surfaces, anatomy, markers };
 }
 
 function downloadJson(
   surfaceState: SurfaceState,
   anatomyState: AnatomyState,
+  markerState: MarkerState,
   dentition: Dentition,
 ) {
   const blob = new Blob(
-    [JSON.stringify(buildExportData(surfaceState, anatomyState, dentition), null, 2)],
+    [
+      JSON.stringify(
+        buildExportData(surfaceState, anatomyState, markerState, dentition),
+        null,
+        2,
+      ),
+    ],
     { type: "application/json" },
   );
   const url = URL.createObjectURL(blob);
@@ -301,6 +411,7 @@ function downloadJson(
 export function OdontogramSurfaceLab() {
   const [surfaceState, setSurfaceState] = useState<SurfaceState>({});
   const [anatomyState, setAnatomyState] = useState<AnatomyState>({});
+  const [markerState, setMarkerState] = useState<MarkerState>({});
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [condition, setCondition] = useState<ConditionId>("caries");
   const [dentition, setDentition] = useState<Dentition>("adult");
@@ -310,6 +421,7 @@ export function OdontogramSurfaceLab() {
   useEffect(() => {
     setSurfaceState(readStoredState());
     setAnatomyState(readStoredAnatomyState());
+    setMarkerState(readStoredMarkerState());
   }, []);
 
   const commitSurfaceState = (
@@ -328,6 +440,16 @@ export function OdontogramSurfaceLab() {
     setAnatomyState((current) => {
       const next = update(current);
       persistStoredAnatomyState(next);
+      return next;
+    });
+  };
+
+  const commitMarkerState = (
+    update: (current: MarkerState) => MarkerState,
+  ) => {
+    setMarkerState((current) => {
+      const next = update(current);
+      persistStoredMarkerState(next);
       return next;
     });
   };
@@ -358,12 +480,24 @@ export function OdontogramSurfaceLab() {
       ) as AnatomyState,
     [activeToothSet, anatomyState],
   );
+  const activeMarkerState = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(markerState).filter(([key]) =>
+          activeToothSet.has(key.split(".")[0] as ToothId),
+        ),
+      ) as MarkerState,
+    [activeToothSet, markerState],
+  );
   const markedSurfaceCount = Object.keys(activeSurfaceState).length;
   const markedAnatomyCount = Object.keys(activeAnatomyState).length;
+  const markedMarkerCount = Object.keys(activeMarkerState).length;
   const markedToothCount = new Set(
-    [...Object.keys(activeSurfaceState), ...Object.keys(activeAnatomyState)].map(
-      (key) => key.split(".")[0],
-    ),
+    [
+      ...Object.keys(activeSurfaceState),
+      ...Object.keys(activeAnatomyState),
+      ...Object.keys(activeMarkerState),
+    ].map((key) => key.split(".")[0]),
   ).size;
 
   const selectedRows = useMemo(
@@ -394,7 +528,7 @@ export function OdontogramSurfaceLab() {
     setSelectedTooth(tooth);
     setHistory((current) => [
       ...current,
-      { target: "surface", key, previous, next: condition },
+      { target: "surface", key, previous },
     ]);
     commitSurfaceState((current) => ({ ...current, [key]: condition }));
   };
@@ -429,7 +563,7 @@ export function OdontogramSurfaceLab() {
     setSelectedTooth(tooth);
     setHistory((current) => [
       ...current,
-      { target: "anatomy", key, previous, next: condition },
+      { target: "anatomy", key, previous },
     ]);
     commitAnatomyState((current) => ({ ...current, [key]: condition }));
   };
@@ -454,9 +588,43 @@ export function OdontogramSurfaceLab() {
     });
   };
 
+  const toggleMarker = (tooth: ToothId, marker: ClinicalMarkerId) => {
+    const key = markerKey(tooth, marker);
+    const previous = markerState[key] === true;
+
+    setSelectedTooth(tooth);
+    setHistory((current) => [
+      ...current,
+      { target: "marker", key, previous },
+    ]);
+    commitMarkerState((current) => {
+      const next = { ...current };
+      if (previous) {
+        delete next[key];
+      } else {
+        next[key] = true;
+      }
+      return next;
+    });
+  };
+
   const undo = () => {
     const last = history.at(-1);
     if (!last) return;
+
+    if (last.target === "marker") {
+      commitMarkerState((current) => {
+        const next = { ...current };
+        if (last.previous) {
+          next[last.key] = true;
+        } else {
+          delete next[last.key];
+        }
+        return next;
+      });
+      setHistory((current) => current.slice(0, -1));
+      return;
+    }
 
     const restore = (current: Record<string, ConditionId>) => {
       const next = { ...current };
@@ -479,7 +647,9 @@ export function OdontogramSurfaceLab() {
   const reset = () => {
     const label = dentition === "adult" ? "răng vĩnh viễn" : "răng sữa";
     if (
-      (markedSurfaceCount === 0 && markedAnatomyCount === 0) ||
+      (markedSurfaceCount === 0 &&
+        markedAnatomyCount === 0 &&
+        markedMarkerCount === 0) ||
       !window.confirm(`Xóa toàn bộ đánh dấu của bộ ${label}?`)
     ) {
       return;
@@ -498,12 +668,24 @@ export function OdontogramSurfaceLab() {
         ),
       ) as AnatomyState,
     );
+    commitMarkerState((current) =>
+      Object.fromEntries(
+        Object.entries(current).filter(
+          ([key]) => !activeToothSet.has(key.split(".")[0] as ToothId),
+        ),
+      ) as MarkerState,
+    );
     setHistory([]);
   };
 
   const copyData = async () => {
     const payload = JSON.stringify(
-      buildExportData(activeSurfaceState, activeAnatomyState, dentition),
+      buildExportData(
+        activeSurfaceState,
+        activeAnatomyState,
+        activeMarkerState,
+        dentition,
+      ),
       null,
       2,
     );
@@ -561,7 +743,11 @@ export function OdontogramSurfaceLab() {
             className={styles.iconButton}
             type="button"
             onClick={reset}
-            disabled={markedSurfaceCount === 0 && markedAnatomyCount === 0}
+            disabled={
+              markedSurfaceCount === 0 &&
+              markedAnatomyCount === 0 &&
+              markedMarkerCount === 0
+            }
             aria-label="Xóa toàn bộ"
             title="Xóa toàn bộ"
           >
@@ -612,6 +798,7 @@ export function OdontogramSurfaceLab() {
           <span><strong>{markedToothCount}</strong> răng</span>
           <span><strong>{markedSurfaceCount}</strong> mặt</span>
           <span><strong>{markedAnatomyCount}</strong> vùng</span>
+          <span><strong>{markedMarkerCount}</strong> dấu</span>
         </div>
       </section>
 
@@ -629,6 +816,7 @@ export function OdontogramSurfaceLab() {
             selectedTooth={selectedTooth}
             state={surfaceState}
             anatomyState={anatomyState}
+            markerState={markerState}
             condition={condition}
             onSelectTooth={setSelectedTooth}
             onSetSurface={setSurface}
@@ -649,6 +837,7 @@ export function OdontogramSurfaceLab() {
             selectedTooth={selectedTooth}
             state={surfaceState}
             anatomyState={anatomyState}
+            markerState={markerState}
             condition={condition}
             onSelectTooth={setSelectedTooth}
             onSetSurface={setSurface}
@@ -733,11 +922,48 @@ export function OdontogramSurfaceLab() {
             ))}
           </div>
 
+          <div className={styles.clinicalMarkers}>
+            <div className={styles.clinicalMarkersHeading}>
+              <span>Ký hiệu lâm sàng</span>
+              <strong>
+                {
+                  clinicalMarkerOptions.filter(
+                    (marker) =>
+                      markerState[markerKey(selectedTooth, marker.id)] === true,
+                  ).length
+                }
+              </strong>
+            </div>
+            <div className={styles.clinicalMarkerGrid}>
+              {clinicalMarkerOptions.map((marker) => {
+                const active =
+                  markerState[markerKey(selectedTooth, marker.id)] === true;
+
+                return (
+                  <button
+                    key={marker.id}
+                    type="button"
+                    className={active ? styles.clinicalMarkerActive : undefined}
+                    onClick={() => toggleMarker(selectedTooth, marker.id)}
+                    aria-pressed={active}
+                  >
+                    <ClinicalMarkerIcon marker={marker.id} color={marker.color} />
+                    <span>{marker.label}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <div className={styles.inspectorActions}>
             <button
               type="button"
               onClick={copyData}
-              disabled={markedSurfaceCount === 0 && markedAnatomyCount === 0}
+              disabled={
+                markedSurfaceCount === 0 &&
+                markedAnatomyCount === 0 &&
+                markedMarkerCount === 0
+              }
             >
               {copied ? <Check size={17} /> : <Clipboard size={17} />}
               {copied ? "Đã sao chép" : "Sao chép JSON"}
@@ -745,9 +971,18 @@ export function OdontogramSurfaceLab() {
             <button
               type="button"
               onClick={() =>
-                downloadJson(activeSurfaceState, activeAnatomyState, dentition)
+                downloadJson(
+                  activeSurfaceState,
+                  activeAnatomyState,
+                  activeMarkerState,
+                  dentition,
+                )
               }
-              disabled={markedSurfaceCount === 0 && markedAnatomyCount === 0}
+              disabled={
+                markedSurfaceCount === 0 &&
+                markedAnatomyCount === 0 &&
+                markedMarkerCount === 0
+              }
             >
               <Download size={17} />
               Tải JSON
@@ -770,6 +1005,7 @@ function Arch({
   selectedTooth,
   state,
   anatomyState,
+  markerState,
   condition,
   onSelectTooth,
   onSetSurface,
@@ -782,6 +1018,7 @@ function Arch({
   selectedTooth: ToothId;
   state: SurfaceState;
   anatomyState: AnatomyState;
+  markerState: MarkerState;
   condition: ConditionId;
   onSelectTooth: (tooth: ToothId) => void;
   onSetSurface: (tooth: ToothId, surface: SurfaceCode) => void;
@@ -805,6 +1042,7 @@ function Arch({
             <ToothIllustration
               tooth={tooth}
               state={anatomyState}
+              markerState={markerState}
               condition={condition}
               onSetAnatomy={onSetAnatomy}
               onClearAnatomy={onClearAnatomy}
@@ -901,12 +1139,14 @@ const anatomyPaths: Record<
 function ToothIllustration({
   tooth,
   state,
+  markerState,
   condition,
   onSetAnatomy,
   onClearAnatomy,
 }: {
   tooth: ToothId;
   state: AnatomyState;
+  markerState: MarkerState;
   condition: ConditionId;
   onSetAnatomy: (tooth: ToothId, zone: AnatomyZone) => void;
   onClearAnatomy: (tooth: ToothId, zone: AnatomyZone) => void;
@@ -914,6 +1154,9 @@ function ToothIllustration({
   const anatomy = anatomyPaths[toothKind(tooth)];
   const lower = !isUpperTooth(tooth);
   const patientLeft = isPatientLeft(tooth);
+  const activeMarkers = clinicalMarkerOptions
+    .filter((marker) => markerState[markerKey(tooth, marker.id)] === true)
+    .map((marker) => marker.id);
   const zones = (["root", "crown"] as const).map((zone) => {
     const current = state[anatomyKey(tooth, zone)];
     return {
@@ -982,7 +1225,13 @@ function ToothIllustration({
         isPrimaryTooth(tooth) ? styles.primaryToothIllustration : ""
       }`}
       viewBox="0 0 70 100"
-      aria-label={`${toothType(tooth)} ${tooth}, đánh dấu thân và chân răng`}
+      aria-label={`${toothType(tooth)} ${tooth}, đánh dấu thân và chân răng${
+        activeMarkers.length > 0
+          ? `, ${activeMarkers
+              .map((marker) => markerFor(marker)?.label)
+              .join(", ")}`
+          : ""
+      }`}
     >
       <defs>
         {zones.map(({ zone, currentCondition, patternId }) =>
@@ -1023,8 +1272,187 @@ function ToothIllustration({
               key={`${tooth}-detail-${index}`}
             />
           ))}
+          <ClinicalMarkerOverlay
+            tooth={tooth}
+            anatomy={anatomy}
+            markers={activeMarkers}
+          />
         </g>
       </g>
+    </svg>
+  );
+}
+
+function ClinicalMarkerOverlay({
+  tooth,
+  anatomy,
+  markers,
+}: {
+  tooth: ToothId;
+  anatomy: (typeof anatomyPaths)[ToothKind];
+  markers: ClinicalMarkerId[];
+}) {
+  if (markers.length === 0) {
+    return null;
+  }
+
+  const has = (marker: ClinicalMarkerId) => markers.includes(marker);
+  const crownPatternId = `clinical-crown-${tooth}`;
+
+  return (
+    <g className={styles.clinicalMarkerOverlay} aria-hidden="true">
+      {has("crown") ? (
+        <>
+          <defs>
+            <pattern
+              id={crownPatternId}
+              width="5"
+              height="5"
+              patternUnits="userSpaceOnUse"
+              patternTransform="rotate(30)"
+            >
+              <rect width="5" height="5" fill="#d18a1220" />
+              <line
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="5"
+                stroke="#d18a12"
+                strokeWidth="2"
+              />
+            </pattern>
+          </defs>
+          <path
+            className={styles.markerCrown}
+            d={anatomy.crown}
+            fill={`url(#${crownPatternId})`}
+          />
+        </>
+      ) : null}
+
+      {has("implant") ? (
+        <g className={styles.markerImplant}>
+          <path d="M27 16 L30 57 H40 L43 16 Z" />
+          {[22, 29, 36, 43, 50].map((y) => (
+            <path d={`M28 ${y} H42`} key={y} />
+          ))}
+          <path d="M31 57 H39 V65 H31 Z" />
+        </g>
+      ) : null}
+
+      {has("rootCanal") ? (
+        <g className={styles.markerRootCanal}>
+          <path d="M32 13 C31 30 32 48 33 66" />
+          <path d="M38 13 C39 30 38 48 37 66" />
+        </g>
+      ) : null}
+
+      {has("pulpitis") ? (
+        <g className={styles.markerPulpitis}>
+          <path d="M35 13 C34 31 35 48 35 64" />
+          <circle cx="35" cy="70" r="5" />
+        </g>
+      ) : null}
+
+      {has("periodontitis") ? (
+        <path
+          className={styles.markerPeriodontitis}
+          d="M4 57 C10 51 16 63 22 57 C28 51 34 63 40 57 C46 51 52 63 58 57 C62 54 65 54 68 57"
+        />
+      ) : null}
+
+      {has("periapical") ? (
+        <g className={styles.markerPeriapical}>
+          <circle cx="35" cy="11" r="8" />
+          <circle cx="35" cy="11" r="3" />
+        </g>
+      ) : null}
+
+      {has("fracture") ? (
+        <path
+          className={styles.markerFracture}
+          d="M17 67 L28 70 L23 76 L38 73 L34 81 L52 78"
+        />
+      ) : null}
+
+      {has("missing") ? (
+        <g className={styles.markerMissing}>
+          <path d="M12 10 L58 90" />
+          <path d="M58 10 L12 90" />
+        </g>
+      ) : null}
+
+      {has("extraction") ? (
+        <g className={styles.markerExtraction}>
+          <path d="M18 18 L52 84" />
+          <path d="M52 18 L18 84" />
+        </g>
+      ) : null}
+    </g>
+  );
+}
+
+function ClinicalMarkerIcon({
+  marker,
+  color,
+}: {
+  marker: ClinicalMarkerId;
+  color: string;
+}) {
+  if (marker === "implant") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M8 3 H16 L15 18 H9 Z M8.5 7 H15.5 M9 11 H15 M9 15 H15" />
+      </svg>
+    );
+  }
+
+  if (marker === "pulpitis" || marker === "rootCanal") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M8 4 C9 8 9 18 12 21 C15 18 15 8 16 4" />
+        <path d="M12 5 V17" style={{ stroke: color }} />
+      </svg>
+    );
+  }
+
+  if (marker === "periodontitis") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M4 7 C7 3 9 11 12 7 C15 3 17 11 20 7" style={{ stroke: color }} />
+        <path d="M8 8 C9 12 9 18 12 21 C15 18 15 12 16 8" />
+      </svg>
+    );
+  }
+
+  if (marker === "periapical") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M9 3 C9 10 10 15 12 17 C14 15 15 10 15 3" />
+        <circle cx="12" cy="19" r="3" style={{ stroke: color }} />
+      </svg>
+    );
+  }
+
+  if (marker === "crown") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 5 L8 9 L12 4 L16 9 L19 5 L18 18 H6 Z" style={{ stroke: color }} />
+      </svg>
+    );
+  }
+
+  if (marker === "fracture") {
+    return (
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M5 12 H10 L8 17 L16 9 L14 14 H20" style={{ stroke: color }} />
+      </svg>
+    );
+  }
+
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M6 5 L18 19 M18 5 L6 19" style={{ stroke: color }} />
     </svg>
   );
 }
