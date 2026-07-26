@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { OdontogramSurfaceLab } from "@/components/OdontogramSurfaceLab";
+import { PublicOdontogram } from "@/components/PublicOdontogram";
 
 export const metadata: Metadata = {
   title: "Odontogram 5 mặt | Codexdentist",
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function OdontogramPage() {
-  return <OdontogramSurfaceLab />;
+  return <PublicOdontogram />;
 }

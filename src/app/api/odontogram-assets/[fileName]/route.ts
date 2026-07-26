@@ -3,7 +3,7 @@ import path from "node:path";
 import { NextResponse } from "next/server";
 
 const generatedAssetPattern =
-  /^(11|13|14|16)-(adult|primary)-(implant|bone|boneLoss|boneLossOnly|implantBoneLoss|pulpitis|periodontitis|periapical|rootCanal|crown|extraction)\.svg$/;
+  /^(11|13|14|16)-(adult|primary)(?:-(implant|bone|boneLoss|boneLossOnly|implantBoneLoss|pulpitis|periodontitis|periapical|rootCanal|crown|extraction))?\.svg$/;
 
 export async function GET(
   _request: Request,

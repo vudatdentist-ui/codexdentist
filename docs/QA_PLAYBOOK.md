@@ -55,6 +55,9 @@ npm run pilot:qa
 - Odontogram structural-state checks: marking a tooth missing removes its artwork and clears/disables its five surfaces; marking an implant replaces the tooth artwork and clears/disables surfaces; selecting a conflicting state removes the old state; one undo restores the complete pre-action tooth state.
 - Odontogram prosthetic check: an implant and its crown can be selected together in either order, both artwork layers remain visible, and removing either state preserves the other.
 - Odontogram multi-select must apply or remove one clinical marker atomically across all selected teeth, show a mixed state when only some selected teeth carry it, and undo as one action. The bridge control stays disabled for one tooth and invalid cross-arch or non-contiguous selections; a valid bridge persists, exports, renders across natural, implant, and pontic units, and can be removed without changing individual tooth markers.
+- Journey odontogram check: selecting teeth updates treatment targets without changing clinical marks; editing a clinical mark auto-saves to the selected patient, increments one revision, survives refresh, and does not collapse or clear the treatment planner.
+- Journey odontogram permission/isolation check: clinical roles can edit, front desk and billing are read-only, an inaccessible clinic patient cannot be read or written, and a stale revision returns a conflict instead of overwriting the newer chart.
+- Journey odontogram persistence check: creating treatment services may clear temporary `PatientJourneyState.odontogramTeeth` but must not alter `PatientOdontogram.snapshot` or its revision history.
 - Demo sessions stop working after expiry; cleanup removes only expired demo organizations.
 - Demo mode blocks patient-file uploads and outbound notification delivery.
 - A clean `docker build` succeeds without a local `.env` or database.

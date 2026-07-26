@@ -98,6 +98,11 @@ async function assertGuardMarkers() {
     'canPerformAction(session, "treatment.plan.create")',
     'canPerformAction(session, "treatment.service.progress")',
   ]);
+  await assertSource("src/app/(app)/journey/odontogram-actions.ts", [
+    "savePatientOdontogramAction",
+    'canPerformAction(session, "clinical.odontogram.update")',
+    "patientAccessWhere(session)",
+  ]);
   await assertSource("src/app/(app)/clinical/actions.ts", [
     "createClinicalNoteAction",
     'canPerformAction(session, "clinical.note.create")',

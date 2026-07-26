@@ -17,7 +17,8 @@ Last updated: 2026-07-26
 - Self-host distribution: `compose.selfhost.yml`, `install.ps1`, `install.sh`, and `scripts/codexdentist.mjs`.
 - Public product/docs: `https://codexdentist.com`, `https://codexdentist.com/features`, and `https://codexdentist.com/docs`.
 - Public demo: `https://demo.codexdentist.com`; each workspace is isolated and expires after 24 hours. Root-domain `/demo` remains a compatibility entry.
-- Public odontogram prototype: `https://odontogram.codexdentist.com`; it provides separate FDI charts for 32 permanent teeth and 20 primary teeth, using generated anatomical SVG layers from the pinned MIT-licensed `@artidev/odontogram-core` package. Five surfaces remain independently selectable on natural teeth. Missing teeth remove the tooth but retain the alveolar bone/gum layer; bone loss can coexist with natural, missing, crowned, or implant units and visibly lowers the bone crest. Implants replace tooth artwork; missing and implant states clear and disable surface findings. Mutually exclusive clinical states are normalized while compatible layers can coexist, including an implant with its prosthetic crown. Multi-select applies one clinical marker to every selected tooth. A bridge is a persisted multi-tooth span, is available only for at least two contiguous teeth on one arch, and can include natural, missing/pontic, or implant units without rewriting their individual clinical states. One quick-diagnosis panel records two-arch occlusal relationships and concise upper/lower arch findings without adding specialty modes or tooth overlays. Prototype state, including quick diagnosis, is browser-local and is not yet a patient clinical record.
+- Odontogram source lives in the versioned `codexdentist-odontogram` package. It provides separate standard-FDI charts for 32 permanent teeth and 20 primary teeth, generated anatomical SVG layers, five surfaces, compatible clinical markers, bone-level states, implants with crowns, contiguous bridges, multi-select, and concise inter-arch/arch diagnosis.
+- `https://odontogram.codexdentist.com` is the public standalone chart and persists only in browser local storage. The same package is embedded in `/journey`, where each patient chart is stored separately with tenant/clinic scope, optimistic revision checks, immutable revision history, audit metadata, and server-enforced clinical permissions.
 - Public S22U tunnel target: `https://app.codexdentist.com`.
 - S22U deploy uses `scripts/deploy-to-s22.ps1` and must preserve `.env`, database, and storage.
 - Check `adb devices -l` before S22U work.
@@ -69,7 +70,8 @@ Route access lives in `src/lib/permissions.ts`. Mutation permissions live in `sr
 - Required block order: `Thông tin hành chính`, `Thông tin khám`, `Odontogram`, `Mục tiêu và kế hoạch điều trị`, `Dịch vụ`, `Timeline`.
 - Journey search belongs in the app-shell control row, not inside the administrative block.
 - Timeline is chronological ascending and includes appointments, clinical notes, treatment, billing, files, forms, prescriptions, CRM, and internal comments.
-- Odontogram lower FDI quadrant mapping is intentional. Verify lower teeth such as 38/48 and 37/47 before changing it.
+- Odontogram and treatment targets use standard FDI codes directly. Verify lower teeth such as 38/48 and 37/47 whenever chart selection or treatment-target mapping changes.
+- Clinical chart state belongs to `PatientOdontogram`; `PatientJourneyState.odontogramTeeth` remains only the temporary treatment-target selection. Never overwrite the clinical snapshot when creating services.
 
 ## Billing Rules
 

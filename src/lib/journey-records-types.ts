@@ -1,3 +1,5 @@
+import type { OdontogramData } from "codexdentist-odontogram";
+
 export type PatientJourneyStateSummary = {
   id: string;
   patientId: string;
@@ -6,6 +8,17 @@ export type PatientJourneyStateSummary = {
   treatmentPlan: string;
   odontogramTeeth: string[];
   updatedAt: string;
+  updatedByName: string | null;
+};
+
+export type PatientOdontogramSummary = {
+  id: string;
+  patientId: string;
+  clinicId: string;
+  snapshot: OdontogramData;
+  revision: number;
+  updatedAt: string;
+  updatedAtIso: string;
   updatedByName: string | null;
 };
 
@@ -38,5 +51,6 @@ export type JourneyRecordsWorkspace = {
   canMutate: boolean;
   message: string | null;
   states: PatientJourneyStateSummary[];
+  odontograms: PatientOdontogramSummary[];
   comments: JourneyCommentSummary[];
 };

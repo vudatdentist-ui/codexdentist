@@ -3,13 +3,13 @@
 import { Activity, CalendarDays, ClipboardList, FileText, MessageSquareText, Search, Stethoscope, Trash2, UsersRound, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Odontogram, type ToothDetail } from "react-odontogram";
 import { useEffect, useMemo, useRef, useState, type FocusEvent, type FormEvent } from "react";
 import { createClinicalNoteAction } from "@/app/(app)/clinical/actions";
 import { updatePatientFileGovernanceAction } from "@/app/(app)/patient-files/actions";
 import { createJourneyCommentAction, createJourneyTreatmentServicesAction, deleteJourneyTreatmentServiceAction, recordJourneyServiceProgressAction, updateJourneyStateAction, updateJourneyTreatmentServiceDiscountAction } from "@/app/(app)/journey/actions";
 import { useAppLanguage, type Language } from "@/components/AppLanguage";
 import { MoneyInput } from "@/components/MoneyInput";
+import { PatientOdontogramEditor } from "@/components/PatientOdontogramEditor";
 import { visibleActionNoticeParam } from "@/lib/action-notices";
 import { EmptyState, PanelHeader, StatusPill as BaseStatusPill } from "@/components/suite-primitives";
 import { invoiceBalanceAmount, isCollectableInvoiceStatus, serviceAppliedAmount as calculateServiceAppliedAmount } from "@/lib/billing-calculations";
@@ -398,73 +398,6 @@ const archTargets = [
 const archTargetIds: ReadonlySet<string> = new Set(
   archTargets.map((target) => target.id),
 );
-
-const fdiToUniversal: Record<string, string> = {
-  "11": "8",
-  "12": "7",
-  "13": "6",
-  "14": "5",
-  "15": "4",
-  "16": "3",
-  "17": "2",
-  "18": "1",
-  "21": "9",
-  "22": "10",
-  "23": "11",
-  "24": "12",
-  "25": "13",
-  "26": "14",
-  "27": "15",
-  "28": "16",
-  "31": "24",
-  "32": "23",
-  "33": "22",
-  "34": "21",
-  "35": "20",
-  "36": "19",
-  "37": "18",
-  "38": "17",
-  "41": "25",
-  "42": "26",
-  "43": "27",
-  "44": "28",
-  "45": "29",
-  "46": "30",
-  "47": "31",
-  "48": "32",
-};
-
-function swapLowerQuadrant(fdi: string) {
-  if (/^3[1-8]$/.test(fdi)) {
-    return `4${fdi[1]}`;
-  }
-
-  if (/^4[1-8]$/.test(fdi)) {
-    return `3${fdi[1]}`;
-  }
-
-  return fdi;
-}
-
-function appFdiToOdontogramFdi(fdi: string) {
-  return swapLowerQuadrant(fdi);
-}
-
-function odontogramFdiToAppFdi(fdi: string) {
-  return swapLowerQuadrant(fdi);
-}
-
-function appToOdontogramId(tooth: string) {
-  return `teeth-${appFdiToOdontogramFdi(tooth.replace(/^R/, ""))}`;
-}
-
-function detailToAppTooth(tooth: ToothDetail) {
-  return `R${odontogramFdiToAppFdi(tooth.notations.fdi)}`;
-}
-
-function universalLabelForFdi(fdi: string) {
-  return fdiToUniversal[fdi] ?? fdi;
-}
 
 function isArchTarget(target: string) {
   return archTargetIds.has(target);
@@ -1963,6 +1896,10 @@ export function PatientJourneyPanel({
   const selectedJourneyState =
     journeyRecordsWorkspace?.states.find((state) => state.patientId === selectedPatientKey) ??
     null;
+  const selectedOdontogram =
+    journeyRecordsWorkspace?.odontograms.find(
+      (odontogram) => odontogram.patientId === selectedPatientKey,
+    ) ?? null;
   const selectedJourneyComments =
     journeyRecordsWorkspace?.comments.filter(
       (comment) => comment.patientId === selectedPatientKey,
@@ -2029,6 +1966,17 @@ export function PatientJourneyPanel({
   );
   const clinicalReady = Boolean(clinicalWorkspace?.canMutate && selectedPatient);
   const journeyRecordsReady = Boolean(journeyRecordsWorkspace?.canMutate && selectedPatient);
+  const odontogramReady = Boolean(
+    journeyRecordsWorkspace?.source === "database" &&
+      selectedPatient &&
+      hasAnyRole(session, [
+        "OWNER",
+        "AREA_MANAGER",
+        "CLINIC_MANAGER",
+        "DENTIST",
+        "HYGIENIST",
+      ]),
+  );
   const journeyServiceDatabaseReady =
     servicesWorkspace?.source === "database" && serviceOptions.length > 0;
   const canDeleteTreatmentServices = hasAnyRole(session, ["OWNER"]);
@@ -3018,6 +2966,19 @@ export function PatientJourneyPanel({
               title={jt.odontogram.title}
               action={jt.actions.toothPlanning}
             />
+            <PatientOdontogramEditor
+              key={selectedPatientKey}
+              canEdit={odontogramReady}
+              initialOdontogram={selectedOdontogram}
+              language={language}
+              onSelectionChange={(teeth) =>
+                updateSelectedToothTargets(teeth.map((tooth) => `R${tooth}`))
+              }
+              patientId={selectedPatientKey}
+              selectedTeeth={selectedToothTargets.map((tooth) =>
+                tooth.replace(/^R/, ""),
+              )}
+            />
             <div className="odontogram-workbench">
               <div>
                 <p className="eyebrow">{jt.odontogram.targetPrompt}</p>
@@ -3042,10 +3003,6 @@ export function PatientJourneyPanel({
                     </button>
                   ))}
                 </div>
-                <OdontogramSelector
-                  selectedTeeth={selectedToothTargets}
-                  onChange={updateSelectedToothTargets}
-                />
                 <div className="selected-teeth-row">
                   {selectedServiceTargets.length > 0 ? (
                     selectedServiceTargets.map((target) => (
@@ -3838,62 +3795,5 @@ function journeyDate(value: string) {
     timeZone: "Asia/Ho_Chi_Minh",
     dateStyle: "short",
   }).format(date);
-}
-
-function OdontogramSelector({
-  onChange,
-  selectedTeeth,
-}: {
-  onChange: (teeth: string[]) => void;
-  selectedTeeth: string[];
-}) {
-  const handleChange = (teeth: ToothDetail[]) => {
-    onChange(teeth.map(detailToAppTooth).filter(isToothTarget));
-  };
-
-  return (
-    <div className="odontogram-grid react-odontogram-grid">
-      <div className="odontogram-row full">
-        <Odontogram
-          key={selectedTeeth.join("-") || "empty"}
-          className="nhavista-odontogram"
-          colors={{
-            darkBlue: "#0f766e",
-            baseBlue: "#14b8a6",
-            lightBlue: "#ccfbf1",
-          }}
-          defaultSelected={selectedTeeth.map(appToOdontogramId)}
-          layout="square"
-          notation="FDI"
-          onChange={handleChange}
-          selectedColor="#f59e0b"
-          showHalf="full"
-          showTooltip
-          styles={{ gap: 0 }}
-          tooltip={{
-            placement: "top",
-            content: (tooth) => (
-              <div>
-                <strong>
-                  {tooth
-                    ? `R${odontogramFdiToAppFdi(tooth.notations.fdi)}`
-                    : "R-"}
-                </strong>
-                <div>{tooth?.type}</div>
-                <small>
-                  Universal:{" "}
-                  {tooth
-                    ? universalLabelForFdi(
-                        odontogramFdiToAppFdi(tooth.notations.fdi),
-                      )
-                    : "-"}
-                </small>
-              </div>
-            ),
-          }}
-        />
-      </div>
-    </div>
-  );
 }
 

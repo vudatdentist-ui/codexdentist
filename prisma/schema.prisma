@@ -280,6 +280,8 @@ model Organization {
   patientForms                   PatientForm[]
   patientFiles                   PatientFile[]
   patientJourneyStates           PatientJourneyState[]
+  patientOdontograms             PatientOdontogram[]
+  patientOdontogramRevisions     PatientOdontogramRevision[]
   journeyComments                JourneyComment[]
   workItems                      WorkItem[]
   learningContents               LearningContent[]
@@ -377,6 +379,8 @@ model Clinic {
   patientForms                   PatientForm[]
   patientFiles                   PatientFile[]
   patientJourneyStates           PatientJourneyState[]
+  patientOdontograms             PatientOdontogram[]
+  patientOdontogramRevisions     PatientOdontogramRevision[]
   journeyComments                JourneyComment[]
   workItems                      WorkItem[]
   learningContents               LearningContent[]
@@ -436,6 +440,8 @@ model User {
   uploadedPatientFiles              PatientFile[]                   @relation("PatientFileUploader")
   createdPaymentPlans               PaymentPlan[]                   @relation("PaymentPlanCreator")
   updatedJourneyStates              PatientJourneyState[]           @relation("PatientJourneyStateUpdater")
+  updatedPatientOdontograms         PatientOdontogram[]             @relation("PatientOdontogramUpdater")
+  createdPatientOdontogramRevisions PatientOdontogramRevision[]     @relation("PatientOdontogramRevisionCreator")
   authoredJourneyComments           JourneyComment[]                @relation("JourneyCommentAuthor")
   assignedWorkItems                 WorkItem[]                      @relation("WorkItemAssignee")
   createdWorkItems                  WorkItem[]                      @relation("WorkItemCreator")
@@ -539,18 +545,18 @@ model Chair {
 }
 
 model Patient {
-  id                       String                    @id @default(cuid())
+  id                       String                      @id @default(cuid())
   organizationId           String
-  organization             Organization              @relation(fields: [organizationId], references: [id])
+  organization             Organization                @relation(fields: [organizationId], references: [id])
   clinicId                 String
-  clinic                   Clinic                    @relation(fields: [clinicId], references: [id])
+  clinic                   Clinic                      @relation(fields: [clinicId], references: [id])
   fullName                 String
   dateOfBirth              DateTime?
   phone                    String
   email                    String?
   gender                   String?
   visitReason              String?
-  leadSource               String                    @default("WALK_IN")
+  leadSource               String                      @default("WALK_IN")
   nationalId               String?
   address                  String?
   guardianName             String?
@@ -573,13 +579,15 @@ model Patient {
   forms                    PatientForm[]
   files                    PatientFile[]
   journeyState             PatientJourneyState?
+  odontogram               PatientOdontogram?
+  odontogramRevisions      PatientOdontogramRevision[]
   journeyComments          JourneyComment[]
   workItems                WorkItem[]
-  mobileDevices            MobileDevice[]            @relation("PatientMobileDevices")
-  notifications            Notification[]            @relation("PatientNotifications")
+  mobileDevices            MobileDevice[]              @relation("PatientMobileDevices")
+  notifications            Notification[]              @relation("PatientNotifications")
   sourceCommissionAccruals SourceCommissionAccrual[]
-  createdAt                DateTime                  @default(now())
-  updatedAt                DateTime                  @updatedAt
+  createdAt                DateTime                    @default(now())
+  updatedAt                DateTime                    @updatedAt
 
   @@unique([organizationId, phone])
 }
@@ -1958,6 +1966,48 @@ model PatientJourneyState {
 
   @@index([clinicId, updatedAt])
   @@index([organizationId, updatedAt])
+}
+
+model PatientOdontogram {
+  id             String                      @id @default(cuid())
+  organizationId String
+  organization   Organization                @relation(fields: [organizationId], references: [id])
+  clinicId       String
+  clinic         Clinic                      @relation(fields: [clinicId], references: [id])
+  patientId      String                      @unique
+  patient        Patient                     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  snapshot       Json
+  revision       Int                         @default(1)
+  updatedById    String?
+  updatedBy      User?                       @relation("PatientOdontogramUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  revisions      PatientOdontogramRevision[]
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+
+  @@index([clinicId, updatedAt])
+  @@index([organizationId, updatedAt])
+}
+
+model PatientOdontogramRevision {
+  id             String            @id @default(cuid())
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id])
+  clinicId       String
+  clinic         Clinic            @relation(fields: [clinicId], references: [id])
+  patientId      String
+  patient        Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  odontogramId   String
+  odontogram     PatientOdontogram @relation(fields: [odontogramId], references: [id], onDelete: Cascade)
+  revision       Int
+  snapshot       Json
+  createdById    String?
+  createdBy      User?             @relation("PatientOdontogramRevisionCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt      DateTime          @default(now())
+
+  @@unique([odontogramId, revision])
+  @@index([patientId, createdAt])
+  @@index([clinicId, createdAt])
+  @@index([organizationId, createdAt])
 }
 
 model JourneyComment {

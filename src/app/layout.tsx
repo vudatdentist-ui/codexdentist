@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
-import "react-odontogram/style.css";
+import "codexdentist-odontogram/style.css";
 import "react-day-picker/style.css";
 import "./globals.css";
 

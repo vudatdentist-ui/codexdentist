@@ -13,8 +13,8 @@
     "url": "https://github.com/vudatdentist-ui/codexdentist/issues"
   },
   "scripts": {
-    "dev": "node scripts/generate-odontogram-assets.mjs && next dev --webpack",
-    "build": "node scripts/generate-odontogram-assets.mjs && next build",
+    "dev": "codexdentist-odontogram-assets public/odontogram-assets && next dev --webpack",
+    "build": "codexdentist-odontogram-assets public/odontogram-assets && next build",
     "postinstall": "prisma generate",
     "start": "next start",
     "start:cpanel": "node server.cjs",
@@ -59,20 +59,19 @@
     "prisma:migrate": "prisma migrate dev",
     "db:seed": "prisma db seed",
     "db:seed:schedule": "node scripts/seed-schedule-demo.mjs",
-    "odontogram:assets": "node scripts/generate-odontogram-assets.mjs"
+    "odontogram:assets": "codexdentist-odontogram-assets public/odontogram-assets"
   },
   "dependencies": {
-    "@artidev/odontogram-core": "0.2.1",
     "@aws-sdk/client-s3": "3.1040.0",
     "@prisma/adapter-pg": "7.8.0",
     "@prisma/client": "7.8.0",
+    "codexdentist-odontogram": "https://github.com/vudatdentist-ui/codexdentist-odontogram/releases/download/v0.2.2/codexdentist-odontogram-0.2.2.tgz",
     "lucide-react": "1.11.0",
     "next": "16.2.11",
     "pg": "8.20.0",
     "react": "19.2.5",
     "react-day-picker": "9.14.0",
     "react-dom": "19.2.5",
-    "react-odontogram": "0.5.5",
     "sharp": "0.35.3"
   },
   "devDependencies": {

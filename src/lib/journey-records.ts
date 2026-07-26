@@ -8,8 +8,10 @@ import type { AppSession } from "@/lib/session";
 import type {
   JourneyCommentSummary,
   JourneyRecordsWorkspace,
+  PatientOdontogramSummary,
   PatientJourneyStateSummary,
 } from "@/lib/journey-records-types";
+import { normalizeOdontogramData } from "@/lib/odontogram-data";
 
 const mutableJourneyRecordRoles: AppRole[] = [
   "OWNER",
@@ -25,8 +27,26 @@ export async function getJourneyRecordsWorkspace(
   options: { patientId?: string } = {},
 ): Promise<JourneyRecordsWorkspace> {
   try {
-    const [states, comments] = await Promise.all([
+    const [states, odontograms, comments] = await Promise.all([
       prisma.patientJourneyState.findMany({
+        where: {
+          organizationId: session.organizationId,
+          ...(options.patientId ? { patientId: options.patientId } : {}),
+          patient: patientAccessWhere(session),
+        },
+        include: {
+          updatedBy: {
+            select: {
+              fullName: true,
+            },
+          },
+        },
+        orderBy: {
+          updatedAt: "desc",
+        },
+        take: 400,
+      }),
+      prisma.patientOdontogram.findMany({
         where: {
           organizationId: session.organizationId,
           ...(options.patientId ? { patientId: options.patientId } : {}),
@@ -74,6 +94,10 @@ export async function getJourneyRecordsWorkspace(
       canMutate: hasAnyRole(session, mutableJourneyRecordRoles),
       message: null,
       states: states.map(toStateSummary),
+      odontograms: odontograms.flatMap((odontogram) => {
+        const summary = toOdontogramSummary(odontogram);
+        return summary ? [summary] : [];
+      }),
       comments: comments.map(toCommentSummary),
     };
   } catch {
@@ -83,6 +107,7 @@ export async function getJourneyRecordsWorkspace(
       message:
         "Chưa lưu được thay đổi. Vui lòng thử lại sau.",
       states: [],
+      odontograms: [],
       comments: [],
     };
   }
@@ -114,6 +139,33 @@ function toStateSummary(state: {
     updatedAt: vietnamDateTime(state.updatedAt),
     updatedByName: state.updatedBy?.fullName ?? null,
   };
+}
+
+function toOdontogramSummary(odontogram: {
+  id: string;
+  patientId: string;
+  clinicId: string;
+  snapshot: unknown;
+  revision: number;
+  updatedAt: Date;
+  updatedBy: {
+    fullName: string;
+  } | null;
+}): PatientOdontogramSummary | null {
+  try {
+    return {
+      id: odontogram.id,
+      patientId: odontogram.patientId,
+      clinicId: odontogram.clinicId,
+      snapshot: normalizeOdontogramData(odontogram.snapshot),
+      revision: odontogram.revision,
+      updatedAt: vietnamDateTime(odontogram.updatedAt),
+      updatedAtIso: odontogram.updatedAt.toISOString(),
+      updatedByName: odontogram.updatedBy?.fullName ?? null,
+    };
+  } catch {
+    return null;
+  }
 }
 
 function toCommentSummary(comment: {

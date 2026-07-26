@@ -5607,76 +5607,43 @@ h2 {
   color: #92400e;
 }
 
-.odontogram-grid {
+.patient-odontogram-editor {
   display: grid;
-  gap: 4px;
-  margin-top: 6px;
-  overflow-x: auto;
-}
-
-.odontogram-row {
-  min-width: 820px;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #f9fbfb;
-  padding: 4px 10px;
-}
-
-.odontogram-visual-layer {
-  position: relative;
-  min-width: 800px;
-}
-
-.odontogram-hitgrid {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  grid-template-rows: repeat(2, minmax(0, 1fr));
-  pointer-events: none;
-}
-
-.odontogram-hitrow {
-  display: grid;
-  grid-template-columns: repeat(16, minmax(0, 1fr));
-  pointer-events: none;
-}
-
-.odontogram-hitbox {
+  gap: 8px;
   min-width: 0;
-  min-height: 0;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: transparent;
-  cursor: pointer;
-  padding: 0;
-  pointer-events: auto;
+  margin-bottom: 14px;
 }
 
-.odontogram-hitbox span {
-  display: inline-flex;
+.patient-odontogram-save-state {
+  display: flex;
   align-items: center;
-  justify-content: center;
-  min-width: 28px;
+  justify-content: flex-end;
+  gap: 8px;
   min-height: 20px;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.86);
-  font-size: 10px;
-  font-weight: 900;
+  color: var(--muted);
+  font-size: 11px;
 }
 
-.odontogram-hitbox:hover,
-.odontogram-hitbox:focus-visible {
-  border-color: rgba(245, 158, 11, 0.75);
-  background: rgba(245, 158, 11, 0.11);
-  color: #92400e;
-  outline: none;
+.patient-odontogram-save-state strong {
+  color: #0f766e;
 }
 
-.odontogram-hitbox.active {
-  border-color: #f59e0b;
-  background: rgba(245, 158, 11, 0.2);
-  color: #92400e;
+.patient-odontogram-save-state strong[data-state="pending"],
+.patient-odontogram-save-state strong[data-state="saving"] {
+  color: #a16207;
+}
+
+.patient-odontogram-save-state strong[data-state="error"] {
+  color: #b42318;
+}
+
+.public-odontogram-loading {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #f4f7f8;
+  color: #637177;
+  font-weight: 700;
 }
 
 .selected-teeth-row {
@@ -7249,24 +7216,6 @@ h2 {
 .chart-header span {
   color: var(--muted);
   font-size: 13px;
-}
-
-.nhavista-odontogram {
-  width: 100%;
-  min-height: 92px;
-  --odontogram-tooltip-bg: #0f172a;
-  --odontogram-tooltip-fg: #ffffff;
-}
-
-.nhavista-odontogram svg {
-  display: block;
-  width: 100%;
-  height: auto;
-  max-height: 126px;
-}
-
-.react-odontogram-grid.compact .nhavista-odontogram svg {
-  max-height: 110px;
 }
 
 .clinical-card {
@@ -10284,9 +10233,6 @@ a:focus-visible {
     text-align: left;
   }
 
-  .odontogram-row {
-    min-width: 760px;
-  }
 }
 
 @media (max-width: 1180px) {

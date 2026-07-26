@@ -13,6 +13,7 @@ export type ActionKey =
   | "clinical.note.create"
   | "clinical.note.sign"
   | "clinical.note.amend"
+  | "clinical.odontogram.update"
   | "treatment.plan.create"
   | "treatment.plan.accept"
   | "treatment.service.delete"
@@ -41,6 +42,7 @@ const actionRoles: Record<ActionKey, AppRole[]> = {
   "clinical.note.create": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST"],
   "clinical.note.sign": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST"],
   "clinical.note.amend": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST"],
+  "clinical.odontogram.update": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST"],
   "treatment.plan.create": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST"],
   "treatment.plan.accept": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "FRONT_DESK"],
   "treatment.service.delete": ["OWNER"],
