@@ -307,6 +307,7 @@ function toothType(tooth: ToothId) {
 }
 
 type ToothKind = "incisor" | "canine" | "premolar" | "molar";
+type ToothTemplate = "11" | "13" | "14" | "16";
 
 function toothKind(tooth: ToothId): ToothKind {
   const position = toothPosition(tooth);
@@ -316,6 +317,20 @@ function toothKind(tooth: ToothId): ToothKind {
   if (isPrimaryTooth(tooth)) return "molar";
   if (position <= 5) return "premolar";
   return "molar";
+}
+
+function toothTemplate(tooth: ToothId): ToothTemplate {
+  const position = toothPosition(tooth);
+
+  if (position <= 2) return "11";
+  if (position === 3) return "13";
+  if (isPrimaryTooth(tooth) || position <= 5) return "14";
+  return "16";
+}
+
+function toothArtworkPath(tooth: ToothId) {
+  const dentition = isPrimaryTooth(tooth) ? "primary" : "adult";
+  return `/odontogram-assets/${toothTemplate(tooth)}-${dentition}.svg`;
 }
 
 function toothSurfaces(tooth: ToothId): SurfaceCode[] {
@@ -1154,6 +1169,9 @@ function ToothIllustration({
   const anatomy = anatomyPaths[toothKind(tooth)];
   const lower = !isUpperTooth(tooth);
   const patientLeft = isPatientLeft(tooth);
+  const artworkTransform = `scale(${patientLeft ? -1 : 1}, ${
+    lower ? -1 : 1
+  })`;
   const activeMarkers = clinicalMarkerOptions
     .filter((marker) => markerState[markerKey(tooth, marker.id)] === true)
     .map((marker) => marker.id);
@@ -1182,7 +1200,7 @@ function ToothIllustration({
       <path
         className={`${styles.anatomyZone} ${
           zone === "root" ? styles.toothRoot : styles.toothCrown
-        }`}
+        } ${currentCondition ? styles.anatomyZoneMarked : ""}`}
         data-anatomy-zone={zone}
         d={path}
         fill={
@@ -1220,11 +1238,12 @@ function ToothIllustration({
   };
 
   return (
-    <svg
+    <div
       className={`${styles.toothIllustration} ${
         isPrimaryTooth(tooth) ? styles.primaryToothIllustration : ""
       }`}
-      viewBox="0 0 70 100"
+      data-tooth={tooth}
+      role="group"
       aria-label={`${toothType(tooth)} ${tooth}, đánh dấu thân và chân răng${
         activeMarkers.length > 0
           ? `, ${activeMarkers
@@ -1233,53 +1252,57 @@ function ToothIllustration({
           : ""
       }`}
     >
-      <defs>
-        {zones.map(({ zone, currentCondition, patternId }) =>
-          currentCondition ? (
-            <pattern
-              id={patternId}
-              width="5"
-              height="5"
-              patternUnits="userSpaceOnUse"
-              patternTransform="rotate(28)"
-              key={zone}
-            >
-              <rect width="5" height="5" fill={`${currentCondition.color}20`} />
-              <line
-                x1="0"
-                y1="0"
-                x2="0"
-                y2="5"
-                stroke={currentCondition.color}
-                strokeWidth="2"
-              />
-            </pattern>
-          ) : null,
-        )}
-      </defs>
-      <g transform={lower ? "translate(0 100) scale(1 -1)" : undefined}>
-        <path
-          className={styles.gumWash}
-          d="M0 54 C18 50 52 50 70 54 V70 C51 67 18 67 0 70 Z"
-        />
-        <g transform={patientLeft ? "translate(70 0) scale(-1 1)" : undefined}>
-          {interactivePath("root", anatomy.root, "#ffffff")}
-          {interactivePath("crown", anatomy.crown, "#e2f0f5")}
-          {anatomy.details.map((detail, index) => (
-            <path
-              className={styles.toothDetail}
-              d={detail}
-              key={`${tooth}-detail-${index}`}
+      <img
+        className={styles.toothArtwork}
+        src={toothArtworkPath(tooth)}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        style={{ transform: artworkTransform }}
+      />
+      <svg
+        className={styles.toothInteractionOverlay}
+        viewBox="0 0 70 100"
+        role="group"
+        aria-label={`Vùng giải phẫu răng ${tooth}`}
+      >
+        <defs>
+          {zones.map(({ zone, currentCondition, patternId }) =>
+            currentCondition ? (
+              <pattern
+                id={patternId}
+                width="5"
+                height="5"
+                patternUnits="userSpaceOnUse"
+                patternTransform="rotate(28)"
+                key={zone}
+              >
+                <rect width="5" height="5" fill={`${currentCondition.color}20`} />
+                <line
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="5"
+                  stroke={currentCondition.color}
+                  strokeWidth="2"
+                />
+              </pattern>
+            ) : null,
+          )}
+        </defs>
+        <g transform={lower ? "translate(0 100) scale(1 -1)" : undefined}>
+          <g transform={patientLeft ? "translate(70 0) scale(-1 1)" : undefined}>
+            {interactivePath("root", anatomy.root, "transparent")}
+            {interactivePath("crown", anatomy.crown, "transparent")}
+            <ClinicalMarkerOverlay
+              tooth={tooth}
+              anatomy={anatomy}
+              markers={activeMarkers}
             />
-          ))}
-          <ClinicalMarkerOverlay
-            tooth={tooth}
-            anatomy={anatomy}
-            markers={activeMarkers}
-          />
+          </g>
         </g>
-      </g>
-    </svg>
+      </svg>
+    </div>
   );
 }
 
