@@ -900,6 +900,19 @@
     border-left: 0;
   }
 
+  .inspectorHeading {
+    display: block;
+  }
+
+  .inspectorHeading h2 {
+    font-size: 22px;
+  }
+
+  .inspectorHeading > strong {
+    display: inline-block;
+    margin-top: 7px;
+  }
+
   .focusTooth {
     grid-column: 2;
     grid-row: 1 / span 2;
