@@ -69,6 +69,36 @@ const implantStyles = `
   </style>
 `;
 
+const boneOnlyStyles = `
+  <style id="codexdentist-bone-only">
+    #tooth,
+    #milktooth,
+    #implant,
+    #endos,
+    #surfaces,
+    #restorations,
+    #mods {
+      display: none !important;
+    }
+
+    #base,
+    #base * {
+      display: inline !important;
+      visibility: visible !important;
+    }
+  </style>
+`;
+
+const boneLossStyles = `
+  <style id="codexdentist-bone-loss">
+    #base {
+      transform-box: fill-box;
+      transform-origin: center top;
+      transform: scaleY(0.62);
+    }
+  </style>
+`;
+
 function markerLayerStyles(marker, ids) {
   const selectors = ids.map((id) => `#${id}`).join(",\n    ");
   const descendantSelectors = ids
@@ -129,6 +159,34 @@ for (const template of templates) {
       writeFile(
         path.join(outputDirectory, `${baseName}-implant.svg`),
         injectStyles(svg, [...dentitionStyles, implantStyles]),
+        "utf8",
+      ),
+      writeFile(
+        path.join(outputDirectory, `${baseName}-bone.svg`),
+        injectStyles(svg, [...dentitionStyles, boneOnlyStyles]),
+        "utf8",
+      ),
+      writeFile(
+        path.join(outputDirectory, `${baseName}-boneLoss.svg`),
+        injectStyles(svg, [...dentitionStyles, boneLossStyles]),
+        "utf8",
+      ),
+      writeFile(
+        path.join(outputDirectory, `${baseName}-boneLossOnly.svg`),
+        injectStyles(svg, [
+          ...dentitionStyles,
+          boneOnlyStyles,
+          boneLossStyles,
+        ]),
+        "utf8",
+      ),
+      writeFile(
+        path.join(outputDirectory, `${baseName}-implantBoneLoss.svg`),
+        injectStyles(svg, [
+          ...dentitionStyles,
+          implantStyles,
+          boneLossStyles,
+        ]),
         "utf8",
       ),
     );

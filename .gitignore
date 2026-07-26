@@ -18,6 +18,10 @@ test-results/
 storage/
 backups/
 uploads/
+public/odontogram-assets/*-bone.svg
+public/odontogram-assets/*-boneLoss.svg
+public/odontogram-assets/*-boneLossOnly.svg
+public/odontogram-assets/*-implantBoneLoss.svg
 .cloudflared/
 selfhost-notes/
 *.backup

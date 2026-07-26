@@ -196,6 +196,40 @@
   color: #125d57;
 }
 
+.quickDiagnosisButton {
+  min-height: 38px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid #9baeb2;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #30474d;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.quickDiagnosisButton:hover {
+  border-color: #438c86;
+  background: #eef6f5;
+  color: #125d57;
+}
+
+.quickDiagnosisButton strong {
+  min-width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #dcecea;
+  color: #125d57;
+  font-size: 10px;
+}
+
 .conditionControl {
   display: flex;
   align-items: center;
@@ -264,6 +298,37 @@
   padding: 22px 28px 26px;
 }
 
+.interarchSummary {
+  width: min(100%, 1120px);
+  min-height: 36px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin: 0 auto 14px;
+  padding: 7px 10px;
+  border: 1px solid #b8ccca;
+  border-radius: 6px;
+  background: #f2f8f7;
+  color: #244f4b;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.interarchSummary span {
+  flex: 0 0 auto;
+  color: #55706e;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.interarchSummary strong {
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .orientation {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -291,11 +356,34 @@
 }
 
 .archLabel {
+  width: 100%;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
   margin-bottom: 10px;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: var(--od-muted);
+  font: inherit;
   font-size: 11px;
   font-weight: 700;
+  text-align: left;
   text-transform: uppercase;
+  cursor: pointer;
+}
+
+.archLabel:hover span {
+  color: var(--od-accent);
+}
+
+.archLabel strong {
+  min-width: 0;
+  color: #3b5f5c;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  text-transform: none;
 }
 
 .teethRow {
@@ -827,6 +915,155 @@
   overflow-wrap: anywhere;
 }
 
+.quickDiagnosisBackdrop {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(20 32 36 / 38%);
+}
+
+.quickDiagnosisDialog {
+  width: min(620px, 100%);
+  max-height: min(720px, calc(100vh - 40px));
+  overflow: auto;
+  border: 1px solid #9fb2b5;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 18px 48px rgb(15 30 35 / 24%);
+}
+
+.quickDiagnosisDialog > header {
+  position: sticky;
+  z-index: 1;
+  top: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--od-line);
+  background: #ffffff;
+}
+
+.quickDiagnosisDialog > header span {
+  color: var(--od-muted);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.quickDiagnosisDialog > header h2 {
+  margin: 2px 0 0;
+  color: var(--od-ink);
+  font-size: 18px;
+  letter-spacing: 0;
+}
+
+.quickDiagnosisDialog > header button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--od-line);
+  border-radius: 6px;
+  background: #ffffff;
+  color: #495a60;
+  cursor: pointer;
+}
+
+.quickDiagnosisScopes {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 3px;
+  margin: 16px 18px 6px;
+  padding: 3px;
+  border: 1px solid var(--od-line-strong);
+  border-radius: 6px;
+  background: #edf2f3;
+}
+
+.quickDiagnosisScopes button {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: #5d6b70;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.quickDiagnosisScopes button.quickDiagnosisScopeActive {
+  background: #ffffff;
+  color: #126b63;
+  box-shadow: 0 1px 3px rgb(21 34 39 / 10%);
+}
+
+.quickDiagnosisGroups {
+  display: grid;
+  gap: 0;
+  padding: 4px 18px 18px;
+}
+
+.quickDiagnosisGroups fieldset {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid #e1e7e8;
+}
+
+.quickDiagnosisGroups fieldset:last-child {
+  border-bottom: 0;
+}
+
+.quickDiagnosisGroups legend {
+  display: contents;
+  color: #3e4f55;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quickDiagnosisGroups fieldset > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quickDiagnosisGroups button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--od-line);
+  border-radius: 5px;
+  background: #f8fafb;
+  color: #4b5b61;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.quickDiagnosisGroups button:hover {
+  border-color: #7da8a4;
+  background: #eef6f5;
+}
+
+.quickDiagnosisGroups button.quickDiagnosisOptionActive {
+  border-color: #438c86;
+  background: #dff0ee;
+  color: #125d57;
+}
+
 .inspectorActions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -877,6 +1114,9 @@
 
 .header button:focus-visible,
 .toolbar button:focus-visible,
+.archLabel:focus-visible,
+.interarchSummary:focus-visible,
+.quickDiagnosisDialog button:focus-visible,
 .toothNumber:focus-visible,
 .surfaceList button:focus-visible,
 .clinicalMarkerGrid button:focus-visible,
@@ -983,6 +1223,10 @@
     gap: 8px;
   }
 
+  .quickDiagnosisButton {
+    width: max-content;
+  }
+
   .conditionControl {
     flex-wrap: wrap;
   }
@@ -1065,6 +1309,12 @@
 
   .toolbarStats {
     justify-content: flex-end;
+  }
+
+  .interarchSummary,
+  .archLabel {
+    display: grid;
+    gap: 3px;
   }
 
   .conditionControl button {
@@ -1153,6 +1403,25 @@
 
   .clinicalMarkerGrid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .quickDiagnosisBackdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .quickDiagnosisDialog {
+    width: 100%;
+    max-height: 88vh;
+    border-right: 0;
+    border-bottom: 0;
+    border-left: 0;
+    border-radius: 8px 8px 0 0;
+  }
+
+  .quickDiagnosisGroups fieldset {
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 
   .footer {

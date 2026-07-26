@@ -6,7 +6,9 @@ import {
   Download,
   ListChecks,
   RotateCcw,
+  Stethoscope,
   Undo2,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -53,6 +55,12 @@ const clinicalMarkerOptions = [
     color: "#c0363c",
   },
   {
+    id: "boneLoss",
+    label: "Tiêu xương",
+    shortLabel: "TX",
+    color: "#b65b36",
+  },
+  {
     id: "periapical",
     label: "Tổn thương quanh chóp",
     shortLabel: "QC",
@@ -95,11 +103,109 @@ type BridgeSpan = {
   dentition: Dentition;
   teeth: ToothId[];
 };
+type QuickDiagnosisScope = "both" | "upper" | "lower";
+type QuickDiagnosisState = Record<
+  QuickDiagnosisScope,
+  Record<string, string>
+>;
 type HistoryEntry = {
   surfaceState: SurfaceState;
   markerState: MarkerState;
   bridges: BridgeSpan[];
+  quickDiagnosis: QuickDiagnosisState;
 };
+
+type QuickDiagnosisGroup = {
+  id: string;
+  label: string;
+  options: readonly {
+    value: string;
+    label: string;
+    summary: string;
+  }[];
+};
+
+const quickDiagnosisGroups: Record<
+  QuickDiagnosisScope,
+  readonly QuickDiagnosisGroup[]
+> = {
+  both: [
+    {
+      id: "angle",
+      label: "Tương quan Angle",
+      options: [
+        { value: "class-i", label: "Loại I", summary: "Angle I" },
+        { value: "class-ii-1", label: "Loại II/1", summary: "Angle II/1" },
+        { value: "class-ii-2", label: "Loại II/2", summary: "Angle II/2" },
+        { value: "class-iii", label: "Loại III", summary: "Angle III" },
+      ],
+    },
+    {
+      id: "overjet",
+      label: "Độ cắn chìa",
+      options: [
+        { value: "normal", label: "Bình thường", summary: "Cắn chìa bình thường" },
+        { value: "increased", label: "Tăng", summary: "Cắn chìa tăng" },
+        { value: "reverse", label: "Cắn ngược", summary: "Cắn ngược" },
+      ],
+    },
+    {
+      id: "overbite",
+      label: "Độ cắn phủ",
+      options: [
+        { value: "normal", label: "Bình thường", summary: "Cắn phủ bình thường" },
+        { value: "deep", label: "Cắn sâu", summary: "Cắn sâu" },
+        { value: "open", label: "Cắn hở", summary: "Cắn hở" },
+      ],
+    },
+    {
+      id: "crossbite",
+      label: "Cắn chéo",
+      options: [{ value: "present", label: "Có", summary: "Cắn chéo" }],
+    },
+    {
+      id: "midline",
+      label: "Đường giữa",
+      options: [{ value: "deviated", label: "Lệch", summary: "Lệch đường giữa" }],
+    },
+  ],
+  upper: [],
+  lower: [],
+};
+
+const archDiagnosisGroups: readonly QuickDiagnosisGroup[] = [
+  {
+    id: "crowding",
+    label: "Chen chúc",
+    options: [
+      { value: "mild", label: "Nhẹ", summary: "Chen chúc nhẹ" },
+      { value: "moderate", label: "Vừa", summary: "Chen chúc vừa" },
+      { value: "severe", label: "Nặng", summary: "Chen chúc nặng" },
+    ],
+  },
+  {
+    id: "spacing",
+    label: "Khe thưa",
+    options: [
+      { value: "mild", label: "Ít", summary: "Khe thưa ít" },
+      { value: "moderate", label: "Vừa", summary: "Khe thưa vừa" },
+      { value: "severe", label: "Nhiều", summary: "Khe thưa nhiều" },
+    ],
+  },
+  {
+    id: "narrow",
+    label: "Cung hàm hẹp",
+    options: [{ value: "present", label: "Có", summary: "Cung hàm hẹp" }],
+  },
+  {
+    id: "asymmetry",
+    label: "Bất đối xứng",
+    options: [{ value: "present", label: "Có", summary: "Bất đối xứng" }],
+  },
+];
+
+quickDiagnosisGroups.upper = archDiagnosisGroups;
+quickDiagnosisGroups.lower = archDiagnosisGroups;
 
 const nativeMarkerIds = new Set<ClinicalMarkerId>([
   "pulpitis",
@@ -111,7 +217,9 @@ const nativeMarkerIds = new Set<ClinicalMarkerId>([
 ]);
 
 const markerConflicts: Record<ClinicalMarkerId, ClinicalMarkerId[]> = {
-  missing: clinicalMarkerOptions.map((marker) => marker.id),
+  missing: clinicalMarkerOptions
+    .map((marker) => marker.id)
+    .filter((marker) => marker !== "missing" && marker !== "boneLoss"),
   implant: [
     "missing",
     "pulpitis",
@@ -127,6 +235,7 @@ const markerConflicts: Record<ClinicalMarkerId, ClinicalMarkerId[]> = {
   extraction: ["missing", "implant"],
   periodontitis: ["missing"],
   periapical: ["missing", "implant"],
+  boneLoss: [],
 };
 
 const surfaceNames: Record<SurfaceCode, string> = {
@@ -141,6 +250,12 @@ const surfaceNames: Record<SurfaceCode, string> = {
 const storageKey = "codexdentist-odontogram-5-surface-v1";
 const markerStorageKey = "codexdentist-odontogram-clinical-markers-v1";
 const bridgeStorageKey = "codexdentist-odontogram-bridges-v1";
+const quickDiagnosisStorageKey =
+  "codexdentist-odontogram-quick-diagnosis-v1";
+
+function emptyQuickDiagnosis(): QuickDiagnosisState {
+  return { both: {}, upper: {}, lower: {} };
+}
 
 function isToothId(value: string): value is ToothId {
   return allTeeth.includes(value as ToothId);
@@ -297,6 +412,45 @@ function parseStoredBridges(value: string | null): BridgeSpan[] {
   }
 }
 
+function parseStoredQuickDiagnosis(value: string | null): QuickDiagnosisState {
+  const result = emptyQuickDiagnosis();
+  if (!value) {
+    return result;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return result;
+    }
+
+    for (const scope of ["both", "upper", "lower"] as const) {
+      const scopeValue = (parsed as Record<string, unknown>)[scope];
+      if (
+        !scopeValue ||
+        typeof scopeValue !== "object" ||
+        Array.isArray(scopeValue)
+      ) {
+        continue;
+      }
+
+      for (const group of quickDiagnosisGroups[scope]) {
+        const selected = (scopeValue as Record<string, unknown>)[group.id];
+        if (
+          typeof selected === "string" &&
+          group.options.some((option) => option.value === selected)
+        ) {
+          result[scope][group.id] = selected;
+        }
+      }
+    }
+
+    return result;
+  } catch {
+    return result;
+  }
+}
+
 function readStoredState() {
   try {
     return parseStoredState(window.localStorage.getItem(storageKey));
@@ -323,6 +477,16 @@ function readStoredBridges() {
   }
 }
 
+function readStoredQuickDiagnosis() {
+  try {
+    return parseStoredQuickDiagnosis(
+      window.localStorage.getItem(quickDiagnosisStorageKey),
+    );
+  } catch {
+    return emptyQuickDiagnosis();
+  }
+}
+
 function normalizeStoredState(
   surfaceState: SurfaceState,
   markerState: MarkerState,
@@ -333,7 +497,7 @@ function normalizeStoredState(
   for (const tooth of allTeeth) {
     if (hasMarker(nextMarkers, tooth, "missing")) {
       for (const marker of clinicalMarkerOptions) {
-        if (marker.id !== "missing") {
+        if (marker.id !== "missing" && marker.id !== "boneLoss") {
           delete nextMarkers[markerKey(tooth, marker.id)];
         }
       }
@@ -389,6 +553,17 @@ function persistStoredMarkerState(state: MarkerState) {
 function persistStoredBridges(bridges: BridgeSpan[]) {
   try {
     window.localStorage.setItem(bridgeStorageKey, JSON.stringify(bridges));
+  } catch {
+    // The odontogram remains usable when browser storage is unavailable.
+  }
+}
+
+function persistStoredQuickDiagnosis(state: QuickDiagnosisState) {
+  try {
+    window.localStorage.setItem(
+      quickDiagnosisStorageKey,
+      JSON.stringify(state),
+    );
   } catch {
     // The odontogram remains usable when browser storage is unavailable.
   }
@@ -466,7 +641,13 @@ function toothTemplate(tooth: ToothId): ToothTemplate {
 
 function toothArtworkPath(
   tooth: ToothId,
-  variant?: "implant" | NativeMarkerId,
+  variant?:
+    | "implant"
+    | "bone"
+    | "boneLoss"
+    | "boneLossOnly"
+    | "implantBoneLoss"
+    | NativeMarkerId,
 ) {
   const dentition = isPrimaryTooth(tooth) ? "primary" : "adult";
   const suffix = variant ? `-${variant}` : "";
@@ -501,10 +682,22 @@ function markerFor(id: ClinicalMarkerId) {
   return clinicalMarkerOptions.find((marker) => marker.id === id);
 }
 
+function quickDiagnosisSummary(
+  state: QuickDiagnosisState,
+  scope: QuickDiagnosisScope,
+) {
+  return quickDiagnosisGroups[scope].flatMap((group) => {
+    const selected = state[scope][group.id];
+    const option = group.options.find((item) => item.value === selected);
+    return option ? [option.summary] : [];
+  });
+}
+
 function buildExportData(
   surfaceState: SurfaceState,
   markerState: MarkerState,
   bridges: BridgeSpan[],
+  quickDiagnosis: QuickDiagnosisState,
   dentition: Dentition,
 ) {
   const surfaces = Object.entries(surfaceState).map(([key, condition]) => {
@@ -528,19 +721,33 @@ function buildExportData(
     };
   });
 
-  return { notation: "FDI", dentition, surfaces, markers, bridges };
+  return {
+    notation: "FDI",
+    dentition,
+    surfaces,
+    markers,
+    bridges,
+    quickDiagnosis,
+  };
 }
 
 function downloadJson(
   surfaceState: SurfaceState,
   markerState: MarkerState,
   bridges: BridgeSpan[],
+  quickDiagnosis: QuickDiagnosisState,
   dentition: Dentition,
 ) {
   const blob = new Blob(
     [
       JSON.stringify(
-        buildExportData(surfaceState, markerState, bridges, dentition),
+        buildExportData(
+          surfaceState,
+          markerState,
+          bridges,
+          quickDiagnosis,
+          dentition,
+        ),
         null,
         2,
       ),
@@ -559,6 +766,10 @@ export function OdontogramSurfaceLab() {
   const [surfaceState, setSurfaceState] = useState<SurfaceState>({});
   const [markerState, setMarkerState] = useState<MarkerState>({});
   const [bridges, setBridges] = useState<BridgeSpan[]>([]);
+  const [quickDiagnosis, setQuickDiagnosis] =
+    useState<QuickDiagnosisState>(emptyQuickDiagnosis);
+  const [quickDiagnosisScope, setQuickDiagnosisScope] =
+    useState<QuickDiagnosisScope | null>(null);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [condition, setCondition] = useState<ConditionId>("caries");
   const [dentition, setDentition] = useState<Dentition>("adult");
@@ -575,6 +786,7 @@ export function OdontogramSurfaceLab() {
     setSurfaceState(normalized.surfaceState);
     setMarkerState(normalized.markerState);
     setBridges(readStoredBridges());
+    setQuickDiagnosis(readStoredQuickDiagnosis());
     persistStoredState(normalized.surfaceState);
     persistStoredMarkerState(normalized.markerState);
   }, []);
@@ -609,6 +821,16 @@ export function OdontogramSurfaceLab() {
     });
   };
 
+  const commitQuickDiagnosis = (
+    update: (current: QuickDiagnosisState) => QuickDiagnosisState,
+  ) => {
+    setQuickDiagnosis((current) => {
+      const next = update(current);
+      persistStoredQuickDiagnosis(next);
+      return next;
+    });
+  };
+
   const saveHistory = () => {
     const snapshot = {
       surfaceState: { ...surfaceState },
@@ -617,6 +839,11 @@ export function OdontogramSurfaceLab() {
         ...bridge,
         teeth: [...bridge.teeth],
       })),
+      quickDiagnosis: {
+        both: { ...quickDiagnosis.both },
+        upper: { ...quickDiagnosis.upper },
+        lower: { ...quickDiagnosis.lower },
+      },
     };
     setHistory((current) => [...current.slice(-49), snapshot]);
   };
@@ -653,6 +880,10 @@ export function OdontogramSurfaceLab() {
   );
   const markedSurfaceCount = Object.keys(activeSurfaceState).length;
   const markedMarkerCount = Object.keys(activeMarkerState).length;
+  const quickDiagnosisCount = Object.values(quickDiagnosis).reduce(
+    (total, scope) => total + Object.keys(scope).length,
+    0,
+  );
   const markedToothCount = new Set(
     [
       ...Object.keys(activeSurfaceState),
@@ -800,6 +1031,29 @@ export function OdontogramSurfaceLab() {
     ]);
   };
 
+  const toggleQuickDiagnosis = (groupId: string, value: string) => {
+    if (!quickDiagnosisScope) {
+      return;
+    }
+
+    saveHistory();
+    commitQuickDiagnosis((current) => {
+      const next = {
+        both: { ...current.both },
+        upper: { ...current.upper },
+        lower: { ...current.lower },
+      };
+
+      if (next[quickDiagnosisScope][groupId] === value) {
+        delete next[quickDiagnosisScope][groupId];
+      } else {
+        next[quickDiagnosisScope][groupId] = value;
+      }
+
+      return next;
+    });
+  };
+
   const undo = () => {
     const last = history.at(-1);
     if (!last) return;
@@ -807,6 +1061,7 @@ export function OdontogramSurfaceLab() {
     commitSurfaceState(() => last.surfaceState);
     commitMarkerState(() => last.markerState);
     commitBridges(() => last.bridges);
+    commitQuickDiagnosis(() => last.quickDiagnosis);
     setHistory((current) => current.slice(0, -1));
   };
 
@@ -815,7 +1070,8 @@ export function OdontogramSurfaceLab() {
     if (
       (markedSurfaceCount === 0 &&
         markedMarkerCount === 0 &&
-        activeBridges.length === 0) ||
+        activeBridges.length === 0 &&
+        quickDiagnosisCount === 0) ||
       !window.confirm(`Xóa toàn bộ đánh dấu của bộ ${label}?`)
     ) {
       return;
@@ -838,6 +1094,7 @@ export function OdontogramSurfaceLab() {
     commitBridges((current) =>
       current.filter((bridge) => bridge.dentition !== dentition),
     );
+    commitQuickDiagnosis(() => emptyQuickDiagnosis());
   };
 
   const copyData = async () => {
@@ -846,6 +1103,7 @@ export function OdontogramSurfaceLab() {
         activeSurfaceState,
         activeMarkerState,
         activeBridges,
+        quickDiagnosis,
         dentition,
       ),
       null,
@@ -909,7 +1167,8 @@ export function OdontogramSurfaceLab() {
             disabled={
               markedSurfaceCount === 0 &&
               markedMarkerCount === 0 &&
-              activeBridges.length === 0
+              activeBridges.length === 0 &&
+              quickDiagnosisCount === 0
             }
             aria-label="Xóa toàn bộ"
             title="Xóa toàn bộ"
@@ -955,6 +1214,15 @@ export function OdontogramSurfaceLab() {
             <ListChecks size={16} />
             Chọn nhiều
           </button>
+          <button
+            type="button"
+            className={styles.quickDiagnosisButton}
+            onClick={() => setQuickDiagnosisScope("both")}
+          >
+            <Stethoscope size={16} />
+            Chẩn đoán nhanh
+            {quickDiagnosisCount > 0 ? <strong>{quickDiagnosisCount}</strong> : null}
+          </button>
           <div className={styles.conditionControl}>
             {conditionOptions.map((option) => (
               <button
@@ -983,6 +1251,18 @@ export function OdontogramSurfaceLab() {
 
       <div className={styles.workspace}>
         <section className={styles.chartPanel} aria-label="Sơ đồ răng">
+          {quickDiagnosisSummary(quickDiagnosis, "both").length > 0 ? (
+            <button
+              type="button"
+              className={styles.interarchSummary}
+              onClick={() => setQuickDiagnosisScope("both")}
+            >
+              <span>Tương quan hai hàm</span>
+              <strong>
+                {quickDiagnosisSummary(quickDiagnosis, "both").join(" · ")}
+              </strong>
+            </button>
+          ) : null}
           <div className={styles.orientation}>
             <span>Phải bệnh nhân</span>
             <span>Đường giữa</span>
@@ -996,7 +1276,9 @@ export function OdontogramSurfaceLab() {
             state={surfaceState}
             markerState={markerState}
             bridges={activeBridges}
+            diagnosisSummary={quickDiagnosisSummary(quickDiagnosis, "upper")}
             condition={condition}
+            onOpenDiagnosis={() => setQuickDiagnosisScope("upper")}
             onSelectTooth={selectTooth}
             onSetSurface={setSurface}
             onClearSurface={clearSurface}
@@ -1015,7 +1297,9 @@ export function OdontogramSurfaceLab() {
             state={surfaceState}
             markerState={markerState}
             bridges={activeBridges}
+            diagnosisSummary={quickDiagnosisSummary(quickDiagnosis, "lower")}
             condition={condition}
+            onOpenDiagnosis={() => setQuickDiagnosisScope("lower")}
             onSelectTooth={selectTooth}
             onSetSurface={setSurface}
             onClearSurface={clearSurface}
@@ -1175,7 +1459,8 @@ export function OdontogramSurfaceLab() {
               disabled={
                 markedSurfaceCount === 0 &&
                 markedMarkerCount === 0 &&
-                activeBridges.length === 0
+                activeBridges.length === 0 &&
+                quickDiagnosisCount === 0
               }
             >
               {copied ? <Check size={17} /> : <Clipboard size={17} />}
@@ -1188,13 +1473,15 @@ export function OdontogramSurfaceLab() {
                   activeSurfaceState,
                   activeMarkerState,
                   activeBridges,
+                  quickDiagnosis,
                   dentition,
                 )
               }
               disabled={
                 markedSurfaceCount === 0 &&
                 markedMarkerCount === 0 &&
-                activeBridges.length === 0
+                activeBridges.length === 0 &&
+                quickDiagnosisCount === 0
               }
             >
               <Download size={17} />
@@ -1208,6 +1495,97 @@ export function OdontogramSurfaceLab() {
         <span>MODBL · FDI surface model</span>
         <span>Prototype · Không dùng thay thế chẩn đoán lâm sàng</span>
       </footer>
+
+      {quickDiagnosisScope ? (
+        <div
+          className={styles.quickDiagnosisBackdrop}
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              setQuickDiagnosisScope(null);
+            }
+          }}
+        >
+          <section
+            className={styles.quickDiagnosisDialog}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="quick-diagnosis-title"
+          >
+            <header>
+              <div>
+                <span>Chẩn đoán chỉnh nha</span>
+                <h2 id="quick-diagnosis-title">Chẩn đoán nhanh</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setQuickDiagnosisScope(null)}
+                aria-label="Đóng"
+                title="Đóng"
+              >
+                <X size={18} />
+              </button>
+            </header>
+
+            <div
+              className={styles.quickDiagnosisScopes}
+              aria-label="Phạm vi chẩn đoán"
+            >
+              {([
+                ["both", "Hai hàm"],
+                ["upper", "Hàm trên"],
+                ["lower", "Hàm dưới"],
+              ] as const).map(([scope, label]) => (
+                <button
+                  type="button"
+                  key={scope}
+                  className={
+                    quickDiagnosisScope === scope
+                      ? styles.quickDiagnosisScopeActive
+                      : undefined
+                  }
+                  onClick={() => setQuickDiagnosisScope(scope)}
+                  aria-pressed={quickDiagnosisScope === scope}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className={styles.quickDiagnosisGroups}>
+              {quickDiagnosisGroups[quickDiagnosisScope].map((group) => (
+                <fieldset key={group.id}>
+                  <legend>{group.label}</legend>
+                  <div>
+                    {group.options.map((option) => {
+                      const active =
+                        quickDiagnosis[quickDiagnosisScope][group.id] ===
+                        option.value;
+                      return (
+                        <button
+                          type="button"
+                          key={option.value}
+                          className={
+                            active
+                              ? styles.quickDiagnosisOptionActive
+                              : undefined
+                          }
+                          onClick={() =>
+                            toggleQuickDiagnosis(group.id, option.value)
+                          }
+                          aria-pressed={active}
+                        >
+                          {option.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </fieldset>
+              ))}
+            </div>
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }
@@ -1219,7 +1597,9 @@ function Arch({
   state,
   markerState,
   bridges,
+  diagnosisSummary,
   condition,
+  onOpenDiagnosis,
   onSelectTooth,
   onSetSurface,
   onClearSurface,
@@ -1230,7 +1610,9 @@ function Arch({
   state: SurfaceState;
   markerState: MarkerState;
   bridges: BridgeSpan[];
+  diagnosisSummary: string[];
   condition: ConditionId;
+  onOpenDiagnosis: () => void;
   onSelectTooth: (tooth: ToothId) => void;
   onSetSurface: (tooth: ToothId, surface: SurfaceCode) => void;
   onClearSurface: (tooth: ToothId, surface: SurfaceCode) => void;
@@ -1240,7 +1622,16 @@ function Arch({
 
   return (
     <section className={upper ? styles.arch : `${styles.arch} ${styles.lowerArch}`}>
-      <div className={styles.archLabel}>{label}</div>
+      <button
+        type="button"
+        className={styles.archLabel}
+        onClick={onOpenDiagnosis}
+      >
+        <span>{label}</span>
+        {diagnosisSummary.length > 0 ? (
+          <strong>{diagnosisSummary.join(" · ")}</strong>
+        ) : null}
+      </button>
       <div
         className={`${styles.teethRow} ${
           primary ? styles.teethRowPrimary : ""
@@ -1337,9 +1728,21 @@ function ToothIllustration({
     .map((marker) => marker.id);
   const missing = activeMarkers.includes("missing");
   const implant = activeMarkers.includes("implant");
+  const boneLoss = activeMarkers.includes("boneLoss");
   const nativeMarkers = activeMarkers.filter(
     (marker): marker is NativeMarkerId => nativeMarkerIds.has(marker),
   );
+  const artworkVariant = missing
+    ? boneLoss
+      ? "boneLossOnly"
+      : "bone"
+    : implant
+      ? boneLoss
+        ? "implantBoneLoss"
+        : "implant"
+      : boneLoss
+        ? "boneLoss"
+        : undefined;
 
   return (
     <div
@@ -1356,16 +1759,14 @@ function ToothIllustration({
           : ""
       }${bridgeUnit ? ", Cầu răng" : ""}`}
     >
-      {!missing ? (
-        <img
-          className={styles.toothArtwork}
-          src={toothArtworkPath(tooth, implant ? "implant" : undefined)}
-          alt=""
-          aria-hidden="true"
-          draggable={false}
-          style={{ transform: artworkTransform }}
-        />
-      ) : null}
+      <img
+        className={styles.toothArtwork}
+        src={toothArtworkPath(tooth, artworkVariant)}
+        alt=""
+        aria-hidden="true"
+        draggable={false}
+        style={{ transform: artworkTransform }}
+      />
       {bridgeUnit ? (
         <>
           <span
@@ -1435,6 +1836,19 @@ function ClinicalMarkerPreview({
   const artworkTransform = `scale(${patientLeft ? -1 : 1}, ${
     lower ? -1 : 1
   })`;
+
+  if (marker === "boneLoss") {
+    return (
+      <span className={styles.clinicalMarkerPreview} aria-hidden="true">
+        <img
+          src={toothArtworkPath(tooth, "boneLoss")}
+          alt=""
+          draggable={false}
+          style={{ transform: artworkTransform }}
+        />
+      </span>
+    );
+  }
 
   if (marker === "missing" || marker === "fracture") {
     return (
