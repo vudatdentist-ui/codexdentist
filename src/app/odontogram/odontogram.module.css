@@ -168,6 +168,34 @@
   box-shadow: 0 1px 3px rgb(21 34 39 / 9%);
 }
 
+.multiSelectButton {
+  min-height: 38px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
+  border: 1px solid var(--od-line);
+  border-radius: 6px;
+  background: var(--od-surface);
+  color: #455258;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.multiSelectButton:hover {
+  border-color: #8aafac;
+  background: #eef6f5;
+}
+
+.multiSelectButton.multiSelectActive {
+  border-color: #438c86;
+  background: #dff0ee;
+  color: #125d57;
+}
+
 .conditionControl {
   display: flex;
   align-items: center;
@@ -389,6 +417,35 @@
   overflow: visible;
 }
 
+.bridgeConnector {
+  position: absolute;
+  z-index: 2;
+  top: 68%;
+  right: -14%;
+  left: -14%;
+  height: 5px;
+  border: 1px solid #a36a0d;
+  border-radius: 3px;
+  background: #f4c35b;
+  box-shadow: 0 1px 2px rgb(72 47 4 / 18%);
+}
+
+.bridgeConnectorFirst {
+  left: 50%;
+}
+
+.bridgeConnectorLast {
+  right: 50%;
+}
+
+.bridgeConnectorLower {
+  top: 28%;
+}
+
+.bridgeCrown {
+  z-index: 3;
+}
+
 .markerFracture {
   fill: none;
   stroke: #d36b28;
@@ -515,6 +572,37 @@
     linear-gradient(#edf2f3 1px, transparent 1px),
     linear-gradient(90deg, #edf2f3 1px, transparent 1px);
   background-size: 24px 24px;
+}
+
+.multiSelectionSummary {
+  min-height: 184px;
+  display: flex;
+  align-content: center;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+  padding: 18px;
+  border-block: 1px solid var(--od-line);
+  background: #f7fafa;
+}
+
+.multiSelectionSummary button {
+  min-width: 52px;
+  height: 36px;
+  border: 1px solid #8dbbb6;
+  border-radius: 5px;
+  background: var(--od-surface);
+  color: #12665f;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.multiSelectionSummary button:hover {
+  background: #e5f2f0;
 }
 
 .surfaceMapLarge {
@@ -657,11 +745,27 @@
   background: #eef6f5;
 }
 
+.clinicalMarkerGrid button:disabled,
+.clinicalMarkerGrid button:disabled:hover {
+  border-color: var(--od-line);
+  background: #f4f6f7;
+  color: #9ca8ac;
+  cursor: not-allowed;
+  opacity: 0.58;
+}
+
 .clinicalMarkerGrid button.clinicalMarkerActive {
   border-color: #438c86;
   background: #e2f1ef;
   color: #164f4b;
   box-shadow: inset 3px 0 #147b72;
+}
+
+.clinicalMarkerGrid button.clinicalMarkerPartial {
+  border-color: #9ab8b5;
+  background: #f0f7f6;
+  color: #315f5b;
+  box-shadow: inset 3px 0 #88aaa6;
 }
 
 .clinicalMarkerPreview {
@@ -704,6 +808,18 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   stroke-width: 2.2;
+}
+
+.bridgePreviewConnector {
+  fill: none;
+  stroke: #9a650e;
+  stroke-width: 3.2;
+}
+
+.bridgePreviewUnit {
+  fill: #f5ca70;
+  stroke: #916114;
+  stroke-width: 1.2;
 }
 
 .clinicalMarkerGrid button > span:last-child {
@@ -787,6 +903,13 @@
   .focusTooth {
     grid-column: 2;
     grid-row: 1 / span 2;
+    min-height: 150px;
+    margin: 0;
+    border: 1px solid var(--od-line);
+  }
+
+  .multiSelectionSummary {
+    grid-column: 2 / -1;
     min-height: 150px;
     margin: 0;
     border: 1px solid var(--od-line);
@@ -998,6 +1121,11 @@
     grid-column: 1;
     grid-row: auto;
     min-height: 170px;
+  }
+
+  .multiSelectionSummary {
+    grid-column: 1;
+    min-height: 130px;
   }
 
   .surfaceList,

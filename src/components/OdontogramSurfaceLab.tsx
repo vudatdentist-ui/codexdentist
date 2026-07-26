@@ -4,6 +4,7 @@ import {
   Check,
   Clipboard,
   Download,
+  ListChecks,
   RotateCcw,
   Undo2,
 } from "lucide-react";
@@ -89,9 +90,15 @@ type NativeMarkerId =
   | "extraction";
 type SurfaceState = Record<string, ConditionId>;
 type MarkerState = Record<string, true>;
+type BridgeSpan = {
+  id: string;
+  dentition: Dentition;
+  teeth: ToothId[];
+};
 type HistoryEntry = {
   surfaceState: SurfaceState;
   markerState: MarkerState;
+  bridges: BridgeSpan[];
 };
 
 const nativeMarkerIds = new Set<ClinicalMarkerId>([
@@ -133,6 +140,7 @@ const surfaceNames: Record<SurfaceCode, string> = {
 
 const storageKey = "codexdentist-odontogram-5-surface-v1";
 const markerStorageKey = "codexdentist-odontogram-clinical-markers-v1";
+const bridgeStorageKey = "codexdentist-odontogram-bridges-v1";
 
 function isToothId(value: string): value is ToothId {
   return allTeeth.includes(value as ToothId);
@@ -144,6 +152,46 @@ function isConditionId(value: unknown): value is ConditionId {
 
 function isClinicalMarkerId(value: unknown): value is ClinicalMarkerId {
   return clinicalMarkerOptions.some((marker) => marker.id === value);
+}
+
+function archTeethFor(tooth: ToothId): readonly ToothId[] {
+  if (adultUpperTeeth.includes(tooth as (typeof adultUpperTeeth)[number])) {
+    return adultUpperTeeth;
+  }
+  if (adultLowerTeeth.includes(tooth as (typeof adultLowerTeeth)[number])) {
+    return adultLowerTeeth;
+  }
+  if (primaryUpperTeeth.includes(tooth as (typeof primaryUpperTeeth)[number])) {
+    return primaryUpperTeeth;
+  }
+  return primaryLowerTeeth;
+}
+
+function normalizeBridgeTeeth(teeth: readonly ToothId[]) {
+  if (teeth.length < 2) {
+    return null;
+  }
+
+  const unique = [...new Set(teeth)];
+  const arch = archTeethFor(unique[0]);
+
+  if (!unique.every((tooth) => arch.includes(tooth))) {
+    return null;
+  }
+
+  const sorted = [...unique].sort(
+    (left, right) => arch.indexOf(left) - arch.indexOf(right),
+  );
+  const indexes = sorted.map((tooth) => arch.indexOf(tooth));
+  const contiguous = indexes.every(
+    (index, position) => position === 0 || index === indexes[position - 1] + 1,
+  );
+
+  return contiguous ? sorted : null;
+}
+
+function bridgeIdFor(dentition: Dentition, teeth: readonly ToothId[]) {
+  return `${dentition}:${teeth.join("-")}`;
 }
 
 function parseStoredState(value: string | null): SurfaceState {
@@ -196,6 +244,59 @@ function parseStoredMarkerState(value: string | null): MarkerState {
   }
 }
 
+function parseStoredBridges(value: string | null): BridgeSpan[] {
+  if (!value) {
+    return [];
+  }
+
+  try {
+    const parsed = JSON.parse(value) as unknown;
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+
+    return parsed.flatMap((entry) => {
+      if (!entry || typeof entry !== "object") {
+        return [];
+      }
+
+      const candidate = entry as { dentition?: unknown; teeth?: unknown };
+      if (
+        (candidate.dentition !== "adult" &&
+          candidate.dentition !== "primary") ||
+        !Array.isArray(candidate.teeth) ||
+        !candidate.teeth.every(
+          (tooth): tooth is ToothId =>
+            typeof tooth === "string" && isToothId(tooth),
+        )
+      ) {
+        return [];
+      }
+
+      const teeth = normalizeBridgeTeeth(candidate.teeth);
+      if (
+        !teeth ||
+        teeth.some(
+          (tooth) =>
+            (candidate.dentition === "primary") !== isPrimaryTooth(tooth),
+        )
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          id: bridgeIdFor(candidate.dentition, teeth),
+          dentition: candidate.dentition,
+          teeth,
+        },
+      ];
+    });
+  } catch {
+    return [];
+  }
+}
+
 function readStoredState() {
   try {
     return parseStoredState(window.localStorage.getItem(storageKey));
@@ -211,6 +312,14 @@ function readStoredMarkerState() {
     );
   } catch {
     return {};
+  }
+}
+
+function readStoredBridges() {
+  try {
+    return parseStoredBridges(window.localStorage.getItem(bridgeStorageKey));
+  } catch {
+    return [];
   }
 }
 
@@ -272,6 +381,14 @@ function persistStoredState(state: SurfaceState) {
 function persistStoredMarkerState(state: MarkerState) {
   try {
     window.localStorage.setItem(markerStorageKey, JSON.stringify(state));
+  } catch {
+    // The odontogram remains usable when browser storage is unavailable.
+  }
+}
+
+function persistStoredBridges(bridges: BridgeSpan[]) {
+  try {
+    window.localStorage.setItem(bridgeStorageKey, JSON.stringify(bridges));
   } catch {
     // The odontogram remains usable when browser storage is unavailable.
   }
@@ -387,6 +504,7 @@ function markerFor(id: ClinicalMarkerId) {
 function buildExportData(
   surfaceState: SurfaceState,
   markerState: MarkerState,
+  bridges: BridgeSpan[],
   dentition: Dentition,
 ) {
   const surfaces = Object.entries(surfaceState).map(([key, condition]) => {
@@ -410,18 +528,19 @@ function buildExportData(
     };
   });
 
-  return { notation: "FDI", dentition, surfaces, markers };
+  return { notation: "FDI", dentition, surfaces, markers, bridges };
 }
 
 function downloadJson(
   surfaceState: SurfaceState,
   markerState: MarkerState,
+  bridges: BridgeSpan[],
   dentition: Dentition,
 ) {
   const blob = new Blob(
     [
       JSON.stringify(
-        buildExportData(surfaceState, markerState, dentition),
+        buildExportData(surfaceState, markerState, bridges, dentition),
         null,
         2,
       ),
@@ -439,11 +558,14 @@ function downloadJson(
 export function OdontogramSurfaceLab() {
   const [surfaceState, setSurfaceState] = useState<SurfaceState>({});
   const [markerState, setMarkerState] = useState<MarkerState>({});
+  const [bridges, setBridges] = useState<BridgeSpan[]>([]);
   const [history, setHistory] = useState<HistoryEntry[]>([]);
   const [condition, setCondition] = useState<ConditionId>("caries");
   const [dentition, setDentition] = useState<Dentition>("adult");
-  const [selectedTooth, setSelectedTooth] = useState<ToothId>("16");
+  const [selectedTeeth, setSelectedTeeth] = useState<ToothId[]>(["16"]);
+  const [multiSelectEnabled, setMultiSelectEnabled] = useState(false);
   const [copied, setCopied] = useState(false);
+  const selectedTooth = selectedTeeth.at(-1) ?? (dentition === "adult" ? "16" : "55");
 
   useEffect(() => {
     const normalized = normalizeStoredState(
@@ -452,6 +574,7 @@ export function OdontogramSurfaceLab() {
     );
     setSurfaceState(normalized.surfaceState);
     setMarkerState(normalized.markerState);
+    setBridges(readStoredBridges());
     persistStoredState(normalized.surfaceState);
     persistStoredMarkerState(normalized.markerState);
   }, []);
@@ -476,10 +599,24 @@ export function OdontogramSurfaceLab() {
     });
   };
 
+  const commitBridges = (
+    update: (current: BridgeSpan[]) => BridgeSpan[],
+  ) => {
+    setBridges((current) => {
+      const next = update(current);
+      persistStoredBridges(next);
+      return next;
+    });
+  };
+
   const saveHistory = () => {
     const snapshot = {
       surfaceState: { ...surfaceState },
       markerState: { ...markerState },
+      bridges: bridges.map((bridge) => ({
+        ...bridge,
+        teeth: [...bridge.teeth],
+      })),
     };
     setHistory((current) => [...current.slice(-49), snapshot]);
   };
@@ -510,12 +647,17 @@ export function OdontogramSurfaceLab() {
       ) as MarkerState,
     [activeToothSet, markerState],
   );
+  const activeBridges = useMemo(
+    () => bridges.filter((bridge) => bridge.dentition === dentition),
+    [bridges, dentition],
+  );
   const markedSurfaceCount = Object.keys(activeSurfaceState).length;
   const markedMarkerCount = Object.keys(activeMarkerState).length;
   const markedToothCount = new Set(
     [
       ...Object.keys(activeSurfaceState),
       ...Object.keys(activeMarkerState),
+      ...activeBridges.flatMap((bridge) => bridge.teeth),
     ].map((key) => key.split(".")[0]),
   ).size;
 
@@ -531,6 +673,36 @@ export function OdontogramSurfaceLab() {
     markerState,
     selectedTooth,
   );
+  const normalizedSelectedBridgeTeeth = normalizeBridgeTeeth(selectedTeeth);
+  const selectedBridge = normalizedSelectedBridgeTeeth
+    ? activeBridges.find(
+        (bridge) =>
+          bridge.teeth.length === normalizedSelectedBridgeTeeth.length &&
+          bridge.teeth.every(
+            (tooth, index) => tooth === normalizedSelectedBridgeTeeth[index],
+          ),
+      )
+    : undefined;
+  const bridgeAvailable = normalizedSelectedBridgeTeeth !== null;
+  const displayedSelectedTeeth =
+    normalizedSelectedBridgeTeeth ?? selectedTeeth;
+
+  const selectTooth = (tooth: ToothId) => {
+    if (!multiSelectEnabled) {
+      setSelectedTeeth([tooth]);
+      return;
+    }
+
+    setSelectedTeeth((current) => {
+      if (current.includes(tooth)) {
+        return current.length === 1
+          ? current
+          : current.filter((selected) => selected !== tooth);
+      }
+      return [...current, tooth];
+    });
+  };
+
   const setSurface = (tooth: ToothId, surface: SurfaceCode) => {
     if (isToothUnavailable(markerState, tooth)) {
       return;
@@ -543,7 +715,8 @@ export function OdontogramSurfaceLab() {
       return;
     }
 
-    setSelectedTooth(tooth);
+    setSelectedTeeth([tooth]);
+    setMultiSelectEnabled(false);
     saveHistory();
     commitSurfaceState((current) => ({ ...current, [key]: condition }));
   };
@@ -568,27 +741,29 @@ export function OdontogramSurfaceLab() {
     });
   };
 
-  const toggleMarker = (tooth: ToothId, marker: ClinicalMarkerId) => {
-    const key = markerKey(tooth, marker);
-    const active = markerState[key] === true;
-
-    setSelectedTooth(tooth);
+  const toggleMarker = (marker: ClinicalMarkerId) => {
+    const removeFromAll = selectedTeeth.every(
+      (tooth) => markerState[markerKey(tooth, marker)] === true,
+    );
     saveHistory();
 
     const nextMarkers = { ...markerState };
     const nextSurfaces = { ...surfaceState };
 
-    if (active) {
-      delete nextMarkers[key];
-    } else {
-      for (const conflict of markerConflicts[marker]) {
-        delete nextMarkers[markerKey(tooth, conflict)];
-      }
-      nextMarkers[key] = true;
+    for (const tooth of selectedTeeth) {
+      const key = markerKey(tooth, marker);
+      if (removeFromAll) {
+        delete nextMarkers[key];
+      } else {
+        for (const conflict of markerConflicts[marker]) {
+          delete nextMarkers[markerKey(tooth, conflict)];
+        }
+        nextMarkers[key] = true;
 
-      if (marker === "missing" || marker === "implant") {
-        for (const surface of toothSurfaces(tooth)) {
-          delete nextSurfaces[surfaceKey(tooth, surface)];
+        if (marker === "missing" || marker === "implant") {
+          for (const surface of toothSurfaces(tooth)) {
+            delete nextSurfaces[surfaceKey(tooth, surface)];
+          }
         }
       }
     }
@@ -597,19 +772,50 @@ export function OdontogramSurfaceLab() {
     commitSurfaceState(() => nextSurfaces);
   };
 
+  const toggleBridge = () => {
+    if (!normalizedSelectedBridgeTeeth) {
+      return;
+    }
+
+    saveHistory();
+    if (selectedBridge) {
+      commitBridges((current) =>
+        current.filter((bridge) => bridge.id !== selectedBridge.id),
+      );
+      return;
+    }
+
+    const bridge: BridgeSpan = {
+      id: bridgeIdFor(dentition, normalizedSelectedBridgeTeeth),
+      dentition,
+      teeth: normalizedSelectedBridgeTeeth,
+    };
+    commitBridges((current) => [
+      ...current.filter(
+        (item) =>
+          item.dentition !== dentition ||
+          !item.teeth.some((tooth) => bridge.teeth.includes(tooth)),
+      ),
+      bridge,
+    ]);
+  };
+
   const undo = () => {
     const last = history.at(-1);
     if (!last) return;
 
     commitSurfaceState(() => last.surfaceState);
     commitMarkerState(() => last.markerState);
+    commitBridges(() => last.bridges);
     setHistory((current) => current.slice(0, -1));
   };
 
   const reset = () => {
     const label = dentition === "adult" ? "răng vĩnh viễn" : "răng sữa";
     if (
-      (markedSurfaceCount === 0 && markedMarkerCount === 0) ||
+      (markedSurfaceCount === 0 &&
+        markedMarkerCount === 0 &&
+        activeBridges.length === 0) ||
       !window.confirm(`Xóa toàn bộ đánh dấu của bộ ${label}?`)
     ) {
       return;
@@ -629,11 +835,19 @@ export function OdontogramSurfaceLab() {
         ),
       ) as MarkerState,
     );
+    commitBridges((current) =>
+      current.filter((bridge) => bridge.dentition !== dentition),
+    );
   };
 
   const copyData = async () => {
     const payload = JSON.stringify(
-      buildExportData(activeSurfaceState, activeMarkerState, dentition),
+      buildExportData(
+        activeSurfaceState,
+        activeMarkerState,
+        activeBridges,
+        dentition,
+      ),
       null,
       2,
     );
@@ -648,7 +862,8 @@ export function OdontogramSurfaceLab() {
     }
 
     setDentition(nextDentition);
-    setSelectedTooth(nextDentition === "adult" ? "16" : "55");
+    setSelectedTeeth([nextDentition === "adult" ? "16" : "55"]);
+    setMultiSelectEnabled(false);
     setHistory([]);
     setCopied(false);
   };
@@ -691,7 +906,11 @@ export function OdontogramSurfaceLab() {
             className={styles.iconButton}
             type="button"
             onClick={reset}
-            disabled={markedSurfaceCount === 0 && markedMarkerCount === 0}
+            disabled={
+              markedSurfaceCount === 0 &&
+              markedMarkerCount === 0 &&
+              activeBridges.length === 0
+            }
             aria-label="Xóa toàn bộ"
             title="Xóa toàn bộ"
           >
@@ -720,6 +939,22 @@ export function OdontogramSurfaceLab() {
               Răng sữa
             </button>
           </div>
+          <button
+            type="button"
+            className={`${styles.multiSelectButton} ${
+              multiSelectEnabled ? styles.multiSelectActive : ""
+            }`}
+            onClick={() => {
+              setMultiSelectEnabled((current) => !current);
+              if (multiSelectEnabled) {
+                setSelectedTeeth([selectedTooth]);
+              }
+            }}
+            aria-pressed={multiSelectEnabled}
+          >
+            <ListChecks size={16} />
+            Chọn nhiều
+          </button>
           <div className={styles.conditionControl}>
             {conditionOptions.map((option) => (
               <button
@@ -742,6 +977,7 @@ export function OdontogramSurfaceLab() {
           <span><strong>{markedToothCount}</strong> răng</span>
           <span><strong>{markedSurfaceCount}</strong> mặt</span>
           <span><strong>{markedMarkerCount}</strong> dấu</span>
+          <span><strong>{activeBridges.length}</strong> cầu</span>
         </div>
       </section>
 
@@ -756,11 +992,12 @@ export function OdontogramSurfaceLab() {
           <Arch
             label="Hàm trên"
             teeth={upperTeeth}
-            selectedTooth={selectedTooth}
+            selectedTeeth={selectedTeeth}
             state={surfaceState}
             markerState={markerState}
+            bridges={activeBridges}
             condition={condition}
-            onSelectTooth={setSelectedTooth}
+            onSelectTooth={selectTooth}
             onSetSurface={setSurface}
             onClearSurface={clearSurface}
           />
@@ -774,11 +1011,12 @@ export function OdontogramSurfaceLab() {
           <Arch
             label="Hàm dưới"
             teeth={lowerTeeth}
-            selectedTooth={selectedTooth}
+            selectedTeeth={selectedTeeth}
             state={surfaceState}
             markerState={markerState}
+            bridges={activeBridges}
             condition={condition}
-            onSelectTooth={setSelectedTooth}
+            onSelectTooth={selectTooth}
             onSetSurface={setSurface}
             onClearSurface={clearSurface}
           />
@@ -787,11 +1025,21 @@ export function OdontogramSurfaceLab() {
         <aside className={styles.inspector}>
           <div className={styles.inspectorHeading}>
             <div>
-              <span>Răng đang chọn</span>
-              <h2>R{selectedTooth}</h2>
+              <span>
+                {selectedTeeth.length > 1
+                  ? `${selectedTeeth.length} răng đang chọn`
+                  : "Răng đang chọn"}
+              </span>
+              <h2>
+                {selectedTeeth.length > 1
+                  ? displayedSelectedTeeth.join(" · ")
+                  : `R${selectedTooth}`}
+              </h2>
             </div>
             <strong>
-              {hasMarker(markerState, selectedTooth, "implant") &&
+              {selectedTeeth.length > 1
+                ? "Chọn theo nhóm"
+                : hasMarker(markerState, selectedTooth, "implant") &&
               hasMarker(markerState, selectedTooth, "crown")
                 ? "Implant + Mão"
                 : hasMarker(markerState, selectedTooth, "missing")
@@ -802,39 +1050,56 @@ export function OdontogramSurfaceLab() {
             </strong>
           </div>
 
-          <div className={styles.focusTooth}>
-            <SurfaceMap
-              tooth={selectedTooth}
-              state={surfaceState}
-              condition={condition}
-              large
-              disabled={selectedToothUnavailable}
-              onSetSurface={setSurface}
-              onClearSurface={clearSurface}
-            />
-          </div>
+          {selectedTeeth.length > 1 ? (
+            <div className={styles.multiSelectionSummary}>
+              {displayedSelectedTeeth.map((tooth) => (
+                <button
+                  type="button"
+                  key={tooth}
+                  onClick={() => selectTooth(tooth)}
+                  aria-label={`Bỏ chọn răng ${tooth}`}
+                >
+                  R{tooth}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <>
+              <div className={styles.focusTooth}>
+                <SurfaceMap
+                  tooth={selectedTooth}
+                  state={surfaceState}
+                  condition={condition}
+                  large
+                  disabled={selectedToothUnavailable}
+                  onSetSurface={setSurface}
+                  onClearSurface={clearSurface}
+                />
+              </div>
 
-          <div className={styles.surfaceList}>
-            {selectedRows.map(({ surface, condition: surfaceCondition }) => (
-              <button
-                key={surface}
-                type="button"
-                disabled={selectedToothUnavailable}
-                onClick={() => setSurface(selectedTooth, surface)}
-              >
-                <span className={styles.surfaceCode}>{surface}</span>
-                <span>
-                  <strong>{surfaceNames[surface]}</strong>
-                  <small>
-                    {conditionFor(surfaceCondition)?.label ?? "Chưa đánh dấu"}
-                  </small>
-                </span>
-                {surfaceCondition ? (
-                  <i style={{ backgroundColor: conditionFor(surfaceCondition)?.color }} />
-                ) : null}
-              </button>
-            ))}
-          </div>
+              <div className={styles.surfaceList}>
+                {selectedRows.map(({ surface, condition: surfaceCondition }) => (
+                  <button
+                    key={surface}
+                    type="button"
+                    disabled={selectedToothUnavailable}
+                    onClick={() => setSurface(selectedTooth, surface)}
+                  >
+                    <span className={styles.surfaceCode}>{surface}</span>
+                    <span>
+                      <strong>{surfaceNames[surface]}</strong>
+                      <small>
+                        {conditionFor(surfaceCondition)?.label ?? "Chưa đánh dấu"}
+                      </small>
+                    </span>
+                    {surfaceCondition ? (
+                      <i style={{ backgroundColor: conditionFor(surfaceCondition)?.color }} />
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
 
           <div className={styles.clinicalMarkers}>
             <div className={styles.clinicalMarkersHeading}>
@@ -843,23 +1108,36 @@ export function OdontogramSurfaceLab() {
                 {
                   clinicalMarkerOptions.filter(
                     (marker) =>
-                      markerState[markerKey(selectedTooth, marker.id)] === true,
-                  ).length
+                      selectedTeeth.some(
+                        (tooth) =>
+                          markerState[markerKey(tooth, marker.id)] === true,
+                      ),
+                  ).length + (selectedBridge ? 1 : 0)
                 }
               </strong>
             </div>
             <div className={styles.clinicalMarkerGrid}>
               {clinicalMarkerOptions.map((marker) => {
-                const active =
-                  markerState[markerKey(selectedTooth, marker.id)] === true;
+                const activeCount = selectedTeeth.filter(
+                  (tooth) =>
+                    markerState[markerKey(tooth, marker.id)] === true,
+                ).length;
+                const active = activeCount === selectedTeeth.length;
+                const partial = activeCount > 0 && !active;
 
                 return (
                   <button
                     key={marker.id}
                     type="button"
-                    className={active ? styles.clinicalMarkerActive : undefined}
-                    onClick={() => toggleMarker(selectedTooth, marker.id)}
-                    aria-pressed={active}
+                    className={
+                      active
+                        ? styles.clinicalMarkerActive
+                        : partial
+                          ? styles.clinicalMarkerPartial
+                          : undefined
+                    }
+                    onClick={() => toggleMarker(marker.id)}
+                    aria-pressed={partial ? "mixed" : active}
                   >
                     <ClinicalMarkerPreview
                       tooth={selectedTooth}
@@ -870,6 +1148,23 @@ export function OdontogramSurfaceLab() {
                   </button>
                 );
               })}
+              <button
+                type="button"
+                className={
+                  selectedBridge ? styles.clinicalMarkerActive : undefined
+                }
+                onClick={toggleBridge}
+                disabled={!bridgeAvailable}
+                aria-pressed={Boolean(selectedBridge)}
+                title={
+                  bridgeAvailable
+                    ? "Tạo hoặc xóa cầu trên các răng đang chọn"
+                    : "Chọn ít nhất 2 răng liền nhau trên cùng một hàm"
+                }
+              >
+                <BridgePreview />
+                <span>Cầu răng</span>
+              </button>
             </div>
           </div>
 
@@ -877,7 +1172,11 @@ export function OdontogramSurfaceLab() {
             <button
               type="button"
               onClick={copyData}
-              disabled={markedSurfaceCount === 0 && markedMarkerCount === 0}
+              disabled={
+                markedSurfaceCount === 0 &&
+                markedMarkerCount === 0 &&
+                activeBridges.length === 0
+              }
             >
               {copied ? <Check size={17} /> : <Clipboard size={17} />}
               {copied ? "Đã sao chép" : "Sao chép JSON"}
@@ -888,10 +1187,15 @@ export function OdontogramSurfaceLab() {
                 downloadJson(
                   activeSurfaceState,
                   activeMarkerState,
+                  activeBridges,
                   dentition,
                 )
               }
-              disabled={markedSurfaceCount === 0 && markedMarkerCount === 0}
+              disabled={
+                markedSurfaceCount === 0 &&
+                markedMarkerCount === 0 &&
+                activeBridges.length === 0
+              }
             >
               <Download size={17} />
               Tải JSON
@@ -911,9 +1215,10 @@ export function OdontogramSurfaceLab() {
 function Arch({
   label,
   teeth,
-  selectedTooth,
+  selectedTeeth,
   state,
   markerState,
+  bridges,
   condition,
   onSelectTooth,
   onSetSurface,
@@ -921,9 +1226,10 @@ function Arch({
 }: {
   label: string;
   teeth: readonly ToothId[];
-  selectedTooth: ToothId;
+  selectedTeeth: ToothId[];
   state: SurfaceState;
   markerState: MarkerState;
+  bridges: BridgeSpan[];
   condition: ConditionId;
   onSelectTooth: (tooth: ToothId) => void;
   onSetSurface: (tooth: ToothId, surface: SurfaceCode) => void;
@@ -941,10 +1247,20 @@ function Arch({
         }`}
       >
         {teeth.map((tooth, index) => {
+          const bridge = bridges.find((item) => item.teeth.includes(tooth));
+          const bridgeIndex = bridge?.teeth.indexOf(tooth) ?? -1;
           const figure = (
             <ToothIllustration
               tooth={tooth}
               markerState={markerState}
+              bridgeUnit={
+                bridge
+                  ? {
+                      first: bridgeIndex === 0,
+                      last: bridgeIndex === bridge.teeth.length - 1,
+                    }
+                  : undefined
+              }
             />
           );
           const number = (
@@ -953,6 +1269,7 @@ function Arch({
               type="button"
               onClick={() => onSelectTooth(tooth)}
               aria-label={`Chọn răng ${tooth}`}
+              aria-pressed={selectedTeeth.includes(tooth)}
             >
               {tooth}
             </button>
@@ -971,7 +1288,7 @@ function Arch({
           return (
             <div
               className={`${styles.toothCell} ${
-                selectedTooth === tooth ? styles.toothSelected : ""
+                selectedTeeth.includes(tooth) ? styles.toothSelected : ""
               } ${
                 index === teeth.length / 2 - 1 ? styles.beforeMidline : ""
               }`}
@@ -1001,9 +1318,14 @@ function Arch({
 function ToothIllustration({
   tooth,
   markerState,
+  bridgeUnit,
 }: {
   tooth: ToothId;
   markerState: MarkerState;
+  bridgeUnit?: {
+    first: boolean;
+    last: boolean;
+  };
 }) {
   const lower = !isUpperTooth(tooth);
   const patientLeft = isPatientLeft(tooth);
@@ -1032,7 +1354,7 @@ function ToothIllustration({
               .map((marker) => markerFor(marker)?.label)
               .join(", ")}`
           : ""
-      }`}
+      }${bridgeUnit ? ", Cầu răng" : ""}`}
     >
       {!missing ? (
         <img
@@ -1043,6 +1365,26 @@ function ToothIllustration({
           draggable={false}
           style={{ transform: artworkTransform }}
         />
+      ) : null}
+      {bridgeUnit ? (
+        <>
+          <span
+            className={`${styles.bridgeConnector} ${
+              bridgeUnit.first ? styles.bridgeConnectorFirst : ""
+            } ${bridgeUnit.last ? styles.bridgeConnectorLast : ""} ${
+              lower ? styles.bridgeConnectorLower : ""
+            }`}
+            aria-hidden="true"
+          />
+          <img
+            className={`${styles.toothClinicalArtwork} ${styles.bridgeCrown}`}
+            src={toothArtworkPath(tooth, "crown")}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            style={{ transform: artworkTransform }}
+          />
+        </>
       ) : null}
       {!missing
         ? nativeMarkers.map((marker) => (
@@ -1146,6 +1488,31 @@ function ClinicalMarkerPreview({
         draggable={false}
         style={{ transform: artworkTransform }}
       />
+    </span>
+  );
+}
+
+function BridgePreview() {
+  return (
+    <span className={styles.clinicalMarkerPreview} aria-hidden="true">
+      <svg viewBox="0 0 32 38">
+        <path
+          className={styles.bridgePreviewConnector}
+          d="M4 18 H28"
+        />
+        <path
+          className={styles.bridgePreviewUnit}
+          d="M3 10 C5 7 8 8 10 10 L9 24 C8 27 5 27 4 24 Z"
+        />
+        <path
+          className={styles.bridgePreviewUnit}
+          d="M12 9 C14 6 18 6 20 9 L19 24 C18 27 14 27 13 24 Z"
+        />
+        <path
+          className={styles.bridgePreviewUnit}
+          d="M22 10 C24 7 27 8 29 10 L28 24 C27 27 24 27 23 24 Z"
+        />
+      </svg>
     </span>
   );
 }
