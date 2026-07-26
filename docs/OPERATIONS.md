@@ -121,16 +121,19 @@ Stellar Plus limits memory and process creation during builds. Stop only this No
 
 ```sh
 cloudlinux-selector stop --json --interpreter nodejs --domain codexdentist.com --app-root codexdentist-app
-source /home/CPANEL_USER/nodevenv/codexdentist-app/22/bin/activate
 cd /home/CPANEL_USER/codexdentist-app
-npm ci --include=dev --ignore-scripts --no-audit --no-fund
-npm run prisma:generate
-CODEXMED_SHARED_HOST_BUILD=true npm run build
+NODE_BIN=/opt/alt/alt-nodejs22/root/usr/bin
+export PATH="$NODE_BIN:$PATH"
+"$NODE_BIN/npm" ci --include=dev --ignore-scripts --no-audit --no-fund
+"$NODE_BIN/npm" run prisma:generate
+CODEXMED_SHARED_HOST_BUILD=true "$NODE_BIN/npm" run build
 set -a && source .env && set +a
-npx prisma migrate deploy
-npm prune --omit=dev --ignore-scripts --no-audit --no-fund
+"$NODE_BIN/npx" prisma migrate deploy
+"$NODE_BIN/npm" prune --omit=dev --ignore-scripts --no-audit --no-fund
 cloudlinux-selector start --json --interpreter nodejs --domain codexdentist.com --app-root codexdentist-app
 ```
+
+The current app root uses a physical `node_modules` directory. Do not activate the Node Selector virtual environment before npm commands: its npm wrapper rejects a physical application-level `node_modules`. Recheck `ls -ld node_modules` after any hosting migration before changing this rule.
 
 If the CLI start fails, start the app from cPanel `Setup Node.js App`. Then verify `https://codexdentist.com/api/health`. Do not enable notification cron jobs until the delivery provider and recipient data have been verified. Shared hosting remains a pilot/community-test target; monitor cPanel resource usage before placing real clinic workloads on it.
 
