@@ -110,13 +110,12 @@ const markerConflicts: Record<ClinicalMarkerId, ClinicalMarkerId[]> = {
     "pulpitis",
     "rootCanal",
     "periapical",
-    "crown",
     "fracture",
     "extraction",
   ],
   pulpitis: ["missing", "implant", "rootCanal"],
   rootCanal: ["missing", "implant", "pulpitis"],
-  crown: ["missing", "implant", "fracture"],
+  crown: ["missing", "fracture"],
   fracture: ["missing", "implant", "crown"],
   extraction: ["missing", "implant"],
   periodontitis: ["missing"],
@@ -792,7 +791,10 @@ export function OdontogramSurfaceLab() {
               <h2>R{selectedTooth}</h2>
             </div>
             <strong>
-              {hasMarker(markerState, selectedTooth, "missing")
+              {hasMarker(markerState, selectedTooth, "implant") &&
+              hasMarker(markerState, selectedTooth, "crown")
+                ? "Implant + Mão"
+                : hasMarker(markerState, selectedTooth, "missing")
                 ? "Mất răng"
                 : hasMarker(markerState, selectedTooth, "implant")
                   ? "Implant"
