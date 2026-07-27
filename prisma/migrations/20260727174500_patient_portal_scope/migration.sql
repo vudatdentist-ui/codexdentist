@@ -39,4 +39,4 @@ $$;
 CREATE TRIGGER "Patient_portal_user_scope_check"
 BEFORE INSERT OR UPDATE OF "organizationId", "portalUserId"
 ON "Patient"
-FOR EACH ROW EXECUTE FUNCTION "assert_patient_portal_user_scope"();
+FOR EACH ROW EXECUTE PROCEDURE "assert_patient_portal_user_scope"();

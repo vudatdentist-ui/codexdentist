@@ -63,22 +63,22 @@ $$;
 CREATE TRIGGER "Invoice_owner_scope_check"
 BEFORE INSERT OR UPDATE OF "organizationId", "clinicId", "patientId"
 ON "Invoice"
-FOR EACH ROW EXECUTE FUNCTION "assert_billing_owner_scope"();
+FOR EACH ROW EXECUTE PROCEDURE "assert_billing_owner_scope"();
 
 CREATE TRIGGER "InvoiceItem_owner_scope_check"
 BEFORE INSERT OR UPDATE OF "organizationId", "clinicId", "patientId"
 ON "InvoiceItem"
-FOR EACH ROW EXECUTE FUNCTION "assert_billing_owner_scope"();
+FOR EACH ROW EXECUTE PROCEDURE "assert_billing_owner_scope"();
 
 CREATE TRIGGER "Receipt_owner_scope_check"
 BEFORE INSERT OR UPDATE OF "organizationId", "clinicId", "patientId"
 ON "Receipt"
-FOR EACH ROW EXECUTE FUNCTION "assert_billing_owner_scope"();
+FOR EACH ROW EXECUTE PROCEDURE "assert_billing_owner_scope"();
 
 CREATE TRIGGER "PatientCreditBalance_owner_scope_check"
 BEFORE INSERT OR UPDATE OF "organizationId", "clinicId", "patientId"
 ON "PatientCreditBalance"
-FOR EACH ROW EXECUTE FUNCTION "assert_billing_owner_scope"();
+FOR EACH ROW EXECUTE PROCEDURE "assert_billing_owner_scope"();
 
 CREATE FUNCTION "assert_invoice_item_scope"()
 RETURNS TRIGGER
@@ -127,7 +127,7 @@ $$;
 CREATE TRIGGER "InvoiceItem_relation_scope_check"
 BEFORE INSERT OR UPDATE OF "organizationId", "clinicId", "patientId", "invoiceId", "treatmentServiceId"
 ON "InvoiceItem"
-FOR EACH ROW EXECUTE FUNCTION "assert_invoice_item_scope"();
+FOR EACH ROW EXECUTE PROCEDURE "assert_invoice_item_scope"();
 
 CREATE FUNCTION "assert_receipt_allocation_scope"()
 RETURNS TRIGGER
@@ -215,4 +215,4 @@ BEFORE INSERT OR UPDATE OF
   "invoiceItemId",
   "treatmentServiceId"
 ON "ReceiptAllocation"
-FOR EACH ROW EXECUTE FUNCTION "assert_receipt_allocation_scope"();
+FOR EACH ROW EXECUTE PROCEDURE "assert_receipt_allocation_scope"();
