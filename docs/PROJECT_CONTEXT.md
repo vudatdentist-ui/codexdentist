@@ -17,7 +17,7 @@ Last updated: 2026-07-27
 - Self-host distribution: `compose.selfhost.yml`, `install.ps1`, `install.sh`, and `scripts/codexdentist.mjs`.
 - Public product/docs: `https://codexdentist.com`, `https://codexdentist.com/features`, and `https://codexdentist.com/docs`.
 - Public demo: `https://demo.codexdentist.com`; each workspace is isolated and expires after 24 hours. Root-domain `/demo` remains a compatibility entry.
-- Odontogram source lives in the versioned `codexdentist-odontogram` package. It provides separate standard-FDI charts for 32 permanent teeth and 20 primary teeth, generated anatomical SVG layers, five surfaces, compatible clinical markers, bone-level states, implants with crowns, contiguous bridges, multi-select, and concise inter-arch/arch diagnosis.
+- Odontogram source lives in the versioned `codexdentist-odontogram` package. It provides separate standard-FDI charts for 32 permanent teeth and 20 primary teeth, generated anatomical SVG layers, five surfaces, compatible clinical markers, bone-level states, implants with crowns, contiguous bridges, always-on multi-tooth selection, and concise inter-arch/arch diagnosis.
 - `https://odontogram.codexdentist.com` is the public standalone chart and persists only in browser local storage. The same package is embedded in `/journey`, where each patient chart is stored separately with tenant/clinic scope, optimistic revision checks, immutable revision history, audit metadata, and server-enforced clinical permissions.
 - Public S22U tunnel target: `https://app.codexdentist.com`.
 - S22U deploy uses `scripts/deploy-to-s22.ps1` and must preserve `.env`, database, and storage.
