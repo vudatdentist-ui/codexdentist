@@ -1,6 +1,6 @@
 # Project Context
 
-Last updated: 2026-07-26
+Last updated: 2026-07-27
 
 ## Product Direction
 
@@ -70,6 +70,7 @@ Route access lives in `src/lib/permissions.ts`. Mutation permissions live in `sr
 - Required block order: `Thông tin hành chính`, `Thông tin khám`, `Odontogram`, `Mục tiêu và kế hoạch điều trị`, `Dịch vụ`, `Timeline`.
 - Journey search belongs in the app-shell control row, not inside the administrative block.
 - Timeline is chronological ascending and includes appointments, clinical notes, treatment, billing, files, forms, prescriptions, CRM, and internal comments.
+- Timeline ordering uses canonical ISO/epoch timestamps, never localized display strings. Valid events sort oldest to newest, unknown timestamps sort last, and every visible timestamp uses `dd/MM/yyyy · HH:mm` in the Viet Nam time zone.
 - Odontogram and treatment targets use standard FDI codes directly. Verify lower teeth such as 38/48 and 37/47 whenever chart selection or treatment-target mapping changes.
 - Clinical chart state belongs to `PatientOdontogram`; `PatientJourneyState.odontogramTeeth` remains only the temporary treatment-target selection. Never overwrite the clinical snapshot when creating services.
 

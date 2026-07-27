@@ -20,6 +20,11 @@ import type { ClinicalWorkspace as ClinicalWorkspaceData } from "@/lib/clinical-
 import type { CrmWorkspace } from "@/lib/crm-types";
 import type { FormsWorkspace } from "@/lib/forms-types";
 import type { JourneyRecordsWorkspace } from "@/lib/journey-records-types";
+import {
+  compareJourneyTimelineEvents,
+  formatJourneyTimelineDateTime,
+  journeyTimelineTimestamp,
+} from "@/lib/journey-timeline";
 import type { PatientFilesWorkspace } from "@/lib/patient-files-types";
 import type { PatientWorkspace } from "@/lib/patient-types";
 import type { PharmacyWorkspace } from "@/lib/pharmacy-types";
@@ -2319,12 +2324,11 @@ export function PatientJourneyPanel({
       group: "Session" as const,
       id: `appointment-${appointment.id}`,
       kind: displayStatus("Session", language),
-      label: appointment.startsAt
-        ? journeyDateTime(appointment.startsAt)
-        : appointment.time,
-      sortMs: appointment.startsAt
-        ? Date.parse(appointment.startsAt)
-        : Number.MAX_SAFE_INTEGER - index,
+      label: appointment.time,
+      sortMs: journeyTimelineTimestamp(
+        appointment.startsAt,
+        Number.MAX_SAFE_INTEGER - index,
+      ),
       status: appointment.status,
       title:
         language === "vi"
@@ -2339,7 +2343,7 @@ export function PatientJourneyPanel({
               language,
             )}. Ghi chú sau thủ thuật: ${appointment.provider} - ${appointment.room} - ${
               appointment.duration
-            }m.`
+            } phút.`
           : `Services performed: ${serviceSummary}. Progress: ${displayStatus(
               appointment.status === "Completed"
                 ? "Completed (100%)"
@@ -2347,14 +2351,14 @@ export function PatientJourneyPanel({
               language,
             )}. Post-procedure note: ${appointment.provider} - ${
               appointment.room
-            } - ${appointment.duration}m.`,
+            } - ${appointment.duration} min.`,
     })),
-    ...selectedNotes.map((note, index) => ({
+    ...selectedNotes.map((note) => ({
       group: "Clinical" as const,
       id: `note-${note.id}`,
       kind: jt.clinical.title,
       label: note.createdAt,
-      sortMs: Date.parse(note.createdAt) || index,
+      sortMs: journeyTimelineTimestamp(note.createdAtIso ?? note.createdAt),
       status: note.lockedAt ? "Locked" : "Draft",
       title: note.assessment ?? note.plan ?? note.subjective ?? jt.clinical.soapNote,
       detail: [note.subjective, note.objective, note.plan].filter(Boolean).join(" | "),
@@ -2363,8 +2367,8 @@ export function PatientJourneyPanel({
       group: "Treatment" as const,
       id: `plan-${plan.id}`,
       kind: jt.plan.title,
-      label: plan.createdAt ? journeyDate(plan.createdAt) : jt.actions.plan,
-      sortMs: plan.createdAt ? Date.parse(plan.createdAt) : 0,
+      label: plan.createdAt ?? jt.actions.plan,
+      sortMs: journeyTimelineTimestamp(plan.createdAt),
       status: plan.status,
       title: plan.title,
       detail: `${plan.phase} - ${formatVnd(plan.patientShare)}`,
@@ -2402,7 +2406,7 @@ export function PatientJourneyPanel({
           id: `service-progress-${event.id}`,
           kind: jt.services.recordProgress,
           label: event.occurredAt,
-          sortMs: Date.parse(event.occurredAtIso) || 0,
+          sortMs: journeyTimelineTimestamp(event.occurredAtIso),
           status: `${Math.round(event.toProgressPercent)}%`,
           title: `${displayServiceInstanceCode(
             service,
@@ -2421,8 +2425,8 @@ export function PatientJourneyPanel({
         group: "Billing" as const,
         id: `receipt-${receipt.id}`,
         kind: jt.timeline.receipt,
-        label: journeyDateTime(new Date(receipt.collectedAt).toISOString()),
-        sortMs: receipt.collectedAt,
+        label: "",
+        sortMs: journeyTimelineTimestamp(receipt.collectedAt),
         status: "Paid",
         title: receiptService
           ? `${displayServiceInstanceCode(
@@ -2446,7 +2450,7 @@ export function PatientJourneyPanel({
             : "Credit allocation"
           : jt.timeline.receipt,
       label: receipt.receivedAt,
-      sortMs: Date.parse(receipt.receivedAtIso) || 0,
+      sortMs: journeyTimelineTimestamp(receipt.receivedAtIso),
       status: receipt.unallocatedAmount > 0 ? "Credit balance" : "Paid",
       title: receipt.receiptNo,
       detail:
@@ -2482,17 +2486,20 @@ export function PatientJourneyPanel({
       id: `invoice-${invoice.id}`,
       kind: displayStatus("Billing", language),
       label: invoice.due,
-      sortMs: Date.parse(invoice.due) || 0,
+      sortMs: journeyTimelineTimestamp(invoice.issuedAtMs ?? invoice.due),
       status: invoice.status,
       title: invoice.id,
-      detail: `${formatVnd(invoice.paidAmount ?? 0)} / ${formatVnd(invoice.amount)}`,
+      detail: [
+        `${formatVnd(invoice.paidAmount ?? 0)} / ${formatVnd(invoice.amount)}`,
+        `${language === "vi" ? "Hạn thanh toán" : "Due"} ${journeyDate(invoice.due)}`,
+      ].join(" · "),
     })),
     ...selectedPrescriptions.map((prescription) => ({
       group: "Clinical" as const,
       id: `prescription-${prescription.id}`,
       kind: jt.timeline.prescription,
       label: prescription.createdAt,
-      sortMs: Date.parse(prescription.createdAtIso) || 0,
+      sortMs: journeyTimelineTimestamp(prescription.createdAtIso),
       status: prescription.status,
       title: prescription.prescriptionNo,
       detail:
@@ -2505,8 +2512,9 @@ export function PatientJourneyPanel({
       id: `form-${form.id}`,
       kind: jt.timeline.patientForm,
       label: form.completedAt ?? form.sentAt ?? form.createdAt,
-      sortMs:
-        Date.parse(form.completedAtIso ?? form.sentAtIso ?? form.createdAtIso) || 0,
+      sortMs: journeyTimelineTimestamp(
+        form.completedAtIso ?? form.sentAtIso ?? form.createdAtIso,
+      ),
       status: form.status,
       title: `${form.formNo} · ${form.templateName}`,
       detail: form.responseText ?? form.templateCode,
@@ -2516,7 +2524,7 @@ export function PatientJourneyPanel({
       id: `patient-file-${file.id}`,
       kind: file.category,
       label: file.createdAt,
-      sortMs: Date.parse(file.createdAtIso) || 0,
+      sortMs: journeyTimelineTimestamp(file.createdAtIso),
       status: "File",
       title: file.title,
       detail: [file.fileName, file.notes].filter(Boolean).join(" · ") || file.url,
@@ -2536,7 +2544,7 @@ export function PatientJourneyPanel({
       id: `crm-activity-${activity.id}`,
       kind: `CSKH · ${displayStatus(activity.type, language)}`,
       label: activity.createdAt,
-      sortMs: Date.parse(activity.createdAtIso) || 0,
+      sortMs: journeyTimelineTimestamp(activity.createdAtIso),
       status: activity.completedAt ? "Completed" : "Open",
       title: activity.subject,
       detail: [
@@ -2554,7 +2562,7 @@ export function PatientJourneyPanel({
       id: `journey-comment-${comment.id}`,
       kind: comment.authorName,
       label: comment.createdAt,
-      sortMs: Date.parse(comment.createdAtIso) || 0,
+      sortMs: journeyTimelineTimestamp(comment.createdAtIso),
       status: "Comment",
       title: comment.body,
       detail: comment.attachments.length > 0
@@ -2586,8 +2594,8 @@ export function PatientJourneyPanel({
               : ("Clinical" as const),
         id: comment.id,
         kind: comment.author,
-        label: journeyDateTime(new Date(comment.createdAt).toISOString()),
-        sortMs: comment.createdAt,
+        label: "",
+        sortMs: journeyTimelineTimestamp(comment.createdAt),
         status: "Comment",
         title: comment.body,
         detail:
@@ -2612,7 +2620,16 @@ export function PatientJourneyPanel({
           comment.attachments?.[0]?.name ??
           comment.imageName,
       })),
-  ].sort((left, right) => left.sortMs - right.sortMs);
+  ]
+    .map((event) => ({
+      ...event,
+      label: formatJourneyTimelineDateTime(
+        event.sortMs,
+        event.label,
+        language,
+      ),
+    }))
+    .sort(compareJourneyTimelineEvents);
   const timelineGroupEvents =
     timelineFilter === "All"
       ? sessionEvents
@@ -3768,20 +3785,6 @@ function patientInitials(name: string) {
   const last = parts.length > 1 ? parts[parts.length - 1][0] : "";
 
   return `${first}${last}`.toUpperCase();
-}
-
-function journeyDateTime(value: string) {
-  const date = new Date(value);
-
-  if (Number.isNaN(date.getTime())) {
-    return value;
-  }
-
-  return new Intl.DateTimeFormat("vi-VN", {
-    timeZone: "Asia/Ho_Chi_Minh",
-    dateStyle: "short",
-    timeStyle: "short",
-  }).format(date);
 }
 
 function journeyDate(value: string) {

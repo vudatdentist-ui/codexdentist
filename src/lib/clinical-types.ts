@@ -11,6 +11,7 @@ export type ClinicalNoteSummary = {
   plan: string | null;
   lockedAt: string | null;
   createdAt: string;
+  createdAtIso: string | null;
 };
 
 export type ClinicalWorkspace = {

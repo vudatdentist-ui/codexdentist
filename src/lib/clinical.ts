@@ -116,6 +116,7 @@ export async function getClinicalWorkspace(
         plan: note.plan,
         lockedAt: note.lockedAt ? vietnamDateTime(note.lockedAt) : null,
         createdAt: vietnamDateTime(note.createdAt),
+        createdAtIso: note.createdAt.toISOString(),
       })),
     };
   } catch (error) {
@@ -145,6 +146,7 @@ function demoClinicalWorkspace(session: AppSession): ClinicalWorkspace {
       plan: "Review imaging, confirm consent, and schedule follow-up.",
       lockedAt: null,
       createdAt: "Demo note",
+      createdAtIso: null,
     })),
   };
 }
