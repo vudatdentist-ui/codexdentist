@@ -72,7 +72,11 @@ function readSingleSnapshot(): OdontogramData {
     bridges: parseLegacyValue(legacyStorageKeys.bridges, []),
     quickDiagnosis: parseLegacyValue(
       legacyStorageKeys.quickDiagnosis,
-      emptyOdontogramData.quickDiagnosis,
+      {
+        both: {},
+        upper: {},
+        lower: {},
+      },
     ),
   });
 }

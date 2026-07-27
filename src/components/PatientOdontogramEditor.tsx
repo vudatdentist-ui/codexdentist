@@ -481,27 +481,24 @@ function compareSnapshots(
   }
 
   const changed = new Set<string>();
-  compareKeyedState(previous.surfaceState, current.surfaceState, changed);
-  compareKeyedState(previous.anatomyState, current.anatomyState, changed);
-  compareKeyedState(previous.markerState, current.markerState, changed);
-
-  const previousBridges = new Map(
-    previous.bridges.map((bridge) => [bridge.id, bridge.teeth]),
+  const previousEntries = new Map(
+    previous.entries.map((entry) => [entry.id, entry]),
   );
-  const currentBridges = new Map(
-    current.bridges.map((bridge) => [bridge.id, bridge.teeth]),
+  const currentEntries = new Map(
+    current.entries.map((entry) => [entry.id, entry]),
   );
-  for (const bridgeId of new Set([
-    ...previousBridges.keys(),
-    ...currentBridges.keys(),
+  for (const entryId of new Set([
+    ...previousEntries.keys(),
+    ...currentEntries.keys(),
   ])) {
+    const previousEntry = previousEntries.get(entryId);
+    const currentEntry = currentEntries.get(entryId);
     if (
-      JSON.stringify(previousBridges.get(bridgeId)) !==
-      JSON.stringify(currentBridges.get(bridgeId))
+      JSON.stringify(previousEntry) !== JSON.stringify(currentEntry)
     ) {
       for (const tooth of [
-        ...(previousBridges.get(bridgeId) ?? []),
-        ...(currentBridges.get(bridgeId) ?? []),
+        ...(previousEntry?.target.teeth ?? []),
+        ...(currentEntry?.target.teeth ?? []),
       ]) {
         changed.add(tooth);
       }
@@ -510,27 +507,12 @@ function compareSnapshots(
 
   return {
     archChanged:
-      JSON.stringify(previous.quickDiagnosis) !==
-      JSON.stringify(current.quickDiagnosis),
+      JSON.stringify(previous.generalAssessment) !==
+      JSON.stringify(current.generalAssessment),
     teeth: [...changed].sort((left, right) =>
       left.localeCompare(right, "en", { numeric: true }),
     ),
   };
-}
-
-function compareKeyedState(
-  previous: Record<string, unknown>,
-  current: Record<string, unknown>,
-  changed: Set<string>,
-) {
-  for (const key of new Set([
-    ...Object.keys(previous),
-    ...Object.keys(current),
-  ])) {
-    if (previous[key] !== current[key]) {
-      changed.add(key.split(".")[0]);
-    }
-  }
 }
 
 function differenceLabel(
@@ -546,8 +528,8 @@ function differenceLabel(
 
   if (teeth.length === 0) {
     return language === "vi"
-      ? "Đã thay đổi chẩn đoán tương quan hàm"
-      : "Arch diagnosis changed";
+      ? "Đã thay đổi đánh giá tổng quát"
+      : "General assessment changed";
   }
 
   const toothList = teeth.slice(0, 8).map((tooth) => `R${tooth}`).join(", ");
@@ -555,9 +537,9 @@ function differenceLabel(
   if (language === "vi") {
     return `${teeth.length} răng thay đổi: ${toothList}${
       remaining > 0 ? ` và ${remaining} răng khác` : ""
-    }${archChanged ? " · Có thay đổi tương quan hàm" : ""}`;
+  }${archChanged ? " · Có thay đổi đánh giá tổng quát" : ""}`;
   }
   return `${teeth.length} changed teeth: ${toothList}${
     remaining > 0 ? ` and ${remaining} more` : ""
-  }${archChanged ? " · Arch diagnosis changed" : ""}`;
+  }${archChanged ? " · General assessment changed" : ""}`;
 }
