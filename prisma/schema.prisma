@@ -1972,20 +1972,27 @@ model PatientJourneyState {
 }
 
 model PatientOdontogram {
-  id             String                      @id @default(cuid())
-  organizationId String
-  organization   Organization                @relation(fields: [organizationId], references: [id])
-  clinicId       String
-  clinic         Clinic                      @relation(fields: [clinicId], references: [id])
-  patientId      String                      @unique
-  patient        Patient                     @relation(fields: [patientId], references: [id], onDelete: Cascade)
-  snapshot       Json
-  revision       Int                         @default(1)
-  updatedById    String?
-  updatedBy      User?                       @relation("PatientOdontogramUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
-  revisions      PatientOdontogramRevision[]
-  createdAt      DateTime                    @default(now())
-  updatedAt      DateTime                    @updatedAt
+  id                String                      @id @default(cuid())
+  organizationId    String
+  organization      Organization                @relation(fields: [organizationId], references: [id])
+  clinicId          String
+  clinic            Clinic                      @relation(fields: [clinicId], references: [id])
+  patientId         String                      @unique
+  patient           Patient                     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  initialSnapshot   Json
+  expectedSnapshot  Json?
+  currentSnapshot   Json
+  initialRevision   Int                         @default(1)
+  expectedRevision  Int                         @default(0)
+  currentRevision   Int                         @default(1)
+  initialUpdatedAt  DateTime                    @default(now())
+  expectedUpdatedAt DateTime?
+  currentUpdatedAt  DateTime                    @default(now())
+  updatedById       String?
+  updatedBy         User?                       @relation("PatientOdontogramUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  revisions         PatientOdontogramRevision[]
+  createdAt         DateTime                    @default(now())
+  updatedAt         DateTime                    @updatedAt
 
   @@index([clinicId, updatedAt])
   @@index([organizationId, updatedAt])
@@ -2001,16 +2008,23 @@ model PatientOdontogramRevision {
   patient        Patient           @relation(fields: [patientId], references: [id], onDelete: Cascade)
   odontogramId   String
   odontogram     PatientOdontogram @relation(fields: [odontogramId], references: [id], onDelete: Cascade)
+  stage          OdontogramStage
   revision       Int
   snapshot       Json
   createdById    String?
   createdBy      User?             @relation("PatientOdontogramRevisionCreator", fields: [createdById], references: [id], onDelete: SetNull)
   createdAt      DateTime          @default(now())
 
-  @@unique([odontogramId, revision])
+  @@unique([odontogramId, stage, revision])
   @@index([patientId, createdAt])
   @@index([clinicId, createdAt])
   @@index([organizationId, createdAt])
+}
+
+enum OdontogramStage {
+  INITIAL
+  EXPECTED
+  CURRENT
 }
 
 model JourneyComment {

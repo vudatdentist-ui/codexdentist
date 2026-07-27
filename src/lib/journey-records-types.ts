@@ -11,14 +11,24 @@ export type PatientJourneyStateSummary = {
   updatedByName: string | null;
 };
 
-export type PatientOdontogramSummary = {
-  id: string;
-  patientId: string;
-  clinicId: string;
+export const odontogramStages = ["INITIAL", "EXPECTED", "CURRENT"] as const;
+export type PatientOdontogramStage = (typeof odontogramStages)[number];
+
+export type PatientOdontogramStageSummary = {
   snapshot: OdontogramData;
   revision: number;
   updatedAt: string;
   updatedAtIso: string;
+};
+
+export type PatientOdontogramSummary = {
+  id: string;
+  patientId: string;
+  clinicId: string;
+  stages: Record<
+    PatientOdontogramStage,
+    PatientOdontogramStageSummary | null
+  >;
   updatedByName: string | null;
 };
 

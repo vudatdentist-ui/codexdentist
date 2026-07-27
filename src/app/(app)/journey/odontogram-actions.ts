@@ -10,12 +10,15 @@ import {
 } from "@/lib/odontogram-data";
 import { patientAccessWhere } from "@/lib/patient-access";
 import { prisma } from "@/lib/prisma";
+import type { PatientOdontogramStage } from "@/lib/journey-records-types";
 
 export type SavePatientOdontogramResult =
   | {
       ok: true;
+      stage: PatientOdontogramStage;
       revision: number;
       updatedAt: string;
+      initializedCurrent: boolean;
     }
   | {
       ok: false;
@@ -25,6 +28,7 @@ export type SavePatientOdontogramResult =
 
 export async function savePatientOdontogramAction(input: {
   patientId: string;
+  stage: PatientOdontogramStage;
   expectedRevision: number | null;
   data: unknown;
 }): Promise<SavePatientOdontogramResult> {
@@ -39,9 +43,11 @@ export async function savePatientOdontogramAction(input: {
   }
 
   const patientId = String(input.patientId ?? "").trim();
+  const stage = input.stage;
   const expectedRevision = input.expectedRevision;
   if (
     !patientId ||
+    !isOdontogramStage(stage) ||
     (expectedRevision !== null &&
       (!Number.isInteger(expectedRevision) || expectedRevision < 0))
   ) {
@@ -111,41 +117,52 @@ export async function savePatientOdontogramAction(input: {
         },
         select: {
           id: true,
-          revision: true,
+          initialRevision: true,
+          expectedRevision: true,
+          currentRevision: true,
         },
       });
 
       if (!current) {
-        if (expectedRevision !== null && expectedRevision !== 0) {
+        if (
+          stage !== "INITIAL" ||
+          (expectedRevision !== null && expectedRevision !== 0)
+        ) {
           return null;
         }
 
+        const now = new Date();
         const created = await transaction.patientOdontogram.create({
           data: {
             organizationId: session.organizationId,
             clinicId: patient.clinicId,
             patientId: patient.id,
-            snapshot: snapshotJson,
-            revision: 1,
+            initialSnapshot: snapshotJson,
+            currentSnapshot: snapshotJson,
+            initialRevision: 1,
+            expectedRevision: 0,
+            currentRevision: 1,
+            initialUpdatedAt: now,
+            currentUpdatedAt: now,
             updatedById: actorId,
           },
           select: {
             id: true,
-            revision: true,
-            updatedAt: true,
           },
         });
 
-        await transaction.patientOdontogramRevision.create({
-          data: {
+        await transaction.patientOdontogramRevision.createMany({
+          data: ["INITIAL", "CURRENT"].map((revisionStage) => ({
             organizationId: session.organizationId,
             clinicId: patient.clinicId,
             patientId: patient.id,
             odontogramId: created.id,
-            revision: created.revision,
+            stage: revisionStage as PatientOdontogramStage,
+            revision: 1,
             snapshot: snapshotJson,
             createdById: actorId,
-          },
+            createdAt: now,
+          })),
         });
 
         await createOdontogramAuditLog(transaction, {
@@ -153,27 +170,33 @@ export async function savePatientOdontogramAction(input: {
           actorId,
           odontogramId: created.id,
           patientId: patient.id,
-          revision: created.revision,
+          stage,
+          revision: 1,
         });
 
-        return created;
+        return {
+          revision: 1,
+          updatedAt: now,
+          initializedCurrent: true,
+        };
       }
 
-      if (expectedRevision !== current.revision) {
+      const currentStageRevision = revisionForStage(current, stage);
+      if (expectedRevision !== currentStageRevision) {
         return null;
       }
 
-      const nextRevision = current.revision + 1;
+      const nextRevision = currentStageRevision + 1;
+      const now = new Date();
       const updated = await transaction.patientOdontogram.updateMany({
         where: {
           id: current.id,
           organizationId: session.organizationId,
-          revision: current.revision,
+          ...revisionWhere(stage, currentStageRevision),
         },
         data: {
           clinicId: patient.clinicId,
-          snapshot: snapshotJson,
-          revision: nextRevision,
+          ...stageUpdateData(stage, snapshotJson, nextRevision, now),
           updatedById: actorId,
         },
       });
@@ -188,9 +211,11 @@ export async function savePatientOdontogramAction(input: {
           clinicId: patient.clinicId,
           patientId: patient.id,
           odontogramId: current.id,
+          stage,
           revision: nextRevision,
           snapshot: snapshotJson,
           createdById: actorId,
+          createdAt: now,
         },
       });
 
@@ -199,19 +224,15 @@ export async function savePatientOdontogramAction(input: {
         actorId,
         odontogramId: current.id,
         patientId: patient.id,
+        stage,
         revision: nextRevision,
       });
 
-      return transaction.patientOdontogram.findUniqueOrThrow({
-        where: {
-          id: current.id,
-        },
-        select: {
-          id: true,
-          revision: true,
-          updatedAt: true,
-        },
-      });
+      return {
+        revision: nextRevision,
+        updatedAt: now,
+        initializedCurrent: false,
+      };
     });
 
     if (!saved) {
@@ -224,8 +245,10 @@ export async function savePatientOdontogramAction(input: {
 
     return {
       ok: true,
+      stage,
       revision: saved.revision,
       updatedAt: saved.updatedAt.toISOString(),
+      initializedCurrent: saved.initializedCurrent,
     };
   } catch (error) {
     if (isUniqueConstraintError(error)) {
@@ -256,6 +279,7 @@ async function createOdontogramAuditLog(
     actorId: string | null;
     odontogramId: string;
     patientId: string;
+    stage: PatientOdontogramStage;
     revision: number;
   },
 ) {
@@ -268,10 +292,69 @@ async function createOdontogramAuditLog(
       entityId: input.odontogramId,
       metadata: {
         patientId: input.patientId,
+        stage: input.stage,
         revision: input.revision,
       } as Prisma.InputJsonValue,
     },
   });
+}
+
+function isOdontogramStage(value: unknown): value is PatientOdontogramStage {
+  return value === "INITIAL" || value === "EXPECTED" || value === "CURRENT";
+}
+
+function revisionForStage(
+  odontogram: {
+    initialRevision: number;
+    expectedRevision: number;
+    currentRevision: number;
+  },
+  stage: PatientOdontogramStage,
+) {
+  if (stage === "INITIAL") {
+    return odontogram.initialRevision;
+  }
+  if (stage === "EXPECTED") {
+    return odontogram.expectedRevision;
+  }
+  return odontogram.currentRevision;
+}
+
+function revisionWhere(stage: PatientOdontogramStage, revision: number) {
+  if (stage === "INITIAL") {
+    return { initialRevision: revision };
+  }
+  if (stage === "EXPECTED") {
+    return { expectedRevision: revision };
+  }
+  return { currentRevision: revision };
+}
+
+function stageUpdateData(
+  stage: PatientOdontogramStage,
+  snapshot: Prisma.InputJsonValue,
+  revision: number,
+  updatedAt: Date,
+) {
+  if (stage === "INITIAL") {
+    return {
+      initialSnapshot: snapshot,
+      initialRevision: revision,
+      initialUpdatedAt: updatedAt,
+    };
+  }
+  if (stage === "EXPECTED") {
+    return {
+      expectedSnapshot: snapshot,
+      expectedRevision: revision,
+      expectedUpdatedAt: updatedAt,
+    };
+  }
+  return {
+    currentSnapshot: snapshot,
+    currentRevision: revision,
+    currentUpdatedAt: updatedAt,
+  };
 }
 
 function isUniqueConstraintError(error: unknown) {

@@ -145,22 +145,52 @@ function toOdontogramSummary(odontogram: {
   id: string;
   patientId: string;
   clinicId: string;
-  snapshot: unknown;
-  revision: number;
-  updatedAt: Date;
+  initialSnapshot: unknown;
+  expectedSnapshot: unknown;
+  currentSnapshot: unknown;
+  initialRevision: number;
+  expectedRevision: number;
+  currentRevision: number;
+  initialUpdatedAt: Date;
+  expectedUpdatedAt: Date | null;
+  currentUpdatedAt: Date;
   updatedBy: {
     fullName: string;
   } | null;
 }): PatientOdontogramSummary | null {
   try {
+    const expectedSnapshot =
+      odontogram.expectedSnapshot === null
+        ? null
+        : normalizeOdontogramData(odontogram.expectedSnapshot);
+
     return {
       id: odontogram.id,
       patientId: odontogram.patientId,
       clinicId: odontogram.clinicId,
-      snapshot: normalizeOdontogramData(odontogram.snapshot),
-      revision: odontogram.revision,
-      updatedAt: vietnamDateTime(odontogram.updatedAt),
-      updatedAtIso: odontogram.updatedAt.toISOString(),
+      stages: {
+        INITIAL: {
+          snapshot: normalizeOdontogramData(odontogram.initialSnapshot),
+          revision: odontogram.initialRevision,
+          updatedAt: vietnamDateTime(odontogram.initialUpdatedAt),
+          updatedAtIso: odontogram.initialUpdatedAt.toISOString(),
+        },
+        EXPECTED:
+          expectedSnapshot && odontogram.expectedUpdatedAt
+            ? {
+                snapshot: expectedSnapshot,
+                revision: odontogram.expectedRevision,
+                updatedAt: vietnamDateTime(odontogram.expectedUpdatedAt),
+                updatedAtIso: odontogram.expectedUpdatedAt.toISOString(),
+              }
+            : null,
+        CURRENT: {
+          snapshot: normalizeOdontogramData(odontogram.currentSnapshot),
+          revision: odontogram.currentRevision,
+          updatedAt: vietnamDateTime(odontogram.currentUpdatedAt),
+          updatedAtIso: odontogram.currentUpdatedAt.toISOString(),
+        },
+      },
       updatedByName: odontogram.updatedBy?.fullName ?? null,
     };
   } catch {

@@ -102,6 +102,9 @@ async function assertGuardMarkers() {
     "savePatientOdontogramAction",
     'canPerformAction(session, "clinical.odontogram.update")',
     "patientAccessWhere(session)",
+    "isOdontogramStage(stage)",
+    "revisionForStage(current, stage)",
+    "patientOdontogramRevision.create",
   ]);
   await assertSource("src/app/(app)/clinical/actions.ts", [
     "createClinicalNoteAction",

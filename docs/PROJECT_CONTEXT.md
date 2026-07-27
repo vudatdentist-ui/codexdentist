@@ -72,7 +72,8 @@ Route access lives in `src/lib/permissions.ts`. Mutation permissions live in `sr
 - Timeline is chronological ascending and includes appointments, clinical notes, treatment, billing, files, forms, prescriptions, CRM, and internal comments.
 - Timeline ordering uses canonical ISO/epoch timestamps, never localized display strings. Valid events sort oldest to newest, unknown timestamps sort last, and every visible timestamp uses `dd/MM/yyyy · HH:mm` in the Viet Nam time zone.
 - Odontogram and treatment targets use standard FDI codes directly. Verify lower teeth such as 38/48 and 37/47 whenever chart selection or treatment-target mapping changes.
-- Clinical chart state belongs to `PatientOdontogram`; `PatientJourneyState.odontogramTeeth` remains only the temporary treatment-target selection. Never overwrite the clinical snapshot when creating services.
+- Clinical chart state belongs to one `PatientOdontogram` per patient with three independent stages in this order: `INITIAL` (`Hiện trạng ban đầu`), `EXPECTED` (`Kết quả kỳ vọng`), and `CURRENT` (`Tiến độ hiện tại`). Each stage has its own snapshot, revision, timestamp, and immutable revision history. Existing single-chart data is migrated into both `INITIAL` and `CURRENT`; `EXPECTED` starts empty.
+- `EXPECTED` may begin from the initial snapshot and `CURRENT` may begin from the preceding available stage, but saving one stage must never mutate either of the others. Stage switching clears only temporary tooth selection. `PatientJourneyState.odontogramTeeth` remains only the temporary treatment-target selection; creating services must never overwrite any clinical-stage snapshot.
 
 ## Billing Rules
 
