@@ -25,23 +25,7 @@ export function proxy(request: NextRequest) {
     return new NextResponse("Misdirected Request", { status: 421 });
   }
 
-  if (isOdontogramHostname(host) && request.nextUrl.pathname === "/") {
-    const url = request.nextUrl.clone();
-    url.hostname = host;
-    url.port = "";
-    url.pathname = "/odontogram";
-    return NextResponse.rewrite(url);
-  }
-
   return NextResponse.next();
-}
-
-export function isOdontogramHostname(hostname: string) {
-  const host = hostnameFromHeader(hostname);
-  const rootDomain =
-    process.env.APP_ROOT_DOMAIN?.trim().toLowerCase() || "codexdentist.com";
-
-  return host === `odontogram.${rootDomain}`;
 }
 
 export function isTrustedRequestHostname(hostname: string) {

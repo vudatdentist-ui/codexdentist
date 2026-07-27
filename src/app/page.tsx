@@ -14,6 +14,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { DemoLanding } from "@/components/DemoLanding";
+import { PublicOdontogram } from "@/components/PublicOdontogram";
 import { appRootDomain, demoWorkspaceEnabled } from "@/lib/env";
 import {
   currentHostname,
@@ -23,11 +24,24 @@ import {
 } from "@/lib/tenant";
 import styles from "./marketing.module.css";
 
-export const metadata: Metadata = {
+const marketingMetadata: Metadata = {
   title: "Codexdentist - Phần mềm quản lý phòng khám nha khoa mã nguồn mở",
   description:
     "Quản lý lịch hẹn, hồ sơ bệnh nhân, điều trị, thu chi, kho và nhân sự trong một hệ thống có thể tự host.",
 };
+
+const odontogramMetadata: Metadata = {
+  title: "Odontogram 5 mặt | Codexdentist",
+  description:
+    "Mô hình odontogram FDI tương tác với năm mặt răng Mesial, Distal, Buccal, Lingual và Occlusal hoặc Incisal.",
+};
+
+export async function generateMetadata(): Promise<Metadata> {
+  const hostname = await currentHostname();
+  return systemSubdomainFromHostname(hostname) === "odontogram"
+    ? odontogramMetadata
+    : marketingMetadata;
+}
 
 const workflows = [
   {
@@ -65,6 +79,10 @@ export default async function Home({ searchParams }: HomePageProps) {
 
   if (systemSubdomain === "docs") {
     redirect("/docs");
+  }
+
+  if (systemSubdomain === "odontogram") {
+    return <PublicOdontogram />;
   }
 
   if (systemSubdomain === "demo") {
