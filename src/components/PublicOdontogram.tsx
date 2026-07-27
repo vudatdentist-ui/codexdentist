@@ -1,8 +1,10 @@
 "use client";
 
 import {
-  Odontogram,
+  StagedOdontogram,
   type OdontogramData,
+  type OdontogramStagesData,
+  type StagedOdontogramChange,
 } from "codexdentist-odontogram";
 import { useEffect, useState } from "react";
 import {
@@ -10,7 +12,8 @@ import {
   normalizeOdontogramData,
 } from "@/lib/odontogram-data";
 
-const storageKey = "codexdentist-odontogram-data-v1";
+const stageStorageKey = "codexdentist-odontogram-stages-v2";
+const singleSnapshotStorageKey = "codexdentist-odontogram-data-v1";
 const legacyStorageKeys = {
   surfaceState: "codexdentist-odontogram-5-surface-v1",
   anatomyState: "codexdentist-odontogram-anatomy-v1",
@@ -20,48 +23,88 @@ const legacyStorageKeys = {
 } as const;
 
 export function PublicOdontogram() {
-  const [initialData, setInitialData] = useState<OdontogramData | null>(null);
+  const [initialStages, setInitialStages] =
+    useState<OdontogramStagesData | null>(null);
 
   useEffect(() => {
-    setInitialData(readStoredData());
+    setInitialStages(readStoredStages());
   }, []);
 
-  if (!initialData) {
+  if (!initialStages) {
     return <div className="public-odontogram-loading">Đang mở odontogram...</div>;
   }
 
   return (
-    <Odontogram
+    <StagedOdontogram
       assetBaseUrl="/api/odontogram-assets"
-      defaultValue={initialData}
-      onChange={persistData}
+      defaultStages={initialStages}
+      onStagesChange={persistStageChange}
     />
   );
 }
 
-function readStoredData(): OdontogramData {
+function readStoredStages(): OdontogramStagesData {
   try {
-    const stored = window.localStorage.getItem(storageKey);
-    if (stored) {
-      return normalizeOdontogramData(JSON.parse(stored));
+    const storedStages = window.localStorage.getItem(stageStorageKey);
+    if (storedStages) {
+      return normalizeStoredStages(JSON.parse(storedStages));
     }
 
-    const migrated = normalizeOdontogramData({
-      version: 1,
-      surfaceState: parseLegacyValue(legacyStorageKeys.surfaceState, {}),
-      anatomyState: parseLegacyValue(legacyStorageKeys.anatomyState, {}),
-      markerState: parseLegacyValue(legacyStorageKeys.markerState, {}),
-      bridges: parseLegacyValue(legacyStorageKeys.bridges, []),
-      quickDiagnosis: parseLegacyValue(
-        legacyStorageKeys.quickDiagnosis,
-        emptyOdontogramData.quickDiagnosis,
-      ),
-    });
-    persistData(migrated);
+    const migrated = migrateSingleSnapshot(readSingleSnapshot());
+    persistStages(migrated);
     return migrated;
   } catch {
-    return emptyOdontogramData;
+    return migrateSingleSnapshot(emptyOdontogramData);
   }
+}
+
+function readSingleSnapshot(): OdontogramData {
+  const stored = window.localStorage.getItem(singleSnapshotStorageKey);
+  if (stored) {
+    return normalizeOdontogramData(JSON.parse(stored));
+  }
+
+  return normalizeOdontogramData({
+    version: 1,
+    surfaceState: parseLegacyValue(legacyStorageKeys.surfaceState, {}),
+    anatomyState: parseLegacyValue(legacyStorageKeys.anatomyState, {}),
+    markerState: parseLegacyValue(legacyStorageKeys.markerState, {}),
+    bridges: parseLegacyValue(legacyStorageKeys.bridges, []),
+    quickDiagnosis: parseLegacyValue(
+      legacyStorageKeys.quickDiagnosis,
+      emptyOdontogramData.quickDiagnosis,
+    ),
+  });
+}
+
+function normalizeStoredStages(value: unknown): OdontogramStagesData {
+  const stages =
+    value && typeof value === "object" && "stages" in value
+      ? (value as { stages: Partial<OdontogramStagesData> }).stages
+      : (value as Partial<OdontogramStagesData>);
+  const initial = stages?.INITIAL
+    ? normalizeOdontogramData(stages.INITIAL)
+    : emptyOdontogramData;
+
+  return {
+    INITIAL: initial,
+    EXPECTED: stages?.EXPECTED
+      ? normalizeOdontogramData(stages.EXPECTED)
+      : null,
+    CURRENT: stages?.CURRENT
+      ? normalizeOdontogramData(stages.CURRENT)
+      : initial,
+  };
+}
+
+function migrateSingleSnapshot(
+  snapshot: OdontogramData,
+): OdontogramStagesData {
+  return {
+    INITIAL: snapshot,
+    EXPECTED: null,
+    CURRENT: snapshot,
+  };
 }
 
 function parseLegacyValue<T>(key: string, fallback: T): T {
@@ -69,9 +112,16 @@ function parseLegacyValue<T>(key: string, fallback: T): T {
   return value ? (JSON.parse(value) as T) : fallback;
 }
 
-function persistData(data: OdontogramData) {
+function persistStageChange(change: StagedOdontogramChange) {
+  persistStages(change.stages);
+}
+
+function persistStages(stages: OdontogramStagesData) {
   try {
-    window.localStorage.setItem(storageKey, JSON.stringify(data));
+    window.localStorage.setItem(
+      stageStorageKey,
+      JSON.stringify({ version: 2, stages }),
+    );
   } catch {
     // The public chart remains usable when browser storage is unavailable.
   }
