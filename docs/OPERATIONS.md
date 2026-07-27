@@ -117,6 +117,8 @@ Authoritative DNS is Cloudflare, using `kanye.ns.cloudflare.com` and `tara.ns.cl
 
 Cloudflare SSL mode is `Full (strict)`. cPanel has a Cloudflare Origin CA certificate covering `codexdentist.com` and `*.codexdentist.com`; keep the wildcard certificate installed before changing TLS settings or moving the origin. Cloudflare also has one active rate-limiting rule named `Protect authentication endpoints`: requests from the same IP exceeding 30 `POST` requests in 10 seconds to `/login`, `/reset-password`, or `/demo` are blocked for 10 seconds. Application-level persistent rate limits remain authoritative for credential abuse.
 
+The cache rule `Cache public odontogram shell` applies only to `odontogram.codexdentist.com/` with a one-hour edge TTL. After each shared-host deployment, purge that exact URL in Cloudflare, request it once to warm the new HTML, then verify a non-empty `MISS` followed by non-empty `HIT` responses. Do not broaden this rule to authenticated app routes or patient data.
+
 Stellar Plus limits memory and process creation during builds. Stop only this Node.js app before installing dependencies, use one Next.js worker, and prune development dependencies before starting it again:
 
 ```sh
