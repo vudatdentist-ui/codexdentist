@@ -1,6 +1,6 @@
 # QA Playbook
 
-Last updated: 2026-07-26
+Last updated: 2026-07-27
 
 ## Fast Check
 
@@ -28,6 +28,7 @@ Use when touching the relevant area:
 
 ```powershell
 npm run test:billing
+npm run test:billing-concurrency
 npm run test:roles
 npm run test:actions
 npm run test:hardening
@@ -55,7 +56,7 @@ npm run pilot:qa
 - Odontogram structural-state checks: marking a tooth missing removes its artwork and clears/disables its five surfaces; marking an implant replaces the tooth artwork and clears/disables surfaces; selecting a conflicting state removes the old state; one undo restores the complete pre-action tooth state.
 - Odontogram anatomy check: crown/root zones are clicked directly on the current tooth artwork without rendering a second tooth image; fill, hover target, and outline must use the exact source contour and matching SVG viewBox for incisor, canine, premolar, molar, and the dedicated primary-tooth artwork. Each zone keeps its own condition, works for upper/lower permanent and primary teeth, persists in `anatomyState`, and is included in undo/reset/export. Missing teeth and implants clear/disable both zones, and one undo restores the previous anatomy state.
 - Odontogram prosthetic check: an implant and its crown can be selected together in either order, both artwork layers remain visible, and removing either state preserves the other.
-- Odontogram multi-select is always active and has no separate mode control. Clicking another tooth adds it, clicking a selected tooth removes only that tooth while retaining at least one selection, and editing one surface preserves the selected group. A clinical marker must apply or remove atomically across all selected teeth, show a mixed state when only some selected teeth carry it, and undo as one action. The bridge control stays disabled for one tooth and invalid cross-arch or non-contiguous selections; a valid bridge persists, exports, renders across natural, implant, and pontic units, and can be removed without changing individual tooth markers.
+- Odontogram multi-select is always active and has no separate mode control. The initial state may contain no selected tooth. Clicking another tooth adds it, clicking a selected tooth removes it, and clicking the last selected tooth returns to an empty selection. Tooth-specific clinical markers and bridges stay disabled while selection is empty; clicking a tooth surface or anatomy region directly selects that tooth before applying the mark. Editing one surface preserves the selected group. A clinical marker must apply or remove atomically across all selected teeth, show a mixed state when only some selected teeth carry it, and undo as one action. The bridge control stays disabled for fewer than two teeth and invalid cross-arch or non-contiguous selections; a valid bridge persists, exports, renders across natural, implant, and pontic units, and can be removed without changing individual tooth markers.
 - Journey odontogram check: selecting teeth updates treatment targets without changing clinical marks; editing a clinical mark auto-saves to the selected patient, increments one revision, survives refresh, and does not collapse or clear the treatment planner.
 - Journey odontogram permission/isolation check: clinical roles can edit, front desk and billing are read-only, an inaccessible clinic patient cannot be read or written, and a stale revision returns a conflict instead of overwriting the newer chart.
 - Journey odontogram persistence check: creating treatment services may clear temporary `PatientJourneyState.odontogramTeeth` but must not alter `PatientOdontogram.snapshot` or its revision history.
@@ -74,14 +75,19 @@ docker build -t codexdentist:qa .
 
 ## Security And Isolation Checklist
 
-- Login and password reset are rate-limited.
+- Login and password reset use both network and account/token rate limits; spoofed proxy headers do not reset the account/token bucket.
+- Credential notifications never store raw setup/reset URLs and never appear in the shared task inbox.
+- Staff-management actions reject targets with an equal or higher effective role and preserve at least one active owner.
+- CSV exports neutralize spreadsheet formula prefixes.
+- `npm run test:security-runtime` verifies manager/owner hierarchy, credential-notification isolation, and atomic single-use password reset.
 - Session cookie is `httpOnly`; production uses secure cookies.
 - Demo auth/fallback is disabled in production.
 - Every protected route uses session/view checks.
 - Every mutation enforces action-level permission server-side.
 - Every mutation fetches target resource by tenant scope before writing.
 - Export routes check role and resource access.
-- Patient portal is self-only.
+- Patient portal is scoped only by `portalUserId`, never email; appointment and treatment-plan state transitions reject terminal/source-invalid records.
+- Billing concurrency tests preserve both receipts without overpaying or over-allocating an invoice; ledger constraints and tenant-scope triggers are installed.
 - Uploads enforce size, MIME, extension, storage, and unsafe scan status rules.
 - Upload content signatures match declared image/PDF/video/Office types before storage.
 - Production readiness rejects requests without `JOB_SECRET`.
@@ -93,7 +99,8 @@ Tenant negative tests to preserve:
 
 - Org A cannot list/edit Org B patients, invoices, payments, or files.
 - Tenant subdomain cannot authenticate a user from another tenant.
-- Patient account cannot access another patient.
+- Patient account cannot access another patient, including a patient in the same organization with the same email.
+- Patient-file tests cover another organization, inaccessible clinic, `QUARANTINED`, and `INFECTED`.
 
 ## Browser Manual Targets
 

@@ -173,12 +173,15 @@ Required:
 - `APP_BASE_URL`: final HTTPS URL.
 - `AUTH_SECRET`: unique random value, at least 32 characters.
 - `JOB_SECRET`: unique random value, at least 32 characters.
+- `TRUSTED_PROXY_PROVIDER`: `cloudflare` only when the origin accepts traffic through Cloudflare; use `reverse-proxy` for a controlled local proxy and `none` for direct access.
 - `DEMO_AUTH_ENABLED=false`.
 - `PATIENT_FILE_STORAGE_DRIVER=r2`.
 - `R2_BUCKET_NAME`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, plus `R2_ACCOUNT_ID` or `R2_ENDPOINT`.
 - Notification provider webhooks and signing secrets before real reminders are enabled.
 
 New staff accounts use one-time setup links from `/settings`; links expire after 24 hours. Shared passwords such as `demo1234` must not be active for real staff.
+
+Self-host HTTP is suitable only on a trusted, isolated LAN. For guest Wi-Fi, shared networks, remote access, or real patient data crossing untrusted devices, terminate TLS at a controlled reverse proxy and set `SESSION_COOKIE_SECURE=true`; do not expose port 3000 directly to the Internet.
 
 ## Jobs
 

@@ -52,6 +52,10 @@ export const notificationTemplates = {
 } as const;
 
 export type NotificationTemplateKey = keyof typeof notificationTemplates;
+export const credentialNotificationTemplateKeys = [
+  "PASSWORD_RESET",
+  "STAFF_PASSWORD_SETUP",
+] satisfies NotificationTemplateKey[];
 
 export function renderNotificationTemplate(
   templateKey: NotificationTemplateKey,

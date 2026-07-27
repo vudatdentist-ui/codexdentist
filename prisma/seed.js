@@ -373,6 +373,9 @@ async function main() {
         clinicId: patient.clinicId,
         fullName: patient.fullName,
         email: patient.email,
+        portalUserId:
+          users.find((user) => user.role === "PATIENT" && user.email === patient.email)?.id ??
+          null,
         guardianName: patient.guardianName,
         medicalAlerts: patient.medicalAlerts,
       },
@@ -384,6 +387,9 @@ async function main() {
         dateOfBirth: new Date(patient.dateOfBirth),
         phone: patient.phone,
         email: patient.email,
+        portalUserId:
+          users.find((user) => user.role === "PATIENT" && user.email === patient.email)?.id ??
+          null,
         guardianName: patient.guardianName,
         medicalAlerts: patient.medicalAlerts,
       },

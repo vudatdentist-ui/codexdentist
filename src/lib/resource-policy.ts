@@ -34,18 +34,7 @@ export async function getAuthorizedPatientFile(
     where: {
       id: fileId,
       organizationId: session.organizationId,
-      AND: [
-        { patient: patientAccessWhere(session) },
-        ...(session.role === "PATIENT"
-          ? [
-              {
-                patient: {
-                  email: session.email,
-                },
-              },
-            ]
-          : []),
-      ],
+      patient: patientAccessWhere(session),
       OR: [
         {
           sourceType: {

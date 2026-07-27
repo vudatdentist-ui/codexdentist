@@ -1,6 +1,7 @@
 import "server-only";
 
 import { hasAnyRole, canUseAllClinics, type AppRole } from "@/lib/permissions";
+import { credentialNotificationTemplateKeys } from "@/lib/notification-templates";
 import { prisma } from "@/lib/prisma";
 import { assertDemoFallbackAllowed } from "@/lib/runtime-guards";
 import type { AppSession } from "@/lib/session";
@@ -235,9 +236,22 @@ export async function getTaskInboxWorkspace(
             {
               OR: [
                 {
+                  templateKey: null,
+                },
+                {
+                  templateKey: {
+                    notIn: credentialNotificationTemplateKeys,
+                  },
+                },
+              ],
+            },
+            {
+              OR: [
+                {
                   userId: session.userId,
                 },
                 {
+                  userId: null,
                   clinicId: {
                     in: clinicIds,
                   },

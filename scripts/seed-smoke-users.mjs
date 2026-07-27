@@ -64,6 +64,7 @@ async function main() {
   }
 
   const passwordHash = hashPassword(password);
+  let patientPortalUserId = "";
 
   for (const [email, fullName, role] of users) {
     const user = await prisma.user.upsert({
@@ -126,29 +127,58 @@ async function main() {
         active: true,
       },
     });
+
+    if (user.role === "PATIENT") {
+      patientPortalUserId = user.id;
+    }
   }
 
-  await prisma.patient.upsert({
-    where: {
-      organizationId_phone: {
-        organizationId: organization.id,
-        phone: "0900000000",
+  const linkedPatient = patientPortalUserId
+    ? await prisma.patient.findUnique({
+        where: {
+          portalUserId: patientPortalUserId,
+        },
+        select: {
+          id: true,
+        },
+      })
+    : null;
+
+  if (linkedPatient) {
+    await prisma.patient.update({
+      where: {
+        id: linkedPatient.id,
       },
-    },
-    update: {
-      clinicId: clinics[0].id,
-      fullName: "Smoke Patient",
-      email: "patient@nhavista.vn",
-    },
-    create: {
-      organizationId: organization.id,
-      clinicId: clinics[0].id,
-      fullName: "Smoke Patient",
-      dateOfBirth: new Date("1990-01-01T00:00:00.000Z"),
-      phone: "0900000000",
-      email: "patient@nhavista.vn",
-    },
-  });
+      data: {
+        email: "patient@nhavista.vn",
+        portalUserId: patientPortalUserId,
+      },
+    });
+  } else {
+    await prisma.patient.upsert({
+      where: {
+        organizationId_phone: {
+          organizationId: organization.id,
+          phone: "0900000000",
+        },
+      },
+      update: {
+        clinicId: clinics[0].id,
+        fullName: "Smoke Patient",
+        email: "patient@nhavista.vn",
+        portalUserId: patientPortalUserId || null,
+      },
+      create: {
+        organizationId: organization.id,
+        clinicId: clinics[0].id,
+        fullName: "Smoke Patient",
+        dateOfBirth: new Date("1990-01-01T00:00:00.000Z"),
+        phone: "0900000000",
+        email: "patient@nhavista.vn",
+        portalUserId: patientPortalUserId || null,
+      },
+    });
+  }
 
   console.log(`Seeded ${users.length} smoke users with password from SMOKE_USER_PASSWORD.`);
 }

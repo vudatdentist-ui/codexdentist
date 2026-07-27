@@ -1,5 +1,6 @@
 import { Buffer } from "node:buffer";
 import { execFile } from "node:child_process";
+import { createHash, randomBytes } from "node:crypto";
 import { promisify } from "node:util";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
@@ -1394,7 +1395,13 @@ async function settingsFlow(cookie) {
 
   const staff = await prisma.user.findUniqueOrThrow({
     where: { email: staffEmail },
-    select: { id: true, role: true, active: true, mustChangePassword: true },
+    select: {
+      id: true,
+      organizationId: true,
+      role: true,
+      active: true,
+      mustChangePassword: true,
+    },
   });
   const [pendingSetupToken, setupNotification] = await Promise.all([
     prisma.passwordResetToken.findFirst({
@@ -1422,11 +1429,32 @@ async function settingsFlow(cookie) {
       },
     }),
   ]);
-  const setupToken = setupNotification?.body.match(/token=([A-Za-z0-9_-]+)/)?.[1] ?? "";
-
   assert(staff.mustChangePassword, "New staff should require password setup.");
   assert(pendingSetupToken, "New staff should have a pending password setup token.");
-  assert(setupToken, "Staff password setup token should be present only in the queued notification body.");
+  assert(
+    !setupNotification?.body.includes("token="),
+    "Staff password setup token must not be stored in the notification body.",
+  );
+  const setupToken = randomBytes(32).toString("base64url");
+  const now = new Date();
+  await prisma.passwordResetToken.updateMany({
+    where: {
+      userId: staff.id,
+      usedAt: null,
+    },
+    data: {
+      usedAt: now,
+    },
+  });
+  await prisma.passwordResetToken.create({
+    data: {
+      organizationId: staff.organizationId,
+      userId: staff.id,
+      tokenHash: createHash("sha256").update(setupToken).digest("hex"),
+      purpose: "INTEGRATION_TEST",
+      expiresAt: new Date(now.getTime() + 60 * 60 * 1000),
+    },
+  });
   await assertAudit("staff.created", "User", staff.id);
 
   const resetHtml = await fetchText(`/reset-password?token=${encodeURIComponent(setupToken)}`);

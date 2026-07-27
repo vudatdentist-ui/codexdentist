@@ -24,10 +24,10 @@ import { clientIpFromHeaders } from "@/lib/request-ip";
 export async function loginAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const password = String(formData.get("password") ?? "");
-  const key = await loginRateLimitKey(email);
-  const limit = await consumeLoginAttempt(key);
+  const keys = await loginRateLimitKeys(email);
+  const limits = await Promise.all(keys.map((key) => consumeLoginAttempt(key)));
 
-  if (!limit.allowed) {
+  if (limits.some((limit) => !limit.allowed)) {
     redirect("/login?error=rate-limited");
   }
 
@@ -37,16 +37,18 @@ export async function loginAction(formData: FormData) {
     redirect(`/login?error=${result.reason}`);
   }
 
-  await clearLoginAttempts(key);
+  await Promise.all(keys.map((key) => clearLoginAttempts(key)));
   redirect("/dashboard");
 }
 
 export async function forgotPasswordAction(formData: FormData) {
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
-  const key = await loginRateLimitKey(`forgot:${email}`);
-  const limit = await consumePasswordResetAttempt(key);
+  const keys = await loginRateLimitKeys(`forgot:${email}`);
+  const limits = await Promise.all(
+    keys.map((key) => consumePasswordResetAttempt(key)),
+  );
 
-  if (!limit.allowed) {
+  if (limits.some((limit) => !limit.allowed)) {
     redirect("/login?forgot=sent");
   }
 
@@ -108,7 +110,7 @@ export async function forgotPasswordAction(formData: FormData) {
           templateKey: "PASSWORD_RESET",
           recipient: user.email,
           subject: rendered.subject,
-          body: rendered.body,
+          body: "A password reset email was requested for this account.",
           scheduledAt: new Date(),
           metadata: {
             purpose: "PASSWORD_RESET",
@@ -116,7 +118,7 @@ export async function forgotPasswordAction(formData: FormData) {
         },
       });
 
-      await processNotificationNow(notification.id);
+      await processNotificationNow(notification.id, rendered);
       await prisma.auditLog.create({
         data: {
           organizationId: user.organizationId,
@@ -137,9 +139,9 @@ export async function forgotPasswordAction(formData: FormData) {
   redirect("/login?forgot=sent");
 }
 
-async function loginRateLimitKey(email: string) {
+async function loginRateLimitKeys(email: string) {
   const headerStore = await headers();
   const ip = clientIpFromHeaders(headerStore);
 
-  return `${ip}:${email}`;
+  return [`network:${ip}:${email}`, `account:${email}`];
 }

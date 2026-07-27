@@ -1,4 +1,5 @@
 import { requireViewSession } from "@/lib/auth";
+import { csvCell } from "@/lib/csv";
 import { canUseAllClinics } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
@@ -133,14 +134,4 @@ function vietnamDate(date: Date) {
     month: "2-digit",
     day: "2-digit",
   }).format(date);
-}
-
-function csvCell(value: string | number) {
-  const text = String(value);
-
-  if (!/[",\r\n]/.test(text)) {
-    return text;
-  }
-
-  return `"${text.replaceAll('"', '""')}"`;
 }

@@ -24,6 +24,8 @@ type NotificationDeliveryResult = {
   reason?: string;
 };
 
+type NotificationDeliveryContent = Pick<Notification, "subject" | "body">;
+
 export async function processDueNotifications(input: ProcessDueNotificationsInput = {}) {
   const now = input.now ?? new Date();
   const limit = sanitizeLimit(input.limit);
@@ -112,7 +114,10 @@ export async function processDueNotifications(input: ProcessDueNotificationsInpu
   };
 }
 
-export async function processNotificationNow(id: string) {
+export async function processNotificationNow(
+  id: string,
+  deliveryContent?: NotificationDeliveryContent,
+) {
   const mode = notificationDeliveryMode();
   const notification = await prisma.notification.findUnique({
     where: {
@@ -158,7 +163,10 @@ export async function processNotificationNow(id: string) {
     };
   }
 
-  const result = await deliverNotification(notification, mode);
+  const result = await deliverNotification(
+    deliveryContent ? { ...notification, ...deliveryContent } : notification,
+    mode,
+  );
 
   await writeBatchAudit([notification], {
     processed: 1,

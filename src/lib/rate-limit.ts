@@ -10,6 +10,7 @@ type RateLimitResult = {
 
 const loginWindowMs = 10 * 60 * 1000;
 const passwordResetWindowMs = 60 * 60 * 1000;
+const aiWindowMs = 60 * 60 * 1000;
 let lastPrunedAt = 0;
 
 export function consumeLoginAttempt(key: string) {
@@ -48,6 +49,24 @@ export function consumeDemoWorkspaceAttempt(key: string) {
     maxAttempts: 3,
     namespace: "demo-workspace",
     windowMs: 24 * 60 * 60 * 1000,
+  });
+}
+
+export function consumeAiUserAttempt(userId: string) {
+  return consumePersistentBucket({
+    key: userId,
+    maxAttempts: 20,
+    namespace: "ai-user",
+    windowMs: aiWindowMs,
+  });
+}
+
+export function consumeAiOrganizationAttempt(organizationId: string) {
+  return consumePersistentBucket({
+    key: organizationId,
+    maxAttempts: 100,
+    namespace: "ai-organization",
+    windowMs: aiWindowMs,
   });
 }
 

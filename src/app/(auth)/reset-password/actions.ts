@@ -10,9 +10,13 @@ export async function resetPasswordAction(formData: FormData) {
   const token = String(formData.get("token") ?? "");
   const password = String(formData.get("password") ?? "");
   const confirmPassword = String(formData.get("confirmPassword") ?? "");
-  const limit = await consumePasswordResetAttempt(await resetRateLimitKey(token));
+  const limits = await Promise.all(
+    (await resetRateLimitKeys(token)).map((key) =>
+      consumePasswordResetAttempt(key),
+    ),
+  );
 
-  if (!limit.allowed) {
+  if (limits.some((limit) => !limit.allowed)) {
     redirect(`/reset-password?token=${encodeURIComponent(token)}&error=rate-limited`);
   }
 
@@ -29,9 +33,10 @@ export async function resetPasswordAction(formData: FormData) {
   redirect("/login?reset=success");
 }
 
-async function resetRateLimitKey(token: string) {
+async function resetRateLimitKeys(token: string) {
   const headerStore = await headers();
   const ip = clientIpFromHeaders(headerStore);
+  const tokenPrefix = token.slice(0, 16);
 
-  return `${ip}:reset:${token.slice(0, 16)}`;
+  return [`network:${ip}:reset:${tokenPrefix}`, `token:${tokenPrefix}`];
 }

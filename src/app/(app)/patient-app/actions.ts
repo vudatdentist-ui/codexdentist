@@ -8,6 +8,7 @@ import { nextDocumentNo } from "@/lib/document-sequence";
 import { databaseActorId, requiredString } from "@/lib/form-validation";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
+import { runSerializableTransaction } from "@/lib/transaction";
 
 export async function confirmPortalAppointmentAction(formData: FormData) {
   const session = await requireViewSession("patient-app");
@@ -20,38 +21,33 @@ export async function confirmPortalAppointmentAction(formData: FormData) {
   let notice: string | null = null;
 
   try {
-    const appointment = await prisma.appointment.findFirst({
-      where: {
-        id: appointmentId,
-        ...portalPatientScope(session),
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!appointment) {
-      notice = "portal-appointment-not-found";
-    } else {
-      await prisma.appointment.update({
+    await runSerializableTransaction(async (tx) => {
+      const result = await tx.appointment.updateMany({
         where: {
           id: appointmentId,
+          status: "REQUESTED",
+          ...portalPatientScope(session),
         },
         data: {
           status: "CONFIRMED",
         },
       });
 
-      await writePortalAuditLog({
+      if (result.count !== 1) {
+        throw new PortalActionError("portal-appointment-not-found");
+      }
+
+      await writePortalAuditLog(tx, {
         organizationId: session.organizationId,
         actorId: databaseActorId(session.userId),
         action: "patient_portal.appointment_confirmed",
         entityType: "Appointment",
         entityId: appointmentId,
       });
-    }
-  } catch {
-    notice = "portal-database";
+    });
+  } catch (error) {
+    notice =
+      error instanceof PortalActionError ? error.notice : "portal-database";
   }
 
   if (notice) {
@@ -73,99 +69,106 @@ export async function payPortalInvoiceAction(formData: FormData) {
   let notice: string | null = null;
 
   try {
-    const invoice = await prisma.invoice.findFirst({
-      where: {
-        invoiceNo,
-        ...portalPatientScope(session),
-      },
-      select: {
-        id: true,
-        amount: true,
-        clinicId: true,
-        patientId: true,
-        paidAmount: true,
-        status: true,
-      },
-    });
+    await runSerializableTransaction(async (tx) => {
+      const invoice = await tx.invoice.findFirst({
+        where: {
+          invoiceNo,
+          status: {
+            in: ["OPEN", "PARTIAL"],
+          },
+          ...portalPatientScope(session),
+        },
+        select: {
+          id: true,
+          amount: true,
+          clinicId: true,
+          patientId: true,
+          paidAmount: true,
+        },
+      });
 
-    if (!invoice || invoice.status === "VOID") {
-      notice = "portal-invoice-not-found";
-    } else {
-      const due = Math.max(Number(invoice.amount) - Number(invoice.paidAmount), 0);
+      if (!invoice) {
+        throw new PortalActionError("portal-invoice-not-found");
+      }
+
+      const due = Math.max(
+        Number(invoice.amount) - Number(invoice.paidAmount),
+        0,
+      );
 
       if (due <= 0) {
-        notice = "portal-invoice-paid";
-      } else {
-        await prisma.$transaction(async (tx) => {
-          const receiptNo = await nextPortalReceiptNo(session.organizationId, tx);
-          const receipt = await tx.receipt.create({
-            data: {
-              organizationId: session.organizationId,
-              clinicId: invoice.clinicId,
-              patientId: invoice.patientId,
-              receiptNo,
-              amount: due,
-              allocatedAmount: due,
-              unallocatedAmount: 0,
-              method: "patient_portal",
-              reference: invoiceNo,
-              note: "Patient portal invoice payment",
-            },
-            select: {
-              id: true,
-              receiptNo: true,
-            },
-          });
-          const nextPaid = Number(invoice.paidAmount) + due;
-          const nextStatus = nextPaid >= Number(invoice.amount) ? "PAID" : "PARTIAL";
-
-          await tx.payment.create({
-            data: {
-              invoiceId: invoice.id,
-              amount: due,
-              method: "patient_portal",
-              reference: receipt.receiptNo,
-            },
-          });
-          await tx.receiptAllocation.create({
-            data: {
-              organizationId: session.organizationId,
-              clinicId: invoice.clinicId,
-              patientId: invoice.patientId,
-              receiptId: receipt.id,
-              invoiceId: invoice.id,
-              amount: due,
-              note: "Patient portal invoice payment",
-            },
-          });
-          await tx.invoice.update({
-            where: {
-              id: invoice.id,
-            },
-            data: {
-              paidAmount: nextPaid,
-              status: nextStatus,
-            },
-          });
-          await tx.auditLog.create({
-            data: {
-              organizationId: session.organizationId,
-              actorId: databaseActorId(session.userId),
-              action: "patient_portal.invoice_paid",
-              entityType: "Invoice",
-              entityId: invoice.id,
-              metadata: {
-                invoiceNo,
-                receiptNo: receipt.receiptNo,
-                amount: due,
-              } as Prisma.InputJsonValue,
-            },
-          });
-        });
+        throw new PortalActionError("portal-invoice-paid");
       }
-    }
-  } catch {
-    notice = "portal-database";
+
+      const receiptNo = await nextPortalReceiptNo(session.organizationId, tx);
+      const receipt = await tx.receipt.create({
+        data: {
+          organizationId: session.organizationId,
+          clinicId: invoice.clinicId,
+          patientId: invoice.patientId,
+          receiptNo,
+          amount: due,
+          allocatedAmount: due,
+          unallocatedAmount: 0,
+          method: "patient_portal",
+          reference: invoiceNo,
+          note: "Patient portal invoice payment",
+        },
+        select: {
+          id: true,
+          receiptNo: true,
+        },
+      });
+      const nextPaid = Number(invoice.paidAmount) + due;
+      const nextStatus =
+        nextPaid >= Number(invoice.amount) ? "PAID" : "PARTIAL";
+
+      await tx.payment.create({
+        data: {
+          invoiceId: invoice.id,
+          amount: due,
+          method: "patient_portal",
+          reference: receipt.receiptNo,
+        },
+      });
+      await tx.receiptAllocation.create({
+        data: {
+          organizationId: session.organizationId,
+          clinicId: invoice.clinicId,
+          patientId: invoice.patientId,
+          receiptId: receipt.id,
+          invoiceId: invoice.id,
+          amount: due,
+          note: "Patient portal invoice payment",
+        },
+      });
+      await tx.invoice.update({
+        where: {
+          id: invoice.id,
+        },
+        data: {
+          paidAmount: nextPaid,
+          status: nextStatus,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: session.organizationId,
+          actorId: databaseActorId(session.userId),
+          action: "patient_portal.invoice_paid",
+          entityType: "Invoice",
+          entityId: invoice.id,
+          metadata: {
+            invoiceNo,
+            receiptNo: receipt.receiptNo,
+            amount: due,
+          } as Prisma.InputJsonValue,
+        },
+      });
+    });
+  } catch (error) {
+    notice =
+      error instanceof PortalActionError ? error.notice : "portal-database";
   }
 
   if (notice) {
@@ -187,38 +190,33 @@ export async function acceptPortalTreatmentAction(formData: FormData) {
   let notice: string | null = null;
 
   try {
-    const plan = await prisma.treatmentPlan.findFirst({
-      where: {
-        id: planId,
-        patient: portalPatientScope(session).patient,
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    if (!plan) {
-      notice = "portal-plan-not-found";
-    } else {
-      await prisma.treatmentPlan.update({
+    await runSerializableTransaction(async (tx) => {
+      const result = await tx.treatmentPlan.updateMany({
         where: {
           id: planId,
+          status: "PRESENTED",
+          patient: portalPatientScope(session).patient,
         },
         data: {
           status: "ACCEPTED",
         },
       });
 
-      await writePortalAuditLog({
+      if (result.count !== 1) {
+        throw new PortalActionError("portal-plan-not-found");
+      }
+
+      await writePortalAuditLog(tx, {
         organizationId: session.organizationId,
         actorId: databaseActorId(session.userId),
         action: "patient_portal.treatment_accepted",
         entityType: "TreatmentPlan",
         entityId: planId,
       });
-    }
-  } catch {
-    notice = "portal-database";
+    });
+  } catch (error) {
+    notice =
+      error instanceof PortalActionError ? error.notice : "portal-database";
   }
 
   if (notice) {
@@ -268,7 +266,7 @@ export async function renewPortalConsentAction(formData: FormData) {
         },
       });
 
-      await writePortalAuditLog({
+      await writePortalAuditLog(prisma, {
         organizationId: session.organizationId,
         actorId: databaseActorId(session.userId),
         action: "patient_portal.consent_renewed",
@@ -304,7 +302,7 @@ function portalPatientScope(session: AppSession) {
       },
       ...(session.role === "PATIENT"
         ? {
-            email: session.email,
+            portalUserId: session.userId,
           }
         : {}),
     },
@@ -313,29 +311,37 @@ function portalPatientScope(session: AppSession) {
 
 type PatientPortalDbClient = Prisma.TransactionClient | typeof prisma;
 
-async function nextPortalReceiptNo(organizationId: string, client: PatientPortalDbClient = prisma) {
+async function nextPortalReceiptNo(
+  organizationId: string,
+  client: PatientPortalDbClient = prisma,
+) {
   return nextDocumentNo({
     client,
     organizationId,
     type: "RCT",
     seedCurrentValue: () =>
-      client.receipt.count({
-        where: {
-          organizationId,
-        },
-      }).then((count) => 1000 + count),
+      client.receipt
+        .count({
+          where: {
+            organizationId,
+          },
+        })
+        .then((count) => 1000 + count),
   });
 }
 
-async function writePortalAuditLog(input: {
-  organizationId: string;
-  actorId: string | null;
-  action: string;
-  entityType: string;
-  entityId: string;
-  metadata?: Record<string, unknown>;
-}) {
-  await prisma.auditLog.create({
+async function writePortalAuditLog(
+  client: PatientPortalDbClient,
+  input: {
+    organizationId: string;
+    actorId: string | null;
+    action: string;
+    entityType: string;
+    entityId: string;
+    metadata?: Record<string, unknown>;
+  },
+) {
+  await client.auditLog.create({
     data: {
       organizationId: input.organizationId,
       actorId: input.actorId,
@@ -345,4 +351,10 @@ async function writePortalAuditLog(input: {
       metadata: input.metadata as Prisma.InputJsonValue | undefined,
     },
   });
+}
+
+class PortalActionError extends Error {
+  constructor(readonly notice: string) {
+    super(notice);
+  }
 }

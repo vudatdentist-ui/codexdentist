@@ -14,7 +14,7 @@ import {
   isUploadedPatientFile,
   storeStaffProfileUpload,
 } from "@/lib/patient-file-storage";
-import { canUseAllClinics, type AppRole } from "@/lib/permissions";
+import { canUseAllClinics, effectiveRoles, type AppRole } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 import { generateSourceCommissionAccruals } from "@/lib/source-commission";
@@ -146,7 +146,7 @@ export async function createOrganizationAction(formData: FormData) {
       userId: result.owner.id,
       createdById: null,
     });
-    const notificationId = await createPasswordSetupNotification({
+    const setupNotification = await createPasswordSetupNotification({
       organizationId: result.organization.id,
       clinicId: null,
       userId: result.owner.id,
@@ -155,7 +155,7 @@ export async function createOrganizationAction(formData: FormData) {
       setupUrl: setup.url,
       expiresAt: setup.expiresAt,
     });
-    await processNotificationNow(notificationId);
+    await processNotificationNow(setupNotification.id, setupNotification.deliveryContent);
   } catch (error) {
     if (isNextRedirect(error)) {
       throw error;
@@ -189,6 +189,10 @@ export async function createStaffAction(formData: FormData) {
         .filter(isStaffProfileRole),
     ),
   );
+
+  if (!canAssignStaffRoles(session, createAssignmentRoles)) {
+    redirect("/settings?notice=settings-denied");
+  }
 
   if (
     !fullName ||
@@ -276,7 +280,7 @@ export async function createStaffAction(formData: FormData) {
         userId: user.id,
         createdById: databaseActorId(session.userId),
       });
-      const notificationId = await createPasswordSetupNotification({
+      const setupNotification = await createPasswordSetupNotification({
         organizationId: targetOrganizationId,
         clinicId,
         userId: user.id,
@@ -285,7 +289,7 @@ export async function createStaffAction(formData: FormData) {
         setupUrl: setup.url,
         expiresAt: setup.expiresAt,
       });
-      await processNotificationNow(notificationId);
+      await processNotificationNow(setupNotification.id, setupNotification.deliveryContent);
 
       await writeSettingsAuditLog({
         organizationId: targetOrganizationId,
@@ -344,41 +348,19 @@ export async function createStaffPasswordSetupLinkAction(formData: FormData) {
   let setupEmail = "";
 
   try {
-    const user = await prisma.user.findFirst({
-      where: {
-        id: userId,
-        organizationId: session.organizationId,
-        clinics: {
-          some: {
-            clinicId: {
-              in: session.clinicIds,
-            },
-          },
-        },
-      },
-      select: {
-        id: true,
-        email: true,
-        fullName: true,
-        clinics: {
-          select: {
-            clinicId: true,
-          },
-          take: 1,
-        },
-      },
-    });
+    const user = await findScopedUser(session, userId);
 
     if (!user) {
       notice = "settings-user-not-found";
     } else {
+      assertCanManageStaffTarget(session, user);
       const setup = await createPasswordSetupToken({
         organizationId: session.organizationId,
         userId: user.id,
         createdById: databaseActorId(session.userId),
       });
       setupEmail = user.email;
-      const notificationId = await createPasswordSetupNotification({
+      const setupNotification = await createPasswordSetupNotification({
         organizationId: session.organizationId,
         clinicId: user.clinics[0]?.clinicId ?? session.activeClinicId ?? session.clinicIds[0] ?? null,
         userId: user.id,
@@ -387,7 +369,7 @@ export async function createStaffPasswordSetupLinkAction(formData: FormData) {
         setupUrl: setup.url,
         expiresAt: setup.expiresAt,
       });
-      await processNotificationNow(notificationId);
+      await processNotificationNow(setupNotification.id, setupNotification.deliveryContent);
 
       await prisma.user.update({
         where: {
@@ -774,6 +756,10 @@ export async function createChainAction(formData: FormData) {
     }
 
     if (ownerMode === "new") {
+      if (!canAssignStaffRoles(session, ["AREA_MANAGER"])) {
+        redirect("/settings?notice=settings-denied");
+      }
+
       if (!ownerFullName || !ownerEmail) {
         redirect("/settings?notice=settings-chain-owner-missing");
       }
@@ -813,7 +799,7 @@ export async function createChainAction(formData: FormData) {
         userId: owner.id,
         createdById: databaseActorId(session.userId),
       });
-      const notificationId = await createPasswordSetupNotification({
+      const setupNotification = await createPasswordSetupNotification({
         organizationId: session.organizationId,
         clinicId: session.activeClinicId ?? session.clinicIds[0] ?? null,
         userId: owner.id,
@@ -822,7 +808,7 @@ export async function createChainAction(formData: FormData) {
         setupUrl: setup.url,
         expiresAt: setup.expiresAt,
       });
-      await processNotificationNow(notificationId);
+      await processNotificationNow(setupNotification.id, setupNotification.deliveryContent);
 
       ownerId = owner.id;
       setupEmail = ownerEmail;
@@ -1085,6 +1071,10 @@ export async function updateStaffRoleAction(formData: FormData) {
 
   const role = primaryStaffRoleForAssignments(assignmentRoles);
 
+  if (!canAssignStaffRoles(session, assignmentRoles)) {
+    redirect("/settings?notice=settings-denied");
+  }
+
   if (
     !canUseAllClinics(session) &&
     assignmentRoles.some(isOrganizationScopedRole)
@@ -1100,6 +1090,10 @@ export async function updateStaffRoleAction(formData: FormData) {
     if (!user) {
       notice = "settings-user-not-found";
     } else {
+      assertCanManageStaffTarget(session, user);
+      if (staffUserHasRole(user, "OWNER") && !assignmentRoles.includes("OWNER")) {
+        await assertAnotherActiveOwner(user.organizationId, user.id);
+      }
       const clinicScopedRoles = assignmentRoles.filter(
         (assignmentRole) => !isOrganizationScopedRole(assignmentRole),
       );
@@ -1679,6 +1673,10 @@ export async function toggleStaffStatusAction(formData: FormData) {
     if (!user) {
       notice = "settings-user-not-found";
     } else {
+      assertCanManageStaffTarget(session, user);
+      if (!active && staffUserHasRole(user, "OWNER")) {
+        await assertAnotherActiveOwner(user.organizationId, user.id);
+      }
       await prisma.user.update({
         where: {
           id: userId,
@@ -1695,7 +1693,10 @@ export async function toggleStaffStatusAction(formData: FormData) {
         entityId: userId,
       });
     }
-  } catch {
+  } catch (error) {
+    if (isNextRedirect(error)) {
+      throw error;
+    }
     notice = "settings-database";
   }
 
@@ -1728,13 +1729,109 @@ async function findScopedUser(session: AppSession, userId: string) {
     select: {
       id: true,
       organizationId: true,
+      email: true,
+      fullName: true,
+      role: true,
+      active: true,
       clinics: {
         select: {
           clinicId: true,
         },
       },
+      roleAssignments: {
+        where: {
+          active: true,
+        },
+        select: {
+          role: true,
+        },
+      },
     },
   });
+}
+
+function assertCanManageStaffTarget(
+  session: AppSession,
+  target: NonNullable<Awaited<ReturnType<typeof findScopedUser>>>,
+) {
+  if (isSuperAdminSession(session) && target.id !== session.userId) {
+    return;
+  }
+
+  const actorRank = strongestRoleRank(effectiveRoles(session));
+  const targetRank = strongestRoleRank([
+    target.role,
+    ...target.roleAssignments.map((assignment) => assignment.role),
+  ]);
+
+  if (actorRank >= targetRank) {
+    redirect("/settings?notice=settings-denied");
+  }
+}
+
+function canAssignStaffRoles(
+  session: AppSession,
+  roles: Array<Exclude<(typeof userRoles)[number], "PATIENT">>,
+) {
+  if (isSuperAdminSession(session)) {
+    return true;
+  }
+
+  const actorRank = strongestRoleRank(effectiveRoles(session));
+  return roles.every((role) => actorRank < strongestRoleRank([role]));
+}
+
+function staffUserHasRole(
+  target: NonNullable<Awaited<ReturnType<typeof findScopedUser>>>,
+  role: AppRole,
+) {
+  return (
+    target.role === role ||
+    target.roleAssignments.some((assignment) => assignment.role === role)
+  );
+}
+
+async function assertAnotherActiveOwner(organizationId: string, excludedUserId: string) {
+  const activeOwner = await prisma.user.findFirst({
+    where: {
+      organizationId,
+      id: {
+        not: excludedUserId,
+      },
+      active: true,
+      OR: [
+        {
+          role: "OWNER",
+        },
+        {
+          roleAssignments: {
+            some: {
+              active: true,
+              role: "OWNER",
+            },
+          },
+        },
+      ],
+    },
+    select: {
+      id: true,
+    },
+  });
+
+  if (!activeOwner) {
+    redirect("/settings?notice=settings-denied");
+  }
+}
+
+function strongestRoleRank(roles: AppRole[]) {
+  return Math.min(
+    ...roles.map((role) => {
+      const rank = staffRolePriority.indexOf(
+        role as (typeof staffRolePriority)[number],
+      );
+      return rank === -1 ? Number.MAX_SAFE_INTEGER : rank;
+    }),
+  );
 }
 
 async function findChainOwnerCandidate(session: AppSession, userId: string) {
@@ -2068,7 +2165,7 @@ async function createPasswordSetupNotification(input: {
       templateKey: "STAFF_PASSWORD_SETUP",
       recipient: input.email,
       subject: rendered.subject,
-      body: rendered.body,
+      body: "A one-time password setup email was requested for this account.",
       scheduledAt: new Date(),
       metadata: {
         purpose: "STAFF_PASSWORD_SETUP",
@@ -2076,7 +2173,10 @@ async function createPasswordSetupNotification(input: {
     },
   });
 
-  return notification.id;
+  return {
+    id: notification.id,
+    deliveryContent: rendered,
+  };
 }
 
 function isNextRedirect(error: unknown) {

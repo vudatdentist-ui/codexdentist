@@ -17,13 +17,31 @@ type OrganizationWorkspaceInput = {
   isDemo?: boolean;
   demoExpiresAt?: Date | null;
   seedDemoData?: boolean;
+  requireEmptyDatabase?: boolean;
 };
+
+const firstRunLockId = 2026072701;
+
+export class FirstRunAlreadyCompletedError extends Error {
+  constructor() {
+    super("First-run setup has already been completed.");
+    this.name = "FirstRunAlreadyCompletedError";
+  }
+}
 
 export async function createOrganizationWorkspace(input: OrganizationWorkspaceInput) {
   const passwordHash = hashPassword(input.ownerPassword);
   const suffix = randomBytes(5).toString("hex");
 
   const workspace = await prisma.$transaction(async (tx) => {
+    if (input.requireEmptyDatabase) {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(${firstRunLockId})`;
+
+      if ((await tx.organization.count()) > 0) {
+        throw new FirstRunAlreadyCompletedError();
+      }
+    }
+
     const organization = await tx.organization.create({
       data: {
         name: input.name,

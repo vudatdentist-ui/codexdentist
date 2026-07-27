@@ -5,10 +5,10 @@ import { hashPassword } from "@/lib/auth";
 import { appBaseUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { tenantDomainForSlug } from "@/lib/tenant";
+import { runSerializableTransaction } from "@/lib/transaction";
 
-const TOKEN_TTL_MS = process.env.NODE_ENV === "production"
-  ? 60 * 60 * 1000
-  : 24 * 60 * 60 * 1000;
+const TOKEN_TTL_MS =
+  process.env.NODE_ENV === "production" ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
 const MIN_PASSWORD_LENGTH = 10;
 
 export async function createPasswordSetupToken(input: {
@@ -82,7 +82,11 @@ export async function resetPasswordWithToken(input: {
     return { ok: false as const, reason: "expired" as const };
   }
 
-  if (resetToken.usedAt || resetToken.expiresAt <= now || !resetToken.user.active) {
+  if (
+    resetToken.usedAt ||
+    resetToken.expiresAt <= now ||
+    !resetToken.user.active
+  ) {
     await prisma.auditLog.create({
       data: {
         organizationId: resetToken.organizationId,
@@ -102,46 +106,67 @@ export async function resetPasswordWithToken(input: {
     return { ok: false as const, reason: "expired" as const };
   }
 
-  await prisma.$transaction([
-    prisma.user.update({
-      where: {
-        id: resetToken.userId,
-      },
-      data: {
-        passwordHash: hashPassword(password),
-        mustChangePassword: false,
-        passwordChangedAt: now,
-      },
-    }),
-    prisma.passwordResetToken.update({
-      where: {
-        id: resetToken.id,
-      },
-      data: {
-        usedAt: now,
-      },
-    }),
-    prisma.session.deleteMany({
-      where: {
-        userId: resetToken.userId,
-      },
-    }),
-    prisma.auditLog.create({
-      data: {
-        organizationId: resetToken.organizationId,
-        actorId: null,
-        action: "staff.password_set",
-        entityType: "User",
-        entityId: resetToken.userId,
-        metadata: {
-          purpose: resetToken.purpose,
+  try {
+    await runSerializableTransaction(async (tx) => {
+      const claim = await tx.passwordResetToken.updateMany({
+        where: {
+          id: resetToken.id,
+          usedAt: null,
+          expiresAt: {
+            gt: now,
+          },
+          user: {
+            active: true,
+          },
         },
-      },
-    }),
-  ]);
+        data: {
+          usedAt: now,
+        },
+      });
+
+      if (claim.count !== 1) {
+        throw new PasswordResetClaimError();
+      }
+
+      await tx.user.update({
+        where: {
+          id: resetToken.userId,
+        },
+        data: {
+          passwordHash: hashPassword(password),
+          mustChangePassword: false,
+          passwordChangedAt: now,
+        },
+      });
+      await tx.session.deleteMany({
+        where: {
+          userId: resetToken.userId,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: resetToken.organizationId,
+          actorId: null,
+          action: "staff.password_set",
+          entityType: "User",
+          entityId: resetToken.userId,
+          metadata: {
+            purpose: resetToken.purpose,
+          },
+        },
+      });
+    });
+  } catch (error) {
+    if (error instanceof PasswordResetClaimError) {
+      return { ok: false as const, reason: "expired" as const };
+    }
+    throw error;
+  }
 
   return { ok: true as const };
 }
+
+class PasswordResetClaimError extends Error {}
 
 export async function passwordSetupUrl(token: string, organizationId: string) {
   const baseUrl = await organizationBaseUrl(organizationId);
@@ -168,8 +193,9 @@ async function organizationBaseUrl(organizationId: string) {
       slug: true,
     },
   });
-  const domain = organization?.primaryDomain?.trim()
-    || (organization?.slug ? tenantDomainForSlug(organization.slug) : "");
+  const domain =
+    organization?.primaryDomain?.trim() ||
+    (organization?.slug ? tenantDomainForSlug(organization.slug) : "");
 
   return domain ? absoluteBaseUrlForDomain(domain) : appBaseUrl();
 }
@@ -185,4 +211,3 @@ function absoluteBaseUrlForDomain(domain: string) {
 
   return `${protocol}//${trimmedDomain}`;
 }
-

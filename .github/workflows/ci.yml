@@ -4,6 +4,9 @@ on:
   pull_request:
   push:
     branches: [master, main]
+  schedule:
+    - cron: "17 20 * * *"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -11,15 +14,30 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: codexdentist
+          POSTGRES_PASSWORD: codexdentist
+          POSTGRES_DB: codexdentist
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U codexdentist -d codexdentist"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       NODE_ENV: production
       DEPLOYMENT_MODE: self-hosted
       DATABASE_URL: postgresql://codexdentist:codexdentist@127.0.0.1:5432/codexdentist?schema=public
-      APP_BASE_URL: http://127.0.0.1:3000
+      APP_BASE_URL: https://codexdentist.test
       AUTH_SECRET: ci-only-auth-secret-with-at-least-32-characters
       JOB_SECRET: ci-only-job-secret-with-at-least-32-characters
       PATIENT_FILE_STORAGE_DRIVER: local
+      SESSION_COOKIE_SECURE: "false"
 
     steps:
       - uses: actions/checkout@v7
@@ -34,5 +52,42 @@ jobs:
       - run: npm ci --include=dev --no-audit --no-fund
       - run: npm run encoding:check
       - run: npm run typecheck
+      - run: npx prisma migrate deploy
+      - run: npx prisma db seed
+        env:
+          NODE_ENV: test
+      - run: npm run test:seed-users
+        env:
+          NODE_ENV: test
       - run: npm run build
+      - name: Start production server
+        run: |
+          npm start > /tmp/codexdentist.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3000/api/health > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/codexdentist.log
+          exit 1
+      - name: Runtime security, tenant, billing, and file tests
+        run: |
+          npm run test:security
+          npm run test:security-runtime
+          npm run test:tenant
+          npm run test:billing
+          npm run test:billing-concurrency
+          npm run test:actions
+          npm run test:patient-files
+          npm run test:data-integrity
+        env:
+          NODE_ENV: test
+      - name: Scheduled browser QA
+        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+        run: |
+          npx playwright install --with-deps chromium
+          npm run browser:qa
+        env:
+          NODE_ENV: test
       - run: docker build -t codexdentist:ci .

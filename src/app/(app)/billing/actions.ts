@@ -16,6 +16,7 @@ import {
 import { renderNotificationTemplate } from "@/lib/notification-templates";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
+import { runSerializableTransaction } from "@/lib/transaction";
 
 const receiptMethods = new Set([
   "cash",
@@ -66,7 +67,7 @@ export async function createInvoiceAction(formData: FormData) {
     if (!patient) {
       notice = "billing-patient-not-found";
     } else {
-      await prisma.$transaction(async (tx) => {
+      await runSerializableTransaction(async (tx) => {
         const invoiceNo = await nextInvoiceNo(session.organizationId, tx);
         const invoice = await tx.invoice.create({
           data: {
@@ -146,129 +147,137 @@ export async function recordPaymentAction(formData: FormData) {
   let notice: string | null = null;
 
   try {
-    const invoice = await prisma.invoice.findFirst({
-      where: {
-        invoiceNo,
-        clinicId: {
-          in: session.clinicIds,
+    await runSerializableTransaction(async (tx) => {
+      const invoice = await tx.invoice.findFirst({
+        where: {
+          invoiceNo,
+          clinicId: {
+            in: session.clinicIds,
+          },
+          patient: {
+            organizationId: session.organizationId,
+          },
         },
-        patient: {
-          organizationId: session.organizationId,
+        select: {
+          id: true,
+          amount: true,
+          clinicId: true,
+          patientId: true,
+          paidAmount: true,
+          status: true,
         },
-      },
-      select: {
-        id: true,
-        amount: true,
-        clinicId: true,
-        patientId: true,
-        paidAmount: true,
-        status: true,
-      },
-    });
+      });
 
-    if (!invoice || invoice.status === "VOID") {
-      notice = "billing-invoice-not-found";
-    } else {
-      const invoiceBalance = Math.max(Number(invoice.amount) - Number(invoice.paidAmount), 0);
+      if (!invoice || invoice.status === "VOID") {
+        throw new BillingActionError("billing-invoice-not-found");
+      }
+
+      const invoiceBalance = Math.max(
+        Number(invoice.amount) - Number(invoice.paidAmount),
+        0,
+      );
       const allocatedAmount = Math.min(amount, invoiceBalance);
       const unallocatedAmount = Math.max(amount - allocatedAmount, 0);
-      const nextPaid = Math.min(Number(invoice.paidAmount) + allocatedAmount, Number(invoice.amount));
-      const nextStatus = nextPaid >= Number(invoice.amount) ? "PAID" : "PARTIAL";
+      const nextPaid = Math.min(
+        Number(invoice.paidAmount) + allocatedAmount,
+        Number(invoice.amount),
+      );
+      const nextStatus =
+        nextPaid >= Number(invoice.amount) ? "PAID" : "PARTIAL";
 
-      await prisma.$transaction(async (tx) => {
-        const receiptNo = await nextReceiptNo(session.organizationId, tx);
-        const receipt = await tx.receipt.create({
+      const receiptNo = await nextReceiptNo(session.organizationId, tx);
+      const receipt = await tx.receipt.create({
+        data: {
+          organizationId: session.organizationId,
+          clinicId: invoice.clinicId,
+          patientId: invoice.patientId,
+          receiptNo,
+          amount,
+          allocatedAmount,
+          unallocatedAmount,
+          method,
+          reference: invoiceNo,
+          note: "Invoice payment",
+        },
+        select: {
+          id: true,
+          receiptNo: true,
+        },
+      });
+
+      if (allocatedAmount > 0) {
+        await tx.payment.create({
+          data: {
+            invoiceId: invoice.id,
+            amount: allocatedAmount,
+            method,
+            reference: receipt.receiptNo,
+          },
+        });
+        await tx.receiptAllocation.create({
           data: {
             organizationId: session.organizationId,
             clinicId: invoice.clinicId,
             patientId: invoice.patientId,
-            receiptNo,
+            receiptId: receipt.id,
+            invoiceId: invoice.id,
+            amount: allocatedAmount,
+            note: "Invoice payment",
+          },
+        });
+      }
+
+      if (unallocatedAmount > 0) {
+        await tx.patientCreditBalance.upsert({
+          where: {
+            patientId: invoice.patientId,
+          },
+          update: {
+            clinicId: invoice.clinicId,
+            amount: {
+              increment: unallocatedAmount,
+            },
+          },
+          create: {
+            organizationId: session.organizationId,
+            clinicId: invoice.clinicId,
+            patientId: invoice.patientId,
+            amount: unallocatedAmount,
+          },
+        });
+      }
+
+      await tx.invoice.update({
+        where: {
+          id: invoice.id,
+        },
+        data: {
+          paidAmount: nextPaid,
+          status: nextStatus,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: session.organizationId,
+          actorId: databaseActorId(session.userId),
+          action: "invoice.receipt_recorded",
+          entityType: "Receipt",
+          entityId: receipt.id,
+          metadata: {
+            invoiceNo,
+            receiptNo: receipt.receiptNo,
             amount,
             allocatedAmount,
             unallocatedAmount,
             method,
-            reference: invoiceNo,
-            note: "Invoice payment",
-          },
-          select: {
-            id: true,
-            receiptNo: true,
-          },
-        });
-
-        if (allocatedAmount > 0) {
-          await tx.payment.create({
-            data: {
-              invoiceId: invoice.id,
-              amount: allocatedAmount,
-              method,
-              reference: receipt.receiptNo,
-            },
-          });
-          await tx.receiptAllocation.create({
-            data: {
-              organizationId: session.organizationId,
-              clinicId: invoice.clinicId,
-              patientId: invoice.patientId,
-              receiptId: receipt.id,
-              invoiceId: invoice.id,
-              amount: allocatedAmount,
-              note: "Invoice payment",
-            },
-          });
-        }
-
-        if (unallocatedAmount > 0) {
-          await tx.patientCreditBalance.upsert({
-            where: {
-              patientId: invoice.patientId,
-            },
-            update: {
-              clinicId: invoice.clinicId,
-              amount: {
-                increment: unallocatedAmount,
-              },
-            },
-            create: {
-              organizationId: session.organizationId,
-              clinicId: invoice.clinicId,
-              patientId: invoice.patientId,
-              amount: unallocatedAmount,
-            },
-          });
-        }
-
-        await tx.invoice.update({
-          where: {
-            id: invoice.id,
-          },
-          data: {
             paidAmount: nextPaid,
-            status: nextStatus,
-          },
-        });
-        await tx.auditLog.create({
-          data: {
-            organizationId: session.organizationId,
-            actorId: databaseActorId(session.userId),
-            action: "invoice.receipt_recorded",
-            entityType: "Receipt",
-            entityId: receipt.id,
-            metadata: {
-              invoiceNo,
-              receiptNo: receipt.receiptNo,
-              amount,
-              allocatedAmount,
-              unallocatedAmount,
-              method,
-              paidAmount: nextPaid,
-            } as Prisma.InputJsonValue,
-          },
-        });
+          } as Prisma.InputJsonValue,
+        },
       });
-    }
-  } catch {
-    notice = "billing-database";
+    });
+  } catch (error) {
+    notice =
+      error instanceof BillingActionError ? error.notice : "billing-database";
   }
 
   if (notice) {
@@ -298,7 +307,9 @@ export async function recordPatientReceiptAction(formData: FormData) {
   const amount = parseMoney(formData.get("amount"));
   const rawMethod = requiredString(formData.get("method")) || "cash";
   const method =
-    rawMethod === "cash" || rawMethod === "card" || rawMethod === "bank_transfer"
+    rawMethod === "cash" ||
+    rawMethod === "card" ||
+    rawMethod === "bank_transfer"
       ? rawMethod
       : "cash";
   const reference = optionalString(formData.get("reference"));
@@ -311,7 +322,7 @@ export async function recordPatientReceiptAction(formData: FormData) {
   let notice: string | null = null;
 
   try {
-    await prisma.$transaction(async (tx) => {
+    await runSerializableTransaction(async (tx) => {
       const patient = await tx.patient.findFirst({
         where: {
           id: patientId,
@@ -415,8 +426,12 @@ export async function issueServiceInvoiceAction(formData: FormData) {
   let redirectPatientId: string | null = null;
 
   try {
-    await prisma.$transaction(async (tx) => {
-      const service = await findScopedTreatmentService(tx, session, treatmentServiceId);
+    await runSerializableTransaction(async (tx) => {
+      const service = await findScopedTreatmentService(
+        tx,
+        session,
+        treatmentServiceId,
+      );
 
       if (!service) {
         throw new BillingActionError("billing-service-not-found");
@@ -519,7 +534,9 @@ export async function issueServiceInvoiceAction(formData: FormData) {
   }
 
   revalidateBillingViews();
-  redirect(billingNoticeUrl("billing-service-invoice-issued", redirectPatientId));
+  redirect(
+    billingNoticeUrl("billing-service-invoice-issued", redirectPatientId),
+  );
 }
 
 export async function voidInvoiceAction(formData: FormData) {
@@ -538,29 +555,30 @@ export async function voidInvoiceAction(formData: FormData) {
   let notice: string | null = null;
 
   try {
-    const invoice = await prisma.invoice.findFirst({
-      where: {
-        invoiceNo,
-        organizationId: session.organizationId,
-        clinicId: {
-          in: session.clinicIds,
-        },
-        patient: {
+    await runSerializableTransaction(async (tx) => {
+      const invoice = await tx.invoice.findFirst({
+        where: {
+          invoiceNo,
           organizationId: session.organizationId,
+          clinicId: {
+            in: session.clinicIds,
+          },
+          patient: {
+            organizationId: session.organizationId,
+          },
         },
-      },
-      select: {
-        id: true,
-        clinicId: true,
-        patientId: true,
-      },
-    });
+        select: {
+          id: true,
+          clinicId: true,
+          patientId: true,
+        },
+      });
 
-    if (!invoice) {
-      notice = "billing-invoice-not-found";
-    } else {
-      await prisma.$transaction(async (tx) => {
-        const allocations = await tx.receiptAllocation.findMany({
+      if (!invoice) {
+        throw new BillingActionError("billing-invoice-not-found");
+      }
+
+      const allocations = await tx.receiptAllocation.findMany({
           where: {
             invoiceId: invoice.id,
           },
@@ -664,10 +682,10 @@ export async function voidInvoiceAction(formData: FormData) {
             } as Prisma.InputJsonValue,
           },
         });
-      });
-    }
-  } catch {
-    notice = "billing-database";
+    });
+  } catch (error) {
+    notice =
+      error instanceof BillingActionError ? error.notice : "billing-database";
   }
 
   if (notice) {
@@ -696,34 +714,36 @@ export async function adjustInvoiceAmountAction(formData: FormData) {
   let notice: string | null = null;
 
   try {
-    const invoice = await prisma.invoice.findFirst({
-      where: {
-        invoiceNo,
-        clinicId: {
-          in: session.clinicIds,
-        },
-        patient: {
-          organizationId: session.organizationId,
-        },
-      },
-      include: {
-        items: {
-          orderBy: {
-            createdAt: "asc",
+    await runSerializableTransaction(async (tx) => {
+      const invoice = await tx.invoice.findFirst({
+        where: {
+          invoiceNo,
+          clinicId: {
+            in: session.clinicIds,
           },
-          take: 1,
+          patient: {
+            organizationId: session.organizationId,
+          },
         },
-      },
-    });
+        include: {
+          items: {
+            orderBy: {
+              createdAt: "asc",
+            },
+            take: 1,
+          },
+        },
+      });
 
-    if (!invoice || invoice.status === "VOID") {
-      notice = "billing-invoice-not-found";
-    } else {
+      if (!invoice || invoice.status === "VOID") {
+        throw new BillingActionError("billing-invoice-not-found");
+      }
+
       const paidAmount = Math.min(Number(invoice.paidAmount), amount);
-      const nextStatus = paidAmount >= amount ? "PAID" : paidAmount > 0 ? "PARTIAL" : "OPEN";
+      const nextStatus =
+        paidAmount >= amount ? "PAID" : paidAmount > 0 ? "PARTIAL" : "OPEN";
 
-      await prisma.$transaction(async (tx) => {
-        await tx.invoice.update({
+      await tx.invoice.update({
           where: {
             id: invoice.id,
           },
@@ -761,10 +781,10 @@ export async function adjustInvoiceAmountAction(formData: FormData) {
             } as Prisma.InputJsonValue,
           },
         });
-      });
-    }
-  } catch {
-    notice = "billing-database";
+    });
+  } catch (error) {
+    notice =
+      error instanceof BillingActionError ? error.notice : "billing-database";
   }
 
   if (notice) {
@@ -794,76 +814,81 @@ export async function recordInvoiceRefundAction(formData: FormData) {
   let notice: string | null = null;
 
   try {
-    const invoice = await prisma.invoice.findFirst({
-      where: {
-        invoiceNo,
-        clinicId: {
-          in: session.clinicIds,
+    await runSerializableTransaction(async (tx) => {
+      const invoice = await tx.invoice.findFirst({
+        where: {
+          invoiceNo,
+          clinicId: {
+            in: session.clinicIds,
+          },
+          patient: {
+            organizationId: session.organizationId,
+          },
         },
-        patient: {
-          organizationId: session.organizationId,
+        select: {
+          id: true,
+          amount: true,
+          paidAmount: true,
+          status: true,
         },
-      },
-      select: {
-        id: true,
-        amount: true,
-        paidAmount: true,
-        status: true,
-      },
-    });
+      });
 
-    if (!invoice || invoice.status === "VOID") {
-      notice = "billing-invoice-not-found";
-    } else {
+      if (!invoice || invoice.status === "VOID") {
+        throw new BillingActionError("billing-invoice-not-found");
+      }
+
       const refundAmount = Math.min(amount, Number(invoice.paidAmount));
       const paidAmount = Math.max(Number(invoice.paidAmount) - refundAmount, 0);
       const nextStatus =
-        paidAmount >= Number(invoice.amount) ? "PAID" : paidAmount > 0 ? "PARTIAL" : "OPEN";
+        paidAmount >= Number(invoice.amount)
+          ? "PAID"
+          : paidAmount > 0
+            ? "PARTIAL"
+            : "OPEN";
 
       if (refundAmount <= 0) {
-        redirect("/billing?notice=billing-bad-payment");
+        throw new BillingActionError("billing-bad-payment");
       }
 
-      await prisma.$transaction([
-        prisma.payment.create({
-          data: {
-            invoiceId: invoice.id,
-            amount: -refundAmount,
-            method: `refund:${method}`,
+      await tx.payment.create({
+        data: {
+          invoiceId: invoice.id,
+          amount: -refundAmount,
+          method: `refund:${method}`,
+          reference,
+        },
+      });
+      await tx.invoice.update({
+        where: {
+          id: invoice.id,
+        },
+        data: {
+          paidAmount,
+          status: nextStatus,
+        },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: session.organizationId,
+          actorId: databaseActorId(session.userId),
+          action: "invoice.refund_recorded",
+          entityType: "Invoice",
+          entityId: invoice.id,
+          metadata: {
+            invoiceNo,
+            amount: refundAmount,
+            method,
             reference,
-          },
-        }),
-        prisma.invoice.update({
-          where: {
-            id: invoice.id,
-          },
-          data: {
-            paidAmount,
-            status: nextStatus,
-          },
-        }),
-        prisma.auditLog.create({
-          data: {
-            organizationId: session.organizationId,
-            actorId: databaseActorId(session.userId),
-            action: "invoice.refund_recorded",
-            entityType: "Invoice",
-            entityId: invoice.id,
-            metadata: {
-              invoiceNo,
-              amount: refundAmount,
-              method,
-              reference,
-            } as Prisma.InputJsonValue,
-          },
-        }),
-      ]);
-    }
+          } as Prisma.InputJsonValue,
+        },
+      });
+    });
   } catch (error) {
     if (isNextRedirect(error)) {
       throw error;
     }
-    notice = "billing-database";
+    notice =
+      error instanceof BillingActionError ? error.notice : "billing-database";
   }
 
   if (notice) {
@@ -883,10 +908,18 @@ export async function createPaymentPlanReminderAction(formData: FormData) {
 
   const patientId = requiredString(formData.get("patientId"));
   const amount = parseMoney(formData.get("amount"));
-  const scheduledAt = parseEndOfDateInVietnam(formData.get("scheduledAt"), () => new Date());
+  const scheduledAt = parseEndOfDateInVietnam(
+    formData.get("scheduledAt"),
+    () => new Date(),
+  );
   const note = optionalString(formData.get("note"));
 
-  if (!patientId || amount === null || amount <= 0 || scheduledAt === "invalid") {
+  if (
+    !patientId ||
+    amount === null ||
+    amount <= 0 ||
+    scheduledAt === "invalid"
+  ) {
     redirect("/billing?notice=billing-plan-missing");
   }
 
@@ -977,9 +1010,15 @@ export async function createPaymentPlanAction(formData: FormData) {
 
   const patientId = requiredString(formData.get("patientId"));
   const totalAmount = parseMoney(formData.get("amount"));
-  const installmentCount = Math.max(Number(formData.get("installmentCount") ?? 0), 0);
+  const installmentCount = Math.max(
+    Number(formData.get("installmentCount") ?? 0),
+    0,
+  );
   const intervalDays = Math.max(Number(formData.get("intervalDays") ?? 30), 1);
-  const firstDueAt = parseEndOfDateInVietnam(formData.get("firstDueAt"), () => new Date());
+  const firstDueAt = parseEndOfDateInVietnam(
+    formData.get("firstDueAt"),
+    () => new Date(),
+  );
   const note = optionalString(formData.get("note"));
 
   if (
@@ -997,7 +1036,7 @@ export async function createPaymentPlanAction(formData: FormData) {
   let notice: string | null = null;
 
   try {
-    await prisma.$transaction(async (tx) => {
+    await runSerializableTransaction(async (tx) => {
       const patient = await tx.patient.findFirst({
         where: {
           id: patientId,
@@ -1040,8 +1079,11 @@ export async function createPaymentPlanAction(formData: FormData) {
       });
 
       for (let index = 0; index < count; index += 1) {
-        const dueAt = new Date(firstDueAt.getTime() + index * intervalDays * 24 * 60 * 60 * 1000);
-        const amount = index === count - 1 ? baseAmount + remainder : baseAmount;
+        const dueAt = new Date(
+          firstDueAt.getTime() + index * intervalDays * 24 * 60 * 60 * 1000,
+        );
+        const amount =
+          index === count - 1 ? baseAmount + remainder : baseAmount;
         const message = renderNotificationTemplate("PAYMENT_REMINDER", {
           patientName: patient.fullName,
           amount: formatMoneyForNotification(amount),
@@ -1113,10 +1155,18 @@ export async function createPaymentPlanAction(formData: FormData) {
   redirect("/billing?notice=billing-plan-created");
 }
 
-async function recordServiceCollection(formData: FormData, issueInvoice: boolean) {
+async function recordServiceCollection(
+  formData: FormData,
+  issueInvoice: boolean,
+) {
   const session = await requireViewSession("billing");
 
-  if (!canPerformAction(session, issueInvoice ? "billing.invoice.issue" : "billing.balance.allocate")) {
+  if (
+    !canPerformAction(
+      session,
+      issueInvoice ? "billing.invoice.issue" : "billing.balance.allocate",
+    )
+  ) {
     redirect("/billing?notice=billing-denied");
   }
 
@@ -1130,7 +1180,10 @@ async function recordServiceCollection(formData: FormData, issueInvoice: boolean
     redirect("/billing?notice=billing-service-not-found");
   }
 
-  if (method !== "credit_balance" && (parsedAmount === null || parsedAmount <= 0)) {
+  if (
+    method !== "credit_balance" &&
+    (parsedAmount === null || parsedAmount <= 0)
+  ) {
     redirect("/billing?notice=billing-bad-payment");
   }
 
@@ -1139,8 +1192,12 @@ async function recordServiceCollection(formData: FormData, issueInvoice: boolean
   let redirectPatientId: string | null = null;
 
   try {
-    await prisma.$transaction(async (tx) => {
-      const service = await findScopedTreatmentService(tx, session, treatmentServiceId);
+    await runSerializableTransaction(async (tx) => {
+      const service = await findScopedTreatmentService(
+        tx,
+        session,
+        treatmentServiceId,
+      );
 
       if (!service) {
         throw new BillingActionError("billing-service-not-found");
@@ -1161,13 +1218,17 @@ async function recordServiceCollection(formData: FormData, issueInvoice: boolean
         isCreditBalance && (!parsedAmount || parsedAmount <= 0)
           ? availableCredit
           : Number(parsedAmount ?? 0);
-      const availableAmount = isCreditBalance ? availableCredit : requestedAmount;
+      const availableAmount = isCreditBalance
+        ? availableCredit
+        : requestedAmount;
       const allocationAmount = Math.min(
         requestedAmount,
         availableAmount,
         snapshot.remainingCollectionAmount,
       );
-      const actualReceiptAmount = isCreditBalance ? allocationAmount : requestedAmount;
+      const actualReceiptAmount = isCreditBalance
+        ? allocationAmount
+        : requestedAmount;
       const overflowAmount = isCreditBalance
         ? 0
         : Math.max(actualReceiptAmount - allocationAmount, 0);
@@ -1188,7 +1249,10 @@ async function recordServiceCollection(formData: FormData, issueInvoice: boolean
         throw new BillingActionError("billing-no-invoiceable-amount");
       }
 
-      const invoiceNo = invoiceAmount > 0 ? await nextInvoiceNo(session.organizationId, tx) : null;
+      const invoiceNo =
+        invoiceAmount > 0
+          ? await nextInvoiceNo(session.organizationId, tx)
+          : null;
       const invoice =
         invoiceNo && invoiceAmount > 0
           ? await tx.invoice.create({
@@ -1432,9 +1496,12 @@ function serviceInvoiceDescription(service: {
   targetSummary: string | null;
   teeth: string[];
 }) {
-  const target = service.teeth.length > 0 ? service.teeth.join(", ") : service.targetSummary;
+  const target =
+    service.teeth.length > 0 ? service.teeth.join(", ") : service.targetSummary;
 
-  return [service.serviceCode, service.serviceName, target].filter(Boolean).join(" - ");
+  return [service.serviceCode, service.serviceName, target]
+    .filter(Boolean)
+    .join(" - ");
 }
 
 function sumMoney(items: Array<{ amount: unknown }>) {
@@ -1476,42 +1543,60 @@ function billingNoticeUrl(notice: string, patientId?: string | null) {
   return `/billing?${params.toString()}`;
 }
 
-async function nextInvoiceNo(organizationId: string, client: BillingDbClient = prisma) {
+async function nextInvoiceNo(
+  organizationId: string,
+  client: BillingDbClient = prisma,
+) {
   return nextDocumentNo({
     client,
     organizationId,
     type: "INV",
-    seedCurrentValue: () => client.invoice.count({
-      where: {
-        organizationId,
-      },
-    }).then((count) => 2400 + count),
+    seedCurrentValue: () =>
+      client.invoice
+        .count({
+          where: {
+            organizationId,
+          },
+        })
+        .then((count) => 2400 + count),
   });
 }
 
-async function nextReceiptNo(organizationId: string, client: BillingDbClient = prisma) {
+async function nextReceiptNo(
+  organizationId: string,
+  client: BillingDbClient = prisma,
+) {
   return nextDocumentNo({
     client,
     organizationId,
     type: "RCT",
-    seedCurrentValue: () => client.receipt.count({
-      where: {
-        organizationId,
-      },
-    }).then((count) => 1000 + count),
+    seedCurrentValue: () =>
+      client.receipt
+        .count({
+          where: {
+            organizationId,
+          },
+        })
+        .then((count) => 1000 + count),
   });
 }
 
-async function nextPaymentPlanNo(organizationId: string, client: BillingDbClient = prisma) {
+async function nextPaymentPlanNo(
+  organizationId: string,
+  client: BillingDbClient = prisma,
+) {
   return nextDocumentNo({
     client,
     organizationId,
     type: "PP",
-    seedCurrentValue: () => client.paymentPlan.count({
-      where: {
-        organizationId,
-      },
-    }).then((count) => 2600 + count),
+    seedCurrentValue: () =>
+      client.paymentPlan
+        .count({
+          where: {
+            organizationId,
+          },
+        })
+        .then((count) => 2600 + count),
   });
 }
 

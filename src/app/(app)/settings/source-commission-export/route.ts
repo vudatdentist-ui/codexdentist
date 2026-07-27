@@ -1,4 +1,5 @@
 import { requireViewSession } from "@/lib/auth";
+import { csvCell } from "@/lib/csv";
 import { prisma } from "@/lib/prisma";
 
 export async function GET() {
@@ -88,14 +89,4 @@ export async function GET() {
     console.error(error);
     return new Response("Source commission export failed.", { status: 500 });
   }
-}
-
-function csvCell(value: string | number) {
-  const text = String(value);
-
-  if (!/[",\r\n]/.test(text)) {
-    return text;
-  }
-
-  return `"${text.replaceAll('"', '""')}"`;
 }

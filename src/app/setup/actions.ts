@@ -3,7 +3,10 @@
 import { redirect } from "next/navigation";
 import { signIn } from "@/lib/auth";
 import { deploymentMode } from "@/lib/env";
-import { createOrganizationWorkspace } from "@/lib/organization-onboarding";
+import {
+  createOrganizationWorkspace,
+  FirstRunAlreadyCompletedError,
+} from "@/lib/organization-onboarding";
 import { prisma } from "@/lib/prisma";
 import { isValidTenantSlug } from "@/lib/tenant";
 
@@ -56,6 +59,7 @@ export async function completeFirstRunSetupAction(formData: FormData) {
       clinicName,
       city,
       address,
+      requireEmptyDatabase: true,
     });
     const result = await signIn(workspace.owner.email, password);
 
@@ -63,6 +67,10 @@ export async function completeFirstRunSetupAction(formData: FormData) {
       redirect("/login");
     }
   } catch (error) {
+    if (error instanceof FirstRunAlreadyCompletedError) {
+      redirect("/login");
+    }
+
     console.error("first_run_setup.failed", error);
     redirect("/setup?error=failed");
   }

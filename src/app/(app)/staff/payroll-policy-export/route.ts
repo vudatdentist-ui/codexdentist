@@ -1,4 +1,5 @@
 import { requireViewSession } from "@/lib/auth";
+import { csvCell } from "@/lib/csv";
 import { canUseAllClinics } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
@@ -73,14 +74,4 @@ function allowedClinicIds(session: AppSession) {
   }
 
   return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
-}
-
-function csvCell(value: string | number) {
-  const text = String(value);
-
-  if (!/[",\r\n]/.test(text)) {
-    return text;
-  }
-
-  return `"${text.replaceAll('"', '""')}"`;
 }

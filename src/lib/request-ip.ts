@@ -1,32 +1,29 @@
 import "server-only";
 
-import { deploymentMode } from "@/lib/env";
+import { trustedProxyProvider } from "@/lib/env";
 
 type HeaderReader = {
   get(name: string): string | null;
 };
 
 export function clientIpFromHeaders(headerStore: HeaderReader) {
-  const cloudflareIp = normalizeIp(headerStore.get("cf-connecting-ip"));
+  const provider = trustedProxyProvider();
 
-  if (cloudflareIp) {
-    return cloudflareIp;
+  if (provider === "cloudflare") {
+    return normalizeIp(headerStore.get("cf-connecting-ip")) ?? "unknown";
   }
 
-  const realIp = normalizeIp(headerStore.get("x-real-ip"));
+  if (provider === "reverse-proxy") {
+    const realIp = normalizeIp(headerStore.get("x-real-ip"));
 
-  if (realIp) {
-    return realIp;
-  }
-
-  if (deploymentMode() === "self-hosted") {
-    const forwardedIp = normalizeIp(
-      headerStore.get("x-forwarded-for")?.split(",")[0] ?? null,
-    );
-
-    if (forwardedIp) {
-      return forwardedIp;
+    if (realIp) {
+      return realIp;
     }
+
+    return (
+      normalizeIp(headerStore.get("x-forwarded-for")?.split(",")[0] ?? null) ??
+      "unknown"
+    );
   }
 
   return "unknown";

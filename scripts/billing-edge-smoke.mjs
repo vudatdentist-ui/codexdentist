@@ -14,8 +14,54 @@ async function main() {
   await assertVoidInvoiceAllocationsReleased();
   await assertJourneyServiceInvoiceCaps();
   await assertReceiptAllocationMath();
+  await assertLedgerDatabaseGuards();
   await prisma.$disconnect();
   console.log("ok billing edge smoke");
+}
+
+async function assertLedgerDatabaseGuards() {
+  const requiredConstraints = [
+    "Invoice_amount_nonnegative_check",
+    "Invoice_paidAmount_range_check",
+    "Payment_amount_nonzero_check",
+    "InvoiceItem_money_check",
+    "Receipt_amounts_check",
+    "ReceiptAllocation_amount_positive_check",
+    "PatientCreditBalance_amount_nonnegative_check",
+  ];
+  const requiredTriggers = [
+    "Invoice_owner_scope_check",
+    "InvoiceItem_owner_scope_check",
+    "InvoiceItem_relation_scope_check",
+    "Receipt_owner_scope_check",
+    "ReceiptAllocation_relation_scope_check",
+    "PatientCreditBalance_owner_scope_check",
+  ];
+  const constraints = await prisma.$queryRaw`
+    SELECT conname
+    FROM pg_constraint
+    WHERE conname = ANY(${requiredConstraints})
+  `;
+  const triggers = await prisma.$queryRaw`
+    SELECT tgname
+    FROM pg_trigger
+    WHERE NOT tgisinternal
+      AND tgname = ANY(${requiredTriggers})
+  `;
+  const installedConstraints = new Set(constraints.map((row) => row.conname));
+  const installedTriggers = new Set(triggers.map((row) => row.tgname));
+
+  for (const name of requiredConstraints) {
+    if (!installedConstraints.has(name)) {
+      throw new Error(`Missing billing database constraint ${name}.`);
+    }
+  }
+
+  for (const name of requiredTriggers) {
+    if (!installedTriggers.has(name)) {
+      throw new Error(`Missing billing scope trigger ${name}.`);
+    }
+  }
 }
 
 async function assertInvoiceBalances() {

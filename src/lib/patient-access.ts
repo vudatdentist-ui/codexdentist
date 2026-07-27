@@ -17,6 +17,13 @@ export function allowedClinicIds(session: AppSession) {
 export function patientAccessWhere(
   session: AppSession,
 ): Prisma.PatientWhereInput {
+  if (session.role === "PATIENT") {
+    return {
+      organizationId: session.organizationId,
+      portalUserId: session.userId,
+    };
+  }
+
   const clinicIds = allowedClinicIds(session);
   const directClinicAccess: Prisma.PatientWhereInput = {
     clinicId: {
@@ -84,4 +91,3 @@ export function clinicalAccessWindow(now = new Date()) {
     to: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
   };
 }
-

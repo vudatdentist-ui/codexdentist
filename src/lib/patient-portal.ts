@@ -223,7 +223,7 @@ async function findPortalPatient(session: AppSession) {
       },
       ...(session.role === "PATIENT"
         ? {
-            email: session.email,
+            portalUserId: session.userId,
           }
         : {}),
     },

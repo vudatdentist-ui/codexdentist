@@ -453,6 +453,7 @@ model User {
   compensationAccrualLines          CompensationAccrualLine[]       @relation("CompensationLineUser")
   mobileDevices                     MobileDevice[]                  @relation("UserMobileDevices")
   notifications                     Notification[]                  @relation("UserNotifications")
+  portalPatient                     Patient?                        @relation("PatientPortalUser")
   createdAiRuns                     AiRun[]                         @relation("AiRunActor")
   createdAccountingEntries          AccountingEntry[]               @relation("AccountingEntryCreator")
   ownedChains                       Chain[]                         @relation("ChainOwner")
@@ -554,6 +555,8 @@ model Patient {
   dateOfBirth              DateTime?
   phone                    String
   email                    String?
+  portalUserId             String?                     @unique
+  portalUser               User?                       @relation("PatientPortalUser", fields: [portalUserId], references: [id], onDelete: SetNull)
   gender                   String?
   visitReason              String?
   leadSource               String                      @default("WALK_IN")

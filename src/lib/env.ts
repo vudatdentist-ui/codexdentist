@@ -22,6 +22,7 @@ export type NotificationWebhookChannel = "EMAIL" | "SMS" | "ZALO" | "PUSH" | "IN
 export type PatientFileStorageDriver = "local" | "r2";
 export type CodexMedAiProvider = "openai-compatible";
 export type DeploymentMode = "hosted" | "self-hosted";
+export type TrustedProxyProvider = "none" | "cloudflare" | "reverse-proxy";
 
 export function databaseUrl() {
   const value = process.env.DATABASE_URL?.trim();
@@ -83,6 +84,18 @@ export function defaultDataSeedEnabled() {
 
 export function deploymentMode(): DeploymentMode {
   return process.env.DEPLOYMENT_MODE === "self-hosted" ? "self-hosted" : "hosted";
+}
+
+export function trustedProxyProvider(): TrustedProxyProvider {
+  const value = process.env.TRUSTED_PROXY_PROVIDER?.trim().toLowerCase() || "none";
+
+  if (!["none", "cloudflare", "reverse-proxy"].includes(value)) {
+    throw new Error(
+      "TRUSTED_PROXY_PROVIDER must be none, cloudflare, or reverse-proxy.",
+    );
+  }
+
+  return value as TrustedProxyProvider;
 }
 
 export function demoWorkspaceEnabled() {

@@ -1,4 +1,5 @@
 import { requireViewSession } from "@/lib/auth";
+import { csvCell } from "@/lib/csv";
 import { getReportsWorkspace } from "@/lib/reports";
 
 export async function GET(request: Request) {
@@ -97,14 +98,4 @@ export async function GET(request: Request) {
       "X-Content-Type-Options": "nosniff",
     },
   });
-}
-
-function csvCell(value: string | number) {
-  const text = String(value);
-
-  if (!/[",\r\n]/.test(text)) {
-    return text;
-  }
-
-  return `"${text.replaceAll('"', '""')}"`;
 }

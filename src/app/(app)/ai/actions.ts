@@ -8,6 +8,10 @@ import { databaseActorId, requiredString } from "@/lib/form-validation";
 import { aiEnabled, generateAiJson } from "@/lib/ai-provider";
 import { canAccessView, viewRoutes, type ViewKey } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import {
+  consumeAiOrganizationAttempt,
+  consumeAiUserAttempt,
+} from "@/lib/rate-limit";
 
 const supportedViews: ViewKey[] = [
   "dashboard",
@@ -70,6 +74,22 @@ export async function chatModuleWithAiAction(formData: FormData) {
     task,
     context,
   };
+  const limits = await Promise.all([
+    consumeAiUserAttempt(session.userId),
+    consumeAiOrganizationAttempt(session.organizationId),
+  ]);
+
+  if (limits.some((limit) => !limit.allowed)) {
+    await createFailedModuleAiRun({
+      session,
+      input,
+      module,
+      error: "AI usage limit reached. Try again later.",
+      model: "rate-limited",
+    });
+    revalidatePath(viewRoutes[module]);
+    redirect(`${viewRoutes[module]}?notice=module-ai-failed`);
+  }
 
   if (!aiEnabled()) {
     await createFailedModuleAiRun({
