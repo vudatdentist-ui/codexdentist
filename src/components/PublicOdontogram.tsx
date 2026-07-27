@@ -13,6 +13,7 @@ import {
 const storageKey = "codexdentist-odontogram-data-v1";
 const legacyStorageKeys = {
   surfaceState: "codexdentist-odontogram-5-surface-v1",
+  anatomyState: "codexdentist-odontogram-anatomy-v1",
   markerState: "codexdentist-odontogram-clinical-markers-v1",
   bridges: "codexdentist-odontogram-bridges-v1",
   quickDiagnosis: "codexdentist-odontogram-quick-diagnosis-v1",
@@ -48,6 +49,7 @@ function readStoredData(): OdontogramData {
     const migrated = normalizeOdontogramData({
       version: 1,
       surfaceState: parseLegacyValue(legacyStorageKeys.surfaceState, {}),
+      anatomyState: parseLegacyValue(legacyStorageKeys.anatomyState, {}),
       markerState: parseLegacyValue(legacyStorageKeys.markerState, {}),
       bridges: parseLegacyValue(legacyStorageKeys.bridges, []),
       quickDiagnosis: parseLegacyValue(

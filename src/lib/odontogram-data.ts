@@ -61,6 +61,7 @@ const quickDiagnosisOptions = {
 export const emptyOdontogramData: OdontogramData = {
   version: 1,
   surfaceState: {},
+  anatomyState: {},
   markerState: {},
   bridges: [],
   quickDiagnosis: {
@@ -90,6 +91,7 @@ export function normalizeOdontogramData(value: unknown): OdontogramData {
   return {
     version: 1,
     surfaceState: normalizeSurfaceState(value.surfaceState),
+    anatomyState: normalizeAnatomyState(value.anatomyState),
     markerState: normalizeMarkerState(value.markerState),
     bridges: normalizeBridges(value.bridges),
     quickDiagnosis: normalizeQuickDiagnosis(value.quickDiagnosis),
@@ -113,6 +115,34 @@ function normalizeSurfaceState(value: unknown) {
       !conditionIds.has(condition)
     ) {
       throw new OdontogramValidationError("Invalid odontogram surface entry.");
+    }
+    result[key] = condition as "caries" | "existing" | "planned" | "watch";
+  }
+
+  return result;
+}
+
+function normalizeAnatomyState(value: unknown) {
+  if (value === undefined) {
+    return {};
+  }
+
+  if (!isRecord(value) || Object.keys(value).length > 104) {
+    throw new OdontogramValidationError("Invalid odontogram anatomy.");
+  }
+
+  const result: Record<string, "caries" | "existing" | "planned" | "watch"> = {};
+
+  for (const [key, condition] of Object.entries(value)) {
+    const [tooth, zone, extra] = key.split(".");
+    if (
+      extra !== undefined ||
+      !isTooth(tooth) ||
+      (zone !== "crown" && zone !== "root") ||
+      typeof condition !== "string" ||
+      !conditionIds.has(condition)
+    ) {
+      throw new OdontogramValidationError("Invalid odontogram anatomy entry.");
     }
     result[key] = condition as "caries" | "existing" | "planned" | "watch";
   }
