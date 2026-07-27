@@ -29,7 +29,13 @@ const arches = [
   primaryLowerTeeth,
 ] as const;
 const allTeeth = new Set(arches.flat());
-const conditionIds = new Set(["caries", "existing", "planned", "watch"]);
+const conditionIds = new Set([
+  "caries",
+  "existing",
+  "inlayOnlay",
+  "planned",
+  "watch",
+]);
 const entryKinds = new Set<OdontogramEntryKind>([
   "condition",
   "restoration",
@@ -43,6 +49,7 @@ const entryStatuses = new Set<OdontogramEntryStatus>([
   "monitoring",
 ]);
 const markerIds = new Set([
+  "caries",
   "pulpitis",
   "periodontitis",
   "boneLoss",
@@ -346,7 +353,10 @@ function normalizeSurfaceState(value: unknown) {
     throw new OdontogramValidationError("Invalid odontogram surfaces.");
   }
 
-  const result: Record<string, "caries" | "existing" | "planned" | "watch"> = {};
+  const result: Record<
+    string,
+    "caries" | "existing" | "inlayOnlay" | "planned" | "watch"
+  > = {};
 
   for (const [key, condition] of Object.entries(value)) {
     const [tooth, surface, extra] = key.split(".");
@@ -359,7 +369,12 @@ function normalizeSurfaceState(value: unknown) {
     ) {
       throw new OdontogramValidationError("Invalid odontogram surface entry.");
     }
-    result[key] = condition as "caries" | "existing" | "planned" | "watch";
+    result[key] = condition as
+      | "caries"
+      | "existing"
+      | "inlayOnlay"
+      | "planned"
+      | "watch";
   }
 
   return result;
@@ -374,7 +389,10 @@ function normalizeAnatomyState(value: unknown) {
     throw new OdontogramValidationError("Invalid odontogram anatomy.");
   }
 
-  const result: Record<string, "caries" | "existing" | "planned" | "watch"> = {};
+  const result: Record<
+    string,
+    "caries" | "existing" | "inlayOnlay" | "planned" | "watch"
+  > = {};
 
   for (const [key, condition] of Object.entries(value)) {
     const [tooth, zone, extra] = key.split(".");
@@ -387,7 +405,12 @@ function normalizeAnatomyState(value: unknown) {
     ) {
       throw new OdontogramValidationError("Invalid odontogram anatomy entry.");
     }
-    result[key] = condition as "caries" | "existing" | "planned" | "watch";
+    result[key] = condition as
+      | "caries"
+      | "existing"
+      | "inlayOnlay"
+      | "planned"
+      | "watch";
   }
 
   return result;
@@ -528,25 +551,30 @@ function normalizeGeneralAssessment(value: unknown): GeneralAssessmentState {
 
 function conditionConcept(condition: string) {
   if (condition === "existing") return "restoration";
+  if (condition === "inlayOnlay") return "inlay-onlay";
   if (condition === "planned") return "treatment";
   return condition;
 }
 
 function conditionKind(condition: string): OdontogramEntryKind {
-  if (condition === "existing") return "restoration";
+  if (condition === "existing" || condition === "inlayOnlay") {
+    return "restoration";
+  }
   if (condition === "planned") return "procedure";
   return "condition";
 }
 
 function conditionStatus(condition: string): OdontogramEntryStatus {
-  if (condition === "existing") return "existing";
+  if (condition === "existing" || condition === "inlayOnlay") return "existing";
   if (condition === "planned") return "planned";
   if (condition === "watch") return "monitoring";
   return "observed";
 }
 
 function defaultMarkerTarget(marker: string): "tooth" | "crown" | "root" {
-  if (marker === "crown" || marker === "fracture") return "crown";
+  if (marker === "caries" || marker === "crown" || marker === "fracture") {
+    return "crown";
+  }
   if (marker === "rootCanal" || marker === "periapical") return "root";
   return "tooth";
 }
