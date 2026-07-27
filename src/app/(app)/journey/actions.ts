@@ -771,6 +771,7 @@ export async function recordJourneyServiceProgressAction(formData: FormData) {
             rule,
           })
         : null;
+    const occurredAt = new Date();
 
     await prisma.$transaction(async (tx) => {
       const progressEvent = await tx.treatmentServiceProgressEvent.create({
@@ -786,6 +787,7 @@ export async function recordJourneyServiceProgressAction(formData: FormData) {
           toProgressPercent,
           progressDeltaPercent,
           note,
+          occurredAt,
         },
         select: {
           id: true,

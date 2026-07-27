@@ -6,7 +6,10 @@ const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
-const adapter = new PrismaPg({ connectionString: databaseUrl() });
+const adapter = new PrismaPg({
+  connectionString: databaseUrl(),
+  options: "-c timezone=UTC",
+});
 
 export const prisma =
   globalForPrisma.prisma ??
