@@ -3732,7 +3732,7 @@ export function PatientJourneyPanel({
 
       {pendingProgressUpdate && selectedPatient && (
         <div
-          className="progress-modal-backdrop"
+          className="progress-modal-backdrop journey-progress-modal-backdrop"
           role="dialog"
           aria-modal="true"
           aria-label={jt.services.recordProgress}
@@ -3740,7 +3740,7 @@ export function PatientJourneyPanel({
         >
           <form
             action={recordJourneyServiceProgressAction}
-            className="progress-modal"
+            className="progress-modal journey-progress-modal"
             onClick={(event) => event.stopPropagation()}
             onSubmit={() => setPendingProgressUpdate(null)}
           >

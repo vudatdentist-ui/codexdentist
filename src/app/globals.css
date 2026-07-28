@@ -6211,6 +6211,63 @@ h2 {
   padding: 18px;
 }
 
+.journey-progress-modal-backdrop {
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: clamp(10px, 2.5vw, 20px);
+}
+
+.journey-progress-modal {
+  box-sizing: border-box;
+  width: min(560px, 100%);
+  max-width: 100%;
+  max-height: calc(100dvh - 20px);
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.journey-progress-modal > *,
+.journey-progress-modal .progress-modal-header > *,
+.journey-progress-modal .progress-modal-grid > * {
+  max-width: 100%;
+  min-width: 0;
+}
+
+.journey-progress-modal .progress-modal-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+
+.journey-progress-modal .progress-modal-header .status {
+  justify-content: flex-start;
+  line-height: 1.35;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  text-align: left;
+  white-space: normal;
+  width: 100%;
+}
+
+.journey-progress-modal .progress-modal-grid select,
+.journey-progress-modal .progress-modal-grid textarea {
+  box-sizing: border-box;
+  max-width: 100%;
+  min-width: 0;
+  width: 100%;
+}
+
+.journey-progress-modal .progress-modal-actions {
+  flex-wrap: wrap;
+}
+
+.journey-progress-modal .progress-modal-actions button {
+  max-width: 100%;
+  white-space: normal;
+}
+
 .service-modal {
   width: min(760px, 96vw);
 }
