@@ -6227,7 +6227,7 @@ h2 {
 
 .journey-progress-modal {
   box-sizing: border-box;
-  width: min(560px, 100%);
+  width: min(720px, 100%);
   max-width: 100%;
   max-height: calc(100dvh - 20px);
   min-width: 0;

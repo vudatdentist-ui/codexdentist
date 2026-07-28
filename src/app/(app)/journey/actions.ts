@@ -20,6 +20,7 @@ import {
 import { patientAccessWhere } from "@/lib/patient-access";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
+import { runSerializableTransaction } from "@/lib/transaction";
 
 const MAX_JOURNEY_COMMENT_FILES = 10;
 
@@ -642,6 +643,8 @@ export async function recordJourneyServiceProgressAction(formData: FormData) {
   const treatmentServiceId = requiredString(formData.get("treatmentServiceId"));
   const patientId = optionalString(formData.get("patientId"));
   const progressRedirect = (notice: string) => journeyRedirect(notice, patientId);
+  const consultantFieldPresent = formData.has("consultantId");
+  const requestedConsultantId = optionalString(formData.get("consultantId"));
   const performedById =
     requiredString(formData.get("performedById")) || session.userId;
   const clinicalSupportId = optionalString(formData.get("clinicalSupportId"));
@@ -655,16 +658,8 @@ export async function recordJourneyServiceProgressAction(formData: FormData) {
   }
 
   try {
-    const participantIds = [
-      performedById,
-      clinicalSupportId,
-      assistantPrimaryId,
-      assistantSecondaryId,
-    ].filter(Boolean) as string[];
-    const uniqueParticipantIds = Array.from(new Set(participantIds));
-
-    const [service, validParticipantCount] = await Promise.all([
-      prisma.treatmentService.findFirst({
+    await runSerializableTransaction(async (tx) => {
+      const service = await tx.treatmentService.findFirst({
         where: {
           id: treatmentServiceId,
           organizationId: session.organizationId,
@@ -720,65 +715,95 @@ export async function recordJourneyServiceProgressAction(formData: FormData) {
             },
           },
         },
-      }),
-      prisma.user.count({
+      });
+
+      if (!service) {
+        redirect(progressRedirect("journey-progress-missing"));
+      }
+
+      const consultantId = consultantFieldPresent
+        ? requestedConsultantId
+        : service.createdById;
+      const participantIds = [
+        consultantId,
+        performedById,
+        clinicalSupportId,
+        assistantPrimaryId,
+        assistantSecondaryId,
+      ].filter(Boolean) as string[];
+      const uniqueParticipantIds = Array.from(new Set(participantIds));
+      const validParticipantCount = await tx.user.count({
         where: {
           id: {
             in: uniqueParticipantIds,
           },
           organizationId: session.organizationId,
           active: true,
-        },
-      }),
-    ]);
-
-    if (!service || validParticipantCount !== uniqueParticipantIds.length) {
-      redirect(progressRedirect("journey-progress-missing"));
-    }
-
-    const fromProgressPercent = Number(service.currentProgressPercent);
-    if (toProgressPercent < fromProgressPercent) {
-      redirect(progressRedirect("journey-progress-regression"));
-    }
-
-    const progressDeltaPercent = Math.max(toProgressPercent - fromProgressPercent, 0);
-    const nextStatus =
-      toProgressPercent >= 100
-        ? "COMPLETED"
-        : toProgressPercent > 0
-          ? "IN_PROGRESS"
-          : "PLANNED";
-    const nextStepSequence =
-      service.serviceCatalogItem?.steps
-        .filter((step) => step.defaultProgress !== null)
-        .find((step) => Math.round(Number(step.defaultProgress)) === Math.round(toProgressPercent))
-        ?.sequence ?? null;
-    const rule = service.compensationRule
-      ? ruleInputFromDatabase(service.compensationRule)
-      : defaultServiceCompensationRule;
-    const compensation =
-      progressDeltaPercent > 0
-        ? calculateServiceProgressCompensation({
-            serviceAmount: Number(service.finalPrice),
-            progressDeltaPercent,
-            participants: {
-              consultantId: service.createdById,
-              operatorId: performedById,
-              clinicalSupportId: clinicalSupportId ?? undefined,
-              assistantPrimaryId: assistantPrimaryId ?? undefined,
-              assistantSecondaryId: assistantSecondaryId ?? undefined,
+          roleAssignments: {
+            some: {
+              active: true,
+              role: {
+                not: "PATIENT",
+              },
+              OR: [
+                {
+                  clinicId: null,
+                },
+                {
+                  clinicId: service.clinicId,
+                },
+              ],
             },
-            rule,
-          })
-        : null;
-    const occurredAt = new Date();
+          },
+        },
+      });
 
-    await prisma.$transaction(async (tx) => {
+      if (validParticipantCount !== uniqueParticipantIds.length) {
+        redirect(progressRedirect("journey-progress-missing"));
+      }
+
+      const fromProgressPercent = Number(service.currentProgressPercent);
+      if (toProgressPercent < fromProgressPercent) {
+        redirect(progressRedirect("journey-progress-regression"));
+      }
+
+      const progressDeltaPercent = Math.max(toProgressPercent - fromProgressPercent, 0);
+      const nextStatus =
+        toProgressPercent >= 100
+          ? "COMPLETED"
+          : toProgressPercent > 0
+            ? "IN_PROGRESS"
+            : "PLANNED";
+      const nextStepSequence =
+        service.serviceCatalogItem?.steps
+          .filter((step) => step.defaultProgress !== null)
+          .find((step) => Math.round(Number(step.defaultProgress)) === Math.round(toProgressPercent))
+          ?.sequence ?? null;
+      const rule = service.compensationRule
+        ? ruleInputFromDatabase(service.compensationRule)
+        : defaultServiceCompensationRule;
+      const compensation =
+        progressDeltaPercent > 0
+          ? calculateServiceProgressCompensation({
+              serviceAmount: Number(service.finalPrice),
+              progressDeltaPercent,
+              participants: {
+                consultantId: consultantId ?? undefined,
+                operatorId: performedById,
+                clinicalSupportId: clinicalSupportId ?? undefined,
+                assistantPrimaryId: assistantPrimaryId ?? undefined,
+                assistantSecondaryId: assistantSecondaryId ?? undefined,
+              },
+              rule,
+            })
+          : null;
+      const occurredAt = new Date();
       const progressEvent = await tx.treatmentServiceProgressEvent.create({
         data: {
           organizationId: session.organizationId,
           clinicId: service.clinicId,
           treatmentServiceId: service.id,
+          consultantId,
           performedById,
           clinicalSupportId,
           assistantPrimaryId,
@@ -860,6 +885,7 @@ export async function recordJourneyServiceProgressAction(formData: FormData) {
 
   revalidatePath("/journey");
   revalidatePath("/staff");
+  revalidatePath("/employee-app");
   revalidatePath("/inventory");
   redirect(progressRedirect("journey-progress-recorded"));
 }

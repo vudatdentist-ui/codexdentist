@@ -97,6 +97,9 @@ async function assertGuardMarkers() {
     "createJourneyTreatmentServicesAction",
     'canPerformAction(session, "treatment.plan.create")',
     'canPerformAction(session, "treatment.service.progress")',
+    "consultantFieldPresent",
+    "runSerializableTransaction",
+    'revalidatePath("/employee-app")',
   ]);
   await assertSource("src/app/(app)/journey/odontogram-actions.ts", [
     "savePatientOdontogramAction",

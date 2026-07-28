@@ -71,6 +71,23 @@ const employeeStatusText: Record<Language, Record<string, string>> = {
   en: {},
 };
 
+const compensationRoleText: Record<Language, Record<string, string>> = {
+  vi: {
+    CONSULTANT: "Tư vấn",
+    OPERATOR: "Thực hiện",
+    CLINICAL_SUPPORT: "Hỗ trợ chuyên môn",
+    ASSISTANT_PRIMARY: "Phụ tá 1",
+    ASSISTANT_SECONDARY: "Phụ tá 2",
+  },
+  en: {
+    CONSULTANT: "Consultant",
+    OPERATOR: "Operator",
+    CLINICAL_SUPPORT: "Clinical support",
+    ASSISTANT_PRIMARY: "Assistant 1",
+    ASSISTANT_SECONDARY: "Assistant 2",
+  },
+};
+
 export function EmployeeAppPanel({
   session,
   staffPayrollWorkspace,
@@ -466,6 +483,15 @@ export function EmployeeAppPanel({
                   </strong>
                   <small>
                     {accrual.earnedProgressPercent}% · {accrual.createdAt}
+                  </small>
+                  <small>
+                    {accrual.lines
+                      .filter((line) => line.userId === session.userId)
+                      .map(
+                        (line) =>
+                          `${compensationRoleText[language][line.role] ?? line.role}: ${formatVnd(line.amount)}`,
+                      )
+                      .join(" · ")}
                   </small>
                 </div>
                 <StatusPill status={accrual.status} />

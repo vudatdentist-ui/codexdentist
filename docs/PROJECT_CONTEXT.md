@@ -119,6 +119,7 @@ A clinic-scoped manager may update only memberships, role assignments, and staff
 - Service material norms live in `/services`.
 - Procurement, lots, expiry, stock movements, suppliers, equipment, and maintenance live in `/inventory`.
 - Journey progress can consume service materials automatically and create low-stock work items.
+- Every positive Journey progress delta creates its own compensation accrual. Consultant, operator, clinical support, and assistants are assigned per progress event so different staff can earn different stages; never merge accruals across progress events.
 - Journey treatment service deletion is owner-only and only allowed while the service is still planned with no progress, invoice, receipt/allocation, or compensation history.
 - Keep stock controls out of compact Journey service cards.
 - Payroll is an audit MVP. It does not automatically calculate taxes, social insurance, base salary proration, or deductions.

@@ -817,6 +817,7 @@ type JourneyServiceProgressEvent = {
   fromProgressPercent: number;
   toProgressPercent: number;
   progressDeltaPercent: number;
+  consultantName: string | null;
   performedByName: string;
   clinicalSupportName: string | null;
   assistantPrimaryName: string | null;
@@ -829,6 +830,8 @@ type JourneyServiceProgressEvent = {
 
 type PendingProgressUpdate = {
   serviceId: string;
+  clinicId: string;
+  consultantId: string | null;
   serviceLabel: string;
   serviceName: string;
   fromProgressPercent: number;
@@ -1300,6 +1303,7 @@ const journeyText = {
       assistantPrimary: "Phụ tá 1",
       assistantSecondary: "Phụ tá 2",
       clinicalSupport: "Hỗ trợ chuyên môn",
+      consultant: "Người tư vấn",
       createdBy: "Tạo bởi",
       diagnosis: "Chẩn đoán",
       delete: "Xóa dịch vụ",
@@ -1472,6 +1476,7 @@ const journeyText = {
       assistantPrimary: "Assistant 1",
       assistantSecondary: "Assistant 2",
       clinicalSupport: "Clinical support",
+      consultant: "Consultant",
       createdBy: "Created by",
       diagnosis: "Diagnosis",
       delete: "Delete service",
@@ -2055,7 +2060,17 @@ export function PatientJourneyPanel({
   const selectedLibraryService =
     serviceOptions.find((service) => service.id === selectedServiceId) ?? null;
   const progressParticipants =
-    settingsWorkspace?.staff.filter((member) => member.active) ?? [];
+    settingsWorkspace?.staff.filter(
+      (member) =>
+        member.active &&
+        member.roleAssignments.some(
+          (assignment) =>
+            assignment.active &&
+            assignment.role !== "PATIENT" &&
+            (assignment.clinicId === null ||
+              assignment.clinicId === pendingProgressUpdate?.clinicId),
+        ),
+    ) ?? [];
   const selectedToothTargets = selectedTeeth.filter(isToothTarget);
   const selectedArchTargets = selectedTeeth.filter(isArchTarget);
   const selectedServiceTargets = serviceTargetsFromSelection(selectedTeeth, language);
@@ -2301,6 +2316,7 @@ export function PatientJourneyPanel({
       .filter((service) => service.patientId === selectedPatientKey)
       .map((service) => ({
         id: service.id,
+        clinicId: service.clinicId,
         patientId: service.patientId,
         catalogItemId: service.serviceCatalogItemId ?? undefined,
         serviceCode: service.serviceCode,
@@ -2435,6 +2451,9 @@ export function PatientJourneyPanel({
         );
         const progressLabel = `${fromProgress} -> ${toProgress}`;
         const participants = [
+          event.consultantName
+            ? `${jt.services.consultant}: ${event.consultantName}`
+            : "",
           `${jt.services.performedBy}: ${event.performedByName}`,
           event.clinicalSupportName
             ? `${jt.services.clinicalSupport}: ${event.clinicalSupportName}`
@@ -3273,6 +3292,8 @@ export function PatientJourneyPanel({
 
                               setPendingProgressUpdate({
                                 serviceId: service.id,
+                                clinicId: service.clinicId ?? "",
+                                consultantId: service.createdById ?? null,
                                 serviceLabel: displayServiceInstanceCode(
                                   service,
                                   visiblePatientsById.get(service.patientId),
@@ -3768,7 +3789,33 @@ export function PatientJourneyPanel({
                 )}`}
               />
             </div>
-            <div className="progress-modal-grid">
+            <div className="progress-modal-grid modal-form-grid">
+              <label>
+                {jt.services.consultant}
+                <select
+                  name="consultantId"
+                  defaultValue={pendingProgressUpdate.consultantId ?? ""}
+                >
+                  <option value="">
+                    {language === "vi" ? "Không chọn" : "Not selected"}
+                  </option>
+                  {progressParticipants.map((member) => (
+                    <option value={member.id} key={member.id}>
+                      {member.fullName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                {jt.services.performedBy}
+                <select name="performedById" defaultValue={session.userId}>
+                  {progressParticipants.map((member) => (
+                    <option value={member.id} key={member.id}>
+                      {member.fullName}
+                    </option>
+                  ))}
+                </select>
+              </label>
               <label>
                 {jt.services.clinicalSupport}
                 <select name="clinicalSupportId" defaultValue="">

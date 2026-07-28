@@ -71,6 +71,7 @@ export function patientAccessWhere(
             progressEvents: {
               some: {
                 OR: [
+                  { consultantId: session.userId },
                   { performedById: session.userId },
                   { clinicalSupportId: session.userId },
                   { assistantPrimaryId: session.userId },

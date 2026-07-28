@@ -265,6 +265,11 @@ export async function getServicesWorkspace(
           },
           progressEvents: {
             include: {
+              consultant: {
+                select: {
+                  fullName: true,
+                },
+              },
               performedBy: {
                 select: {
                   fullName: true,
@@ -1006,6 +1011,7 @@ function sharePercent(
 
 function toTreatmentServiceSummary(service: {
   id: string;
+  clinicId: string;
   patientId: string;
   serviceCatalogItemId: string | null;
   serviceCode: string;
@@ -1055,6 +1061,9 @@ function toTreatmentServiceSummary(service: {
     fromProgressPercent: unknown;
     toProgressPercent: unknown;
     progressDeltaPercent: unknown;
+    consultant: {
+      fullName: string;
+    } | null;
     performedBy: {
       fullName: string;
     };
@@ -1080,6 +1089,7 @@ function toTreatmentServiceSummary(service: {
 
   return {
     id: service.id,
+    clinicId: service.clinicId,
     patientId: service.patientId,
     serviceCatalogItemId: service.serviceCatalogItemId,
     serviceCode: service.serviceCode,
@@ -1126,6 +1136,7 @@ function toTreatmentServiceSummary(service: {
       fromProgressPercent: Number(event.fromProgressPercent),
       toProgressPercent: Number(event.toProgressPercent),
       progressDeltaPercent: Number(event.progressDeltaPercent),
+      consultantName: event.consultant?.fullName ?? null,
       performedByName: event.performedBy.fullName,
       clinicalSupportName: event.clinicalSupport?.fullName ?? null,
       assistantPrimaryName: event.assistantPrimary?.fullName ?? null,

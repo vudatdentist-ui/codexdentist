@@ -80,6 +80,7 @@ export type ServiceCatalogSummary = {
 
 export type TreatmentServiceSummary = {
   id: string;
+  clinicId: string;
   patientId: string;
   serviceCatalogItemId: string | null;
   serviceCode: string;
@@ -109,6 +110,7 @@ export type TreatmentServiceSummary = {
     fromProgressPercent: number;
     toProgressPercent: number;
     progressDeltaPercent: number;
+    consultantName: string | null;
     performedByName: string;
     clinicalSupportName: string | null;
     assistantPrimaryName: string | null;

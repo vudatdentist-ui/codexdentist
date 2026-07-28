@@ -425,6 +425,7 @@ model User {
   comments                          PostComment[]
   staffProfile                      StaffProfile?
   createdTreatmentServices          TreatmentService[]              @relation("TreatmentServiceCreator")
+  consultedTreatmentEvents          TreatmentServiceProgressEvent[] @relation("TreatmentProgressConsultant")
   performedTreatmentEvents          TreatmentServiceProgressEvent[] @relation("TreatmentProgressPerformer")
   clinicalSupportTreatmentEvents    TreatmentServiceProgressEvent[] @relation("TreatmentProgressClinicalSupport")
   primaryAssistantTreatmentEvents   TreatmentServiceProgressEvent[] @relation("TreatmentProgressAssistantPrimary")
@@ -1670,6 +1671,8 @@ model TreatmentServiceProgressEvent {
   clinic               Clinic               @relation(fields: [clinicId], references: [id])
   treatmentServiceId   String
   treatmentService     TreatmentService     @relation(fields: [treatmentServiceId], references: [id], onDelete: Cascade)
+  consultantId         String?
+  consultant           User?                @relation("TreatmentProgressConsultant", fields: [consultantId], references: [id])
   performedById        String
   performedBy          User                 @relation("TreatmentProgressPerformer", fields: [performedById], references: [id])
   clinicalSupportId    String?
@@ -1691,6 +1694,7 @@ model TreatmentServiceProgressEvent {
 
   @@index([clinicId, occurredAt])
   @@index([treatmentServiceId, occurredAt])
+  @@index([consultantId, occurredAt])
   @@index([performedById, occurredAt])
 }
 
