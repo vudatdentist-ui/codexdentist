@@ -38,6 +38,7 @@ jobs:
       JOB_SECRET: ci-only-job-secret-with-at-least-32-characters
       PATIENT_FILE_STORAGE_DRIVER: local
       SESSION_COOKIE_SECURE: "false"
+      TRUSTED_PROXY_PROVIDER: reverse-proxy
 
     steps:
       - uses: actions/checkout@v7
