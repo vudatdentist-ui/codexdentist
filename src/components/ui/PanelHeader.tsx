@@ -6,7 +6,7 @@ export function PanelHeader({
   icon: Icon,
   title,
 }: {
-  action: ReactNode;
+  action?: ReactNode;
   icon: LucideIcon;
   title: string;
 }) {
@@ -16,7 +16,7 @@ export function PanelHeader({
         <Icon size={18} aria-hidden="true" />
         <strong>{title}</strong>
       </div>
-      <span className="panel-header-action">{action}</span>
+      {action != null && <span className="panel-header-action">{action}</span>}
     </div>
   );
 }

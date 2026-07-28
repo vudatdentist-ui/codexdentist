@@ -588,7 +588,7 @@ async function nextOpenScheduleSlot() {
 
 async function createClinicalNoteFlow(cookie, patientId) {
   const html = await getPage("/journey", cookie);
-  const action = findActionName(html, "Lưu thông tin khám");
+  const action = findActionName(html, "Thêm vào timeline");
 
   await postAction("/journey", cookie, action, {
     patientId,

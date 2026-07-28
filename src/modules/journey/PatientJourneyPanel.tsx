@@ -6,7 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type FocusEvent, type FormEvent } from "react";
 import { createClinicalNoteAction, lockClinicalNoteAction } from "@/app/(app)/clinical/actions";
 import { updatePatientFileGovernanceAction } from "@/app/(app)/patient-files/actions";
-import { createJourneyCommentAction, createJourneyTreatmentServicesAction, deleteJourneyTreatmentServiceAction, recordJourneyServiceProgressAction, updateJourneyStateAction, updateJourneyTreatmentServiceDiscountAction } from "@/app/(app)/journey/actions";
+import { createJourneyCommentAction, createJourneyTreatmentServicesAction, deleteJourneyTreatmentServiceAction, recordJourneyServiceProgressAction, updateJourneyTreatmentServiceDiscountAction } from "@/app/(app)/journey/actions";
 import { useAppLanguage, type Language } from "@/components/AppLanguage";
 import { MoneyInput } from "@/components/MoneyInput";
 import { PatientOdontogramEditor } from "@/components/PatientOdontogramEditor";
@@ -247,8 +247,8 @@ function SourceBadge({ source }: { source?: "database" | "demo" }) {
 function noticeText(notice: string | null, language: Language) {
   const notices: Record<string, Record<Language, string>> = {
     "clinical-created": {
-      vi: "Đã thêm thông tin khám vào timeline.",
-      en: "Exam information added to the timeline.",
+      vi: "Đã thêm thông tin khám và kế hoạch vào timeline.",
+      en: "Exam information and treatment plan added to the timeline.",
     },
     "clinical-locked": { vi: "Đã hoàn tất ghi chú khám.", en: "Clinical note completed." },
     "journey-service-created": { vi: "Đã tạo dịch vụ điều trị trong timeline bệnh nhân.", en: "Treatment service created in the patient timeline." },
@@ -1193,9 +1193,8 @@ const journeyText = {
     actions: {
       admin: "Hành chính",
       intake: "Khám",
-      plan: "Mục tiêu & kế hoạch",
+      plan: "Kế hoạch",
       services: "Dịch vụ",
-      toothPlanning: "Lập kế hoạch răng",
     },
     admin: {
       address: "Địa chỉ",
@@ -1230,7 +1229,6 @@ const journeyText = {
       title: "Bệnh án trung tâm: 1 bệnh nhân, 1 timeline",
     },
     clinical: {
-      action: "Khám & điều trị",
       assessment: "Khám lâm sàng",
       assessmentPlaceholder:
         "Mô mềm, nha chu, khớp cắn, vùng đau, phim X-quang...",
@@ -1291,11 +1289,10 @@ const journeyText = {
       planPlaceholder:
         "Ví dụ: chụp phim, nhổ răng còn lại, lấy dấu, thử khung, giao hàm...",
       procedures: "Thủ thuật",
-      title: "Mục tiêu và kế hoạch điều trị",
+      title: "Kế hoạch điều trị",
       totalAmount: "Tổng tiền",
       titleField: "Tên kế hoạch",
       create: "Tạo kế hoạch",
-      save: "Lưu mục tiêu và kế hoạch",
     },
     services: {
       actions: "Thao tác",
@@ -1368,9 +1365,8 @@ const journeyText = {
     actions: {
       admin: "Admin",
       intake: "Intake",
-      plan: "Goals & plan",
+      plan: "Plan",
       services: "Services",
-      toothPlanning: "Tooth planning",
     },
     admin: {
       address: "Address",
@@ -1405,7 +1401,6 @@ const journeyText = {
       title: "Central chart: 1 patient, 1 timeline",
     },
     clinical: {
-      action: "Exam & treatment",
       assessment: "Clinical exam",
       assessmentPlaceholder:
         "Soft tissue, perio, occlusion, pain area, X-ray findings...",
@@ -1466,11 +1461,10 @@ const journeyText = {
       planPlaceholder:
         "Example: imaging, extract remaining teeth, impression, framework try-in, delivery...",
       procedures: "Procedures",
-      title: "Treatment Goals and Plan",
+      title: "Treatment plan",
       totalAmount: "Total amount",
       titleField: "Plan title",
       create: "Create plan",
-      save: "Save goals and plan",
     },
     services: {
       actions: "Actions",
@@ -2028,6 +2022,12 @@ export function PatientJourneyPanel({
   );
   const clinicalReady = Boolean(clinicalWorkspace?.canMutate && selectedPatient);
   const journeyRecordsReady = Boolean(journeyRecordsWorkspace?.canMutate && selectedPatient);
+  const canEditTreatmentPlan = hasAnyRole(session, [
+    "OWNER",
+    "AREA_MANAGER",
+    "CLINIC_MANAGER",
+    "DENTIST",
+  ]);
   const odontogramReady = Boolean(
     journeyRecordsWorkspace?.source === "database" &&
       selectedPatient &&
@@ -2824,6 +2824,7 @@ export function PatientJourneyPanel({
 
       {selectedPatient ? (
         <section className="patient-chart-flow">
+          <section className="patient-chart-paired-blocks">
           <section className="panel patient-chart-header" id="chart-admin">
             <PanelHeader
               icon={UsersRound}
@@ -2937,155 +2938,128 @@ export function PatientJourneyPanel({
             <PanelHeader
               icon={Stethoscope}
               title={jt.clinical.title}
-              action={jt.clinical.action}
             />
-            <div className="clinical-plan-workspace">
-              <section className="clinical-plan-section">
-                <h3>{jt.clinical.examSection}</h3>
-                <form
-                  action={createClinicalNoteAction}
-                  className="clinical-intake-form"
-                  key={`${selectedPatient.id}-${latestNote?.id ?? "new"}`}
-                >
-                  <input name="patientId" type="hidden" value={selectedPatient.id} />
-                  <label className="clinical-wide">
-                    {jt.clinical.reason}
-                    <textarea
-                      name="subjective"
-                      defaultValue={selectedPatient.visitReason ?? latestNote?.subjective ?? ""}
-                      placeholder={jt.clinical.reasonPlaceholder}
-                      disabled={!clinicalReady}
-                    />
-                  </label>
-                  <label>
-                    {jt.clinical.historyAllergy}
-                    <textarea
-                      name="objective"
-                      defaultValue={latestExamFields.objective}
-                      placeholder={jt.clinical.historyAllergyPlaceholder}
-                      disabled={!clinicalReady}
-                    />
-                  </label>
-                  <label>
-                    {jt.clinical.history}
-                    <textarea
-                      name="medicalHistory"
-                      defaultValue={latestExamFields.medicalHistory}
-                      placeholder={jt.clinical.historyPlaceholder}
-                      disabled={!clinicalReady}
-                    />
-                  </label>
-                  <div className="vitals-grid">
-                    <label>
-                      {jt.clinical.heartRate}
-                      <input
-                        name="heartRate"
-                        defaultValue={latestExamFields.heartRate}
-                        placeholder="78 bpm"
-                        disabled={!clinicalReady}
-                      />
-                    </label>
-                    <label>
-                      {jt.clinical.temperature}
-                      <input
-                        name="temperature"
-                        defaultValue={latestExamFields.temperature}
-                        placeholder="36.8 C"
-                        disabled={!clinicalReady}
-                      />
-                    </label>
-                    <label>
-                      {jt.clinical.bloodPressure}
-                      <input
-                        name="bloodPressure"
-                        defaultValue={latestExamFields.bloodPressure}
-                        placeholder="120/80"
-                        disabled={!clinicalReady}
-                      />
-                    </label>
-                  </div>
-                  <label>
-                    {jt.clinical.assessment}
-                    <textarea
-                      name="assessment"
-                      defaultValue=""
-                      placeholder={jt.clinical.assessmentPlaceholder}
-                      disabled={!clinicalReady}
-                    />
-                  </label>
-                  <label>
-                    {jt.clinical.prognosis}
-                    <textarea
-                      name="prognosis"
-                      defaultValue=""
-                      placeholder={jt.clinical.prognosisPlaceholder}
-                      disabled={!clinicalReady}
-                    />
-                  </label>
-                  <button className="primary-button" type="submit" disabled={!clinicalReady}>
-                    <FileText size={16} />
-                    {jt.clinical.save}
-                  </button>
-                </form>
-              </section>
-
-              <section className="clinical-plan-section">
-                <h3>{jt.plan.title}</h3>
-                <form
-                  action={updateJourneyStateAction}
-                  className="journey-treatment-notes"
-                  key={`${selectedPatient.id}-${selectedJourneyState?.updatedAt ?? "draft"}`}
-                >
-                  <input name="patientId" type="hidden" value={selectedPatient.id} />
+            <form
+              action={createClinicalNoteAction}
+              className="clinical-intake-form clinical-plan-form"
+              key={`${selectedPatient.id}-${latestNote?.id ?? "new"}-${selectedJourneyState?.updatedAt ?? "draft"}`}
+            >
+              <input name="patientId" type="hidden" value={selectedPatient.id} />
+              <input
+                name="odontogramTeeth"
+                type="hidden"
+                value={selectedTeeth.join("\n")}
+              />
+              <label className="clinical-wide">
+                {jt.clinical.reason}
+                <textarea
+                  name="subjective"
+                  defaultValue={selectedPatient.visitReason ?? latestNote?.subjective ?? ""}
+                  placeholder={jt.clinical.reasonPlaceholder}
+                  disabled={!clinicalReady}
+                />
+              </label>
+              <label>
+                {jt.clinical.historyAllergy}
+                <textarea
+                  name="objective"
+                  defaultValue={latestExamFields.objective}
+                  placeholder={jt.clinical.historyAllergyPlaceholder}
+                  disabled={!clinicalReady}
+                />
+              </label>
+              <label>
+                {jt.clinical.history}
+                <textarea
+                  name="medicalHistory"
+                  defaultValue={latestExamFields.medicalHistory}
+                  placeholder={jt.clinical.historyPlaceholder}
+                  disabled={!clinicalReady}
+                />
+              </label>
+              <div className="vitals-grid">
+                <label>
+                  {jt.clinical.heartRate}
                   <input
-                    name="odontogramTeeth"
-                    type="hidden"
-                    value={selectedTeeth.join("\n")}
+                    name="heartRate"
+                    defaultValue={latestExamFields.heartRate}
+                    placeholder="78 bpm"
+                    disabled={!clinicalReady}
                   />
-                  <label>
-                    {jt.plan.goalField}
-                    <textarea
-                      name="treatmentGoal"
-                      defaultValue={selectedTreatmentGoal}
-                      onChange={(event) => updateTreatmentDraft("goal", event.target.value)}
-                      placeholder={jt.plan.goalPlaceholder}
-                      disabled={
-                        !journeyRecordsReady &&
-                        journeyRecordsWorkspace?.source === "database"
-                      }
-                    />
-                  </label>
-                  <label>
-                    {jt.plan.planField}
-                    <textarea
-                      name="treatmentPlan"
-                      defaultValue={selectedTreatmentPlanText}
-                      onChange={(event) => updateTreatmentDraft("plan", event.target.value)}
-                      placeholder={jt.plan.planPlaceholder}
-                      disabled={
-                        !journeyRecordsReady &&
-                        journeyRecordsWorkspace?.source === "database"
-                      }
-                    />
-                  </label>
-                  <button
-                    className="primary-button"
-                    type="submit"
-                    disabled={!journeyRecordsReady}
-                  >
-                    <ClipboardList size={16} />
-                    {jt.plan.save}
-                  </button>
-                </form>
-              </section>
-            </div>
+                </label>
+                <label>
+                  {jt.clinical.temperature}
+                  <input
+                    name="temperature"
+                    defaultValue={latestExamFields.temperature}
+                    placeholder="36.8 C"
+                    disabled={!clinicalReady}
+                  />
+                </label>
+                <label>
+                  {jt.clinical.bloodPressure}
+                  <input
+                    name="bloodPressure"
+                    defaultValue={latestExamFields.bloodPressure}
+                    placeholder="120/80"
+                    disabled={!clinicalReady}
+                  />
+                </label>
+              </div>
+              <label>
+                {jt.clinical.assessment}
+                <textarea
+                  name="assessment"
+                  defaultValue=""
+                  placeholder={jt.clinical.assessmentPlaceholder}
+                  disabled={!clinicalReady}
+                />
+              </label>
+              <label>
+                {jt.clinical.prognosis}
+                <textarea
+                  name="prognosis"
+                  defaultValue=""
+                  placeholder={jt.clinical.prognosisPlaceholder}
+                  disabled={!clinicalReady}
+                />
+              </label>
+              <label>
+                {jt.plan.goalField}
+                <textarea
+                  name="treatmentGoal"
+                  defaultValue={selectedTreatmentGoal}
+                  onChange={(event) => updateTreatmentDraft("goal", event.target.value)}
+                  placeholder={jt.plan.goalPlaceholder}
+                  disabled={!canEditTreatmentPlan || !journeyRecordsReady}
+                />
+              </label>
+              <label>
+                {jt.plan.planField}
+                <textarea
+                  name="treatmentPlan"
+                  defaultValue={selectedTreatmentPlanText}
+                  onChange={(event) => updateTreatmentDraft("plan", event.target.value)}
+                  placeholder={jt.plan.planPlaceholder}
+                  disabled={!canEditTreatmentPlan || !journeyRecordsReady}
+                />
+              </label>
+              <button
+                className="primary-button clinical-wide"
+                type="submit"
+                disabled={!clinicalReady}
+              >
+                <FileText size={16} />
+                {jt.clinical.save}
+              </button>
+            </form>
+          </section>
           </section>
 
           <section className="panel journey-odontogram-panel" id="chart-odontogram">
             <PanelHeader
               icon={Activity}
               title={jt.odontogram.title}
-              action={jt.actions.toothPlanning}
             />
             <PatientOdontogramEditor
               key={selectedPatientKey}

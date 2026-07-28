@@ -9,6 +9,7 @@ import {
   databaseActorId,
   optionalString,
   requiredString,
+  splitList,
 } from "@/lib/form-validation";
 import { patientAccessWhere } from "@/lib/patient-access";
 import { prisma } from "@/lib/prisma";
@@ -48,7 +49,29 @@ export async function createClinicalNoteAction(formData: FormData) {
       .join("\n\n") || null;
   const assessment = optionalString(formData.get("assessment"));
   const prognosis = optionalString(formData.get("prognosis"));
-  const plan = optionalString(formData.get("plan"));
+  const legacyPlan = optionalString(formData.get("plan"));
+  const treatmentGoal = optionalString(formData.get("treatmentGoal"));
+  const treatmentPlan = optionalString(formData.get("treatmentPlan"));
+  const odontogramTeeth = splitList(formData.get("odontogramTeeth"), /[\n,]/);
+  const hasTreatmentFields =
+    formData.has("treatmentGoal") || formData.has("treatmentPlan");
+  const canUpdateTreatmentPlan = canPerformAction(
+    session,
+    "treatment.plan.create",
+  );
+
+  if (hasTreatmentFields && !canUpdateTreatmentPlan) {
+    redirect("/journey?notice=clinical-denied");
+  }
+
+  const plan =
+    [
+      legacyPlan,
+      treatmentGoal ? `Mục tiêu điều trị: ${treatmentGoal}` : null,
+      treatmentPlan ? `Kế hoạch điều trị: ${treatmentPlan}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n\n") || null;
 
   if (
     !patientId ||
@@ -68,6 +91,7 @@ export async function createClinicalNoteAction(formData: FormData) {
         },
         select: {
           id: true,
+          clinicId: true,
         },
       }),
       prisma.user.findFirst({
@@ -113,6 +137,58 @@ export async function createClinicalNoteAction(formData: FormData) {
           });
         }
 
+        let journeyStateId: string | null = null;
+
+        if (hasTreatmentFields && canUpdateTreatmentPlan) {
+          const journeyState = await tx.patientJourneyState.upsert({
+            where: {
+              patientId,
+            },
+            update: {
+              clinicId: patient.clinicId,
+              treatmentGoal,
+              treatmentPlan,
+              odontogramTeeth,
+              odontogramSnapshot: {
+                selectedTargets: odontogramTeeth,
+              } as Prisma.InputJsonValue,
+              updatedById: author.id,
+            },
+            create: {
+              organizationId: session.organizationId,
+              clinicId: patient.clinicId,
+              patientId,
+              treatmentGoal,
+              treatmentPlan,
+              odontogramTeeth,
+              odontogramSnapshot: {
+                selectedTargets: odontogramTeeth,
+              } as Prisma.InputJsonValue,
+              updatedById: author.id,
+            },
+            select: {
+              id: true,
+            },
+          });
+
+          journeyStateId = journeyState.id;
+
+          await tx.auditLog.create({
+            data: {
+              organizationId: session.organizationId,
+              actorId: author.id,
+              action: "journey.state_updated",
+              entityType: "PatientJourneyState",
+              entityId: journeyState.id,
+              metadata: {
+                patientId,
+                odontogramTeeth,
+                source: "clinical_timeline",
+              } as Prisma.InputJsonValue,
+            },
+          });
+        }
+
         await tx.auditLog.create({
           data: {
             organizationId: session.organizationId,
@@ -123,6 +199,7 @@ export async function createClinicalNoteAction(formData: FormData) {
             metadata: {
               patientId,
               finalized: true,
+              journeyStateId,
             },
           },
         });
@@ -130,7 +207,8 @@ export async function createClinicalNoteAction(formData: FormData) {
         return createdNote;
       });
     }
-  } catch {
+  } catch (error) {
+    console.error("clinical.note_create_failed", error);
     notice = "clinical-database";
   }
 
