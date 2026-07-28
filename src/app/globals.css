@@ -5567,37 +5567,44 @@ h2 {
 .odontogram-workbench {
   display: grid;
   gap: 12px;
+}
+
+.vitals-grid {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .odontogram-workbench {
-  align-items: start;
-}
-
-.odontogram-workbench > div:first-child {
-  grid-column: span 2;
+  align-items: end;
+  grid-template-columns: minmax(210px, 0.72fr) minmax(0, 1.8fr);
 }
 
 .odontogram-planner {
   display: grid;
-  gap: 12px;
+  grid-template-columns: minmax(150px, 0.75fr) minmax(230px, 1.25fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.odontogram-planner .primary-button {
+  min-height: 39px;
+  white-space: nowrap;
 }
 
 .arch-target-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
+  gap: 6px;
+  margin-bottom: 8px;
 }
 
 .arch-target {
-  min-height: 36px;
+  min-height: 32px;
   border: 1px solid var(--line);
-  border-radius: 8px;
+  border-radius: 6px;
   background: var(--surface);
   color: var(--ink);
-  padding: 0 12px;
-  font-size: 12px;
+  padding: 0 9px;
+  font-size: 11px;
   font-weight: 900;
 }
 
@@ -10214,6 +10221,10 @@ a:focus-visible {
 
   .odontogram-workbench > div:first-child {
     grid-column: auto;
+  }
+
+  .odontogram-planner {
+    grid-template-columns: 1fr;
   }
 
   .odontogram-stage-switcher {

@@ -5,7 +5,14 @@ import {
   type OdontogramData,
 } from "codexdentist-odontogram";
 import { ChevronRight, Copy, Ellipsis, Trash2 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   resetPatientOdontogramStagesAction,
   savePatientOdontogramAction,
@@ -90,6 +97,7 @@ const copyLabels: Record<
 
 export function PatientOdontogramEditor({
   canEdit,
+  chartFooter,
   initialOdontogram,
   language,
   onSelectionChange,
@@ -97,6 +105,7 @@ export function PatientOdontogramEditor({
   selectedTeeth,
 }: {
   canEdit: boolean;
+  chartFooter?: ReactNode;
   initialOdontogram: PatientOdontogramSummary | null;
   language: Language;
   onSelectionChange: (teeth: string[]) => void;
@@ -616,6 +625,7 @@ export function PatientOdontogramEditor({
 
       <Odontogram
         assetBaseUrl="/api/odontogram-assets"
+        chartFooter={chartFooter}
         defaultValue={activeSnapshot}
         embedded
         hideResetAction
