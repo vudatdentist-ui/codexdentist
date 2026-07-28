@@ -5037,13 +5037,14 @@ h2 {
 }
 
 .patient-chart-paired-blocks {
-  align-items: start;
+  align-items: stretch;
   display: grid;
   gap: 18px;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
 }
 
 .patient-chart-paired-blocks > .panel {
+  height: 100%;
   min-width: 0;
 }
 
@@ -9787,6 +9788,10 @@ a:focus-visible {
   .schedule-side-stack,
   .schedule-queue {
     position: static;
+  }
+
+  .patient-chart-paired-blocks > .panel {
+    height: auto;
   }
 
   .patient-chart-side {
