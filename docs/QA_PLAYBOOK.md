@@ -29,6 +29,7 @@ Use when touching the relevant area:
 ```powershell
 npm run test:billing
 npm run test:billing-concurrency
+npm run test:compensation
 npm run test:roles
 npm run test:actions
 npm run test:hardening

@@ -658,6 +658,7 @@ export async function createCompensationPolicyAction(formData: FormData) {
                   {
                     role: "ASSISTANT_PRIMARY",
                     sharePercent: assistantPrimarySharePercent,
+                    fallbackRole: "OPERATOR",
                     required: false,
                   },
                   {

@@ -28,6 +28,7 @@ export type ServiceCompensationRuleInput = {
     secondaryPercent: number;
   };
   fallbackMissingClinicalSupportToOperator: boolean;
+  fallbackMissingAssistantPrimaryToOperator: boolean;
   fallbackMissingAssistantSecondaryToPrimary: boolean;
 };
 
@@ -61,6 +62,7 @@ export const defaultServiceCompensationRule: ServiceCompensationRuleInput = {
     secondaryPercent: 30,
   },
   fallbackMissingClinicalSupportToOperator: true,
+  fallbackMissingAssistantPrimaryToOperator: true,
   fallbackMissingAssistantSecondaryToPrimary: true,
 };
 
@@ -144,34 +146,54 @@ export function calculateServiceProgressCompensation({
     sourceRole: !participants.clinicalSupportId ? "OPERATOR" : undefined,
   });
 
+  const assistantPrimaryParticipantId =
+    participants.assistantPrimaryId ??
+    participants.assistantSecondaryId ??
+    (rule.fallbackMissingAssistantPrimaryToOperator
+      ? participants.operatorId
+      : undefined);
+  const assistantPrimarySourceRole = participants.assistantPrimaryId
+    ? undefined
+    : participants.assistantSecondaryId
+      ? "ASSISTANT_SECONDARY"
+      : assistantPrimaryParticipantId
+        ? "OPERATOR"
+        : undefined;
+
   addLine({
-    participantId:
-      participants.assistantPrimaryId ?? participants.assistantSecondaryId,
+    participantId: assistantPrimaryParticipantId,
     pool: "ASSISTANT",
     poolAmount: assistantPoolAmount,
     role: "ASSISTANT_PRIMARY",
     sharePercent: rule.assistantShares.primaryPercent,
-    resolvedFromFallback:
-      !participants.assistantPrimaryId && Boolean(participants.assistantSecondaryId),
-    sourceRole:
-      !participants.assistantPrimaryId && participants.assistantSecondaryId
-        ? "ASSISTANT_SECONDARY"
-        : undefined,
+    resolvedFromFallback: Boolean(assistantPrimarySourceRole),
+    sourceRole: assistantPrimarySourceRole,
   });
+
+  const assistantSecondaryParticipantId =
+    participants.assistantSecondaryId ??
+    (rule.fallbackMissingAssistantSecondaryToPrimary
+      ? participants.assistantPrimaryId ??
+        (rule.fallbackMissingAssistantPrimaryToOperator
+          ? participants.operatorId
+          : undefined)
+      : undefined);
+  const assistantSecondarySourceRole = participants.assistantSecondaryId
+    ? undefined
+    : participants.assistantPrimaryId
+      ? "ASSISTANT_PRIMARY"
+      : assistantSecondaryParticipantId
+        ? "OPERATOR"
+        : undefined;
+
   addLine({
-    participantId:
-      participants.assistantSecondaryId ??
-      (rule.fallbackMissingAssistantSecondaryToPrimary
-        ? participants.assistantPrimaryId
-        : undefined),
+    participantId: assistantSecondaryParticipantId,
     pool: "ASSISTANT",
     poolAmount: assistantPoolAmount,
     role: "ASSISTANT_SECONDARY",
     sharePercent: rule.assistantShares.secondaryPercent,
-    resolvedFromFallback: !participants.assistantSecondaryId,
-    sourceRole: !participants.assistantSecondaryId
-      ? "ASSISTANT_PRIMARY"
-      : undefined,
+    resolvedFromFallback: Boolean(assistantSecondarySourceRole),
+    sourceRole: assistantSecondarySourceRole,
   });
 
   return {

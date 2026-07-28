@@ -47,62 +47,6 @@ Self-host storage:
 - Backups: `backups/codexdentist-<timestamp>/`.
 - Copy backups off the server and run a restore drill before storing real patient data.
 
-## S22U Deploy
-
-Check device:
-
-```powershell
-adb devices -l
-```
-
-Deploy:
-
-```powershell
-powershell -ExecutionPolicy Bypass -File scripts/deploy-to-s22.ps1
-Invoke-WebRequest -UseBasicParsing https://app.codexdentist.com/api/health
-```
-
-Rules:
-
-- Do not deploy unless ADB sees the intended phone.
-- Do not reset DB during deploy.
-- Do not overwrite `.env`.
-- Preserve S22U database and storage.
-- Known non-blocking build warning: dynamic dependency in `src/lib/patient-file-storage.ts`.
-
-Manual Termux fallback:
-
-```sh
-cd ~/codexmed-os
-bash tools/s22-termux/keep-codexmed-alive.sh
-bash tools/s22-termux/keep-named-tunnel-alive.sh
-curl http://127.0.0.1:3000/api/health
-```
-
-Reinstall reboot autostart:
-
-```sh
-cd ~/codexmed-os
-bash tools/s22-termux/install-boot-autostart.sh
-```
-
-Termux:Boot must be installed, opened once, and allowed to run in the background. The boot script starts both the app watchdog and named Cloudflare tunnel watchdog. PID files are only trusted when the process command line matches the expected watchdog/tunnel/server process.
-
-Android 16 PostgreSQL fallback:
-
-- If PostgreSQL hangs in `unix_stream_data_wait` and health reports database unavailable, do not reset the DB or change `DATABASE_URL`.
-- Build the local Android API 26 shared-memory runtime once:
-
-```sh
-cd ~/codexmed-os
-bash tools/s22-termux/build-android-shmem-api26.sh
-bash tools/s22-termux/keep-codexmed-alive.sh
-```
-
-- The S22U start/watchdog scripts use `$HOME/libandroid-shmem-api26/libandroid-shmem.so` for PostgreSQL when it exists.
-
-Phone backups live under `Download/codexmed-backups/` when using `tools/s22-termux/backup-codexmed.sh`.
-
 ## Namecheap Shared Hosting
 
 Current cPanel deployment:
@@ -216,7 +160,7 @@ Pilot policy:
 - Daily backups.
 - Keep at least 14 daily backups.
 - Keep one weekly backup for 8 weeks.
-- Copy S22U backups off-device.
+- Copy production backups outside the Namecheap hosting account.
 - Run one restore drill before real patient onboarding and after migration batches.
 
 Restore drill:

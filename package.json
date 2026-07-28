@@ -26,6 +26,7 @@
     "test:billing": "node scripts/billing-edge-smoke.mjs",
     "test:billing-concurrency": "node scripts/billing-concurrency-smoke.mjs",
     "test:source-commission": "node scripts/source-commission-smoke.mjs",
+    "test:compensation": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/compensation-smoke.mjs",
     "test:m789": "node scripts/milestone-789-smoke.mjs",
     "test:m1015": "node scripts/milestone-1015-smoke.mjs",
     "test:actions": "node scripts/action-permission-smoke.mjs",

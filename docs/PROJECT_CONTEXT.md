@@ -20,9 +20,8 @@ Last updated: 2026-07-28
 - Odontogram source lives in the versioned `codexdentist-odontogram` package. It provides separate standard-FDI charts for 32 permanent teeth and 20 primary teeth, generated anatomical SVG layers, five surfaces, clinically scoped crown/root selection on the current tooth artwork, compatible clinical markers, bone-level states, implants with crowns, contiguous bridges, always-on multi-tooth selection that also permits an empty selection, and a general assessment for gingiva, calculus, plaque, oral hygiene, occlusion, arch findings, and short notes. The surface color toolbar is limited to caries, fillings, and inlay/onlay; the large surface map carries its M/D/B/L/O-I labels directly and has no duplicate detail list. Crown/root clicks only select a clinical target; the clinical caries marker is a black contour-adjacent lesion while surface-condition colors remain separate.
 - Odontogram snapshots use the extensible `version: 2` entry model. Every entry separates concept, status, and target (`tooth`, `surface`, `region`, or `span`). Legacy `version: 1` snapshots migrate on read; structurally valid unknown entries must survive round trips so integrations can extend the catalog without losing data.
 - `https://odontogram.codexdentist.com` is the public standalone chart and persists the three treatment stages only in browser local storage. Existing one-snapshot browser data migrates into `INITIAL` and `CURRENT`, with `EXPECTED` empty. The same package is embedded in `/journey`, where each patient chart is stored separately with tenant/clinic scope, optimistic revision checks, immutable revision history, audit metadata, and server-enforced clinical permissions. Temporary tooth/arch targets and the treatment-service form render directly below the dental arches, inside the chart area.
-- Public S22U tunnel target: `https://app.codexdentist.com`.
-- S22U deploy uses `scripts/deploy-to-s22.ps1` and must preserve `.env`, database, and storage.
-- Check `adb devices -l` before S22U work.
+- Hosted production runs on Namecheap Stellar Plus through cPanel/CloudLinux. `https://app.codexdentist.com` is the neutral application host.
+- Production deploys must preserve the cPanel `.env`, PostgreSQL database, and protected-file storage. S22U is retired and must not be used as a deploy target.
 
 ## Tenant And Auth
 
@@ -120,6 +119,7 @@ A clinic-scoped manager may update only memberships, role assignments, and staff
 - Procurement, lots, expiry, stock movements, suppliers, equipment, and maintenance live in `/inventory`.
 - Journey progress can consume service materials automatically and create low-stock work items.
 - Every positive Journey progress delta creates its own compensation accrual. Consultant, operator, clinical support, and assistants are assigned per progress event so different staff can earn different stages; never merge accruals across progress events.
+- When neither assistant is assigned, both assistant shares fall back to the operator. When only the primary assistant is assigned, the secondary share falls back to that primary assistant.
 - Journey treatment service deletion is owner-only and only allowed while the service is still planned with no progress, invoice, receipt/allocation, or compensation history.
 - Keep stock controls out of compact Journey service cards.
 - Payroll is an audit MVP. It does not automatically calculate taxes, social insurance, base salary proration, or deductions.

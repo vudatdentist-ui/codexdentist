@@ -616,6 +616,7 @@ async function ensureCompensationPolicies(organizationId: string) {
                   {
                     role: "ASSISTANT_PRIMARY",
                     sharePercent: policy.assistantPrimarySharePercent,
+                    fallbackRole: "OPERATOR",
                     required: false,
                   },
                   {
@@ -642,7 +643,12 @@ async function ensureCompensationPolicies(organizationId: string) {
       ["CLINICAL_SUPPORT", policy.clinicalSupportSharePercent, "OPERATOR", false],
     ]);
     await syncPolicyPool(record.id, "ASSISTANT", policy.assistantPoolPercent, [
-      ["ASSISTANT_PRIMARY", policy.assistantPrimarySharePercent, null, false],
+      [
+        "ASSISTANT_PRIMARY",
+        policy.assistantPrimarySharePercent,
+        "OPERATOR",
+        false,
+      ],
       [
         "ASSISTANT_SECONDARY",
         policy.assistantSecondarySharePercent,

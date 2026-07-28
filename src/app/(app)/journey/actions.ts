@@ -1066,6 +1066,9 @@ function ruleInputFromDatabase(rule: {
       doctorPool?.shares.find((share) => share.role === "CLINICAL_SUPPORT")
         ?.fallbackRole,
     ),
+    fallbackMissingAssistantPrimaryToOperator:
+      assistantPool?.shares.find((share) => share.role === "ASSISTANT_PRIMARY")
+        ?.fallbackRole === "OPERATOR",
     fallbackMissingAssistantSecondaryToPrimary: Boolean(
       assistantPool?.shares.find((share) => share.role === "ASSISTANT_SECONDARY")
         ?.fallbackRole,
