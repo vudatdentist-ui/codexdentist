@@ -5574,13 +5574,35 @@ h2 {
 }
 
 .odontogram-workbench {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.odontogram-target-toolbar {
   align-items: end;
-  grid-template-columns: minmax(210px, 0.72fr) minmax(0, 1.8fr);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  min-width: 0;
+}
+
+.odontogram-target-actions {
+  align-items: end;
+  display: flex;
+  flex: 1 1 610px;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-width: 0;
+}
+
+.odontogram-target-actions .eyebrow {
+  flex: 1 0 100%;
+  margin: 0;
 }
 
 .odontogram-planner {
   display: grid;
-  grid-template-columns: minmax(150px, 0.75fr) minmax(230px, 1.25fr) auto;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(320px, 1.45fr) auto;
   align-items: end;
   gap: 10px;
 }
@@ -5594,7 +5616,14 @@ h2 {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-bottom: 8px;
+  margin: 0;
+}
+
+.odontogram-target-toolbar .selected-teeth-row {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  margin: 0 0 1px auto;
+  min-width: 120px;
 }
 
 .arch-target {
@@ -10225,6 +10254,21 @@ a:focus-visible {
 
   .odontogram-planner {
     grid-template-columns: 1fr;
+  }
+
+  .odontogram-target-toolbar {
+    align-items: stretch;
+  }
+
+  .odontogram-target-actions {
+    align-items: stretch;
+    display: grid;
+    flex-basis: 100%;
+  }
+
+  .odontogram-target-toolbar .selected-teeth-row {
+    justify-content: flex-start;
+    margin-left: 0;
   }
 
   .odontogram-stage-switcher {

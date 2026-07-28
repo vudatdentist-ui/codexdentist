@@ -2988,30 +2988,35 @@ export function PatientJourneyPanel({
               canEdit={odontogramReady}
               chartFooter={
                 <div className="odontogram-workbench">
-                  <div>
-                    <p className="eyebrow">{jt.odontogram.targetPrompt}</p>
-                    <div
-                      className="arch-target-row"
-                      role="group"
-                      aria-label={jt.odontogram.targetAria}
-                    >
-                      {archTargets.map((target) => (
-                        <button
-                          className={
-                            selectedArchTargets.includes(target.id)
-                              ? "arch-target active"
-                              : "arch-target"
-                          }
-                          type="button"
-                          key={target.id}
-                          onClick={() => toggleArchTarget(target.id)}
-                          aria-pressed={selectedArchTargets.includes(target.id)}
-                        >
-                          {treatmentTargetLabel(target.id, language)}
-                        </button>
-                      ))}
+                  <div className="odontogram-target-toolbar">
+                    <div className="odontogram-target-actions">
+                      <p className="eyebrow">{jt.odontogram.targetPrompt}</p>
+                      <div
+                        className="arch-target-row"
+                        role="group"
+                        aria-label={jt.odontogram.targetAria}
+                      >
+                        {archTargets.map((target) => (
+                          <button
+                            className={
+                              selectedArchTargets.includes(target.id)
+                                ? "arch-target active"
+                                : "arch-target"
+                            }
+                            type="button"
+                            key={target.id}
+                            onClick={() => toggleArchTarget(target.id)}
+                            aria-pressed={selectedArchTargets.includes(target.id)}
+                          >
+                            {treatmentTargetLabel(target.id, language)}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    <div className="selected-teeth-row">
+                    <div
+                      className="selected-teeth-row"
+                      aria-live="polite"
+                    >
                       {selectedServiceTargets.length > 0 ? (
                         selectedServiceTargets.map((target) => (
                           <span key={target}>{target}</span>
