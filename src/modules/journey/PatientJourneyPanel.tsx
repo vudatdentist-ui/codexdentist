@@ -1,10 +1,10 @@
 "use client";
 
-import { Activity, CalendarDays, ClipboardList, FileText, MessageSquareText, Search, Stethoscope, Trash2, UsersRound, WalletCards } from "lucide-react";
+import { Activity, CalendarDays, CheckCircle2, ClipboardList, FileText, MessageSquareText, Search, Stethoscope, Trash2, UsersRound, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type FocusEvent, type FormEvent } from "react";
-import { createClinicalNoteAction } from "@/app/(app)/clinical/actions";
+import { createClinicalNoteAction, lockClinicalNoteAction } from "@/app/(app)/clinical/actions";
 import { updatePatientFileGovernanceAction } from "@/app/(app)/patient-files/actions";
 import { createJourneyCommentAction, createJourneyTreatmentServicesAction, deleteJourneyTreatmentServiceAction, recordJourneyServiceProgressAction, updateJourneyStateAction, updateJourneyTreatmentServiceDiscountAction } from "@/app/(app)/journey/actions";
 import { useAppLanguage, type Language } from "@/components/AppLanguage";
@@ -22,7 +22,10 @@ import type { FormsWorkspace } from "@/lib/forms-types";
 import type { JourneyRecordsWorkspace } from "@/lib/journey-records-types";
 import {
   compareJourneyTimelineEvents,
+  formatJourneyTimelineDay,
   formatJourneyTimelineDateTime,
+  formatJourneyTimelineTime,
+  journeyTimelineDayKey,
   journeyTimelineTimestamp,
 } from "@/lib/journey-timeline";
 import type { PatientFilesWorkspace } from "@/lib/patient-files-types";
@@ -244,6 +247,7 @@ function SourceBadge({ source }: { source?: "database" | "demo" }) {
 function noticeText(notice: string | null, language: Language) {
   const notices: Record<string, Record<Language, string>> = {
     "clinical-created": { vi: "Đã tạo ghi chú lâm sàng.", en: "Clinical note created." },
+    "clinical-locked": { vi: "Đã hoàn tất ghi chú khám.", en: "Clinical note completed." },
     "journey-service-created": { vi: "Đã tạo dịch vụ điều trị trong timeline bệnh nhân.", en: "Treatment service created in the patient timeline." },
     "journey-discount-updated": { vi: "Đã cập nhật giảm giá dịch vụ.", en: "Service discount updated." },
     "journey-service-deleted": { vi: "Đã xóa dịch vụ điều trị.", en: "Treatment service deleted." },
@@ -1136,6 +1140,37 @@ type JourneyTimelineEvent = {
   imageUrl?: string;
 };
 
+type JourneyTimelineDayGroup = {
+  id: string;
+  label: string;
+  events: JourneyTimelineEvent[];
+};
+
+function groupJourneyTimelineEvents(
+  events: JourneyTimelineEvent[],
+  language: Language,
+) {
+  const groups = new Map<string, JourneyTimelineDayGroup>();
+
+  for (const event of events) {
+    const dayKey = journeyTimelineDayKey(event.sortMs);
+    const current = groups.get(dayKey);
+
+    if (current) {
+      current.events.push(event);
+      continue;
+    }
+
+    groups.set(dayKey, {
+      id: dayKey,
+      label: formatJourneyTimelineDay(event.sortMs, language),
+      events: [event],
+    });
+  }
+
+  return Array.from(groups.values());
+}
+
 const journeyTimelineFilters = [
   "All",
   "Session",
@@ -1311,6 +1346,13 @@ const journeyText = {
       openFile: "Mở file",
       saveFile: "Lưu tài liệu",
       patientForm: "Biểu mẫu",
+      completeNote: "Hoàn tất ghi chú",
+      completeNoteConfirm:
+        "Hoàn tất ghi chú này? Nội dung sẽ được đưa vào bệnh sử chính thức và không thể sửa trực tiếp.",
+      eventCount: "sự kiện",
+      unfinishedNotes: "Ghi chú chưa hoàn tất",
+      unfinishedNotesHint:
+        "Các ghi chú này chưa thuộc bệnh sử chính thức. Kiểm tra nội dung rồi hoàn tất.",
       title: "Timeline bệnh án",
     },
   },
@@ -1477,6 +1519,13 @@ const journeyText = {
       openFile: "Open file",
       saveFile: "Save file",
       patientForm: "Patient form",
+      completeNote: "Complete note",
+      completeNoteConfirm:
+        "Complete this note? It will become part of the finalized chart and cannot be edited directly.",
+      eventCount: "events",
+      unfinishedNotes: "Unfinished notes",
+      unfinishedNotesHint:
+        "These notes are not part of the finalized chart yet. Review and complete them.",
       title: "Chart Timeline",
     },
   },
@@ -1825,7 +1874,6 @@ export function PatientJourneyPanel({
   );
   const [timelineComments, setTimelineComments] = useState<JourneyComment[]>([]);
   const [timelineFilter, setTimelineFilter] = useState<JourneyTimelineFilter>("All");
-  const [selectedTimelineEventId, setSelectedTimelineEventId] = useState("");
   const [commentBody, setCommentBody] = useState("");
   const [commentAttachments, setCommentAttachments] = useState<JourneyTimelineAttachment[]>([]);
   const [commentImage, setCommentImage] = useState<{
@@ -1855,7 +1903,6 @@ export function PatientJourneyPanel({
     crmWorkspace?.source,
   ].includes("database");
   useEffect(() => {
-    setSelectedTimelineEventId("");
     setPendingProgressUpdate(null);
   }, [chartSearch, selectedPatientId]);
   useEffect(() => {
@@ -1982,6 +2029,20 @@ export function PatientJourneyPanel({
         "HYGIENIST",
       ]),
   );
+  const unfinishedClinicalNotes = selectedNotes
+    .filter((note) => !note.lockedAt)
+    .sort(
+      (left, right) =>
+        journeyTimelineTimestamp(left.createdAtIso ?? left.createdAt) -
+        journeyTimelineTimestamp(right.createdAtIso ?? right.createdAt),
+    );
+  const canCompleteClinicalNotes = hasAnyRole(session, [
+    "OWNER",
+    "AREA_MANAGER",
+    "CLINIC_MANAGER",
+    "DENTIST",
+    "HYGIENIST",
+  ]);
   const journeyServiceDatabaseReady =
     servicesWorkspace?.source === "database" && serviceOptions.length > 0;
   const canDeleteTreatmentServices = hasAnyRole(session, ["OWNER"]);
@@ -2303,22 +2364,6 @@ export function PatientJourneyPanel({
       serviceAppliedAmount(service.id),
     ]),
   );
-  const serviceSummary =
-    treatmentServices.length > 0
-      ? treatmentServices
-          .slice(0, 4)
-          .map(
-            (service) =>
-              `${displayServiceInstanceCode(
-                service,
-                visiblePatientsById.get(service.patientId),
-              )} ${service.object}: ${service.serviceName} - ${displayStatus(
-                service.progress,
-                language,
-              )}`,
-          )
-          .join("; ")
-      : jt.empty.noServices;
   const sessionEvents: JourneyTimelineEvent[] = [
     ...selectedAppointments.map((appointment, index) => ({
       group: "Session" as const,
@@ -2330,36 +2375,19 @@ export function PatientJourneyPanel({
         Number.MAX_SAFE_INTEGER - index,
       ),
       status: appointment.status,
-      title:
-        language === "vi"
-          ? `Buổi ${index + 1}: ${appointment.procedure}`
-          : `Session ${index + 1}: ${appointment.procedure}`,
+      title: appointment.procedure,
       detail:
         language === "vi"
-          ? `Dịch vụ đã làm: ${serviceSummary}. Tiến độ: ${displayStatus(
-              appointment.status === "Completed"
-                ? "Completed (100%)"
-                : "Planned (0%)",
-              language,
-            )}. Ghi chú sau thủ thuật: ${appointment.provider} - ${appointment.room} - ${
-              appointment.duration
-            } phút.`
-          : `Services performed: ${serviceSummary}. Progress: ${displayStatus(
-              appointment.status === "Completed"
-                ? "Completed (100%)"
-                : "Planned (0%)",
-              language,
-            )}. Post-procedure note: ${appointment.provider} - ${
-              appointment.room
-            } - ${appointment.duration} min.`,
+          ? `${appointment.provider} · ${appointment.room} · ${appointment.duration} phút`
+          : `${appointment.provider} · ${appointment.room} · ${appointment.duration} min`,
     })),
-    ...selectedNotes.map((note) => ({
+    ...selectedNotes.filter((note) => note.lockedAt).map((note) => ({
       group: "Clinical" as const,
       id: `note-${note.id}`,
       kind: jt.clinical.title,
       label: note.createdAt,
       sortMs: journeyTimelineTimestamp(note.createdAtIso ?? note.createdAt),
-      status: note.lockedAt ? "Locked" : "Draft",
+      status: "Completed",
       title: note.assessment ?? note.plan ?? note.subjective ?? jt.clinical.soapNote,
       detail: [note.subjective, note.objective, note.plan].filter(Boolean).join(" | "),
     })),
@@ -2645,10 +2673,10 @@ export function PatientJourneyPanel({
       event.imageName,
     ]),
   );
-  const selectedTimelineEvent =
-    filteredSessionEvents.find((event) => event.id === selectedTimelineEventId) ??
-    filteredSessionEvents[0] ??
-    (chartSearchQuery || timelineFilter !== "All" ? undefined : sessionEvents[0]);
+  const timelineDayGroups = groupJourneyTimelineEvents(
+    filteredSessionEvents,
+    language,
+  );
   const searchSummary = chartSearchQuery
     ? language === "vi"
       ? `${patientSearchMatches.length} bệnh nhân, ${treatmentPlanSearchCount} kế hoạch, ${filteredTreatmentServices.length} dịch vụ, ${filteredSessionEvents.length} timeline`
@@ -3439,7 +3467,6 @@ export function PatientJourneyPanel({
                   key={filter}
                   onClick={() => {
                     setTimelineFilter(filter);
-                    setSelectedTimelineEventId("");
                   }}
                 >
                   {displayStatus(filter, language)}
@@ -3447,132 +3474,183 @@ export function PatientJourneyPanel({
               ))}
             </div>
 
-            {selectedTimelineEvent && (
-              <div className="chart-context-detail chart-context-detail-inline">
-                <span>{selectedTimelineEvent.label}</span>
-                <strong>{selectedTimelineEvent.title}</strong>
-                <StatusPill status={selectedTimelineEvent.status} />
-                <p>{selectedTimelineEvent.detail}</p>
-                {(!selectedTimelineEvent.attachments ||
-                  selectedTimelineEvent.attachments.length === 0) &&
-                  selectedTimelineEvent.imageUrl && (
-                  renderTimelineImageButton(
-                    selectedTimelineEvent.imageUrl,
-                    selectedTimelineEvent.imageName,
-                  )
-                )}
-                {selectedTimelineEvent.fileUrl &&
-                  (!selectedTimelineEvent.attachments ||
-                    selectedTimelineEvent.attachments.length === 0) && (
-                  <a
-                    className="secondary-button timeline-file-link"
-                    href={selectedTimelineEvent.fileUrl}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    <FileText size={16} />
-                    {jt.timeline.openFile}
-                  </a>
-                )}
-                {selectedTimelineEvent.patientFileGovernance && (
-                  <form
-                    action={updatePatientFileGovernanceAction}
-                    className="patient-file-governance-form"
-                  >
-                    <input
-                      name="fileId"
-                      type="hidden"
-                      value={selectedTimelineEvent.patientFileGovernance.fileId}
-                    />
-                    <label>
-                      {jt.timeline.scanStatus}
-                      <select
-                        name="virusScanStatus"
-                        defaultValue={selectedTimelineEvent.patientFileGovernance.virusScanStatus}
-                        disabled={!patientFilesWorkspace?.canMutate}
-                      >
-                        {[
-                          "NOT_SCANNED",
-                          "PENDING",
-                          "CLEAN",
-                          "QUARANTINED",
-                          "INFECTED",
-                          "EXTERNAL_URL",
-                        ].map((status) => (
-                          <option value={status} key={status}>
-                            {displayStatus(status, language)}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      {jt.timeline.retentionUntil}
-                      <input
-                        name="retentionUntil"
-                        type="date"
-                        defaultValue={
-                          selectedTimelineEvent.patientFileGovernance.retentionUntilIso ?? ""
-                        }
-                        disabled={!patientFilesWorkspace?.canMutate}
-                      />
-                    </label>
-                    <button type="submit" disabled={!patientFilesWorkspace?.canMutate}>
-                      {jt.timeline.saveGovernance}
-                    </button>
-                  </form>
-                )}
-                {selectedTimelineEvent.attachments &&
-                  selectedTimelineEvent.attachments.length > 0 && (
-                    <div className="timeline-attachment-list">
-                      {selectedTimelineEvent.attachments.map((attachment) =>
-                        renderTimelineAttachment(attachment, "preview"),
-                      )}
+            {unfinishedClinicalNotes.length > 0 &&
+              (timelineFilter === "All" || timelineFilter === "Clinical") && (
+                <section className="timeline-unfinished" aria-label={jt.timeline.unfinishedNotes}>
+                  <header>
+                    <div>
+                      <strong>{jt.timeline.unfinishedNotes}</strong>
+                      <span>{jt.timeline.unfinishedNotesHint}</span>
                     </div>
-                  )}
-              </div>
-            )}
+                    <span className="timeline-unfinished-count">
+                      {unfinishedClinicalNotes.length}
+                    </span>
+                  </header>
+                  <div className="timeline-unfinished-list">
+                    {unfinishedClinicalNotes.map((note) => (
+                      <article key={note.id}>
+                        <div>
+                          <time>
+                            {formatJourneyTimelineDateTime(
+                              journeyTimelineTimestamp(
+                                note.createdAtIso ?? note.createdAt,
+                              ),
+                              note.createdAt,
+                              language,
+                            )}
+                          </time>
+                          <strong>
+                            {note.assessment ??
+                              note.plan ??
+                              note.subjective ??
+                              jt.clinical.soapNote}
+                          </strong>
+                          <small>{note.author}</small>
+                        </div>
+                        {canCompleteClinicalNotes && (
+                          <form
+                            action={lockClinicalNoteAction}
+                            onSubmit={(submitEvent) => {
+                              if (!window.confirm(jt.timeline.completeNoteConfirm)) {
+                                submitEvent.preventDefault();
+                              }
+                            }}
+                          >
+                            <input name="noteId" type="hidden" value={note.id} />
+                            <button className="secondary-button" type="submit">
+                              <CheckCircle2 size={16} />
+                              {jt.timeline.completeNote}
+                            </button>
+                          </form>
+                        )}
+                      </article>
+                    ))}
+                  </div>
+                </section>
+              )}
 
             <div className="journey-timeline chart-timeline">
-              {filteredSessionEvents.length > 0 ? (
-                filteredSessionEvents.map((event) => (
-                  <article
-                    className={
-                      selectedTimelineEvent?.id === event.id
-                        ? "chart-timeline-event active"
-                        : "chart-timeline-event"
-                    }
-                    key={event.id}
-                    onClick={() => setSelectedTimelineEventId(event.id)}
-                    onKeyDown={(keyboardEvent) => {
-                      if (keyboardEvent.key === "Enter" || keyboardEvent.key === " ") {
-                        keyboardEvent.preventDefault();
-                        setSelectedTimelineEventId(event.id);
-                      }
-                    }}
-                    tabIndex={0}
-                  >
-                    <time>{event.label}</time>
-                    <span className={`chart-event-marker ${statusClass(event.group)}`} />
-                    <div className="chart-timeline-event-body">
-                      <span>{event.kind}</span>
-                      <strong>{event.title}</strong>
-                      <small>{event.detail}</small>
-                      {event.attachments && event.attachments.length > 0 ? (
-                        <div className="timeline-attachment-list compact">
-                          {event.attachments.map((attachment) =>
-                            renderTimelineAttachment(attachment, "compact"),
-                          )}
-                        </div>
-                      ) : event.imageUrl ? (
-                        renderTimelineImageButton(
-                          event.imageUrl,
-                          event.imageName,
-                          event.id,
-                        )
-                      ) : null}
+              {timelineDayGroups.length > 0 ? (
+                timelineDayGroups.map((dayGroup) => (
+                  <section className="timeline-day-group" key={dayGroup.id}>
+                    <header className="timeline-day-header">
+                      <time>{dayGroup.label}</time>
+                      <span>
+                        {dayGroup.events.length} {jt.timeline.eventCount}
+                      </span>
+                    </header>
+                    <div className="timeline-day-events">
+                      {dayGroup.events.map((event) => (
+                        <details className="chart-timeline-event" key={event.id}>
+                          <summary>
+                            <time>
+                              {formatJourneyTimelineTime(
+                                event.sortMs,
+                                event.label,
+                                language,
+                              )}
+                            </time>
+                            <span
+                              className={`chart-event-marker ${statusClass(
+                                event.group,
+                              )}`}
+                            />
+                            <span className="chart-timeline-event-body">
+                              <span>{event.kind}</span>
+                              <strong>{event.title}</strong>
+                            </span>
+                            <StatusPill status={event.status} />
+                          </summary>
+                          <div className="timeline-event-detail">
+                            {event.detail && <p>{event.detail}</p>}
+                            {event.fileUrl &&
+                              (!event.attachments ||
+                                event.attachments.length === 0) && (
+                                <a
+                                  className="secondary-button timeline-file-link"
+                                  href={event.fileUrl}
+                                  rel="noreferrer"
+                                  target="_blank"
+                                >
+                                  <FileText size={16} />
+                                  {jt.timeline.openFile}
+                                </a>
+                              )}
+                            {event.patientFileGovernance && (
+                              <form
+                                action={updatePatientFileGovernanceAction}
+                                className="patient-file-governance-form"
+                              >
+                                <input
+                                  name="fileId"
+                                  type="hidden"
+                                  value={event.patientFileGovernance.fileId}
+                                />
+                                <label>
+                                  {jt.timeline.scanStatus}
+                                  <select
+                                    name="virusScanStatus"
+                                    defaultValue={
+                                      event.patientFileGovernance.virusScanStatus
+                                    }
+                                    disabled={!patientFilesWorkspace?.canMutate}
+                                  >
+                                    {[
+                                      "NOT_SCANNED",
+                                      "PENDING",
+                                      "CLEAN",
+                                      "QUARANTINED",
+                                      "INFECTED",
+                                      "EXTERNAL_URL",
+                                    ].map((status) => (
+                                      <option value={status} key={status}>
+                                        {displayStatus(status, language)}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <label>
+                                  {jt.timeline.retentionUntil}
+                                  <input
+                                    name="retentionUntil"
+                                    type="date"
+                                    defaultValue={
+                                      event.patientFileGovernance
+                                        .retentionUntilIso ?? ""
+                                    }
+                                    disabled={!patientFilesWorkspace?.canMutate}
+                                  />
+                                </label>
+                                <button
+                                  type="submit"
+                                  disabled={!patientFilesWorkspace?.canMutate}
+                                >
+                                  {jt.timeline.saveGovernance}
+                                </button>
+                              </form>
+                            )}
+                            {event.attachments &&
+                            event.attachments.length > 0 ? (
+                              <div className="timeline-attachment-list">
+                                {event.attachments.map((attachment) =>
+                                  renderTimelineAttachment(
+                                    attachment,
+                                    "preview",
+                                  ),
+                                )}
+                              </div>
+                            ) : event.imageUrl ? (
+                              renderTimelineImageButton(
+                                event.imageUrl,
+                                event.imageName,
+                                event.id,
+                              )
+                            ) : null}
+                          </div>
+                        </details>
+                      ))}
                     </div>
-                    <StatusPill status={event.status} />
-                  </article>
+                  </section>
                 ))
               ) : (
                 <EmptyState label={jt.empty.noMatchingEvents} />

@@ -5220,8 +5220,7 @@ h2 {
 }
 
 .patient-chart-stats span,
-.chart-event-count,
-.chart-context-detail span {
+.chart-event-count {
   color: var(--muted);
   font-size: 12px;
   font-weight: 800;
@@ -5347,36 +5346,77 @@ h2 {
 }
 
 .chart-timeline {
-  gap: 10px;
+  gap: 18px;
+}
+
+.timeline-day-group,
+.timeline-day-events {
+  display: grid;
+}
+
+.timeline-day-group {
+  gap: 8px;
+}
+
+.timeline-day-header {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 0 2px 7px;
+}
+
+.timeline-day-header time {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.timeline-day-header span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.timeline-day-events {
+  gap: 6px;
 }
 
 .journey-timeline .chart-timeline-event {
   width: 100%;
-  display: grid;
-  grid-template-columns: 96px 14px minmax(0, 1fr) auto;
-  align-items: start;
-  gap: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #f9fbfb;
   color: var(--ink);
-  padding: 12px;
   text-align: left;
 }
 
+.journey-timeline .chart-timeline-event > summary {
+  align-items: start;
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 54px 12px minmax(0, 1fr) auto;
+  list-style: none;
+  padding: 10px 12px;
+}
+
+.journey-timeline .chart-timeline-event > summary::-webkit-details-marker {
+  display: none;
+}
+
 .journey-timeline .chart-timeline-event:hover,
-.journey-timeline .chart-timeline-event:focus-visible,
-.journey-timeline .chart-timeline-event.active {
+.journey-timeline .chart-timeline-event[open] {
   border-color: #99d8d0;
   background: #f0fdfa;
 }
 
-.journey-timeline .chart-timeline-event:focus-visible {
+.journey-timeline .chart-timeline-event > summary:focus-visible {
   outline: 3px solid rgba(20, 184, 166, 0.24);
   outline-offset: 2px;
 }
 
-.journey-timeline .chart-timeline-event time {
+.journey-timeline .chart-timeline-event > summary > time {
   color: var(--muted);
   font-size: 12px;
   font-weight: 900;
@@ -5384,21 +5424,21 @@ h2 {
 }
 
 .chart-timeline-event-body {
+  color: var(--ink);
   min-width: 0;
   display: grid;
   justify-items: start;
   align-content: start;
 }
 
-.journey-timeline .chart-timeline-event strong,
-.chart-context-detail strong {
+.journey-timeline .chart-timeline-event strong {
+  color: var(--ink);
   display: block;
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .journey-timeline .chart-timeline-event span,
-.journey-timeline .chart-timeline-event small,
-.chart-context-detail p {
+.journey-timeline .chart-timeline-event small {
   color: var(--muted);
   font-size: 12px;
 }
@@ -5407,6 +5447,21 @@ h2 {
   display: block;
   margin-top: 4px;
   line-height: 1.45;
+}
+
+.timeline-event-detail {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  margin-left: 88px;
+  padding: 10px 12px 12px 0;
+}
+
+.timeline-event-detail p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 0;
 }
 
 .chart-event-marker {
@@ -5438,22 +5493,78 @@ h2 {
   background: var(--green);
 }
 
-.chart-context-detail {
+.timeline-unfinished {
+  background: #fffbeb;
+  border: 1px solid #efd28c;
+  border-radius: 8px;
   display: grid;
   gap: 10px;
-}
-
-.chart-context-detail-inline {
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: #f9fbfb;
+  margin-bottom: 16px;
   padding: 12px;
-  margin-bottom: 14px;
 }
 
-.chart-context-detail p {
-  margin: 0;
-  line-height: 1.55;
+.timeline-unfinished > header {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.timeline-unfinished > header div {
+  display: grid;
+  gap: 3px;
+}
+
+.timeline-unfinished > header span,
+.timeline-unfinished article small,
+.timeline-unfinished article time {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.timeline-unfinished-count {
+  align-items: center;
+  background: #f5dfaa;
+  border-radius: 999px;
+  color: #784f08 !important;
+  display: inline-flex;
+  flex: 0 0 26px;
+  font-weight: 900;
+  height: 26px;
+  justify-content: center;
+}
+
+.timeline-unfinished-list {
+  display: grid;
+  gap: 6px;
+}
+
+.timeline-unfinished article {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid #ead9ad;
+  border-radius: 6px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 9px 10px;
+}
+
+.timeline-unfinished article > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.timeline-unfinished article strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-unfinished article .secondary-button {
+  min-height: 34px;
+  white-space: nowrap;
 }
 
 .journey-detail-list.compact {
@@ -9586,7 +9697,6 @@ a:focus-visible {
 .patient-profile-strip > div,
 .patient-operation-strip > span,
 .patient-chart-stats div,
-.chart-context-detail-inline,
 .patient-admin-details,
 .schedule-alert,
 .credential-box,
@@ -10067,8 +10177,27 @@ a:focus-visible {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .journey-timeline .chart-timeline-event {
+  .journey-timeline .chart-timeline-event > summary {
+    grid-template-columns: 44px 10px minmax(0, 1fr);
+  }
+
+  .journey-timeline .chart-timeline-event > summary > .status {
+    grid-column: 3;
+    justify-self: start;
+  }
+
+  .timeline-event-detail {
+    margin-left: 64px;
+  }
+
+  .timeline-unfinished article {
+    align-items: stretch;
     grid-template-columns: 1fr;
+  }
+
+  .timeline-unfinished article form,
+  .timeline-unfinished article .secondary-button {
+    width: 100%;
   }
 
   .chart-event-marker {

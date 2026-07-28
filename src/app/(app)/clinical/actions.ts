@@ -145,6 +145,7 @@ export async function lockClinicalNoteAction(formData: FormData) {
   }
 
   let notice: string | null = null;
+  let patientId: string | null = null;
 
   try {
     const note = await prisma.clinicalNote.findFirst({
@@ -155,27 +156,32 @@ export async function lockClinicalNoteAction(formData: FormData) {
       select: {
         id: true,
         lockedAt: true,
+        patientId: true,
       },
     });
 
     if (!note) {
       notice = "clinical-note-not-found";
-    } else if (!note.lockedAt) {
-      await prisma.clinicalNote.update({
-        where: {
-          id: noteId,
-        },
-        data: {
-          lockedAt: new Date(),
-        },
-      });
+    } else {
+      patientId = note.patientId;
 
-      await writeClinicalAuditLog({
-        organizationId: session.organizationId,
-        actorId: databaseActorId(session.userId),
-        action: "clinical_note.locked",
-        entityId: noteId,
-      });
+      if (!note.lockedAt) {
+        await prisma.clinicalNote.update({
+          where: {
+            id: noteId,
+          },
+          data: {
+            lockedAt: new Date(),
+          },
+        });
+
+        await writeClinicalAuditLog({
+          organizationId: session.organizationId,
+          actorId: databaseActorId(session.userId),
+          action: "clinical_note.locked",
+          entityId: noteId,
+        });
+      }
     }
   } catch {
     notice = "clinical-database";
@@ -186,7 +192,11 @@ export async function lockClinicalNoteAction(formData: FormData) {
   }
 
   revalidatePath("/journey");
-  redirect("/journey?notice=clinical-locked");
+  redirect(
+    `/journey?notice=clinical-locked${
+      patientId ? `&patientId=${encodeURIComponent(patientId)}` : ""
+    }`,
+  );
 }
 
 async function writeClinicalAuditLog(input: {
