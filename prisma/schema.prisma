@@ -638,6 +638,7 @@ model ClinicalNote {
   subjective String?
   objective  String?
   assessment String?
+  prognosis  String?
   plan       String?
   lockedAt   DateTime?
   createdAt  DateTime  @default(now())

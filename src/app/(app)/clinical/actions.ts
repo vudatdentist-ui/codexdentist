@@ -16,7 +16,10 @@ import { prisma } from "@/lib/prisma";
 export async function createClinicalNoteAction(formData: FormData) {
   const session = await requireViewSession("clinical");
 
-  if (!canPerformAction(session, "clinical.note.create")) {
+  if (
+    !canPerformAction(session, "clinical.note.create") ||
+    !canPerformAction(session, "clinical.note.sign")
+  ) {
     redirect("/journey?notice=clinical-denied");
   }
 
@@ -44,9 +47,13 @@ export async function createClinicalNoteAction(formData: FormData) {
       .filter(Boolean)
       .join("\n\n") || null;
   const assessment = optionalString(formData.get("assessment"));
+  const prognosis = optionalString(formData.get("prognosis"));
   const plan = optionalString(formData.get("plan"));
 
-  if (!patientId || (!subjective && !objective && !assessment && !plan)) {
+  if (
+    !patientId ||
+    (!subjective && !objective && !assessment && !prognosis && !plan)
+  ) {
     redirect("/journey?notice=clinical-missing");
   }
 
@@ -78,7 +85,7 @@ export async function createClinicalNoteAction(formData: FormData) {
     if (!patient || !author) {
       notice = "clinical-patient-not-found";
     } else {
-      const note = await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx) => {
         const createdNote = await tx.clinicalNote.create({
           data: {
             patientId,
@@ -86,7 +93,9 @@ export async function createClinicalNoteAction(formData: FormData) {
             subjective,
             objective,
             assessment,
+            prognosis,
             plan,
+            lockedAt: new Date(),
           },
           select: {
             id: true,
@@ -104,17 +113,21 @@ export async function createClinicalNoteAction(formData: FormData) {
           });
         }
 
-        return createdNote;
-      });
+        await tx.auditLog.create({
+          data: {
+            organizationId: session.organizationId,
+            actorId: author.id,
+            action: "clinical_note.created",
+            entityType: "ClinicalNote",
+            entityId: createdNote.id,
+            metadata: {
+              patientId,
+              finalized: true,
+            },
+          },
+        });
 
-      await writeClinicalAuditLog({
-        organizationId: session.organizationId,
-        actorId: author.id,
-        action: "clinical_note.created",
-        entityId: note.id,
-        metadata: {
-          patientId,
-        },
+        return createdNote;
       });
     }
   } catch {

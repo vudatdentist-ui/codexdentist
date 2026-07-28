@@ -8,6 +8,7 @@ export type ClinicalNoteSummary = {
   subjective: string | null;
   objective: string | null;
   assessment: string | null;
+  prognosis: string | null;
   plan: string | null;
   lockedAt: string | null;
   createdAt: string;

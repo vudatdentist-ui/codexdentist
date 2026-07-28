@@ -5036,18 +5036,6 @@ h2 {
   text-align: left;
 }
 
-.patient-chart-paired-blocks {
-  display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(0, 1.05fr);
-  gap: 18px;
-  align-items: start;
-}
-
-.patient-chart-paired-blocks > .panel {
-  height: 100%;
-  min-width: 0;
-}
-
 .patient-chart-header {
   grid-template-columns: 1fr;
   align-content: start;
@@ -5123,28 +5111,6 @@ h2 {
   grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
   gap: 14px;
   align-items: center;
-}
-
-.patient-chart-paired-blocks .patient-chart-tools,
-.patient-chart-paired-blocks .patient-chart-topline,
-.patient-chart-paired-blocks .patient-admin-list {
-  grid-template-columns: 1fr;
-}
-
-.patient-chart-paired-blocks .chart-search-meta {
-  align-items: flex-start;
-  flex-direction: column;
-  justify-content: flex-start;
-  text-align: left;
-}
-
-.patient-chart-paired-blocks .patient-chart-picker {
-  justify-self: stretch;
-  width: 100%;
-}
-
-.patient-chart-paired-blocks .patient-chart-stats {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .patient-chart-identity {
@@ -5603,7 +5569,38 @@ h2 {
 }
 
 .clinical-intake-form {
-  margin-bottom: 14px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 0;
+}
+
+.clinical-intake-form .clinical-wide,
+.clinical-intake-form .vitals-grid {
+  grid-column: 1 / -1;
+}
+
+.clinical-plan-workspace {
+  display: grid;
+  gap: 18px;
+}
+
+.clinical-plan-section {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.clinical-plan-section + .clinical-plan-section {
+  border-top: 1px solid var(--line);
+  padding-top: 18px;
+}
+
+.clinical-plan-section > h3 {
+  font-size: 14px;
+  margin: 0;
+}
+
+.clinical-plan-section .primary-button {
+  justify-self: start;
 }
 
 .clinical-intake-form label,
@@ -9785,7 +9782,6 @@ a:focus-visible {
   .content-grid.two,
   .patient-layout,
   .journey-grid,
-  .patient-chart-paired-blocks,
   .patient-chart-layout,
   .portal-layout,
   .schedule-ops-layout,
@@ -9810,10 +9806,6 @@ a:focus-visible {
     position: static;
     max-height: none;
     overflow: visible;
-  }
-
-  .patient-chart-paired-blocks {
-    align-items: start;
   }
 
   .metric-grid,
@@ -10323,6 +10315,7 @@ a:focus-visible {
   .patient-form,
   .patient-edit-form,
   .treatment-form,
+  .clinical-intake-form,
   .journey-treatment-notes,
   .phase-form,
   .billing-form,

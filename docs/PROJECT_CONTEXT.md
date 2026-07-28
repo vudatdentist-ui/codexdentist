@@ -1,6 +1,6 @@
 # Project Context
 
-Last updated: 2026-07-27
+Last updated: 2026-07-28
 
 ## Product Direction
 
@@ -68,10 +68,10 @@ Route access lives in `src/lib/permissions.ts`. Mutation permissions live in `sr
 
 - `/journey` is the patient chart center: one patient, one timeline.
 - `/clinical` and `/treatment` intentionally render the unified Journey workspace.
-- Required block order: `Thông tin hành chính`, `Thông tin khám`, `Odontogram`, `Mục tiêu và kế hoạch điều trị`, `Dịch vụ`, `Timeline`.
+- Required block order: `Thông tin hành chính`, `Khám và kế hoạch điều trị`, `Odontogram`, `Dịch vụ`, `Timeline`. The combined clinical block keeps exam history, vitals, clinical assessment, and prognosis above the editable treatment goals and plan.
 - Journey search belongs in the app-shell control row, not inside the administrative block.
 - Timeline is chronological ascending and includes appointments, clinical notes, treatment, billing, files, forms, prescriptions, CRM, and internal comments.
-- Timeline groups finalized history by Viet Nam calendar day. Rows stay compact and reveal detail, attachments, or file governance only when expanded. Unlocked clinical notes appear separately as unfinished work and enter the official timeline only after an authorized clinical user completes them.
+- Timeline groups finalized history by Viet Nam calendar day. Rows stay compact and reveal detail, attachments, or file governance only when expanded. New exam entries are finalized immediately through `Thêm vào timeline`; unlocked legacy clinical notes remain separate as unfinished work until an authorized clinical user completes them.
 - Timeline ordering uses canonical ISO/epoch timestamps, never localized display strings. Valid events sort oldest to newest, unknown timestamps sort last, and every visible timestamp uses `dd/MM/yyyy · HH:mm` in the Viet Nam time zone.
 - Odontogram and treatment targets use standard FDI codes directly. Verify lower teeth such as 38/48 and 37/47 whenever chart selection or treatment-target mapping changes.
 - Clinical chart state belongs to one `PatientOdontogram` per patient with three independent stages in this order: `INITIAL` (`Hiện trạng ban đầu`), `CURRENT` (`Tình trạng hiện tại`), and `EXPECTED` (`Kết quả kỳ vọng`). Each stage has its own snapshot, revision, timestamp, and immutable revision history. Existing single-chart data is migrated into both `INITIAL` and `CURRENT`; `EXPECTED` starts empty.

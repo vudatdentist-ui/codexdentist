@@ -1,6 +1,6 @@
 # QA Playbook
 
-Last updated: 2026-07-27
+Last updated: 2026-07-28
 
 ## Fast Check
 
@@ -62,6 +62,7 @@ npm run pilot:qa
 - Journey odontogram persistence check: edit one distinguishable condition in each stage, wait for autosave, refresh, and verify all three snapshots remain different. Only the edited stage revision may increment; stale revision writes conflict rather than overwrite. Existing pre-migration charts must appear unchanged in both `INITIAL` and `CURRENT`, with `EXPECTED` empty. Select at least two teeth and verify `Bỏ chọn tất cả` changes no clinical data; `Xóa trạng thái` requires confirmation and removes every entry for the selected teeth plus intersecting bridges. Verify `Xóa mốc đang mở` changes only that stage, `Xóa cả 3 mốc` clears all stages, and both operations remain cleared after refresh.
 - Journey odontogram integration check: selecting teeth updates temporary treatment targets without changing clinical marks or stage snapshots. The tooth/arch selection summary, diagnosis, service catalog, and add-service action stay directly below both arches inside the chart column. Switching stages clears the temporary tooth selection but does not collapse the planner. Creating treatment services may clear `PatientJourneyState.odontogramTeeth` but must not alter any `PatientOdontogram` stage or its revision history.
 - Journey odontogram permission/isolation check: clinical roles can edit, front desk and billing are read-only, and an inaccessible clinic patient cannot read or write any stage.
+- Journey clinical-plan check: `Khám và kế hoạch điều trị` is one panel with exam information first and editable treatment goals/plan second. Adding an exam with prognosis creates one finalized timeline event immediately; saving goals/plan updates journey state without creating a duplicate clinical event.
 - Journey timeline check: finalized events remain chronological ascending and are grouped by Viet Nam calendar day; compact rows show time/type/title/status and reveal detail only when expanded. Unlocked clinical notes appear only in `Ghi chú chưa hoàn tất`; completing one requires confirmation, returns to the same patient, and moves it into the finalized timeline.
 - Demo sessions stop working after expiry; cleanup removes only expired demo organizations.
 - Demo mode blocks patient-file uploads and outbound notification delivery.
