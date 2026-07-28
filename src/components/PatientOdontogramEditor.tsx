@@ -4,9 +4,12 @@ import {
   Odontogram,
   type OdontogramData,
 } from "codexdentist-odontogram";
-import { ChevronRight, Copy } from "lucide-react";
+import { ChevronRight, Copy, Ellipsis, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { savePatientOdontogramAction } from "@/app/(app)/journey/odontogram-actions";
+import {
+  resetPatientOdontogramStagesAction,
+  savePatientOdontogramAction,
+} from "@/app/(app)/journey/odontogram-actions";
 import type { Language } from "@/components/AppLanguage";
 import {
   odontogramStages,
@@ -29,12 +32,12 @@ const stageLabels: Record<
   vi: {
     INITIAL: "Hiện trạng ban đầu",
     EXPECTED: "Kết quả kỳ vọng",
-    CURRENT: "Tiến độ hiện tại",
+    CURRENT: "Tình trạng hiện tại",
   },
   en: {
     INITIAL: "Initial condition",
     EXPECTED: "Expected result",
-    CURRENT: "Current progress",
+    CURRENT: "Current condition",
   },
 };
 
@@ -76,12 +79,12 @@ const copyLabels: Record<
   Record<Exclude<PatientOdontogramStage, "INITIAL">, string>
 > = {
   vi: {
-    EXPECTED: "Sao chép hiện trạng",
-    CURRENT: "Sao chép mốc trước",
+    EXPECTED: "Sao chép tình trạng hiện tại",
+    CURRENT: "Sao chép hiện trạng ban đầu",
   },
   en: {
-    EXPECTED: "Copy initial condition",
-    CURRENT: "Copy previous stage",
+    EXPECTED: "Copy current condition",
+    CURRENT: "Copy initial condition",
   },
 };
 
@@ -102,6 +105,7 @@ export function PatientOdontogramEditor({
 }) {
   const [activeStage, setActiveStage] =
     useState<PatientOdontogramStage>("INITIAL");
+  const [resetMenuOpen, setResetMenuOpen] = useState(false);
   const [stageRecords, setStageRecords] = useState<StageRecords>(() =>
     recordsFromSummary(initialOdontogram),
   );
@@ -140,6 +144,7 @@ export function PatientOdontogramEditor({
     revisionRef.current = revisionsFromSummary(initialOdontogram);
     pendingDataRef.current = null;
     setActiveStage("INITIAL");
+    setResetMenuOpen(false);
     setStageRecords(recordsFromSummary(initialOdontogram));
     setSaveStates(saveStatesFromSummary(initialOdontogram));
     setSaveMessages({
@@ -276,10 +281,10 @@ export function PatientOdontogramEditor({
   );
 
   const initialSnapshot = stageRecords.INITIAL?.snapshot;
-  const expectedSnapshot =
-    stageRecords.EXPECTED?.snapshot ?? initialSnapshot;
   const currentSnapshot =
-    stageRecords.CURRENT?.snapshot ?? expectedSnapshot ?? initialSnapshot;
+    stageRecords.CURRENT?.snapshot ?? initialSnapshot;
+  const expectedSnapshot =
+    stageRecords.EXPECTED?.snapshot ?? currentSnapshot ?? initialSnapshot;
   const snapshots = {
     INITIAL: initialSnapshot,
     EXPECTED: expectedSnapshot,
@@ -287,10 +292,10 @@ export function PatientOdontogramEditor({
   } satisfies Record<PatientOdontogramStage, OdontogramData | undefined>;
   const activeSnapshot = snapshots[activeStage];
   const previousSnapshot =
-    activeStage === "EXPECTED"
+    activeStage === "CURRENT"
       ? initialSnapshot
-      : activeStage === "CURRENT"
-        ? expectedSnapshot
+      : activeStage === "EXPECTED"
+        ? currentSnapshot
         : undefined;
   const difference = useMemo(
     () => compareSnapshots(previousSnapshot, activeSnapshot),
@@ -307,6 +312,7 @@ export function PatientOdontogramEditor({
     flushPendingSave();
     activeStageRef.current = stage;
     setActiveStage(stage);
+    setResetMenuOpen(false);
     onSelectionChange([]);
   };
 
@@ -334,7 +340,173 @@ export function PatientOdontogramEditor({
     }));
     onSelectionChange([]);
     setStageSaveState(setSaveStates, activeStage, "pending");
+    setResetMenuOpen(false);
     queueSave(activeStage, previousSnapshot);
+  };
+
+  const cancelPendingSave = () => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    pendingDataRef.current = null;
+  };
+
+  const resetActiveStage = () => {
+    if (!canEdit || !activeSnapshot) {
+      return;
+    }
+    const message =
+      language === "vi"
+        ? `Xóa toàn bộ trạng thái trong “${stageLabels.vi[activeStage]}”?`
+        : `Clear every condition in “${stageLabels.en[activeStage]}”?`;
+    if (!window.confirm(message)) {
+      return;
+    }
+
+    cancelPendingSave();
+    const blank = createEmptyOdontogramData();
+    setStageRecords((current) => ({
+      ...current,
+      [activeStage]: {
+        snapshot: blank,
+        revision: revisionRef.current[activeStage] ?? 0,
+        updatedAt: current[activeStage]?.updatedAt ?? "",
+        updatedAtIso: current[activeStage]?.updatedAtIso ?? "",
+      },
+    }));
+    setChartVersions((current) => ({
+      ...current,
+      [activeStage]: current[activeStage] + 1,
+    }));
+    onSelectionChange([]);
+    setStageMessage(setSaveMessages, activeStage, "");
+    setStageSaveState(setSaveStates, activeStage, "pending");
+    setResetMenuOpen(false);
+    queueSave(activeStage, blank);
+  };
+
+  const resetAllStages = () => {
+    if (!canEdit || !hasInitialStage) {
+      return;
+    }
+    const message =
+      language === "vi"
+        ? "Xóa toàn bộ trạng thái của cả 3 mốc điều trị?"
+        : "Clear every condition from all three treatment stages?";
+    if (!window.confirm(message)) {
+      return;
+    }
+
+    cancelPendingSave();
+    const blanks = {
+      INITIAL: createEmptyOdontogramData(),
+      CURRENT: createEmptyOdontogramData(),
+      EXPECTED: createEmptyOdontogramData(),
+    } satisfies Record<PatientOdontogramStage, OdontogramData>;
+    setStageRecords((current) =>
+      Object.fromEntries(
+        odontogramStages.map((stage) => [
+          stage,
+          {
+            snapshot: blanks[stage],
+            revision: revisionRef.current[stage] ?? 0,
+            updatedAt: current[stage]?.updatedAt ?? "",
+            updatedAtIso: current[stage]?.updatedAtIso ?? "",
+          },
+        ]),
+      ) as StageRecords,
+    );
+    setChartVersions((current) => ({
+      INITIAL: current.INITIAL + 1,
+      CURRENT: current.CURRENT + 1,
+      EXPECTED: current.EXPECTED + 1,
+    }));
+    onSelectionChange([]);
+    setSaveMessages({
+      INITIAL: "",
+      CURRENT: "",
+      EXPECTED: "",
+    });
+    setSaveStates({
+      INITIAL: "pending",
+      CURRENT: "pending",
+      EXPECTED: "pending",
+    });
+    setResetMenuOpen(false);
+    const generation = generationRef.current;
+    saveChainRef.current = saveChainRef.current
+      .then(async () => {
+        if (generation !== generationRef.current) {
+          return;
+        }
+
+        setSaveStates({
+          INITIAL: "saving",
+          CURRENT: "saving",
+          EXPECTED: "saving",
+        });
+        const result = await resetPatientOdontogramStagesAction({
+          patientId,
+          expectedRevisions: { ...revisionRef.current },
+        });
+
+        if (generation !== generationRef.current) {
+          return;
+        }
+        if (!result.ok) {
+          setSaveStates({
+            INITIAL: "error",
+            CURRENT: "error",
+            EXPECTED: "error",
+          });
+          setSaveMessages({
+            INITIAL: result.message,
+            CURRENT: result.message,
+            EXPECTED: result.message,
+          });
+          return;
+        }
+
+        const updatedAt = formatSavedAt(result.updatedAt, languageRef.current);
+        revisionRef.current = { ...result.revisions };
+        setStageRecords(
+          Object.fromEntries(
+            odontogramStages.map((stage) => [
+              stage,
+              {
+                snapshot: blanks[stage],
+                revision: result.revisions[stage],
+                updatedAt,
+                updatedAtIso: result.updatedAt,
+              },
+            ]),
+          ) as StageRecords,
+        );
+        setSaveStates({
+          INITIAL: "saved",
+          CURRENT: "saved",
+          EXPECTED: "saved",
+        });
+      })
+      .catch(() => {
+        if (generation === generationRef.current) {
+          const message =
+            languageRef.current === "vi"
+              ? "Chưa reset được odontogram. Vui lòng thử lại."
+              : "The odontogram could not be reset. Please try again.";
+          setSaveStates({
+            INITIAL: "error",
+            CURRENT: "error",
+            EXPECTED: "error",
+          });
+          setSaveMessages({
+            INITIAL: message,
+            CURRENT: message,
+            EXPECTED: message,
+          });
+        }
+      });
   };
 
   return (
@@ -372,22 +544,62 @@ export function PatientOdontogramEditor({
           <strong>{stageLabels[language][activeStage]}</strong>
           <span>{stageDescriptions[language][activeStage]}</span>
         </div>
-        {activeStage !== "INITIAL" && previousSnapshot ? (
-          <div className="odontogram-stage-difference">
-            <span>
-              {differenceLabel(language, difference)}
-            </span>
-            <button
-              disabled={!canEdit}
-              onClick={copyPreviousStage}
-              title={copyLabels[language][activeStage]}
-              type="button"
-            >
-              <Copy aria-hidden="true" size={15} />
-              {copyLabels[language][activeStage]}
-            </button>
-          </div>
-        ) : null}
+        <div className="odontogram-stage-actions">
+          {activeStage !== "INITIAL" && previousSnapshot ? (
+            <div className="odontogram-stage-difference">
+              <span>
+                {differenceLabel(language, difference)}
+              </span>
+              <button
+                disabled={!canEdit}
+                onClick={copyPreviousStage}
+                title={copyLabels[language][activeStage]}
+                type="button"
+              >
+                <Copy aria-hidden="true" size={15} />
+                {copyLabels[language][activeStage]}
+              </button>
+            </div>
+          ) : null}
+          {canEdit ? (
+            <div className="odontogram-stage-reset-menu">
+              <button
+                aria-expanded={resetMenuOpen}
+                aria-label={
+                  language === "vi" ? "Mở thao tác xóa" : "Open clear actions"
+                }
+                className="odontogram-stage-menu-trigger"
+                onClick={() => setResetMenuOpen((current) => !current)}
+                title={language === "vi" ? "Thao tác xóa" : "Clear actions"}
+                type="button"
+              >
+                <Ellipsis aria-hidden="true" size={17} />
+              </button>
+              {resetMenuOpen ? (
+                <div className="odontogram-stage-reset-popover">
+                  <button
+                    disabled={!activeSnapshot}
+                    onClick={resetActiveStage}
+                    type="button"
+                  >
+                    <Trash2 aria-hidden="true" size={14} />
+                    {language === "vi"
+                      ? "Xóa mốc đang mở"
+                      : "Clear current stage"}
+                  </button>
+                  <button
+                    disabled={!hasInitialStage}
+                    onClick={resetAllStages}
+                    type="button"
+                  >
+                    <Trash2 aria-hidden="true" size={14} />
+                    {language === "vi" ? "Xóa cả 3 mốc" : "Clear all stages"}
+                  </button>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="patient-odontogram-save-state" aria-live="polite">
@@ -406,6 +618,7 @@ export function PatientOdontogramEditor({
         assetBaseUrl="/api/odontogram-assets"
         defaultValue={activeSnapshot}
         embedded
+        hideResetAction
         key={`${patientId}:${activeStage}:${chartVersions[activeStage]}`}
         onChange={handleChange}
         onSelectionChange={onSelectionChange}
@@ -414,6 +627,23 @@ export function PatientOdontogramEditor({
       />
     </div>
   );
+}
+
+function createEmptyOdontogramData(): OdontogramData {
+  return {
+    version: 2,
+    entries: [],
+    generalAssessment: {
+      both: {},
+      upper: {},
+      lower: {},
+      notes: {
+        both: "",
+        upper: "",
+        lower: "",
+      },
+    },
+  };
 }
 
 function recordsFromSummary(

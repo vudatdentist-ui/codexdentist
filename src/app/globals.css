@@ -5732,6 +5732,15 @@ h2 {
   font-size: 11px;
 }
 
+.odontogram-stage-actions {
+  align-items: center;
+  display: flex;
+  flex: 0 1 auto;
+  gap: 8px;
+  justify-content: flex-end;
+  min-width: 0;
+}
+
 .odontogram-stage-difference {
   align-items: center;
   display: flex;
@@ -5758,6 +5767,64 @@ h2 {
   min-height: 34px;
   padding: 0 10px;
   white-space: nowrap;
+}
+
+.odontogram-stage-reset-menu {
+  flex: 0 0 auto;
+  position: relative;
+}
+
+.odontogram-stage-menu-trigger {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--ink);
+  display: inline-grid;
+  height: 34px;
+  padding: 0;
+  place-items: center;
+  width: 34px;
+}
+
+.odontogram-stage-reset-popover {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: 0 10px 30px rgb(25 45 48 / 16%);
+  display: grid;
+  gap: 3px;
+  padding: 5px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  width: 190px;
+  z-index: 30;
+}
+
+.odontogram-stage-reset-popover button {
+  align-items: center;
+  background: var(--surface);
+  border: 0;
+  border-radius: 5px;
+  color: #b42318;
+  display: flex;
+  font-size: 11px;
+  font-weight: 900;
+  gap: 7px;
+  justify-content: flex-start;
+  min-height: 34px;
+  padding: 0 8px;
+  text-align: left;
+  width: 100%;
+}
+
+.odontogram-stage-reset-popover button:hover:not(:disabled) {
+  background: #fff1f2;
+}
+
+.odontogram-stage-reset-popover button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .patient-odontogram-save-state {
@@ -10170,13 +10237,28 @@ a:focus-visible {
   }
 
   .odontogram-stage-context,
+  .odontogram-stage-actions,
   .odontogram-stage-difference {
     align-items: flex-start;
     flex-direction: column;
   }
 
+  .odontogram-stage-actions,
   .odontogram-stage-difference {
     width: 100%;
+  }
+
+  .odontogram-stage-actions {
+    position: relative;
+  }
+
+  .odontogram-stage-reset-menu {
+    align-self: flex-end;
+    position: static;
+  }
+
+  .odontogram-stage-reset-popover {
+    top: 100%;
   }
 
   .odontogram-stage-difference > span {

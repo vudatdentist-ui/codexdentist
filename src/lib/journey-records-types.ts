@@ -11,7 +11,7 @@ export type PatientJourneyStateSummary = {
   updatedByName: string | null;
 };
 
-export const odontogramStages = ["INITIAL", "EXPECTED", "CURRENT"] as const;
+export const odontogramStages = ["INITIAL", "CURRENT", "EXPECTED"] as const;
 export type PatientOdontogramStage = (typeof odontogramStages)[number];
 
 export type PatientOdontogramStageSummary = {

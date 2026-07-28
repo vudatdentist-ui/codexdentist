@@ -26,6 +26,18 @@ export type SavePatientOdontogramResult =
       message: string;
     };
 
+export type ResetPatientOdontogramStagesResult =
+  | {
+      ok: true;
+      revisions: Record<PatientOdontogramStage, number>;
+      updatedAt: string;
+    }
+  | {
+      ok: false;
+      code: "CONFLICT" | "DENIED" | "INVALID" | "NOT_FOUND" | "UNAVAILABLE";
+      message: string;
+    };
+
 export async function savePatientOdontogramAction(input: {
   patientId: string;
   stage: PatientOdontogramStage;
@@ -272,6 +284,190 @@ export async function savePatientOdontogramAction(input: {
   }
 }
 
+export async function resetPatientOdontogramStagesAction(input: {
+  patientId: string;
+  expectedRevisions: Record<PatientOdontogramStage, number | null>;
+}): Promise<ResetPatientOdontogramStagesResult> {
+  const session = await requireViewSession("journey");
+
+  if (!canPerformAction(session, "clinical.odontogram.update")) {
+    return {
+      ok: false,
+      code: "DENIED",
+      message: "Bạn không có quyền cập nhật odontogram.",
+    };
+  }
+
+  const patientId = String(input.patientId ?? "").trim();
+  const expectedRevisions = input.expectedRevisions;
+  if (
+    !patientId ||
+    !expectedRevisions ||
+    !odontogramStagesHaveValidRevisions(expectedRevisions)
+  ) {
+    return {
+      ok: false,
+      code: "INVALID",
+      message: "Dữ liệu reset odontogram không hợp lệ.",
+    };
+  }
+
+  let patient;
+  try {
+    patient = await prisma.patient.findFirst({
+      where: {
+        ...patientAccessWhere(session),
+        id: patientId,
+      },
+      select: {
+        id: true,
+        clinicId: true,
+      },
+    });
+  } catch (error) {
+    console.error("patient.odontogram_reset_patient_lookup_failed", {
+      patientId,
+      organizationId: session.organizationId,
+      error,
+    });
+    return {
+      ok: false,
+      code: "UNAVAILABLE",
+      message: "Chưa reset được odontogram. Vui lòng thử lại.",
+    };
+  }
+
+  if (!patient) {
+    return {
+      ok: false,
+      code: "NOT_FOUND",
+      message: "Không tìm thấy bệnh nhân trong phạm vi được phép.",
+    };
+  }
+
+  const actorId = databaseActorId(session.userId);
+  const blankSnapshot = createEmptyOdontogramSnapshot();
+  const snapshotJson = blankSnapshot as Prisma.InputJsonValue;
+
+  try {
+    const reset = await prisma.$transaction(async (transaction) => {
+      const current = await transaction.patientOdontogram.findFirst({
+        where: {
+          organizationId: session.organizationId,
+          patientId: patient.id,
+        },
+        select: {
+          id: true,
+          initialRevision: true,
+          currentRevision: true,
+          expectedRevision: true,
+        },
+      });
+
+      if (
+        !current ||
+        current.initialRevision !== expectedRevisions.INITIAL ||
+        current.currentRevision !== expectedRevisions.CURRENT ||
+        current.expectedRevision !== expectedRevisions.EXPECTED
+      ) {
+        return null;
+      }
+
+      const now = new Date();
+      const revisions = {
+        INITIAL: current.initialRevision + 1,
+        CURRENT: current.currentRevision + 1,
+        EXPECTED: current.expectedRevision + 1,
+      } satisfies Record<PatientOdontogramStage, number>;
+      const updated = await transaction.patientOdontogram.updateMany({
+        where: {
+          id: current.id,
+          organizationId: session.organizationId,
+          initialRevision: current.initialRevision,
+          currentRevision: current.currentRevision,
+          expectedRevision: current.expectedRevision,
+        },
+        data: {
+          clinicId: patient.clinicId,
+          initialSnapshot: snapshotJson,
+          currentSnapshot: snapshotJson,
+          expectedSnapshot: snapshotJson,
+          initialRevision: revisions.INITIAL,
+          currentRevision: revisions.CURRENT,
+          expectedRevision: revisions.EXPECTED,
+          initialUpdatedAt: now,
+          currentUpdatedAt: now,
+          expectedUpdatedAt: now,
+          updatedById: actorId,
+        },
+      });
+
+      if (updated.count !== 1) {
+        return null;
+      }
+
+      await transaction.patientOdontogramRevision.createMany({
+        data: (["INITIAL", "CURRENT", "EXPECTED"] as const).map((stage) => ({
+          organizationId: session.organizationId,
+          clinicId: patient.clinicId,
+          patientId: patient.id,
+          odontogramId: current.id,
+          stage,
+          revision: revisions[stage],
+          snapshot: snapshotJson,
+          createdById: actorId,
+          createdAt: now,
+        })),
+      });
+      for (const stage of ["INITIAL", "CURRENT", "EXPECTED"] as const) {
+        await createOdontogramAuditLog(transaction, {
+          organizationId: session.organizationId,
+          actorId,
+          odontogramId: current.id,
+          patientId: patient.id,
+          stage,
+          revision: revisions[stage],
+        });
+      }
+
+      return { revisions, updatedAt: now };
+    });
+
+    if (!reset) {
+      return {
+        ok: false,
+        code: "CONFLICT",
+        message: "Odontogram đã được cập nhật ở nơi khác. Hãy tải lại hồ sơ.",
+      };
+    }
+
+    return {
+      ok: true,
+      revisions: reset.revisions,
+      updatedAt: reset.updatedAt.toISOString(),
+    };
+  } catch (error) {
+    if (isUniqueConstraintError(error)) {
+      return {
+        ok: false,
+        code: "CONFLICT",
+        message: "Odontogram đã được cập nhật ở nơi khác. Hãy tải lại hồ sơ.",
+      };
+    }
+
+    console.error("patient.odontogram_reset_failed", {
+      patientId: patient.id,
+      organizationId: session.organizationId,
+      error,
+    });
+    return {
+      ok: false,
+      code: "UNAVAILABLE",
+      message: "Chưa reset được odontogram. Vui lòng thử lại.",
+    };
+  }
+}
+
 async function createOdontogramAuditLog(
   transaction: Prisma.TransactionClient,
   input: {
@@ -301,6 +497,32 @@ async function createOdontogramAuditLog(
 
 function isOdontogramStage(value: unknown): value is PatientOdontogramStage {
   return value === "INITIAL" || value === "EXPECTED" || value === "CURRENT";
+}
+
+function odontogramStagesHaveValidRevisions(
+  revisions: Record<PatientOdontogramStage, number | null>,
+) {
+  return (["INITIAL", "CURRENT", "EXPECTED"] as const).every((stage) => {
+    const revision = revisions[stage];
+    return Number.isInteger(revision) && Number(revision) >= 0;
+  });
+}
+
+function createEmptyOdontogramSnapshot() {
+  return {
+    version: 2 as const,
+    entries: [],
+    generalAssessment: {
+      both: {},
+      upper: {},
+      lower: {},
+      notes: {
+        both: "",
+        upper: "",
+        lower: "",
+      },
+    },
+  };
 }
 
 function revisionForStage(

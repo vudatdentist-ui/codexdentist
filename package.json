@@ -68,7 +68,7 @@
     "@aws-sdk/client-s3": "3.1040.0",
     "@prisma/adapter-pg": "7.8.0",
     "@prisma/client": "7.8.0",
-    "codexdentist-odontogram": "https://github.com/vudatdentist-ui/codexdentist-odontogram/releases/download/v0.6.0/codexdentist-odontogram-0.6.0.tgz",
+    "codexdentist-odontogram": "https://github.com/vudatdentist-ui/codexdentist-odontogram/releases/download/v0.7.0/codexdentist-odontogram-0.7.0.tgz",
     "lucide-react": "1.11.0",
     "next": "16.2.11",
     "pg": "8.20.0",
