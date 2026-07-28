@@ -31,8 +31,8 @@ const reportsText = {
     completed: "hoàn tất",
     collected: "đã thu",
     collection: "Thu tiền",
-    collectionRatio: "Tỷ lệ thu",
-    consentRenewals: "Đồng ý cần gia hạn",
+    collectionRatio: "Thu / doanh thu kỳ",
+    consentRenewals: "Đồng thuận cần gia hạn",
     count: "Số lượng",
     daily: "Hằng ngày",
     close: "Đóng",
@@ -44,7 +44,7 @@ const reportsText = {
     generated: "Cập nhật",
     generatedDemo: "Demo",
     heading: "Hiệu suất phòng khám và tín hiệu rủi ro",
-    live: "Live",
+    live: "Đang cập nhật",
     monthToDate: "Tháng hiện tại",
     newPatients: "Bệnh nhân mới",
     noData: "Chưa có dữ liệu trong phạm vi này",
@@ -149,6 +149,49 @@ const reportStatusText: Record<Language, Record<string, string>> = {
   },
   en: {},
 };
+
+const reportSignalTitleVi: Record<string, string> = {
+  "Open balance": "Công nợ mở",
+  "Unapplied credit": "Tiền thu chưa phân bổ",
+  "CRM follow-ups": "Việc CSKH cần theo dõi",
+  "Low stock items": "Vật tư sắp hết",
+  "Open attendance": "Ca chấm công chưa đóng",
+  "Patient files": "Tệp bệnh án",
+  "Collection ratio": "Tỷ lệ thu",
+};
+
+const reportPeriodLabelVi: Record<string, string> = {
+  Current: "Chưa quá hạn",
+  Mon: "T2",
+  Tue: "T3",
+  Wed: "T4",
+  Thu: "T5",
+  Fri: "T6",
+  Sat: "T7",
+  Sun: "CN",
+};
+
+const reportSourceLabelVi: Record<string, string> = {
+  WALK_IN: "Khách trực tiếp",
+  REFERRAL: "Được giới thiệu",
+  FACEBOOK: "Facebook",
+  GOOGLE: "Google",
+  ZALO: "Zalo",
+  CAMPAIGN: "Chiến dịch",
+  OTHER: "Nguồn khác",
+};
+
+function localizedReportLabel(label: string, language: Language) {
+  if (language !== "vi") {
+    return label;
+  }
+
+  return reportSignalTitleVi[label] ?? reportPeriodLabelVi[label] ?? label;
+}
+
+function localizedSourceLabel(source: string, language: Language) {
+  return language === "vi" ? reportSourceLabelVi[source] ?? source : source;
+}
 
 export function ReportsPanel({
   reportsWorkspace,
@@ -369,7 +412,7 @@ export function ReportsPanel({
           <div className="record-grid">
             {signals.map((signal) => (
               <RecordTile
-                title={signal.title}
+                title={localizedReportLabel(signal.title, language)}
                 value={signal.value}
                 key={signal.title}
               />
@@ -385,7 +428,7 @@ export function ReportsPanel({
             {(reportsWorkspace?.trend ?? []).length > 0 ? (
               reportsWorkspace?.trend.map((point) => (
                 <div className="report-trend-row" key={point.label}>
-                  <span>{point.label}</span>
+                  <span>{localizedReportLabel(point.label, language)}</span>
                   <div>
                     <i
                       className="production"
@@ -416,7 +459,7 @@ export function ReportsPanel({
               reportsWorkspace?.aging.map((bucket) => (
                 <div className="report-aging-row" key={bucket.label}>
                   <span>
-                    <strong>{bucket.label}</strong>
+                    <strong>{localizedReportLabel(bucket.label, language)}</strong>
                     <small>{bucket.count} {text.count}</small>
                   </span>
                   <div>
@@ -513,7 +556,7 @@ export function ReportsPanel({
                   type="button"
                 >
                   <span>
-                    <strong>{item.source}</strong>
+                    <strong>{localizedSourceLabel(item.source, language)}</strong>
                     <small>
                       {item.newPatientCount} {text.newPatients}
                     </small>
@@ -546,7 +589,7 @@ export function ReportsPanel({
                   type="button"
                 >
                   <span>
-                    <strong>{item.source}</strong>
+                    <strong>{localizedSourceLabel(item.source, language)}</strong>
                     <small>
                       {formatVnd(item.collection)} {text.collected} · {text.sourceRoi}: {item.roiPercent == null ? "-" : `${item.roiPercent}%`}
                     </small>
@@ -620,7 +663,7 @@ export function ReportsPanel({
               <h3>
                 {selectedService?.label ??
                   selectedProvider?.name ??
-                  selectedSource?.source ??
+                  (selectedSource ? localizedSourceLabel(selectedSource.source, language) : null) ??
                   text.details}
               </h3>
               <button
@@ -666,7 +709,10 @@ export function ReportsPanel({
               )}
               {selectedSource && (
                 <>
-                  <RecordTile title={text.sourceDrilldown} value={selectedSource.source} />
+                  <RecordTile
+                    title={text.sourceDrilldown}
+                    value={localizedSourceLabel(selectedSource.source, language)}
+                  />
                   <RecordTile title={text.newPatients} value={String(selectedSource.newPatientCount)} />
                   <RecordTile title={text.production} value={formatVnd(selectedSource.production)} />
                   <RecordTile title={text.collection} value={formatVnd(selectedSource.collection)} />

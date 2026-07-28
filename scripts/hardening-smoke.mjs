@@ -15,7 +15,7 @@ async function main() {
     "return process.env.DEFAULT_DATA_SEED_ENABLED === \"true\";",
   ]);
   assertSource("src/app/(auth)/login/page.tsx", [
-    "Sign-in is temporarily unavailable. Please try again later.",
+    "Tạm thời chưa thể đăng nhập. Vui lòng thử lại sau.",
   ]);
   assertSourceMissing("src/app/(auth)/login/page.tsx", [
     "DATABASE_URL",
@@ -47,6 +47,21 @@ async function main() {
     "checkSecretHygiene",
     "Add ${pattern} to .gitignore",
   ]);
+  assertSource("src/app/(app)/settings/actions.ts", [
+    "preservedAssignments",
+    "roleAssignmentDeleteWhere",
+    "!session.clinicIds.includes(existingAssignment.clinicId)",
+  ]);
+  assertFunctionSourceMissing(
+    "src/app/(app)/patients/actions.ts",
+    "createPatientAction",
+    ["consents"],
+  );
+  assertFunctionSourceMissing(
+    "src/app/(app)/crm/actions.ts",
+    "convertCrmLeadToPatientAction",
+    ["consents"],
+  );
 
   await assertDocumentSequenceModel();
   console.log("ok hardening smoke");
@@ -68,6 +83,27 @@ function assertSourceMissing(path, needles) {
   for (const needle of needles) {
     if (source.includes(needle)) {
       throw new Error(`${path} should not include user-facing implementation detail: ${needle}`);
+    }
+  }
+}
+
+function assertFunctionSourceMissing(path, functionName, needles) {
+  const source = readFileSync(path, "utf8");
+  const functionStart = source.indexOf(`export async function ${functionName}`);
+  const nextFunction = source.indexOf("\nexport async function ", functionStart + 1);
+
+  if (functionStart < 0) {
+    throw new Error(`${path} missing function: ${functionName}`);
+  }
+
+  const functionSource = source.slice(
+    functionStart,
+    nextFunction < 0 ? source.length : nextFunction,
+  );
+
+  for (const needle of needles) {
+    if (functionSource.includes(needle)) {
+      throw new Error(`${path} ${functionName} must not include: ${needle}`);
     }
   }
 }

@@ -351,7 +351,12 @@ export function InventoryPanel({
   const openPurchaseOrders = purchaseOrders.filter((order) => order.status !== "RECEIVED");
   const lowStock = items.filter((item) => item.minimumStock > 0 && item.onHandQuantity <= item.minimumStock);
   const outOfStock = items.filter((item) => item.minimumStock > 0 && item.onHandQuantity <= 0);
-  const expiringLots = lots.filter((lot) => Boolean(lot.expiresAt) && lot.quantityOnHand > 0).slice(0, 8);
+  const expiringLots = lots
+    .filter((lot) => Boolean(lot.expiresAt) && lot.quantityOnHand > 0)
+    .sort((left, right) =>
+      String(left.expiresAt).localeCompare(String(right.expiresAt)),
+    )
+    .slice(0, 8);
   const inventoryValue = items.reduce(
     (total, item) => total + item.onHandQuantity * (item.averageUnitCost ?? 0),
     0,

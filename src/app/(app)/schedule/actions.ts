@@ -30,6 +30,7 @@ function scheduleRedirect(
   context: {
     clinicId?: string | null;
     date?: string | null;
+    dateTo?: string | null;
     providerId?: string | null;
     status?: string | null;
   } = {},
@@ -46,6 +47,10 @@ function scheduleRedirect(
 
   if (context.date) {
     params.set("date", context.date);
+  }
+
+  if (context.dateTo) {
+    params.set("dateTo", context.dateTo);
   }
 
   if (context.providerId) {
@@ -268,6 +273,7 @@ export async function updateAppointmentStatusAction(formData: FormData) {
   const postedPatientId = requiredString(formData.get("patientId"));
   const postedClinicId = requiredString(formData.get("clinicId"));
   const postedDate = requiredString(formData.get("date"));
+  const postedDateTo = requiredString(formData.get("dateTo"));
   const postedProviderId = requiredString(formData.get("providerFilter"));
   const postedStatus = requiredString(formData.get("statusFilter"));
   const requestedChairId = requiredString(formData.get("chairId"));
@@ -276,6 +282,7 @@ export async function updateAppointmentStatusAction(formData: FormData) {
   const redirectContext = {
     clinicId: postedClinicId || null,
     date: postedDate || null,
+    dateTo: postedDateTo || null,
     providerId: postedProviderId === "all" ? null : postedProviderId,
     status: postedStatus === "all" ? null : postedStatus,
   };
@@ -415,11 +422,13 @@ export async function cancelAppointmentAction(formData: FormData) {
   const postedPatientId = requiredString(formData.get("patientId"));
   const postedClinicId = requiredString(formData.get("clinicId"));
   const postedDate = requiredString(formData.get("date"));
+  const postedDateTo = requiredString(formData.get("dateTo"));
   const postedProviderId = requiredString(formData.get("providerFilter"));
   const postedStatus = requiredString(formData.get("statusFilter"));
   const redirectContext = {
     clinicId: postedClinicId || null,
     date: postedDate || null,
+    dateTo: postedDateTo || null,
     providerId: postedProviderId === "all" ? null : postedProviderId,
     status: postedStatus === "all" ? null : postedStatus,
   };
@@ -694,12 +703,14 @@ function normalizeOperationalStatus(status: string) {
 function scheduleContextFromForm(formData: FormData) {
   const postedClinicId = requiredString(formData.get("clinicId"));
   const postedDate = requiredString(formData.get("date"));
+  const postedDateTo = requiredString(formData.get("dateTo"));
   const postedProviderId = requiredString(formData.get("providerFilter"));
   const postedStatus = requiredString(formData.get("statusFilter"));
 
   return {
     clinicId: postedClinicId || null,
     date: postedDate || null,
+    dateTo: postedDateTo || null,
     providerId: postedProviderId === "all" ? null : postedProviderId,
     status: postedStatus === "all" ? null : postedStatus,
   };

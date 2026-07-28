@@ -40,7 +40,7 @@ const routeMarkers = {
   crm: ["Customer care", "Chăm sóc khách hàng"],
   inventory: ["Equipment and supplies", "Thiết bị và vật tư tiêu hao"],
   pharmacy: ["Prescriptions and drug library", "Đơn thuốc và thư viện thuốc"],
-  forms: ["Forms and consent library", "Biểu mẫu và consent form"],
+  forms: ["Forms and consent library", "Biểu mẫu và phiếu đồng thuận"],
   learning: ["Digital library and courses", "Thư viện số và khóa học"],
   "employee-app": ["Staff mobile app", "Ứng dụng nhân viên"],
   reports: ["Reports", "Báo cáo"],

@@ -45,6 +45,8 @@ Staff job title/position lives in the staff profile (`StaffProfile.title`) and i
 
 Route access lives in `src/lib/permissions.ts`. Mutation permissions live in `src/lib/actions/permissions.ts`. UI role checks are presentation only. Server code should use permission helpers with the full session, not direct `session.role` checks, unless the logic is explicitly about legacy compatibility or patient self-scope.
 
+A clinic-scoped manager may update only memberships, role assignments, and staff profiles in clinics they manage. Assignments outside that scope must be preserved, and staff management must never demote or disable an equal/higher-ranked account.
+
 ## Product Modules
 
 - Dashboard/task inbox
@@ -94,6 +96,8 @@ Route access lives in `src/lib/permissions.ts`. Mutation permissions live in `sr
 ## Files And Storage
 
 - Patient Portal authorization uses the unique `Patient.portalUserId -> User.id` relation. Email is contact data and must never be used as an authorization key.
+- Creating a patient or converting a CRM lead must never auto-grant consent. Consent becomes valid only through an explicit, auditable patient/staff consent action.
+- Patient Portal shows only actionable future appointments and calculates the outstanding balance from all open invoices, not from a paginated display subset.
 - Patient files are protected records, not public assets.
 - Hosted production uses private Cloudflare R2. Self-host mode may use the private local volume mounted at `/data/patient-files`.
 - Files are served through `/patient-files/[fileId]` with session, role, organization, clinic, and linked-patient checks.

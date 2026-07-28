@@ -451,10 +451,11 @@ export function ScheduleBoard({
   const inChairAppointments = activeDayAppointments.filter(
     (appointment) => appointment.status === "In chair",
   );
-  const occupiedChairAppointments = activeDayAppointments.filter(
+  const occupiedChairAppointments = visibleAppointments.filter(
     (appointment) =>
       Boolean(appointment.chairId) &&
-      (appointment.status === "In chair" || appointment.status === "Completed"),
+      appointment.status === "In chair" &&
+      (clinicFilter === "all" || appointment.clinicId === clinicFilter),
   );
   const readyChairCount = filteredChairs.filter(
     (chair) =>
@@ -517,6 +518,7 @@ export function ScheduleBoard({
   const scheduleFilterContext = {
     clinicId: clinicFilter,
     date: scheduleStartDate,
+    dateTo: scheduleEndDate,
     providerFilter,
     statusFilter,
   };
@@ -1245,6 +1247,7 @@ function utcDateToDateInput(date: Date) {
 type ScheduleFilterContext = {
   clinicId: string;
   date: string;
+  dateTo: string;
   providerFilter: string;
   statusFilter: string;
 };
@@ -1254,6 +1257,7 @@ function ScheduleFilterHiddenFields({ context }: { context: ScheduleFilterContex
     <>
       <input name="clinicId" type="hidden" value={context.clinicId} />
       <input name="date" type="hidden" value={context.date} />
+      <input name="dateTo" type="hidden" value={context.dateTo} />
       <input name="providerFilter" type="hidden" value={context.providerFilter} />
       <input name="statusFilter" type="hidden" value={context.statusFilter} />
     </>

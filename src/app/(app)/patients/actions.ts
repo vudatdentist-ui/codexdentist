@@ -127,15 +127,6 @@ export async function createPatientAction(formData: FormData) {
           address,
           nationalId,
           medicalAlerts,
-          consents: {
-            create: {
-              status: "GRANTED",
-              purpose: "Health data processing for dental care",
-              channel: "front_desk",
-              signedAt: new Date(),
-              version: "vn-simple-v1",
-            },
-          },
         },
         select: {
           id: true,

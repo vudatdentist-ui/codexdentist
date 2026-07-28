@@ -3,7 +3,7 @@
 import { FileText, UsersRound, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createPatientAction,
   updatePatientAction,
@@ -29,6 +29,14 @@ function SourceBadge({ source }: { source?: "database" | "demo" }) {
 
 function clinicIsActive(clinic: Pick<Clinic, "active">) {
   return clinic.active !== false;
+}
+
+function patientVisitLabel(value: string | null | undefined, language: Language) {
+  if (!value || /^not booked$/i.test(value)) {
+    return language === "vi" ? "Chưa có lịch hẹn" : "Not booked";
+  }
+
+  return value;
 }
 
 function workspaceMessageText(message: string | null | undefined, language: Language) {
@@ -178,6 +186,7 @@ export function PatientsPanel({
   const [appliedPatientUrlId, setAppliedPatientUrlId] = useState(requestedPatientId);
   const [createPatientModalOpen, setCreatePatientModalOpen] = useState(false);
   const [editPatientModalOpen, setEditPatientModalOpen] = useState(false);
+  const patientDetailRef = useRef<HTMLElement>(null);
   const [createPatientPhone, setCreatePatientPhone] = useState("");
   const [createPatientEmail, setCreatePatientEmail] = useState("");
   const selectedPatient =
@@ -213,6 +222,11 @@ export function PatientsPanel({
     setEditPatientModalOpen(false);
     router.replace(`/patients?patientId=${encodeURIComponent(patientId)}`, {
       scroll: false,
+    });
+    requestAnimationFrame(() => {
+      if (window.matchMedia("(max-width: 760px)").matches) {
+        patientDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
     });
   };
 
@@ -419,29 +433,37 @@ export function PatientsPanel({
         <section className="panel">
           <PanelHeader icon={UsersRound} title={text.patientRegistry} action={text.live} />
           <div className="table-list">
-            {operationalPatients.map((patient) => (
-              <button
-                className={
-                  selectedPatient?.id === patient.id ? "table-row active" : "table-row"
-                }
-                key={patient.id}
-                onClick={() => selectPatient(patient.id)}
-                type="button"
-              >
-                <span>
-                  <strong>{patient.name}</strong>
-                  <small>
-                    {patientCodeFor(patient)} · {patient.phone} · {patient.city}
-                  </small>
-                </span>
-                <span>{patient.nextVisit}</span>
-                <span>{formatVnd(patient.balance)}</span>
-              </button>
-            ))}
+            {operationalPatients.length > 0 ? (
+              operationalPatients.map((patient) => (
+                <button
+                  className={
+                    selectedPatient?.id === patient.id ? "table-row active" : "table-row"
+                  }
+                  key={patient.id}
+                  onClick={() => selectPatient(patient.id)}
+                  type="button"
+                >
+                  <span>
+                    <strong>{patient.name}</strong>
+                    <small>
+                      {patientCodeFor(patient)} · {patient.phone} · {patient.city}
+                    </small>
+                  </span>
+                  <span>{patientVisitLabel(patient.nextVisit, language)}</span>
+                  <span>{formatVnd(patient.balance)}</span>
+                </button>
+              ))
+            ) : (
+              <EmptyState label={text.empty} />
+            )}
           </div>
         </section>
 
-        <section className="panel patient-card" key={selectedPatient?.id ?? "empty"}>
+        <section
+          className="panel patient-card"
+          key={selectedPatient?.id ?? "empty"}
+          ref={patientDetailRef}
+        >
           {selectedPatient ? (
             <>
               <PanelHeader
@@ -497,7 +519,7 @@ export function PatientsPanel({
                   </span>
                   <span>
                     <span>{text.nextVisit}</span>
-                    <strong>{selectedPatient.nextVisit || text.unknown}</strong>
+                    <strong>{patientVisitLabel(selectedPatient.nextVisit, language)}</strong>
                   </span>
                   <span>
                     <span>{text.treatmentProgress}</span>
@@ -780,7 +802,15 @@ export function PatientsPanel({
               ) : null}
             </>
           ) : (
-            <EmptyState label={text.empty} />
+            <EmptyState
+              label={
+                operationalPatients.length > 0
+                  ? language === "vi"
+                    ? "Chọn một bệnh nhân trong danh sách để xem hồ sơ."
+                    : "Select a patient from the list to view the profile."
+                  : text.empty
+              }
+            />
           )}
         </section>
       </section>

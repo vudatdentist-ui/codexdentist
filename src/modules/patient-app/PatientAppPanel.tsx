@@ -30,6 +30,9 @@ const portalText = {
     heading: "Lịch hẹn, điều trị, đồng ý, thanh toán",
     mobileAria: "Xem trước ứng dụng bệnh nhân",
     mobileFlow: "Luồng ứng dụng bệnh nhân",
+    live: "Đang hoạt động",
+    nextAppointment: (procedure: string, clinic: string, time: string) =>
+      `${procedure} tại ${clinic}, ${time}.`,
     noAppointmentPrefix: "Hồ sơ của bạn đang hoạt động tại",
     noServices: "Chưa có dịch vụ điều trị",
     notLinked: "Chưa liên kết",
@@ -59,6 +62,9 @@ const portalText = {
     heading: "Appointments, treatment, consent, payments",
     mobileAria: "Patient mobile app preview",
     mobileFlow: "Patient mobile flow",
+    live: "Live",
+    nextAppointment: (procedure: string, clinic: string, time: string) =>
+      `${procedure} at ${clinic} on ${time}.`,
     noAppointmentPrefix: "Your profile is active at",
     noServices: "No treatment services yet",
     notLinked: "Not linked",
@@ -73,7 +79,7 @@ const portalText = {
     treatmentPlans: "Treatment plans",
     unknown: "Unknown",
   },
-} satisfies Record<Language, Record<string, string>>;
+};
 
 const noticeText: Record<string, Record<Language, string>> = {
   "portal-appointment-confirmed": {
@@ -126,12 +132,11 @@ export function PatientAppPanel({
   const patient = patientPortalWorkspace?.patient ?? null;
   const appointments = patientPortalWorkspace?.appointments ?? [];
   const invoices = patientPortalWorkspace?.invoices ?? [];
+  const outstandingBalance = patientPortalWorkspace?.outstandingBalance ?? 0;
   const treatmentPlans = patientPortalWorkspace?.treatmentPlans ?? [];
   const patientFiles = patientPortalWorkspace?.patientFiles ?? [];
   const treatmentServices = patientPortalWorkspace?.treatmentServices ?? [];
-  const nextAppointment = appointments.find(
-    (appointment) => appointment.status !== "Cancelled" && appointment.status !== "Completed",
-  );
+  const nextAppointment = appointments[0];
   const openInvoice = invoices.find(
     (invoice) => invoice.status !== "Paid" && invoice.status !== "Void",
   );
@@ -161,7 +166,7 @@ export function PatientAppPanel({
 
       <section className="content-grid portal-layout mobile-app-grid">
         <section className="panel">
-          <PanelHeader icon={Smartphone} title={text.mobileFlow} action="Live" />
+          <PanelHeader icon={Smartphone} title={text.mobileFlow} action={text.live} />
           {patient ? (
             <div className="phone-frame" aria-label={text.mobileAria}>
               <div className="phone-top">
@@ -176,7 +181,11 @@ export function PatientAppPanel({
               </strong>
               <p>
                 {nextAppointment
-                  ? `${nextAppointment.procedure} at ${patient.clinic} on ${nextAppointment.time}.`
+                  ? text.nextAppointment(
+                      nextAppointment.procedure,
+                      patient.clinic,
+                      nextAppointment.time,
+                    )
                   : `${text.noAppointmentPrefix} ${patient.clinic}.`}
               </p>
               <div className="mobile-actions">
@@ -287,12 +296,7 @@ export function PatientAppPanel({
             <RecordTile title={text.files} value={String(patientFiles.length)} />
             <RecordTile
               title={text.balance}
-              value={formatVnd(
-                invoices.reduce(
-                  (total, invoice) => total + invoice.amount - (invoice.paidAmount ?? 0),
-                  0,
-                ),
-              )}
+              value={formatVnd(outstandingBalance)}
             />
           </div>
 

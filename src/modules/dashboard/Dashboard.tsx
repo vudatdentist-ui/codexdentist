@@ -139,7 +139,7 @@ export function Dashboard({
           patientFlow: "Luồng bệnh nhân hôm nay",
           clinics: "Phòng khám",
           risks: "Tín hiệu cần xử lý",
-          providers: "Tải bác sĩ/hygienist",
+          providers: "Tải bác sĩ/phụ tá",
           appointments: "Lịch hẹn sắp tới",
           emptyAppointments: "Chưa có lịch hẹn trong hôm nay",
           emptyProviders: "Chưa có tải nhân sự trong hôm nay",
@@ -379,7 +379,9 @@ export function Dashboard({
           <div className="schedule-alert">{workspaceMessageText(taskInboxWorkspace.message, language)}</div>
         )}
         {notice && <div className="schedule-alert action">{notice}</div>}
-        <div className="dashboard-inbox-subhead">{inboxLabels.notificationForm}</div>
+        {taskInboxWorkspace?.canMutate ? (
+        <details className="dashboard-compose-details">
+          <summary>{inboxLabels.notificationForm}</summary>
         <form action={createInAppNotificationAction} className="notification-compose-form dashboard-notification-form">
           <input name="redirectTo" type="hidden" value="/dashboard" />
           <div className="notification-compose-grid">
@@ -475,7 +477,11 @@ export function Dashboard({
             </details>
           </div>
         </form>
-        <div className="dashboard-inbox-subhead">{inboxLabels.taskForm}</div>
+        </details>
+        ) : null}
+        {taskInboxWorkspace?.canMutate ? (
+        <details className="dashboard-compose-details">
+          <summary>{inboxLabels.taskForm}</summary>
         <form action={createWorkItemAction} className="staff-form compact task-inbox-form">
           <input name="title" placeholder={inboxLabels.create} disabled={!taskInboxWorkspace?.canMutate} required />
           <select name="patientId" disabled={!taskInboxWorkspace?.canMutate}>
@@ -506,6 +512,8 @@ export function Dashboard({
             {inboxLabels.create}
           </button>
         </form>
+        </details>
+        ) : null}
         <div className="invoice-list task-inbox-list">
           {inboxItems.length > 0 ? (
             inboxItems.slice(0, 12).map((item) => (

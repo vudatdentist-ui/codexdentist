@@ -1069,8 +1069,6 @@ export async function updateStaffRoleAction(formData: FormData) {
     redirect("/settings?notice=settings-missing");
   }
 
-  const role = primaryStaffRoleForAssignments(assignmentRoles);
-
   if (!canAssignStaffRoles(session, assignmentRoles)) {
     redirect("/settings?notice=settings-denied");
   }
@@ -1124,12 +1122,50 @@ export async function updateStaffRoleAction(formData: FormData) {
           isOrganizationScopedRole(assignmentRole) ? null : clinicId,
         ),
       );
+      const managesAllClinics = canUseAllClinics(session);
+      const preservedAssignments = managesAllClinics
+        ? []
+        : user.roleAssignments.filter(
+            (existingAssignment) =>
+              !existingAssignment.clinicId ||
+              !session.clinicIds.includes(existingAssignment.clinicId),
+          );
+      const role = primaryStaffRoleForAssignments([
+        ...preservedAssignments
+          .map((existingAssignment) => existingAssignment.role)
+          .filter(isStaffProfileRole),
+        ...assignmentRoles,
+      ]);
       const membershipClinicIds =
         clinicScopedRoles.length > 0 && clinicId ? [clinicId] : [];
-      const userClinicDeleteWhere = canUseAllClinics(session)
+      const userClinicDeleteWhere = managesAllClinics
         ? { userId }
         : {
             userId,
+            clinicId: {
+              in: session.clinicIds,
+            },
+          };
+      const roleAssignmentDeleteWhere = managesAllClinics
+        ? {
+            userId,
+            organizationId: user.organizationId,
+          }
+        : {
+            userId,
+            organizationId: user.organizationId,
+            clinicId: {
+              in: session.clinicIds,
+            },
+          };
+      const staffProfileUpdateWhere = managesAllClinics
+        ? {
+            userId,
+            organizationId: user.organizationId,
+          }
+        : {
+            userId,
+            organizationId: user.organizationId,
             clinicId: {
               in: session.clinicIds,
             },
@@ -1145,10 +1181,7 @@ export async function updateStaffRoleAction(formData: FormData) {
           },
         }),
         prisma.userRoleAssignment.deleteMany({
-          where: {
-            userId,
-            organizationId: user.organizationId,
-          },
+          where: roleAssignmentDeleteWhere,
         }),
         prisma.userRoleAssignment.createMany({
           data: assignments,
@@ -1171,10 +1204,7 @@ export async function updateStaffRoleAction(formData: FormData) {
         ...(clinicScopedRoles.length > 0 && clinicId
           ? [
               prisma.staffProfile.updateMany({
-                where: {
-                  userId,
-                  organizationId: user.organizationId,
-                },
+                where: staffProfileUpdateWhere,
                 data: {
                   clinicId,
                 },
@@ -1743,6 +1773,7 @@ async function findScopedUser(session: AppSession, userId: string) {
           active: true,
         },
         select: {
+          clinicId: true,
           role: true,
         },
       },

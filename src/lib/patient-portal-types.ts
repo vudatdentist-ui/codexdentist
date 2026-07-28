@@ -40,6 +40,7 @@ export type PatientPortalWorkspace = {
   patient: PortalPatientSummary | null;
   appointments: Appointment[];
   invoices: Invoice[];
+  outstandingBalance: number;
   treatmentPlans: TreatmentPlan[];
   patientFiles: PortalPatientFileSummary[];
   treatmentServices: PortalTreatmentServiceSummary[];

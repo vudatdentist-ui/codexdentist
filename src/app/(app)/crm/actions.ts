@@ -331,15 +331,6 @@ export async function convertCrmLeadToPatientAction(formData: FormData) {
             email: lead.email,
             leadSource: crmLeadSourceToPatientSource(lead.source),
             medicalAlerts: [],
-            consents: {
-              create: {
-                status: "GRANTED",
-                purpose: "Health data processing for dental care",
-                channel: "crm",
-                signedAt: new Date(),
-                version: "vn-simple-v1",
-              },
-            },
           },
           select: {
             id: true,

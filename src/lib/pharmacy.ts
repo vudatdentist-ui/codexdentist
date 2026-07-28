@@ -723,6 +723,7 @@ export async function getPharmacyWorkspace(
           fullName: true,
           phone: true,
           clinicId: true,
+          medicalAlerts: true,
         },
         orderBy: {
           fullName: "asc",
@@ -802,6 +803,7 @@ export async function getPharmacyWorkspace(
         name: patient.fullName,
         phone: patient.phone,
         clinicId: patient.clinicId,
+        medicalAlerts: patient.medicalAlerts,
       })),
       medications: medications.map(toMedicationSummary),
       templates: templates.map(toTemplateSummary),

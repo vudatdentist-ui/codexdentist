@@ -30,6 +30,16 @@ function normalizeSearchText(value: string | number | null | undefined) {
     .toLowerCase();
 }
 
+function accountingPeriodLabel(periodMonth: string, language: Language) {
+  const [year, month] = periodMonth.split("-");
+
+  if (!year || !month) {
+    return periodMonth;
+  }
+
+  return language === "vi" ? `Tháng ${month}/${year}` : `${year}-${month}`;
+}
+
 function matchesAccountingSearch(query: string, values: Array<string | number | null | undefined>) {
   if (!query) return true;
   return values.some((value) => normalizeSearchText(value).includes(query));
@@ -291,7 +301,7 @@ export function AccountingPanel({
     <section className="view-stack">
       <div className="toolbar">
         <div>
-          <p className="eyebrow">Accounting</p>
+          <p className="eyebrow">{language === "vi" ? "Kế toán" : "Accounting"}</p>
           <h2>{labels.heading}</h2>
         </div>
         <div className="accounting-toolbar-actions">
@@ -363,7 +373,11 @@ export function AccountingPanel({
       {accountingSection === "pnl" && (
       <section className="content-grid accounting-layout">
         <section className="panel">
-          <PanelHeader icon={BarChart3} title={labels.pnl} action={periodMonth} />
+          <PanelHeader
+            icon={BarChart3}
+            title={labels.pnl}
+            action={accountingPeriodLabel(periodMonth, language)}
+          />
           <div className="accounting-pnl-list">
             {pnlLines.map((line) => (
               <div className="accounting-pnl-row" key={line.categoryId}>

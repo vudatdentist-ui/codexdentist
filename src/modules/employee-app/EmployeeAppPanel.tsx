@@ -173,12 +173,12 @@ export function EmployeeAppPanel({
   const labels =
     language === "vi"
       ? {
-          appTitle: "App nhân viên",
-          approvedCommission: "Commission đã duyệt/đã trả",
+          appTitle: "Ứng dụng nhân viên",
+          approvedCommission: "Hoa hồng đã duyệt/đã trả",
           attendance: "Chấm công cá nhân",
           baseSalary: "Lương cứng",
           baseSalaryEstimate: "Lương cứng tạm tính",
-          commission: "Commission",
+          commission: "Hoa hồng",
           clockIn: "Vào ca",
           clockOutConfirm: "Xác nhận ra ca và đóng log chấm công hiện tại?",
           clockOut: "Ra ca",
@@ -199,7 +199,7 @@ export function EmployeeAppPanel({
           noShifts: "Chưa có ca làm",
           note: "Ghi chú",
           openShift: "Đang mở",
-          pendingCommission: "Commission chờ duyệt",
+          pendingCommission: "Hoa hồng chờ duyệt",
           reason: "Lý do",
           requestLeave: "Gửi đơn nghỉ",
           start: "Từ ngày",

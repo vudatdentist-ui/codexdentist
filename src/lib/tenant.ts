@@ -1,7 +1,7 @@
 import "server-only";
 
 import { headers } from "next/headers";
-import { appRootDomain } from "@/lib/env";
+import { appRootDomain, trustedProxyProvider } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 
 export const reservedTenantSlugs = new Set([
@@ -42,9 +42,17 @@ export function tenantDomainForSlug(slug: string) {
 
 export async function currentHostname() {
   const headerStore = await headers();
-  return normalizeHostname(
-    headerStore.get("host") ?? headerStore.get("x-forwarded-host") ?? "",
+  const directHostname = normalizeHostname(headerStore.get("host") ?? "");
+  const forwardedHostname = normalizeHostname(
+    headerStore.get("x-forwarded-host")?.split(",")[0] ?? "",
   );
+  const canTrustForwardedHost =
+    trustedProxyProvider() !== "none" ||
+    (process.env.NODE_ENV !== "production" && isLocalHostname(directHostname));
+
+  return canTrustForwardedHost && forwardedHostname
+    ? forwardedHostname
+    : directHostname;
 }
 
 export function normalizeHostname(host: string) {

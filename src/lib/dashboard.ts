@@ -380,7 +380,7 @@ export async function getDashboardWorkspace(
           href: "/billing",
         },
         {
-          label: "Consent cần xử lý",
+          label: "Đồng thuận cần xử lý",
           value: String(patientsMissingConsent),
           detail: "Bệnh nhân chưa có consent hợp lệ",
           tone: patientsMissingConsent > 0 ? "amber" : "green",
@@ -401,7 +401,7 @@ export async function getDashboardWorkspace(
           href: "/dashboard",
         },
         {
-          label: "Task mở",
+          label: "Công việc đang mở",
           value: String(openWorkItems),
           detail: `${openCrmActivities} việc CRM, ${openAttendanceLogs} chấm công mở`,
           tone: openWorkItems + openCrmActivities > 0 ? "violet" : "green",

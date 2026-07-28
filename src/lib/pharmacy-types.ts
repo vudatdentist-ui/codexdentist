@@ -3,6 +3,7 @@ export type PharmacyPatientOption = {
   name: string;
   phone: string | null;
   clinicId: string;
+  medicalAlerts: string[];
 };
 
 export type MedicationCatalogSummary = {

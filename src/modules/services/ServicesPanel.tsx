@@ -835,10 +835,10 @@ export function ServicesPanel({
                 <label>
                   {labels.status}
                   <select name="status" defaultValue={editingService.status} disabled={!canMutate}>
-                    <option value="DRAFT">DRAFT</option>
-                    <option value="ACTIVE">ACTIVE</option>
+                    <option value="DRAFT">{displayStatus("DRAFT", language)}</option>
+                    <option value="ACTIVE">{displayStatus("ACTIVE", language)}</option>
                     <option value="RETIRED" disabled={!canDeleteServices && editingService.status !== "RETIRED"}>
-                      RETIRED
+                      {displayStatus("RETIRED", language)}
                     </option>
                   </select>
                 </label>

@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 
 const baseUrl = process.env.SETTINGS_FORM_SMOKE_BASE_URL ?? "http://127.0.0.1:3000";
 const email = process.env.SETTINGS_FORM_SMOKE_EMAIL ?? "owner@nhavista.vn";
-const password = process.env.SETTINGS_FORM_SMOKE_PASSWORD ?? "demo1234";
+const password = process.env.SETTINGS_FORM_SMOKE_PASSWORD ?? "CodexSmoke2026!";
 const connectionString =
   process.env.DATABASE_URL ??
   "postgresql://postgres:postgres@localhost:5432/vietnam_dental_suite?schema=public";
@@ -12,8 +12,6 @@ const prisma = new PrismaClient({
 });
 const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 const fixture = {
-  chainName: `MFORM Chain ${suffix}`,
-  chainNameUpdated: `MFORM Chain Updated ${suffix}`,
   clinicName: `MFORM Clinic ${suffix}`,
   clinicNameUpdated: `MFORM Clinic Updated ${suffix}`,
 };
@@ -22,49 +20,12 @@ async function main() {
   const cookie = await login();
 
   try {
-    const settingsHtml = await getPage("/settings", cookie);
-    const createChainAction = actionForForm(settingsHtml, {
-      include: ["name", "brandName", "phone"],
-      exclude: ["chainId", "clinicId", "city", "address"],
-    });
-
-    await postAction(cookie, createChainAction, {
-      name: fixture.chainName,
-      brandName: `Brand ${suffix}`,
-      phone: "0900000000",
-    });
-
-    const chain = await prisma.chain.findFirstOrThrow({
-      where: { name: fixture.chainName },
-      select: { id: true, organizationId: true },
-    });
-    console.log("ok create chain form");
-
-    const refreshedAfterChain = await getPage("/settings", cookie);
-    const updateChainAction = actionForForm(refreshedAfterChain, {
-      include: ["chainId", "legalName", "specialty", "taxCode", "website"],
+    const settingsHtml = await getPage("/settings?section=organization", cookie);
+    const createClinicAction = actionForForm(settingsHtml, {
+      include: ["name", "city", "address", "phone"],
       exclude: ["clinicId"],
     });
-    await postAction(cookie, updateChainAction, {
-      chainId: chain.id,
-      name: fixture.chainNameUpdated,
-      legalName: `Legal ${suffix}`,
-      brandName: `Brand Updated ${suffix}`,
-      taxCode: `TAX${suffix}`,
-      phone: "0911111111",
-      email: `chain-${suffix}@example.test`,
-      website: "https://example.test",
-      specialty: "DENTAL",
-    });
-    console.log("ok update chain form");
-
-    const refreshedAfterUpdate = await getPage("/settings", cookie);
-    const createClinicAction = actionForForm(refreshedAfterUpdate, {
-      include: ["name", "city", "address", "phone"],
-      exclude: ["clinicId", "legalName"],
-    });
     await postAction(cookie, createClinicAction, {
-      chainId: chain.id,
       name: fixture.clinicName,
       city: "QA",
       address: "Disposable form fixture",
@@ -73,18 +34,17 @@ async function main() {
 
     const clinic = await prisma.clinic.findFirstOrThrow({
       where: { name: fixture.clinicName },
-      select: { id: true },
+      select: { id: true, organizationId: true },
     });
     console.log("ok create clinic form");
 
-    const refreshedAfterClinic = await getPage("/settings", cookie);
+    const refreshedAfterClinic = await getPage("/settings?section=organization", cookie);
     const updateClinicAction = actionForForm(refreshedAfterClinic, {
-      include: ["clinicId", "chainId", "city", "address", "phone"],
+      include: ["clinicId", "city", "address", "phone"],
       exclude: ["legalName"],
     });
     await postAction(cookie, updateClinicAction, {
       clinicId: clinic.id,
-      chainId: chain.id,
       name: fixture.clinicNameUpdated,
       city: "QA2",
       address: "Disposable form fixture updated",
@@ -92,7 +52,7 @@ async function main() {
     });
     console.log("ok update clinic form");
 
-    const refreshedAfterClinicUpdate = await getPage("/settings", cookie);
+    const refreshedAfterClinicUpdate = await getPage("/settings?section=organization", cookie);
     const toggleClinicAction = actionForForm(refreshedAfterClinicUpdate, {
       include: ["clinicId", "active"],
       exclude: ["name", "city", "address"],
@@ -107,38 +67,17 @@ async function main() {
     });
     console.log("ok toggle clinic form");
 
-    const refreshedAfterToggle = await getPage("/settings", cookie);
-    const toggleChainAction = actionForForm(refreshedAfterToggle, {
-      include: ["chainId", "active"],
-      exclude: ["name", "legalName", "clinicId"],
-    });
-    await postAction(cookie, toggleChainAction, {
-      chainId: chain.id,
-      active: "false",
-    });
-    await postAction(cookie, toggleChainAction, {
-      chainId: chain.id,
-      active: "true",
-    });
-    console.log("ok toggle chain form");
-
-    const finalChain = await prisma.chain.findUniqueOrThrow({
-      where: { id: chain.id },
+    const finalClinic = await prisma.clinic.findUniqueOrThrow({
+      where: { id: clinic.id },
       select: {
         active: true,
         name: true,
-        clinics: {
-          where: { id: clinic.id },
-          select: { active: true, name: true },
-        },
       },
     });
 
     if (
-      !finalChain.active ||
-      finalChain.name !== fixture.chainNameUpdated ||
-      finalChain.clinics[0]?.name !== fixture.clinicNameUpdated ||
-      !finalChain.clinics[0]?.active
+      !finalClinic.active ||
+      finalClinic.name !== fixture.clinicNameUpdated
     ) {
       throw new Error("Settings form lifecycle did not persist expected final state.");
     }
@@ -261,31 +200,21 @@ function cookieHeader(response) {
 }
 
 async function cleanup() {
-  const chains = await prisma.chain.findMany({
+  const clinics = await prisma.clinic.findMany({
     where: {
       name: {
-        in: [fixture.chainName, fixture.chainNameUpdated],
+        in: [fixture.clinicName, fixture.clinicNameUpdated],
       },
     },
     select: {
       id: true,
-      clinics: {
-        select: {
-          id: true,
-        },
-      },
     },
   });
-  const clinicIds = chains.flatMap((chain) => chain.clinics.map((clinic) => clinic.id));
-  const chainIds = chains.map((chain) => chain.id);
+  const clinicIds = clinics.map((clinic) => clinic.id);
 
   if (clinicIds.length > 0) {
     await prisma.userClinic.deleteMany({ where: { clinicId: { in: clinicIds } } });
     await prisma.clinic.deleteMany({ where: { id: { in: clinicIds } } });
-  }
-
-  if (chainIds.length > 0) {
-    await prisma.chain.deleteMany({ where: { id: { in: chainIds } } });
   }
 
   console.log("ok cleanup");

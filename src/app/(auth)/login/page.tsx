@@ -35,8 +35,8 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         </div>
 
         <div>
-          <p className="eyebrow">Staff access</p>
-          <h1>Sign in to Codexdentist</h1>
+          <p className="eyebrow">Dành cho nhân sự</p>
+          <h1>Đăng nhập Codexdentist</h1>
         </div>
 
         {params?.error && (
@@ -46,12 +46,12 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         )}
         {params?.reset === "success" && (
           <p className="login-success">
-            Password saved. Sign in with the new password.
+            Đã lưu mật khẩu. Hãy đăng nhập bằng mật khẩu mới.
           </p>
         )}
         {params?.forgot === "sent" && (
           <p className="login-success">
-            If that email belongs to an active account, a password reset link has been sent.
+            Nếu email thuộc tài khoản đang hoạt động, hệ thống đã gửi liên kết đặt lại mật khẩu.
           </p>
         )}
 
@@ -67,7 +67,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
             />
           </label>
           <label>
-            Password
+            Mật khẩu
             <input
               name="password"
               type="password"
@@ -78,15 +78,15 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
           </label>
           <button className="primary-button" type="submit">
             <LockKeyhole size={16} />
-            Sign in
+            Đăng nhập
           </button>
         </form>
 
         <details className="forgot-password-panel">
-          <summary>Forgot password?</summary>
+          <summary>Quên mật khẩu?</summary>
           <form action={forgotPasswordAction} className="login-form">
             <label>
-              Account email
+              Email tài khoản
               <input
                 name="email"
                 type="email"
@@ -95,14 +95,14 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               />
             </label>
             <button className="secondary-button" type="submit">
-              Send reset link
+              Gửi liên kết đặt lại mật khẩu
             </button>
           </form>
         </details>
 
         {showDemoAccounts && (
           <div className="demo-accounts">
-            <strong>Demo accounts</strong>
+            <strong>Tài khoản dùng thử</strong>
             {demoAccounts.map((account) => (
               <span key={account}>
                 {account} / demo1234
@@ -117,24 +117,24 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
 function loginErrorText(error: string) {
   if (error === "database") {
-    return "Sign-in is temporarily unavailable. Please try again later.";
+    return "Tạm thời chưa thể đăng nhập. Vui lòng thử lại sau.";
   }
 
   if (error === "rate-limited") {
-    return "Too many sign-in attempts. Wait a few minutes, then try again.";
+    return "Bạn đã thử đăng nhập quá nhiều lần. Vui lòng chờ vài phút rồi thử lại.";
   }
 
   if (error === "password-change-required") {
-    return "This account needs a password setup link from an administrator.";
+    return "Tài khoản này cần liên kết thiết lập mật khẩu từ quản trị viên.";
   }
 
   if (error === "tenant-not-found") {
-    return "This system subdomain is not registered.";
+    return "Tên miền phòng khám này chưa được đăng ký.";
   }
 
   if (error === "expired") {
-    return "This demo workspace has expired. Start a new 24-hour demo.";
+    return "Không gian dùng thử đã hết hạn. Hãy tạo một phiên dùng thử 24 giờ mới.";
   }
 
-  return "Email or password is not valid.";
+  return "Email hoặc mật khẩu không đúng.";
 }

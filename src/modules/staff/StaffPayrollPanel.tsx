@@ -4,6 +4,7 @@ import { Activity, Building2, CalendarDays, FileText, WalletCards, X } from "luc
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { DayPicker, type DayButtonProps } from "react-day-picker";
+import { enUS, vi } from "react-day-picker/locale";
 import { useMemo, useState, type MouseEvent } from "react";
 import {
   approvePayrollRunAction,
@@ -800,13 +801,14 @@ export function StaffPayrollPanel({
         <PanelHeader
           icon={CalendarDays}
           title={hrLabels.calendar30}
-          action={selectedStaffDay?.dateKey ?? today}
+          action={staffCalendarDayLabel(selectedStaffDay?.dateKey ?? today, language)}
         />
         <p className="staff-calendar-hint">{hrLabels.calendarHint}</p>
         <DayPicker
           className="staff-day-picker"
           components={{ DayButton: StaffCalendarDayButton }}
           fixedWeeks
+          locale={language === "vi" ? vi : enUS}
           mode="single"
           month={staffCalendarMonth}
           onMonthChange={setStaffCalendarMonth}

@@ -2,8 +2,8 @@
 
 import { Bell, CreditCard, Download, FileText, Printer, Search, UsersRound, WalletCards } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
-import { useMemo, useState, type FormEvent } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   adjustInvoiceAmountAction,
   createInvoiceAction,
@@ -1161,6 +1161,7 @@ export function BillingPanel({
   visiblePatients: Patient[];
 }) {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const { language } = useAppLanguage();
   const bt = billingText[language];
   const requestedBillingPatientId = searchParams.get("patientId") ?? "";
@@ -1185,6 +1186,24 @@ export function BillingPanel({
   const [selectedBillingPatientId, setSelectedBillingPatientId] = useState(
     requestedBillingPatientId,
   );
+  const selectBillingPatient = (patientId: string) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+
+    if (patientId) {
+      nextParams.set("patientId", patientId);
+    } else {
+      nextParams.delete("patientId");
+    }
+
+    setSelectedBillingPatientId(patientId);
+    router.replace(`/billing${nextParams.size ? `?${nextParams.toString()}` : ""}`, {
+      scroll: false,
+    });
+  };
+
+  useEffect(() => {
+    setSelectedBillingPatientId(requestedBillingPatientId);
+  }, [requestedBillingPatientId]);
   const billingDatabaseOnly = billingWorkspace?.source === "database";
   const billingClinicOptions = visibleClinics.filter((clinic) =>
     visibleClinicIds.has(clinic.id),
@@ -2546,7 +2565,7 @@ export function BillingPanel({
                   className="billing-patient-card"
                   key={row.patient.id}
                   onClick={() => {
-                    setSelectedBillingPatientId(row.patient.id);
+                    selectBillingPatient(row.patient.id);
                     setBillingSection("collection");
                   }}
                   type="button"
@@ -2594,7 +2613,7 @@ export function BillingPanel({
       <div className="billing-selected-patient-bar">
         <button
           className="secondary-button"
-          onClick={() => setSelectedBillingPatientId("")}
+          onClick={() => selectBillingPatient("")}
           type="button"
         >
           {bt.backToPatients}

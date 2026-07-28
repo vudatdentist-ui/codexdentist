@@ -470,6 +470,7 @@ export function PharmacyPanel({
       name: patient.name,
       phone: patient.phone,
       clinicId: patient.clinicId,
+      medicalAlerts: patient.flags,
     })) ??
     []
   ).filter((patient) => visibleClinicIds.has(patient.clinicId));
@@ -571,6 +572,7 @@ export function PharmacyPanel({
           patientSearchPlaceholder: "Tìm bệnh nhân theo tên, mã, số điện thoại",
           noPatientResults: "Không có bệnh nhân phù hợp",
           selectPatientFirst: "Chọn bệnh nhân bằng ô tìm kiếm trước khi lưu đơn.",
+          medicalAlerts: "Cảnh báo y khoa",
           diagnosis: "Chẩn đoán",
           notes: "Ghi chú / dặn dò chung",
           drug: "Thuốc",
@@ -646,6 +648,7 @@ export function PharmacyPanel({
           patientSearchPlaceholder: "Search patient by name, code, or phone",
           noPatientResults: "No matching patients",
           selectPatientFirst: "Select a patient with search before saving the prescription.",
+          medicalAlerts: "Medical alerts",
           diagnosis: "Diagnosis",
           notes: "Notes / general instructions",
           drug: "Drug",
@@ -939,6 +942,12 @@ export function PharmacyPanel({
                 />
                 {!selectedPrescriptionPatient ? (
                   <small className="field-helper warning">{text.selectPatientFirst}</small>
+                ) : null}
+                {selectedPrescriptionPatient?.medicalAlerts.length ? (
+                  <div className="schedule-alert">
+                    <strong>{text.medicalAlerts}:</strong>{" "}
+                    {selectedPrescriptionPatient.medicalAlerts.join(", ")}
+                  </div>
                 ) : null}
               </section>
 

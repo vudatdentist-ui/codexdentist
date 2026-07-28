@@ -14,7 +14,7 @@ import {
   X,
 } from "lucide-react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import {
   createChairAction,
@@ -366,13 +366,35 @@ export function SettingsPanel({
   const { language } = useAppLanguage();
   const text = settingsText[language];
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const requestedSettingsSection = searchParams.get("section");
+  const initialSettingsSection =
+    requestedSettingsSection &&
+    ["accounts", "organization", "archive", "providers", "governance"].includes(
+      requestedSettingsSection,
+    )
+      ? (requestedSettingsSection as
+          | "accounts"
+          | "organization"
+          | "archive"
+          | "providers"
+          | "governance")
+      : "accounts";
   const notice = useNoticeText(visibleActionNoticeParam(searchParams.get("notice")));
   const [settingsModal, setSettingsModal] = useState<"staff" | "staff-config" | null>(null);
   const [selectedStaffId, setSelectedStaffId] = useState<string | null>(null);
   const [staffConfigTab, setStaffConfigTab] = useState<"profile" | "access" | "security">("profile");
   const [settingsSection, setSettingsSection] = useState<
     "accounts" | "organization" | "archive" | "providers" | "governance"
-  >("accounts");
+  >(initialSettingsSection);
+  const selectSettingsSection = (
+    section: "accounts" | "organization" | "archive" | "providers" | "governance",
+  ) => {
+    const nextParams = new URLSearchParams(searchParams.toString());
+    nextParams.set("section", section);
+    setSettingsSection(section);
+    router.replace(`/settings?${nextParams.toString()}`, { scroll: false });
+  };
   const [settingsArchiveSearch, setSettingsArchiveSearch] = useState("");
   const setupEmail = searchParams.get("setupEmail");
   const canMutate = settingsWorkspace?.canMutate ?? false;
@@ -839,7 +861,7 @@ export function SettingsPanel({
           title: "Chức vụ / chức danh công việc",
           totalStaff: "Tài khoản",
           pendingSetup: "Chờ mật khẩu",
-          activeOwners: "Owner hoạt động",
+          activeOwners: "Chủ hệ thống hoạt động",
           addChain: "Thêm chuỗi",
           addClinic: "Thêm chi nhánh",
           address: "Địa chỉ",
@@ -940,7 +962,7 @@ export function SettingsPanel({
           clinicScope: "Clinic scope",
           createPasswordLink: "Send password setup email",
           createStaffTitle: "Create staff account",
-          commissionRate: "Commission %",
+          commissionRate: "Tỷ lệ hoa hồng (%)",
           contractType: "Contract type",
           dateOfBirth: "Date of birth",
           department: "Department",
@@ -1143,7 +1165,7 @@ export function SettingsPanel({
             aria-selected={settingsSection === section.key}
             className={settingsSection === section.key ? "active" : ""}
             key={section.key}
-            onClick={() => setSettingsSection(section.key)}
+            onClick={() => selectSettingsSection(section.key)}
             role="tab"
             type="button"
           >

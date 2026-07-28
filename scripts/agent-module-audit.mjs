@@ -22,6 +22,10 @@ const allowedTechnical = [
   "src/lib/runtime-guards.ts",
   "src/lib/prisma.ts",
   "src/app/(app)/actions.ts",
+  // Public product and installation pages may explain the self-host stack.
+  "src/app/page.tsx",
+  "src/app/docs/page.tsx",
+  "src/app/features/page.tsx",
 ];
 
 const findings = [];

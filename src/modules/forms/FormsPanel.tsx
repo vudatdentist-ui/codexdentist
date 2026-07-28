@@ -300,7 +300,7 @@ export function FormsPanel({
   const text =
     language === "vi"
       ? {
-          heading: "Biểu mẫu, consent form và khai báo bệnh nhân",
+          heading: "Biểu mẫu, phiếu đồng thuận và khai báo bệnh nhân",
           assign: "Gửi biểu mẫu",
           cancel: "Hủy",
           close: "Đóng",
@@ -339,7 +339,7 @@ export function FormsPanel({
           save: "Lưu",
           voidConfirm: "Hủy biểu mẫu này? Hành động sẽ được lưu audit.",
           empty: "Chưa có dữ liệu",
-          formsTab: "Form bệnh nhân",
+          formsTab: "Phiếu bệnh nhân",
           templatesTab: "Thư viện mẫu",
           storageTab: "Lưu trữ & chữ ký",
         }
@@ -390,13 +390,13 @@ export function FormsPanel({
   const formStorageLabels =
     language === "vi"
       ? {
-          attachments: "File đính kèm",
-          patientFiles: "File bệnh án",
-          patientFilesValue: "Ảnh/PDF qua route bảo vệ /patient-files/[fileId]",
-          signature: "Link chữ ký",
-          signatureValue: "Lưu signatureUrl trong PatientForm và audit khi hoàn tất",
-          storagePolicy: "Chính sách file và chữ ký",
-          attachmentsValue: "Lưu danh sách link/file id trong PatientForm.attachments",
+          attachments: "Tệp đính kèm",
+          patientFiles: "Tệp bệnh án",
+          patientFilesValue: "Ảnh và PDF được bảo vệ theo quyền truy cập bệnh án.",
+          signature: "Liên kết chữ ký",
+          signatureValue: "Chữ ký được lưu cùng thời điểm hoàn tất biểu mẫu.",
+          storagePolicy: "Chính sách tệp và chữ ký",
+          attachmentsValue: "Tệp đính kèm được lưu cùng biểu mẫu của bệnh nhân.",
         }
       : {
           attachments: "Attachments",

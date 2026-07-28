@@ -1926,14 +1926,10 @@ export function PatientJourneyPanel({
     clinicalWorkspace?.notes.filter((note) => note.patientId === selectedPatientKey) ??
     [];
   const selectedPlans = visiblePlans.filter(
-    (plan) =>
-      plan.patientId === selectedPatientKey ||
-      (selectedPatient && plan.patient === selectedPatient.name),
+    (plan) => plan.patientId === selectedPatientKey,
   );
   const selectedInvoices = visibleInvoices.filter(
-    (invoice) =>
-      invoice.patientId === selectedPatientKey ||
-      (selectedPatient && invoice.patient === selectedPatient.name),
+    (invoice) => invoice.patientId === selectedPatientKey,
   );
   const selectedBillingReceipts =
     billingWorkspace?.receipts.filter(

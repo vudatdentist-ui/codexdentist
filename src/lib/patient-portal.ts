@@ -31,16 +31,24 @@ export async function getPatientPortalWorkspace(
         patient: null,
         appointments: [],
         invoices: [],
+        outstandingBalance: 0,
         treatmentPlans: [],
         patientFiles: [],
         treatmentServices: [],
       };
     }
 
-    const [appointments, invoices, plans, patientFiles, treatmentServices] = await Promise.all([
+    const now = new Date();
+    const [appointments, invoices, invoiceTotals, plans, patientFiles, treatmentServices] = await Promise.all([
       prisma.appointment.findMany({
         where: {
           patientId: patient.id,
+          startsAt: {
+            gte: now,
+          },
+          status: {
+            notIn: ["CANCELLED", "COMPLETED", "NO_SHOW"],
+          },
         },
         include: {
           provider: {
@@ -67,6 +75,18 @@ export async function getPatientPortalWorkspace(
           dueDate: "asc",
         },
         take: 6,
+      }),
+      prisma.invoice.aggregate({
+        where: {
+          patientId: patient.id,
+          status: {
+            notIn: ["PAID", "VOID"],
+          },
+        },
+        _sum: {
+          amount: true,
+          paidAmount: true,
+        },
       }),
       prisma.treatmentPlan.findMany({
         where: {
@@ -158,6 +178,10 @@ export async function getPatientPortalWorkspace(
         status: invoiceStatusLabel(invoice.status, invoice.dueDate),
         due: vietnamDate(invoice.dueDate),
       })),
+      outstandingBalance: Math.max(
+        Number(invoiceTotals._sum.amount ?? 0) - Number(invoiceTotals._sum.paidAmount ?? 0),
+        0,
+      ),
       treatmentPlans: plans.map((plan) => ({
         id: plan.id,
         patient: patient.fullName,
@@ -259,11 +283,14 @@ function demoPatientPortalWorkspace(session: AppSession): PatientPortalWorkspace
       patient: null,
       appointments: [],
       invoices: [],
+      outstandingBalance: 0,
       treatmentPlans: [],
       patientFiles: [],
       treatmentServices: [],
     };
   }
+
+  const invoices = demoInvoices.filter((invoice) => invoice.patientId === patient.id);
 
   return {
     source: "demo",
@@ -282,7 +309,11 @@ function demoPatientPortalWorkspace(session: AppSession): PatientPortalWorkspace
     appointments: demoAppointments.filter(
       (appointment) => appointment.patientId === patient.id,
     ),
-    invoices: demoInvoices.filter((invoice) => invoice.patientId === patient.id),
+    invoices,
+    outstandingBalance: invoices.reduce(
+      (total, invoice) => total + invoice.amount - (invoice.paidAmount ?? 0),
+      0,
+    ),
     treatmentPlans: demoPlans.filter((plan) => plan.patientId === patient.id),
     patientFiles: [],
     treatmentServices: [],

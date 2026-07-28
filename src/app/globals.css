@@ -1883,10 +1883,16 @@ h2 {
 
 .schedule-row {
   display: grid;
-  grid-template-columns: 82px minmax(220px, 1.4fr) minmax(150px, 0.9fr) minmax(120px, 0.7fr) 112px minmax(220px, 0.9fr);
+  grid-template-columns:
+    64px
+    minmax(150px, 1.35fr)
+    minmax(110px, 0.85fr)
+    minmax(80px, 0.65fr)
+    108px
+    minmax(160px, 0.95fr);
   gap: 10px;
   align-items: center;
-  min-width: 980px;
+  min-width: 760px;
   border: 1px solid var(--line);
   border-left: 4px solid var(--line);
   border-radius: 8px;
@@ -8169,6 +8175,24 @@ textarea {
   padding: 12px;
 }
 
+.dashboard-compose-details {
+  border-bottom: 1px solid var(--line);
+  padding: 8px 0;
+}
+
+.dashboard-compose-details > summary {
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 900;
+  list-style-position: inside;
+  padding: 6px 0;
+}
+
+.dashboard-compose-details[open] > summary {
+  margin-bottom: 8px;
+}
+
 .task-inbox-row {
   grid-template-columns: minmax(240px, 1fr) 92px auto;
 }
@@ -10344,16 +10368,31 @@ a:focus-visible {
   .reports-summary-grid,
   .dashboard-command-panel,
   .dashboard-flow,
+  .learning-metric-grid,
+  .inventory-metric-grid,
+  .settings-metric-grid,
+  .staff-ops-metric-grid,
+  .schedule-metrics.three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metric-card {
+    min-height: 86px;
+    padding: 12px;
+  }
+
+  .dashboard-command-copy,
+  .dashboard-command-status {
+    grid-column: 1 / -1;
+  }
+
   .task-inbox-row,
   .report-trend-row,
   .report-aging-row,
   .report-service-row,
   .patient-file-governance-form,
-  .learning-metric-grid,
-  .inventory-metric-grid,
   .inventory-alert-grid,
   .inventory-main-grid,
-  .settings-metric-grid,
   .settings-overview-grid,
   .settings-lower-grid,
   .settings-staff-meta,
@@ -10381,12 +10420,10 @@ a:focus-visible {
   .staff-calendar-grid,
   .staff-day-detail-grid,
   .staff-day-modal-grid,
-  .staff-ops-metric-grid,
   .staff-form,
   .staff-roster-grid,
   .staff-row,
   .schedule-filters,
-  .schedule-metrics.three,
   .vitals-grid,
   .odontogram-workbench,
   .journey-service-row,
