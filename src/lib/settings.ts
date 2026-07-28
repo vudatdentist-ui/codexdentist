@@ -166,7 +166,6 @@ export async function getSettingsWorkspace(
               department: true,
               contractType: true,
               baseSalary: true,
-              commissionRate: true,
               hireDate: true,
               dateOfBirth: true,
               gender: true,
@@ -344,7 +343,6 @@ export async function getSettingsWorkspace(
         department: user.staffProfile?.department ?? null,
         contractType: user.staffProfile?.contractType ?? null,
         baseSalary: user.staffProfile?.baseSalary?.toString() ?? null,
-        commissionRate: user.staffProfile?.commissionRate?.toString() ?? null,
         hireDate: user.staffProfile?.hireDate
           ? vietnamDate(user.staffProfile.hireDate)
           : null,

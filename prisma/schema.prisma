@@ -879,7 +879,6 @@ model StaffProfile {
   department                String?
   contractType              String          @default("FULL_TIME")
   baseSalary                Decimal?        @db.Decimal(12, 2)
-  commissionRate            Decimal?        @db.Decimal(5, 2)
   hireDate                  DateTime?
   dateOfBirth               DateTime?
   gender                    String?

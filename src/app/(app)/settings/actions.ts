@@ -1259,7 +1259,6 @@ export async function updateStaffProfileAction(formData: FormData) {
   const dateOfBirth = optionalDate(formData.get("dateOfBirth"));
   const gender = optionalString(formData.get("gender"));
   const baseSalary = optionalDecimal(formData.get("baseSalary"));
-  const commissionRate = optionalDecimal(formData.get("commissionRate"));
   const avatarFile = formData.get("avatar");
 
   if (!userId || !fullName) {
@@ -1282,7 +1281,7 @@ export async function updateStaffProfileAction(formData: FormData) {
     redirect("/settings?notice=settings-profile-bad-date");
   }
 
-  if (baseSalary === false || commissionRate === false) {
+  if (baseSalary === false) {
     redirect("/settings?notice=settings-profile-bad-number");
   }
 
@@ -1340,7 +1339,6 @@ export async function updateStaffProfileAction(formData: FormData) {
         department,
         contractType,
         baseSalary: baseSalary || null,
-        commissionRate: commissionRate || null,
         hireDate: hireDate || null,
         dateOfBirth: dateOfBirth || null,
         gender,

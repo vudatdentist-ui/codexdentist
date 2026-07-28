@@ -123,7 +123,6 @@ async function seedUsersAndStaff(organizationId, clinicId, actorId) {
       department: "Lâm sàng",
       employeeCode: "AI-BS01",
       baseSalary: "18000000",
-      commissionRate: "12.00",
       gender: "Nữ",
     },
     {
@@ -135,7 +134,6 @@ async function seedUsersAndStaff(organizationId, clinicId, actorId) {
       department: "Lâm sàng",
       employeeCode: "AI-PT01",
       baseSalary: "9000000",
-      commissionRate: "3.00",
       gender: "Nữ",
     },
     {
@@ -147,7 +145,6 @@ async function seedUsersAndStaff(organizationId, clinicId, actorId) {
       department: "Vận hành",
       employeeCode: "AI-LT01",
       baseSalary: "11000000",
-      commissionRate: "2.00",
       gender: "Nam",
     },
     {
@@ -159,7 +156,6 @@ async function seedUsersAndStaff(organizationId, clinicId, actorId) {
       department: "Tài chính",
       employeeCode: "AI-KT01",
       baseSalary: "13000000",
-      commissionRate: "0.00",
       gender: "Nữ",
     },
   ];
@@ -206,7 +202,6 @@ async function seedUsersAndStaff(organizationId, clinicId, actorId) {
         department: user.department,
         contractType: "FULL_TIME",
         baseSalary: user.baseSalary,
-        commissionRate: user.commissionRate,
         hireDate: addDays(-180),
         dateOfBirth: addDays(-365 * 29),
         gender: user.gender,
@@ -218,7 +213,6 @@ async function seedUsersAndStaff(organizationId, clinicId, actorId) {
         department: user.department,
         contractType: "FULL_TIME",
         baseSalary: user.baseSalary,
-        commissionRate: user.commissionRate,
         active: true,
       },
     });

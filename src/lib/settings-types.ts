@@ -69,7 +69,6 @@ export type StaffMember = {
   department: string | null;
   contractType: string | null;
   baseSalary: string | null;
-  commissionRate: string | null;
   hireDate: string | null;
   hireDateIso: string | null;
   dateOfBirth: string | null;

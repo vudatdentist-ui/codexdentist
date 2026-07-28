@@ -120,6 +120,7 @@ A clinic-scoped manager may update only memberships, role assignments, and staff
 - Journey progress can consume service materials automatically and create low-stock work items.
 - Every positive Journey progress delta creates its own compensation accrual. Consultant, operator, clinical support, and assistants are assigned per progress event so different staff can earn different stages; never merge accruals across progress events.
 - When neither assistant is assigned, both assistant shares fall back to the operator. When only the primary assistant is assigned, the secondary share falls back to that primary assistant.
+- Staff profiles store base salary only. There is no personal commission percentage; variable income comes from service compensation accruals or the separate source-commission workflow.
 - Journey treatment service deletion is owner-only and only allowed while the service is still planned with no progress, invoice, receipt/allocation, or compensation history.
 - Keep stock controls out of compact Journey service cards.
 - Payroll is an audit MVP. It does not automatically calculate taxes, social insurance, base salary proration, or deductions.

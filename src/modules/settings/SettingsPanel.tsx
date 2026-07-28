@@ -226,7 +226,7 @@ const settingsNotices: Record<Language, Record<string, string>> = {
     "settings-profile-updated": "Đã cập nhật hồ sơ nhân sự.",
     "settings-profile-missing-fields": "Cần có họ tên nhân sự.",
     "settings-profile-bad-date": "Chọn ngày hồ sơ nhân sự hợp lệ.",
-    "settings-profile-bad-number": "Nhập lương và hoa hồng hợp lệ.",
+    "settings-profile-bad-number": "Nhập lương hợp lệ.",
     "settings-profile-bad-avatar": "Ảnh hồ sơ phải là file ảnh.",
     "settings-profile-avatar-large": "Ảnh hồ sơ phải nhỏ hơn hoặc bằng 5 MB.",
     "settings-profile-code-exists": "Mã nhân sự này đã được hồ sơ khác sử dụng.",
@@ -278,7 +278,7 @@ const settingsNotices: Record<Language, Record<string, string>> = {
     "settings-profile-updated": "Staff profile updated.",
     "settings-profile-missing-fields": "Staff name is required.",
     "settings-profile-bad-date": "Select valid staff profile dates.",
-    "settings-profile-bad-number": "Enter valid salary and commission numbers.",
+    "settings-profile-bad-number": "Enter a valid salary.",
     "settings-profile-bad-avatar": "Profile photo must be an image file.",
     "settings-profile-avatar-large": "Profile photo must be 5 MB or smaller.",
     "settings-profile-code-exists": "Another staff profile already uses that employee code.",
@@ -822,7 +822,6 @@ export function SettingsPanel({
           clinicScope: "Phạm vi phòng khám",
           createPasswordLink: "Gửi email thiết lập mật khẩu",
           createStaffTitle: "Tạo tài khoản nhân sự",
-          commissionRate: "Hoa hồng %",
           contractType: "Loại hợp đồng",
           dateOfBirth: "Ngày sinh",
           department: "Bộ phận",
@@ -962,7 +961,6 @@ export function SettingsPanel({
           clinicScope: "Clinic scope",
           createPasswordLink: "Send password setup email",
           createStaffTitle: "Create staff account",
-          commissionRate: "Tỷ lệ hoa hồng (%)",
           contractType: "Contract type",
           dateOfBirth: "Date of birth",
           department: "Department",
@@ -1497,10 +1495,6 @@ export function SettingsPanel({
                       <label>
                         {accountLabels.salary}
                         <input name="baseSalary" inputMode="decimal" defaultValue={member.baseSalary ?? ""} disabled={!formReady} />
-                      </label>
-                      <label>
-                        {accountLabels.commissionRate}
-                        <input name="commissionRate" inputMode="decimal" defaultValue={member.commissionRate ?? ""} disabled={!formReady} />
                       </label>
                       <label className="settings-profile-file-field">
                         {accountLabels.profilePhoto}
@@ -2234,10 +2228,6 @@ export function SettingsPanel({
                 <label>
                   {accountLabels.salary}
                   <input name="baseSalary" inputMode="decimal" defaultValue={selectedStaff.baseSalary ?? ""} disabled={!formReady} />
-                </label>
-                <label>
-                  {accountLabels.commissionRate}
-                  <input name="commissionRate" inputMode="decimal" defaultValue={selectedStaff.commissionRate ?? ""} disabled={!formReady} />
                 </label>
                 <label className="settings-profile-file-field">
                   {accountLabels.profilePhoto}
