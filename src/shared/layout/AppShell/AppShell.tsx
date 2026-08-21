@@ -6,8 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { logoutAction } from "@/app/(app)/actions";
 import { LanguageContext, type Language } from "@/components/AppLanguage";
-import { roleLabels, viewRoutes, type ViewKey } from "@/lib/permissions";
-import type { AppSession } from "@/lib/session";
+import { roleLabels, viewRoutes, type AppRole, type ViewKey } from "@/lib/permissions";
 import { appShellNavigation } from "./navigation";
 import styles from "./AppShell.module.css";
 
@@ -30,12 +29,22 @@ const shellText = {
   },
 } satisfies Record<Language, Record<string, string>>;
 
+export type AppShellContext = {
+  fullName: string;
+  organizationName: string;
+  role: AppRole;
+  clinics: Array<{
+    id: string;
+    name: string;
+  }>;
+};
+
 export type AppShellV2Props = {
   activeView: ViewKey;
   allowedViews: ViewKey[];
   children: ReactNode;
+  context: AppShellContext;
   notificationCount?: number;
-  session: AppSession;
   title: Record<Language, string>;
 };
 
@@ -43,8 +52,8 @@ export function AppShellV2({
   activeView,
   allowedViews,
   children,
+  context,
   notificationCount = 0,
-  session,
   title,
 }: AppShellV2Props) {
   const router = useRouter();
@@ -55,7 +64,7 @@ export function AppShellV2({
   const text = shellText[language];
   const requestedClinicId = searchParams.get("clinicId");
   const selectedClinicId =
-    requestedClinicId && session.clinics.some((clinic) => clinic.id === requestedClinicId)
+    requestedClinicId && context.clinics.some((clinic) => clinic.id === requestedClinicId)
       ? requestedClinicId
       : "all";
 
@@ -92,7 +101,7 @@ export function AppShellV2({
             </div>
             <div className={styles.brandText}>
               <strong>Codexdentist</strong>
-              <span>{session.organizationName}</span>
+              <span>{context.organizationName}</span>
             </div>
           </div>
 
@@ -136,7 +145,7 @@ export function AppShellV2({
             </div>
 
             <div className={styles.actions}>
-              {session.clinics.length > 1 && (
+              {context.clinics.length > 1 && (
                 <select
                   aria-label={text.clinicScope}
                   className={styles.select}
@@ -144,7 +153,7 @@ export function AppShellV2({
                   value={selectedClinicId}
                 >
                   <option value="all">{text.allClinics}</option>
-                  {session.clinics.map((clinic) => (
+                  {context.clinics.map((clinic) => (
                     <option key={clinic.id} value={clinic.id}>
                       {clinic.name}
                     </option>
@@ -183,8 +192,8 @@ export function AppShellV2({
               </Link>
 
               <div className={styles.identity}>
-                <strong>{session.fullName}</strong>
-                <span>{roleLabels[session.role]}</span>
+                <strong>{context.fullName}</strong>
+                <span>{roleLabels[context.role]}</span>
               </div>
 
               <form action={logoutAction}>
