@@ -164,7 +164,7 @@ export default async function Home({ searchParams }: HomePageProps) {
             hệ thống thống nhất, có thể tự host và để phòng khám chủ động kiểm soát dữ liệu.
           </p>
           <div className={styles.heroActions}>
-            <Link className={styles.primaryCta} href={demoUrl}>
+            <Link className={styles.primaryCta} href={demoUrl} data-qa="demo-cta">
               Dùng thử đầy đủ 24 giờ
               <ArrowRight size={17} aria-hidden="true" />
             </Link>
@@ -191,7 +191,7 @@ export default async function Home({ searchParams }: HomePageProps) {
       </section>
 
       <section className={styles.proofStrip} aria-label="Tín hiệu tin cậy có thể kiểm chứng">
-        <a href={sourceUrl}>
+        <a href={sourceUrl} data-qa="source-cta">
           <strong>Mã nguồn mở</strong>
           <span>Kho mã nguồn công khai để kiểm tra và đóng góp.</span>
         </a>

@@ -187,8 +187,8 @@ async function auditLanding(page, viewport, consoleErrors, networkErrors) {
 }
 
 async function checkLink(page, selector, label, failures, predicate) {
-  const link = page.locator(selector).first();
-  if (!(await link.isVisible().catch(() => false))) {
+  const link = page.locator(`${selector}:visible`).first();
+  if ((await link.count()) === 0) {
     failures.push(`${label} is not visible`);
     return;
   }
