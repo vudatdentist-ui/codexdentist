@@ -4,10 +4,9 @@ import { LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { logoutAction } from "@/app/(app)/actions";
 import { LanguageContext, type Language } from "@/components/AppLanguage";
 import { roleLabels, viewRoutes, type ViewKey } from "@/lib/permissions";
-import { appShellNavigation } from "./navigation";
+import { migrationCompatibilityNavigation } from "./navigation";
 import { NotificationButton } from "./NotificationButton";
 import type { AppShellContext, AppShellNotification } from "./types";
 import styles from "./AppShell.module.css";
@@ -35,6 +34,7 @@ export type AppShellV2Props = {
   children: ReactNode;
   context: AppShellContext;
   notifications: AppShellNotification[];
+  signOutAction: () => Promise<void>;
   title: Record<Language, string>;
 };
 
@@ -44,6 +44,7 @@ export function AppShellV2({
   children,
   context,
   notifications,
+  signOutAction,
   title,
 }: AppShellV2Props) {
   const router = useRouter();
@@ -96,7 +97,7 @@ export function AppShellV2({
           </div>
 
           <nav className={styles.nav}>
-            {appShellNavigation.map((group) => {
+            {migrationCompatibilityNavigation.map((group) => {
               const visibleItems = group.items.filter((item) => allowedViewSet.has(item.key));
 
               if (visibleItems.length === 0) {
@@ -177,7 +178,7 @@ export function AppShellV2({
                 <span>{roleLabels[context.role]}</span>
               </div>
 
-              <form action={logoutAction}>
+              <form action={signOutAction}>
                 <button className={styles.button} type="submit" aria-label={text.signOut}>
                   <LogOut size={16} aria-hidden="true" />
                 </button>
