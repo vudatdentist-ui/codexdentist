@@ -1,6 +1,6 @@
 # Project Context
 
-Last updated: 2026-07-28
+Last updated: 2026-08-21
 
 ## Product Direction
 
@@ -10,6 +10,17 @@ Last updated: 2026-07-28
 - Hosted `codexdentist.com` provides the product site, installation docs, and isolated 24-hour demo workspaces.
 - Long-term direction: community-maintained multi-clinic dental OS with optional hosted services.
 - PostgreSQL is canonical when available; local/demo fallback must not make staff think writes were persisted.
+
+## Frontend Architecture Direction
+
+- Staff frontend is workflow-first, not module-first. Primary staff workspaces are `Today`, `Schedule`, `Patients`, `Treatment`, `Work`, `Care`, `Operations`, and `Settings`.
+- A domain capability does not imply a primary navigation item. Frontend navigation should reflect staff workflows rather than mirror every backend/domain module.
+- New staff routes should move toward `route -> workspace-specific loader -> workspace`, with workspaces composing features and domain/read-model contracts rather than routing through the legacy monolith.
+- New routes and new architecture directories must not add dependencies on `DentalSuite` or `AppViewPage`.
+- Shared UI must remain business-agnostic. Domain rules, permissions, tenant scope, billing semantics, and clinical behavior do not belong in shared presentation primitives.
+- Mutation permission remains server-side. UI visibility is never sufficient authorization.
+- Tenant, organization, and clinic scoping remain mandatory during frontend restructuring.
+- Frontend refactors must not trigger opportunistic Prisma-schema, billing-model, or clinical-model redesigns.
 
 ## Current Runtime
 

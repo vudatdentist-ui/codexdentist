@@ -1,6 +1,6 @@
 # QA Playbook
 
-Last updated: 2026-07-28
+Last updated: 2026-08-21
 
 ## Fast Check
 
@@ -12,6 +12,8 @@ node scripts/agent-health-check.mjs
 node scripts/agent-module-audit.mjs
 ```
 
+`agent-module-audit` hard-enforces dependency boundaries only for the new architecture directories (`src/shared`, `src/domains`, `src/features`, `src/workspaces`) and for new migration-route dependencies. Existing `src/components`, `src/modules`, and `src/lib` code remains migration territory rather than a retroactive boundary failure. Migration route pages that do not yet delegate to a workspace emit an advisory by default; use `ARCHITECTURE_AUDIT_STRICT_ROUTES=1` when Agent 0 is ready to make that route-shape check blocking.
+
 ## Route And Browser Checks
 
 ```powershell
@@ -21,6 +23,54 @@ npm run browser:qa
 ```
 
 `browser:qa` checks desktop `1440x900` and mobile `390x844` for protected routes. Review failures for route errors, console/network errors, horizontal overflow, broken modal/form layout, technical copy, and mojibake.
+
+Legacy route coverage stays mandatory during migration:
+
+```text
+/dashboard
+/schedule
+/patients
+/journey
+/billing
+/accounting
+/services
+/staff
+/crm
+/inventory
+/pharmacy
+/forms
+/learning
+/reports
+/settings
+```
+
+Do not retire a legacy route gate until Agent 0 explicitly approves its redirect or removal.
+
+Migration routes are opt-in so a route can be prepared in QA before its implementation merges. Supported contracts are `/today`, `/work`, `/patients/[patientId]`, and `/operations/finance`. Enable only routes implemented by the PR under test:
+
+```powershell
+$env:SMOKE_MIGRATION_ROUTES = "today,work,patients/[patientId],operations/finance"
+$env:BROWSER_QA_MIGRATION_ROUTES = "today,work,patients/[patientId],operations/finance"
+npm run test:smoke
+npm run browser:qa
+```
+
+For `/patients/[patientId]`, the harness first tries to discover an existing patient detail link from `/patients`. If the UI does not expose one, set `$env:QA_PATIENT_ID = "<patient-id>"` (or the script-specific `SMOKE_PATIENT_ID` / `BROWSER_QA_PATIENT_ID`). Agent 0 should add the relevant migration route to these env gates in the route PR once that route exists; leaving an unimplemented route disabled must not fail `main`.
+
+## Migration PR Gates
+
+Use existing scripts rather than inventing a parallel test framework. Minimum review matrix:
+
+| PR type | Required gates |
+| --- | --- |
+| Shared UI / primitives | `encoding:check`, `typecheck`, `build`, `agent-module-audit`; add `browser:qa` when globals, shell layout, responsive behavior, or shared interaction primitives change. |
+| Route / AppShell / workspace | `encoding:check`, `typecheck`, `build`, `agent-module-audit`, `test:smoke`, `browser:qa`, `test:security`; enable the PR's migration route contract in smoke/browser QA. |
+| Permission / tenant boundary | `test:roles`, `test:actions`, `test:tenant`, `test:security`, plus affected smoke/browser coverage. |
+| Billing-affecting | `test:billing`, `test:billing-concurrency`, `test:data-integrity`, `test:security`; add tenant/browser checks when route or scoping behavior changes. |
+| Patient files / Patient 360 / Journey | `test:patient-files`, `test:tenant`, `test:security`, Journey integration and odontogram checks below, plus `browser:qa` on desktop/mobile. |
+| Treatment compensation / progress | `test:compensation`, `test:data-integrity`, `test:tenant`, affected Journey/odontogram checks. |
+
+A frontend refactor must never disable, bypass, or weaken `test:security`, `test:tenant`, `test:billing`, `test:billing-concurrency`, `test:patient-files`, `test:data-integrity`, `test:roles`, `test:compensation`, or the Journey/odontogram checks. If a migration appears to require suppressing one of these gates, treat that as an architectural red flag and escalate to Agent 0 instead of merging around it.
 
 ## Targeted Checks
 

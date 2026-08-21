@@ -53,6 +53,7 @@ jobs:
       - run: npm ci --include=dev --no-audit --no-fund
       - run: npm run encoding:check
       - run: npm run typecheck
+      - run: node scripts/agent-module-audit.mjs
       - run: npx prisma migrate deploy
       - run: npx prisma db seed
         env:
@@ -72,6 +73,12 @@ jobs:
           done
           cat /tmp/codexdentist.log
           exit 1
+      - name: Agent health and legacy route smoke
+        run: |
+          node scripts/agent-health-check.mjs
+          npm run test:smoke
+        env:
+          NODE_ENV: test
       - name: Runtime security, tenant, billing, and file tests
         run: |
           npm run test:security
@@ -84,8 +91,8 @@ jobs:
           npm run test:data-integrity
         env:
           NODE_ENV: test
-      - name: Scheduled browser QA
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+      - name: Browser QA
+        if: github.event_name == 'pull_request' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: |
           npx playwright install --with-deps chromium
           npm run browser:qa
