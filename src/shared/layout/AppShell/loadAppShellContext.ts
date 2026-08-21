@@ -4,15 +4,7 @@ import { credentialNotificationTemplateKeys } from "@/lib/notification-templates
 import { accessibleViews, canUseAllClinics } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
-
-export type AppShellNotification = {
-  id: string;
-  title: string;
-  detail: string;
-  href: string;
-  clinicName: string | null;
-  createdAt: string;
-};
+import type { AppShellNotification } from "./types";
 
 export async function loadAppShellContext(session: AppSession) {
   const notifications = await loadNotificationSummary(session);
