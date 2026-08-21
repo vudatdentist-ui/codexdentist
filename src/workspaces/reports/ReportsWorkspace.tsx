@@ -1,3 +1,5 @@
+"use client";
+
 import { ReportsPanel } from "@/modules/reports/ReportsPanel";
 import type { Clinic } from "@/lib/data";
 import type { ReportsWorkspace as ReportsWorkspaceData } from "@/lib/reports-types";
