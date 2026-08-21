@@ -3,6 +3,8 @@ import path from "node:path";
 import { chromium } from "playwright";
 
 const baseUrl = process.env.BROWSER_QA_BASE_URL ?? "http://127.0.0.1:3000";
+const appRootDomain = process.env.APP_ROOT_DOMAIN?.trim().toLowerCase() || "codexdentist.com";
+const configuredSourceUrl = process.env.NEXT_PUBLIC_SOURCE_REPOSITORY_URL?.trim() || null;
 const runId = new Date().toISOString().replace(/[:.]/g, "-");
 const outputDir = path.join("output", "playwright", "public-landing-qa", runId);
 const viewports = [
@@ -42,22 +44,26 @@ try {
   await browser.close();
 }
 
-const failures = results.flatMap((result) =>
-  result.failures.map((failure) => `${result.viewport}: ${failure}`),
-);
+const routing = await auditPublicRouting();
+const failures = [
+  ...results.flatMap((result) =>
+    result.failures.map((failure) => `${result.viewport}: ${failure}`),
+  ),
+  ...routing.failures.map((failure) => `routing: ${failure}`),
+];
 
 await writeFile(
   path.join(outputDir, "summary.json"),
-  JSON.stringify({ baseUrl, failures, results }, null, 2),
+  JSON.stringify({ baseUrl, failures, results, routing }, null, 2),
   "utf8",
 );
 await writeFile(
   path.join(outputDir, "REPORT.md"),
-  renderMarkdown(results, failures),
+  renderMarkdown(results, routing, failures),
   "utf8",
 );
 
-console.log(JSON.stringify({ outputDir, failures, results }, null, 2));
+console.log(JSON.stringify({ outputDir, failures, results, routing }, null, 2));
 
 if (failures.length > 0) process.exitCode = 1;
 
@@ -79,6 +85,13 @@ async function auditLanding(page, viewport, consoleErrors, networkErrors) {
   }
 
   if (status !== 200) failures.push(`homepage returned HTTP ${status ?? "unknown"}`);
+
+  const wordmark = page.locator('[data-qa="landing-wordmark"]');
+  if (!(await wordmark.isVisible().catch(() => false))) {
+    failures.push("Dental OS temporary wordmark is not visible");
+  } else if ((await wordmark.innerText()).trim() !== "Dental OS") {
+    failures.push(`unexpected public wordmark: ${(await wordmark.innerText()).trim()}`);
+  }
 
   const hero = page.locator('[data-qa="landing-hero-title"]');
   if (!(await hero.isVisible().catch(() => false))) {
@@ -111,9 +124,12 @@ async function auditLanding(page, viewport, consoleErrors, networkErrors) {
   await checkLink(page, '[data-qa="demo-cta"]', "demo CTA", failures, (url) =>
     url.pathname === "/demo" || url.hostname.startsWith("demo."),
   );
-  await checkLink(page, '[data-qa="source-cta"]', "GitHub/source CTA", failures, (url) =>
-    url.hostname === "github.com" || (url.pathname === "/docs" && url.hash === "#source"),
-  );
+  await checkLink(page, '[data-qa="source-cta"]', "GitHub/source CTA", failures, (url) => {
+    if (configuredSourceUrl) {
+      return url.href === new URL(configuredSourceUrl, baseUrl).href;
+    }
+    return url.pathname === "/docs" && url.hash === "#source";
+  });
   await checkLink(page, '[data-qa="docs-cta"]', "docs CTA", failures, (url) =>
     url.pathname === "/docs",
   );
@@ -136,11 +152,25 @@ async function auditLanding(page, viewport, consoleErrors, networkErrors) {
         if (!focusMovedIntoMenu) {
           failures.push("Tab does not move focus into mobile navigation links");
         }
+
+        await page.keyboard.press("Escape");
+        if (await menu.evaluate((element) => element.hasAttribute("open"))) {
+          failures.push("Escape does not close mobile navigation");
+        }
+        if (!(await summary.evaluate((element) => element === document.activeElement))) {
+          failures.push("Escape does not return focus to the mobile navigation trigger");
+        }
+      }
+
+      await summary.focus();
+      await page.keyboard.press("Enter");
+      if (!(await menu.evaluate((element) => element.hasAttribute("open")))) {
+        failures.push("mobile navigation cannot reopen after Escape close");
       }
       await summary.focus();
       await page.keyboard.press("Enter");
       if (await menu.evaluate((element) => element.hasAttribute("open"))) {
-        failures.push("mobile navigation does not close from keyboard");
+        failures.push("mobile navigation does not close from keyboard trigger");
       }
     }
   }
@@ -187,6 +217,61 @@ async function auditLanding(page, viewport, consoleErrors, networkErrors) {
   };
 }
 
+async function auditPublicRouting() {
+  const failures = [];
+  const cases = [
+    { name: "docs routing", host: `docs.${appRootDomain}`, kind: "redirect", pathname: "/docs" },
+    { name: "odontogram public route", host: `odontogram.${appRootDomain}`, kind: "ok" },
+    { name: "demo routing", host: `demo.${appRootDomain}`, kind: "ok" },
+    { name: "tenant redirect", host: `qa-clinic.${appRootDomain}`, kind: "redirect", pathname: "/dashboard" },
+    { name: "app redirect", host: `app.${appRootDomain}`, kind: "redirect", pathname: "/dashboard" },
+    { name: "admin redirect", host: `admin.${appRootDomain}`, kind: "redirect", pathname: "/dashboard" },
+  ];
+  const results = [];
+
+  for (const testCase of cases) {
+    try {
+      const response = await fetch(`${baseUrl}/`, {
+        headers: { "x-forwarded-host": testCase.host },
+        redirect: "manual",
+      });
+      const location = response.headers.get("location");
+      const result = {
+        name: testCase.name,
+        host: testCase.host,
+        status: response.status,
+        location,
+      };
+      results.push(result);
+
+      if (testCase.kind === "ok") {
+        if (response.status !== 200) {
+          failures.push(`${testCase.name} returned HTTP ${response.status}`);
+        }
+        continue;
+      }
+
+      if (![301, 302, 303, 307, 308].includes(response.status)) {
+        failures.push(`${testCase.name} did not redirect; HTTP ${response.status}`);
+        continue;
+      }
+
+      const redirectedPath = location ? new URL(location, baseUrl).pathname : null;
+      if (redirectedPath !== testCase.pathname) {
+        failures.push(
+          `${testCase.name} redirected to ${redirectedPath ?? "no location"}, expected ${testCase.pathname}`,
+        );
+      }
+    } catch (error) {
+      failures.push(
+        `${testCase.name} request failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  return { appRootDomain, results, failures };
+}
+
 async function checkLink(page, selector, label, failures, predicate) {
   const link = page.locator(`${selector}:visible`).first();
   if ((await link.count()) === 0) {
@@ -204,7 +289,7 @@ async function checkLink(page, selector, label, failures, predicate) {
   if (!predicate(url)) failures.push(`${label} points to unexpected URL: ${url.href}`);
 }
 
-function renderMarkdown(results, failures) {
+function renderMarkdown(results, routing, failures) {
   return [
     "# Public Landing Browser QA",
     "",
@@ -215,6 +300,14 @@ function renderMarkdown(results, failures) {
     "| --- | ---: | --- | --- | --- |",
     ...results.map((result) =>
       `| ${result.viewport} (${result.dimensions}) | ${result.status ?? "?"} | ${result.reducedMotion.matches ? "yes" : "no"} | ${result.failures.join("; ") || "none"} | ${result.screenshot} |`,
+    ),
+    "",
+    `Routing host root: ${routing.appRootDomain}`,
+    "",
+    "| Routing check | Host | HTTP | Location |",
+    "| --- | --- | ---: | --- |",
+    ...routing.results.map((result) =>
+      `| ${result.name} | ${result.host} | ${result.status} | ${result.location ?? "-"} |`,
     ),
     "",
   ].join("\n");

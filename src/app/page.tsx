@@ -18,6 +18,7 @@ import {
   systemSubdomainFromHostname,
   tenantSlugFromHostname,
 } from "@/lib/tenant";
+import { LandingMobileNav } from "./LandingMobileNav";
 import styles from "./landing.module.css";
 
 const marketingMetadata: Metadata = {
@@ -113,7 +114,12 @@ export default async function Home({ searchParams }: HomePageProps) {
   return (
     <main className={styles.landingShell}>
       <header className={styles.header}>
-        <Link className={styles.wordmark} href="/" aria-label="Dental OS - Trang chủ">
+        <Link
+          className={styles.wordmark}
+          href="/"
+          aria-label="Dental OS - Trang chủ"
+          data-qa="landing-wordmark"
+        >
           Dental OS
         </Link>
 
@@ -135,22 +141,7 @@ export default async function Home({ searchParams }: HomePageProps) {
           </Link>
         </div>
 
-        <details className={styles.mobileMenu} data-qa="mobile-menu">
-          <summary aria-label="Mở điều hướng">Menu</summary>
-          <div className={styles.mobileMenuPanel}>
-            <nav aria-label="Điều hướng trên di động">
-              <a href="#san-pham">Sản phẩm</a>
-              <a href="#ma-nguon-mo">Mã nguồn mở</a>
-              <a href="#trien-khai">Triển khai</a>
-              <Link href="/docs" data-qa="docs-cta-mobile">Tài liệu</Link>
-              <a href={sourceUrl}>GitHub</a>
-            </nav>
-            <Link className={styles.headerCta} href={demoUrl}>
-              Dùng thử 24 giờ
-              <ArrowRight size={15} aria-hidden="true" />
-            </Link>
-          </div>
-        </details>
+        <LandingMobileNav demoUrl={demoUrl} sourceUrl={sourceUrl} />
       </header>
 
       <section className={styles.hero} aria-labelledby="landing-title">
