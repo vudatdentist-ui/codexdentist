@@ -72,57 +72,62 @@ jobs:
           const fs = require('node:fs');
           const path = require('node:path');
 
-          const out = path.join('output', 'pr16-visual-handoff');
-          const url = 'http://127.0.0.1:3000/';
-          const browser = await chromium.launch({ headless: true });
+          (async () => {
+            const out = path.join('output', 'pr16-visual-handoff');
+            const url = 'http://127.0.0.1:3000/';
+            const browser = await chromium.launch({ headless: true });
 
-          async function load(viewport) {
-            const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
-            const page = await context.newPage();
-            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
-            await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => null);
-            return { context, page };
-          }
+            async function load(viewport) {
+              const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+              const page = await context.newPage();
+              await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+              await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => null);
+              return { context, page };
+            }
 
-          async function warmLazyImages(page, step) {
-            await page.evaluate(async (scrollStep) => {
-              const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-              const height = document.documentElement.scrollHeight;
-              for (let y = 0; y < height; y += scrollStep) {
-                window.scrollTo(0, y);
-                await delay(60);
-              }
-              window.scrollTo(0, 0);
-              await delay(120);
-            }, step);
-          }
+            async function warmLazyImages(page, step) {
+              await page.evaluate(async (scrollStep) => {
+                const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+                const height = document.documentElement.scrollHeight;
+                for (let y = 0; y < height; y += scrollStep) {
+                  window.scrollTo(0, y);
+                  await delay(60);
+                }
+                window.scrollTo(0, 0);
+                await delay(120);
+              }, step);
+            }
 
-          {
-            const { context, page } = await load({ width: 1440, height: 900 });
-            await page.screenshot({ path: path.join(out, 'desktop-1440x900-top.png'), fullPage: false });
-            await warmLazyImages(page, 850);
-            await page.screenshot({ path: path.join(out, 'desktop-1440x900-full.png'), fullPage: true });
-            await context.close();
-          }
+            {
+              const { context, page } = await load({ width: 1440, height: 900 });
+              await page.screenshot({ path: path.join(out, 'desktop-1440x900-top.png'), fullPage: false });
+              await warmLazyImages(page, 850);
+              await page.screenshot({ path: path.join(out, 'desktop-1440x900-full.png'), fullPage: true });
+              await context.close();
+            }
 
-          {
-            const { context, page } = await load({ width: 390, height: 844 });
-            await page.screenshot({ path: path.join(out, 'mobile-390x844-top.png'), fullPage: false });
+            {
+              const { context, page } = await load({ width: 390, height: 844 });
+              await page.screenshot({ path: path.join(out, 'mobile-390x844-top.png'), fullPage: false });
 
-            const summary = page.locator('[data-qa="mobile-menu"] summary');
-            await summary.focus();
-            await page.keyboard.press('Enter');
-            await page.waitForTimeout(120);
-            await page.screenshot({ path: path.join(out, 'mobile-390x844-menu-open.png'), fullPage: false });
-            await page.keyboard.press('Escape');
+              const summary = page.locator('[data-qa="mobile-menu"] summary');
+              await summary.focus();
+              await page.keyboard.press('Enter');
+              await page.waitForTimeout(120);
+              await page.screenshot({ path: path.join(out, 'mobile-390x844-menu-open.png'), fullPage: false });
+              await page.keyboard.press('Escape');
 
-            await warmLazyImages(page, 760);
-            await page.screenshot({ path: path.join(out, 'mobile-390x844-full.png'), fullPage: true });
-            await context.close();
-          }
+              await warmLazyImages(page, 760);
+              await page.screenshot({ path: path.join(out, 'mobile-390x844-full.png'), fullPage: true });
+              await context.close();
+            }
 
-          await browser.close();
-          fs.writeFileSync(path.join(out, 'SOURCE_HEAD.txt'), '402bad4b2b8a8bfd1f55f4f7e3a828d859fd714a\n');
+            await browser.close();
+            fs.writeFileSync(path.join(out, 'SOURCE_HEAD.txt'), '402bad4b2b8a8bfd1f55f4f7e3a828d859fd714a\n');
+          })().catch((error) => {
+            console.error(error);
+            process.exitCode = 1;
+          });
           NODE
 
       - name: Upload visual handoff
