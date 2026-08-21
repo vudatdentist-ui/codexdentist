@@ -9,6 +9,7 @@ DOMAIN="${4:?application domain is required}"
 NODE_BIN="/opt/alt/alt-nodejs22/root/usr/bin"
 ARCHIVE_PATH="$HOME/$ARCHIVE_NAME"
 RELEASE_DIR="$HOME/.codexdentist-release-$SHA"
+ROLLBACK_DIR="$APP_DIR/.codexdentist-rollback-$SHA"
 LOCK_PATH="$HOME/.codexdentist-deploy.lock"
 
 if [[ ! -d "$APP_DIR" ]]; then
@@ -40,12 +41,20 @@ fi
 
 started=0
 cleanup() {
-  rm -rf -- "$RELEASE_DIR" "$ARCHIVE_PATH"
+  rm -rf -- "$RELEASE_DIR" "$ARCHIVE_PATH" "$ROLLBACK_DIR"
 }
 restart_after_failure() {
   local status=$?
+  if [[ -d "$ROLLBACK_DIR" ]]; then
+    rm -rf -- "$APP_DIR/.next" "$APP_DIR/package.json" "$APP_DIR/package-lock.json"
+    for item in .next package.json package-lock.json; do
+      if [[ -e "$ROLLBACK_DIR/$item" || -L "$ROLLBACK_DIR/$item" ]]; then
+        mv -- "$ROLLBACK_DIR/$item" "$APP_DIR/$item"
+      fi
+    done
+  fi
   if [[ "$started" == "1" ]]; then
-    cloudlinux-selector start --json --interpreter nodejs --domain "$DOMAIN" --app-root "$APP_DIR" >/dev/null || true
+    cloudlinux-selector start --json --interpreter nodejs --domain "$DOMAIN" --app-root "$APP_DIR" >/dev/null 2>&1 </dev/null || true
   fi
   cleanup
   exit "$status"
@@ -53,6 +62,7 @@ restart_after_failure() {
 trap restart_after_failure ERR
 
 rm -rf -- "$RELEASE_DIR"
+rm -rf -- "$ROLLBACK_DIR"
 mkdir -p "$RELEASE_DIR"
 tar -xzf "$ARCHIVE_PATH" -C "$RELEASE_DIR"
 cp -- "$APP_DIR/.env" "$RELEASE_DIR/.env"
@@ -64,6 +74,16 @@ started=1
 
 export PATH="$NODE_BIN:$PATH"
 
+# Keep the previous compiled app and package manifests available if the new
+# build fails. The source tree can be updated before building because Next.js
+# serves the compiled `.next` output, not the source files directly.
+mkdir -p "$ROLLBACK_DIR"
+for item in .next package.json package-lock.json; do
+  if [[ -e "$APP_DIR/$item" || -L "$APP_DIR/$item" ]]; then
+    mv -- "$APP_DIR/$item" "$ROLLBACK_DIR/$item"
+  fi
+done
+
 # Keep the physical node_modules directory required by this cPanel setup, but
 # install from the exact package lock that is about to be released.
 cp -- "$RELEASE_DIR/package.json" "$APP_DIR/package.json"
@@ -74,36 +94,35 @@ cp -- "$RELEASE_DIR/package-lock.json" "$APP_DIR/package-lock.json"
   "$NODE_BIN/npm" run prisma:generate
 )
 
-# The build uses the already-installed physical dependency tree without copying
-# it into the temporary release. This keeps shared-host inode usage bounded.
-ln -s "$APP_DIR/node_modules" "$RELEASE_DIR/node_modules"
-set -a
-# shellcheck disable=SC1091
-. "$RELEASE_DIR/.env"
-set +a
-(
-  cd "$RELEASE_DIR"
-  CODEXMED_SHARED_HOST_BUILD=true "$NODE_BIN/npm" run build
-  "$NODE_BIN/npx" prisma migrate deploy
-)
-
-# Replace only application source/build artifacts. Production env, local
-# storage, backups, and the physical dependency tree remain untouched.
+# Copy source files into the real cPanel app root. This keeps `node_modules`
+# physical and inside the Next.js project root; Turbopack rejects a symlink that
+# points from a temporary project outside its filesystem root.
 while IFS= read -r -d '' item; do
   name="${item##*/}"
   case "$name" in
-    .env|node_modules|storage|backups) continue ;;
+    .env|node_modules|storage|backups|.next|package.json|package-lock.json) continue ;;
   esac
   rm -rf -- "$APP_DIR/$name"
   cp -a -- "$item" "$APP_DIR/$name"
 done < <(find "$RELEASE_DIR" -mindepth 1 -maxdepth 1 -print0)
+
+set -a
+# shellcheck disable=SC1091
+. "$APP_DIR/.env"
+set +a
+(
+  cd "$APP_DIR"
+  CODEXMED_SHARED_HOST_BUILD=true "$NODE_BIN/npm" run build
+  "$NODE_BIN/npx" prisma migrate deploy
+)
 
 (
   cd "$APP_DIR"
   "$NODE_BIN/npm" prune --omit=dev --ignore-scripts --no-audit --no-fund
 )
 
-cloudlinux-selector start --json --interpreter nodejs --domain "$DOMAIN" --app-root "$APP_DIR" >/dev/null
+rm -rf -- "$ROLLBACK_DIR"
+cloudlinux-selector start --json --interpreter nodejs --domain "$DOMAIN" --app-root "$APP_DIR" >/dev/null 2>&1 </dev/null
 started=0
 cleanup
 echo "Codexdentist release $SHA deployed to $DOMAIN."

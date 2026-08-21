@@ -53,8 +53,9 @@ Self-host storage:
 
 The repository deploys to the Namecheap cPanel app after a successful commit to
 `main` through `.github/workflows/deploy-namecheap.yml`. The workflow uploads a
-source archive over SSH, builds in a temporary directory, runs Prisma migrations,
-updates only application files, and restarts the existing CloudLinux Node.js app.
+source archive over SSH, stages it outside the live app, builds with the physical
+dependency tree in the cPanel app root, runs Prisma migrations, updates only
+application files, and restarts the existing CloudLinux Node.js app.
 It never reads, replaces, or commits the production `.env`, PostgreSQL data,
 protected files, backups, or the physical `node_modules` directory.
 
