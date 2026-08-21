@@ -53,7 +53,11 @@ export function AppShellV2({
   const [language, setLanguage] = useState<Language>("vi");
   const allowedViewSet = useMemo(() => new Set(allowedViews), [allowedViews]);
   const text = shellText[language];
-  const selectedClinicId = searchParams.get("clinicId") ?? "all";
+  const requestedClinicId = searchParams.get("clinicId");
+  const selectedClinicId =
+    requestedClinicId && session.clinics.some((clinic) => clinic.id === requestedClinicId)
+      ? requestedClinicId
+      : "all";
 
   useEffect(() => {
     const storedLanguage = window.localStorage.getItem(languageStorageKey);
