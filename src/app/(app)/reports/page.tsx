@@ -25,7 +25,15 @@ export default async function ReportsPage({
     <AppShellV2
       activeView="reports"
       allowedViews={accessibleViews(session)}
-      session={session}
+      context={{
+        fullName: session.fullName,
+        organizationName: session.organizationName,
+        role: session.role,
+        clinics: session.clinics.map((clinic) => ({
+          id: clinic.id,
+          name: clinic.name,
+        })),
+      }}
       title={{ vi: "Báo cáo", en: "Reports" }}
     >
       <ReportsWorkspace data={data} />
