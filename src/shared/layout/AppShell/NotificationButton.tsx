@@ -4,7 +4,7 @@ import { Bell, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { Language } from "@/components/AppLanguage";
-import type { AppShellNotification } from "./loadAppShellContext";
+import type { AppShellNotification } from "./types";
 import styles from "./AppShell.module.css";
 
 const readStorageKey = "codexmed.notification.readIds";
