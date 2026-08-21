@@ -1,14 +1,10 @@
 import {
   ArrowRight,
   Building2,
-  CalendarDays,
   DatabaseBackup,
   GitFork,
-  HeartPulse,
-  PackageCheck,
   Server,
   ShieldCheck,
-  UsersRound,
 } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
