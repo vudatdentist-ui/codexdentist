@@ -1,13 +1,15 @@
 "use client";
 
-import { Bell, LogOut } from "lucide-react";
+import { LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { logoutAction } from "@/app/(app)/actions";
 import { LanguageContext, type Language } from "@/components/AppLanguage";
 import { roleLabels, viewRoutes, type AppRole, type ViewKey } from "@/lib/permissions";
+import type { TaskInboxItemSummary } from "@/lib/task-inbox-types";
 import { appShellNavigation } from "./navigation";
+import { NotificationButton } from "./NotificationButton";
 import styles from "./AppShell.module.css";
 
 const languageStorageKey = "nhavista.language";
@@ -16,14 +18,12 @@ const shellText = {
   vi: {
     allClinics: "Tất cả phòng khám",
     clinicScope: "Phạm vi phòng khám",
-    notifications: "Thông báo",
     signOut: "Đăng xuất",
     eyebrow: "Codexdentist",
   },
   en: {
     allClinics: "All clinics",
     clinicScope: "Clinic scope",
-    notifications: "Notifications",
     signOut: "Sign out",
     eyebrow: "Codexdentist",
   },
@@ -44,7 +44,7 @@ export type AppShellV2Props = {
   allowedViews: ViewKey[];
   children: ReactNode;
   context: AppShellContext;
-  notificationCount?: number;
+  notifications: TaskInboxItemSummary[];
   title: Record<Language, string>;
 };
 
@@ -53,7 +53,7 @@ export function AppShellV2({
   allowedViews,
   children,
   context,
-  notificationCount = 0,
+  notifications,
   title,
 }: AppShellV2Props) {
   const router = useRouter();
@@ -180,16 +180,7 @@ export function AppShellV2({
                 EN
               </button>
 
-              <Link
-                aria-label={text.notifications}
-                className={styles.iconButton}
-                href="/dashboard"
-              >
-                <Bell size={18} aria-hidden="true" />
-                {notificationCount > 0 && (
-                  <span className={styles.badge}>{Math.min(notificationCount, 99)}</span>
-                )}
-              </Link>
+              <NotificationButton items={notifications} language={language} />
 
               <div className={styles.identity}>
                 <strong>{context.fullName}</strong>
