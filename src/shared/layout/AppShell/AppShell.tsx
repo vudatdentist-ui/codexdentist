@@ -6,10 +6,10 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { logoutAction } from "@/app/(app)/actions";
 import { LanguageContext, type Language } from "@/components/AppLanguage";
-import { roleLabels, viewRoutes, type AppRole, type ViewKey } from "@/lib/permissions";
+import { roleLabels, viewRoutes, type ViewKey } from "@/lib/permissions";
 import { appShellNavigation } from "./navigation";
-import type { AppShellNotification } from "./loadAppShellContext";
 import { NotificationButton } from "./NotificationButton";
+import type { AppShellContext, AppShellNotification } from "./types";
 import styles from "./AppShell.module.css";
 
 const languageStorageKey = "nhavista.language";
@@ -28,16 +28,6 @@ const shellText = {
     eyebrow: "Codexdentist",
   },
 } satisfies Record<Language, Record<string, string>>;
-
-export type AppShellContext = {
-  fullName: string;
-  organizationName: string;
-  role: AppRole;
-  clinics: Array<{
-    id: string;
-    name: string;
-  }>;
-};
 
 export type AppShellV2Props = {
   activeView: ViewKey;
