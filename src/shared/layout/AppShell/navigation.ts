@@ -30,7 +30,10 @@ export type AppShellNavGroup = {
   items: AppShellNavItem[];
 };
 
-export const appShellNavigation: AppShellNavGroup[] = [
+// Migration-only compatibility IA. This intentionally mirrors the legacy
+// module navigation while routes move out of DentalSuite. It is not the final
+// workflow-first product navigation described in the architecture direction.
+export const migrationCompatibilityNavigation: AppShellNavGroup[] = [
   {
     label: { vi: "Tổng quan", en: "Overview" },
     items: [
