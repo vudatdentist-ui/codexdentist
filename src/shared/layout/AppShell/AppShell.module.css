@@ -1,0 +1,391 @@
+.shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(220px, 260px) minmax(0, 1fr);
+  background: #f6f8fb;
+  color: #172033;
+}
+
+.sidebar {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  padding: 20px 16px;
+  border-right: 1px solid #e3e8ef;
+  background: #ffffff;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 8px 18px;
+}
+
+.brandMark {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  background: #eef3ff;
+}
+
+.brandMark img {
+  width: 24px;
+  height: 24px;
+}
+
+.brandText {
+  display: grid;
+  gap: 2px;
+}
+
+.brandText span {
+  font-size: 12px;
+  color: #697386;
+}
+
+.nav {
+  display: grid;
+  gap: 18px;
+}
+
+.navGroup {
+  display: grid;
+  gap: 4px;
+}
+
+.navGroupTitle {
+  padding: 0 10px 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8a94a6;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 40px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: #4a5568;
+  text-decoration: none;
+}
+
+.navItem:hover {
+  background: #f3f6fa;
+}
+
+.navItemActive {
+  background: #eaf0ff;
+  color: #2349a6;
+  font-weight: 700;
+}
+
+.workspace {
+  min-width: 0;
+}
+
+.topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 22px;
+  border-bottom: 1px solid #e3e8ef;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(10px);
+}
+
+.titleBlock {
+  min-width: 0;
+}
+
+.eyebrow {
+  margin: 0 0 2px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #7b8798;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(18px, 2vw, 24px);
+  line-height: 1.2;
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.select,
+.button,
+.iconButton {
+  min-height: 38px;
+  border: 1px solid #d7dee8;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #263247;
+  font: inherit;
+}
+
+.select {
+  max-width: 210px;
+  padding: 0 32px 0 10px;
+}
+
+.button,
+.iconButton {
+  cursor: pointer;
+}
+
+.button {
+  padding: 0 12px;
+}
+
+.iconButton {
+  position: relative;
+  width: 38px;
+  display: grid;
+  place-items: center;
+  text-decoration: none;
+}
+
+.badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 4px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: #c83b3b;
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.identity {
+  display: grid;
+  gap: 1px;
+  max-width: 180px;
+}
+
+.identity strong,
+.identity span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identity span {
+  font-size: 12px;
+  color: #697386;
+}
+
+.notificationWrap {
+  position: relative;
+}
+
+.notificationPanel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 40;
+  width: min(420px, calc(100vw - 28px));
+  max-height: min(70vh, 560px);
+  overflow: hidden;
+  border: 1px solid #d7dee8;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 18px 48px rgba(31, 41, 55, 0.18);
+}
+
+.notificationHeader {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-bottom: 1px solid #e7ebf0;
+}
+
+.notificationHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.notificationHeaderActions button,
+.notificationOpen {
+  min-height: 32px;
+  border: 1px solid #d7dee8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  font: inherit;
+  font-size: 12px;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.notificationHeaderActions button {
+  padding: 0 9px;
+}
+
+.notificationList {
+  max-height: min(62vh, 500px);
+  overflow-y: auto;
+}
+
+.notificationRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  padding: 12px;
+  border-bottom: 1px solid #eef1f5;
+}
+
+.notificationRowRead {
+  opacity: 0.68;
+}
+
+.notificationRow strong,
+.notificationRow p,
+.notificationRow span {
+  overflow-wrap: anywhere;
+}
+
+.notificationRow p {
+  margin: 4px 0;
+  color: #526174;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.notificationRow span {
+  color: #7b8798;
+  font-size: 11px;
+}
+
+.notificationOpen {
+  display: inline-flex;
+  align-items: center;
+  padding: 0 9px;
+}
+
+.notificationEmpty {
+  margin: 0;
+  padding: 20px 14px;
+  color: #697386;
+  text-align: center;
+}
+
+.content {
+  min-width: 0;
+  padding: 20px 22px 32px;
+}
+
+@media (max-width: 900px) {
+  .shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: static;
+    height: auto;
+    overflow: visible;
+    border-right: 0;
+    border-bottom: 1px solid #e3e8ef;
+    padding: 12px;
+  }
+
+  .brand {
+    padding-bottom: 10px;
+  }
+
+  .nav {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+
+  .navGroup {
+    display: contents;
+  }
+
+  .navGroupTitle {
+    display: none;
+  }
+
+  .navItem {
+    flex: 0 0 auto;
+    min-height: 36px;
+    white-space: nowrap;
+  }
+
+  .topbar {
+    position: static;
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 12px 14px;
+  }
+
+  .actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .select {
+    max-width: min(100%, 220px);
+  }
+
+  .identity {
+    display: none;
+  }
+
+  .notificationPanel {
+    position: fixed;
+    top: 72px;
+    right: 12px;
+    left: 12px;
+    width: auto;
+    max-height: calc(100vh - 88px);
+  }
+
+  .notificationList {
+    max-height: calc(100vh - 150px);
+  }
+
+  .notificationRow {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .notificationOpen {
+    justify-self: start;
+  }
+
+  .content {
+    padding: 14px 12px 24px;
+    overflow-x: clip;
+  }
+}
