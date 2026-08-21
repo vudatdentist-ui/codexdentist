@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 import "codexdentist-odontogram/style.css";
 import "react-day-picker/style.css";
+import "@/styles/globals.css";
 import "./globals.css";
 
 export const metadata: Metadata = {

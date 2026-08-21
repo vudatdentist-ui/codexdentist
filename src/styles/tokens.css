@@ -1,0 +1,83 @@
+:root {
+  color-scheme: light;
+
+  /* Surfaces and text */
+  --color-bg: #f3f6f8;
+  --color-surface: #ffffff;
+  --color-surface-subtle: #f7fafb;
+  --color-surface-emphasis: #eef7f6;
+  --color-text: #16232b;
+  --color-text-muted: #60717b;
+  --color-text-subtle: #87939b;
+  --color-text-inverse: #ffffff;
+  --color-border: #dbe4e8;
+  --color-border-strong: #c5d2d8;
+
+  /* Brand and semantic state. Color communicates meaning, not decoration. */
+  --color-accent: #08766f;
+  --color-accent-hover: #075f5a;
+  --color-accent-soft: #dff5f1;
+  --color-success: #138a48;
+  --color-success-soft: #e1f7ea;
+  --color-warning: #a85a08;
+  --color-warning-soft: #fff1d6;
+  --color-danger: #c91d45;
+  --color-danger-soft: #ffe8ed;
+  --color-info: #2563eb;
+  --color-info-soft: #e6efff;
+
+  /* Spacing: 4px base rhythm */
+  --space-0: 0;
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  --shadow-sm: 0 1px 2px rgb(20 35 45 / 0.05);
+  --shadow-md: 0 8px 24px rgb(20 35 45 / 0.08);
+  --shadow-lg: 0 18px 45px rgb(20 35 45 / 0.14);
+
+  --focus-ring-color: rgb(8 118 111 / 0.34);
+  --focus-ring-width: 3px;
+  --focus-ring-offset: 2px;
+
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.8125rem;
+  --font-size-md: 0.875rem;
+  --font-size-lg: 1rem;
+  --font-size-xl: 1.25rem;
+  --font-size-2xl: 1.5rem;
+  --font-weight-regular: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --control-height-sm: 2rem;
+  --control-height-md: 2.5rem;
+  --control-height-lg: 3rem;
+
+  --z-base: 0;
+  --z-sticky: 20;
+  --z-popover: 40;
+  --z-overlay: 80;
+  --z-toast: 100;
+
+  /* Migration aliases used by the existing UI. Keep these stable while legacy CSS is split. */
+  --ds-bg: var(--color-bg);
+  --ds-surface: var(--color-surface);
+  --ds-text: var(--color-text);
+  --ds-muted: var(--color-text-muted);
+  --ds-border: var(--color-border);
+  --ds-brand: var(--color-accent);
+}
