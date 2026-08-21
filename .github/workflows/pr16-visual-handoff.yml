@@ -1,0 +1,134 @@
+name: PR16 Visual Handoff
+
+on:
+  push:
+    branches: [handoff/pr16-visual-capture]
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: codexdentist
+          POSTGRES_PASSWORD: codexdentist
+          POSTGRES_DB: codexdentist
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U codexdentist -d codexdentist"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: production
+      DEPLOYMENT_MODE: self-hosted
+      DATABASE_URL: postgresql://codexdentist:codexdentist@127.0.0.1:5432/codexdentist?schema=public
+      APP_BASE_URL: https://codexdentist.test
+      AUTH_SECRET: visual-handoff-only-auth-secret-at-least-32-characters
+      JOB_SECRET: visual-handoff-only-job-secret-at-least-32-characters
+      PATIENT_FILE_STORAGE_DRIVER: local
+      SESSION_COOKIE_SECURE: "false"
+      TRUSTED_PROXY_PROVIDER: reverse-proxy
+
+    steps:
+      - name: Checkout approved PR head exactly
+        uses: actions/checkout@v7
+        with:
+          ref: 402bad4b2b8a8bfd1f55f4f7e3a828d859fd714a
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --include=dev --no-audit --no-fund
+      - run: npm run build
+
+      - name: Start production server
+        run: |
+          npm start > /tmp/codexdentist-visual.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3000/api/health > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/codexdentist-visual.log
+          exit 1
+
+      - name: Capture approved landing screenshots
+        run: |
+          npx playwright install --with-deps chromium
+          mkdir -p output/pr16-visual-handoff
+          node <<'NODE'
+          const { chromium } = require('playwright');
+          const fs = require('node:fs');
+          const path = require('node:path');
+
+          const out = path.join('output', 'pr16-visual-handoff');
+          const url = 'http://127.0.0.1:3000/';
+          const browser = await chromium.launch({ headless: true });
+
+          async function load(viewport) {
+            const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+            const page = await context.newPage();
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => null);
+            return { context, page };
+          }
+
+          async function warmLazyImages(page, step) {
+            await page.evaluate(async (scrollStep) => {
+              const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+              const height = document.documentElement.scrollHeight;
+              for (let y = 0; y < height; y += scrollStep) {
+                window.scrollTo(0, y);
+                await delay(60);
+              }
+              window.scrollTo(0, 0);
+              await delay(120);
+            }, step);
+          }
+
+          {
+            const { context, page } = await load({ width: 1440, height: 900 });
+            await page.screenshot({ path: path.join(out, 'desktop-1440x900-top.png'), fullPage: false });
+            await warmLazyImages(page, 850);
+            await page.screenshot({ path: path.join(out, 'desktop-1440x900-full.png'), fullPage: true });
+            await context.close();
+          }
+
+          {
+            const { context, page } = await load({ width: 390, height: 844 });
+            await page.screenshot({ path: path.join(out, 'mobile-390x844-top.png'), fullPage: false });
+
+            const summary = page.locator('[data-qa="mobile-menu"] summary');
+            await summary.focus();
+            await page.keyboard.press('Enter');
+            await page.waitForTimeout(120);
+            await page.screenshot({ path: path.join(out, 'mobile-390x844-menu-open.png'), fullPage: false });
+            await page.keyboard.press('Escape');
+
+            await warmLazyImages(page, 760);
+            await page.screenshot({ path: path.join(out, 'mobile-390x844-full.png'), fullPage: true });
+            await context.close();
+          }
+
+          await browser.close();
+          fs.writeFileSync(path.join(out, 'SOURCE_HEAD.txt'), '402bad4b2b8a8bfd1f55f4f7e3a828d859fd714a\n');
+          NODE
+
+      - name: Upload visual handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr16-visual-handoff-402bad4b
+          path: output/pr16-visual-handoff
+          retention-days: 1
+          if-no-files-found: error
