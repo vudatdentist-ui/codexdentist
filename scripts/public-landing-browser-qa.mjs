@@ -247,17 +247,34 @@ async function checkScene(page, scene, expectedImage, failures) {
   const activeScene = await stage.getAttribute("data-scene");
   if (activeScene !== scene) failures.push(`ProductStage scene is ${activeScene}, expected ${scene}`);
 
-  const image = page.locator(`[data-qa="product-stage-image-${scene}"]`);
+  const imageSelector = `[data-qa="product-stage-image-${scene}"]`;
+  const image = page.locator(imageSelector);
+
+  await page.waitForFunction(
+    (selector) => {
+      const element = document.querySelector(selector);
+      return (
+        element instanceof HTMLImageElement &&
+        element.getAttribute("data-active") === "true" &&
+        element.complete &&
+        element.naturalWidth > 0 &&
+        Number.parseFloat(getComputedStyle(element).opacity) > 0.9
+      );
+    },
+    imageSelector,
+    { timeout: 1500 },
+  );
+
   const imageState = await image.evaluate((element) => ({
     active: element.getAttribute("data-active"),
     complete: element.complete,
     naturalWidth: element.naturalWidth,
     src: element.getAttribute("src") ?? "",
     width: element.getBoundingClientRect().width,
-    opacity: getComputedStyle(element).opacity,
+    opacity: Number.parseFloat(getComputedStyle(element).opacity),
   }));
 
-  if (imageState.active !== "true" || imageState.opacity === "0") {
+  if (imageState.active !== "true" || imageState.opacity < 0.9) {
     failures.push(`${scene} product image is not active`);
   }
   if (!imageState.complete || imageState.naturalWidth <= 0 || imageState.width <= 0) {
