@@ -4,7 +4,7 @@ import { Bell, X } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { Language } from "@/components/AppLanguage";
-import type { TaskInboxItemSummary } from "@/lib/task-inbox-types";
+import type { AppShellNotification } from "./loadAppShellContext";
 import styles from "./AppShell.module.css";
 
 const readStorageKey = "codexmed.notification.readIds";
@@ -12,14 +12,14 @@ const readStorageKey = "codexmed.notification.readIds";
 const text = {
   vi: {
     close: "Đóng",
-    empty: "Không có thông báo hoặc công việc mới.",
+    empty: "Không có thông báo mới.",
     markAllRead: "Đánh dấu đã đọc",
     notifications: "Thông báo",
     open: "Mở",
   },
   en: {
     close: "Close",
-    empty: "No new notifications or tasks.",
+    empty: "No new notifications.",
     markAllRead: "Mark all read",
     notifications: "Notifications",
     open: "Open",
@@ -30,7 +30,7 @@ export function NotificationButton({
   items,
   language,
 }: {
-  items: TaskInboxItemSummary[];
+  items: AppShellNotification[];
   language: Language;
 }) {
   const [open, setOpen] = useState(false);
@@ -100,7 +100,6 @@ export function NotificationButton({
           <div className={styles.notificationList}>
             {items.length > 0 ? (
               items.map((item) => {
-                const href = item.actionUrl ?? item.href;
                 const read = readIds.has(item.id);
 
                 return (
@@ -111,24 +110,18 @@ export function NotificationButton({
                     <div>
                       <strong>{item.title}</strong>
                       <p>{item.detail}</p>
-                      <span>
-                        {[item.clinicName, item.patientName, item.dueAt ?? item.createdAt]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </span>
+                      <span>{[item.clinicName, item.createdAt].filter(Boolean).join(" · ")}</span>
                     </div>
-                    {href && (
-                      <Link
-                        className={styles.notificationOpen}
-                        href={href}
-                        onClick={() => {
-                          markRead(item.id);
-                          setOpen(false);
-                        }}
-                      >
-                        {copy.open}
-                      </Link>
-                    )}
+                    <Link
+                      className={styles.notificationOpen}
+                      href={item.href}
+                      onClick={() => {
+                        markRead(item.id);
+                        setOpen(false);
+                      }}
+                    >
+                      {copy.open}
+                    </Link>
                   </article>
                 );
               })
