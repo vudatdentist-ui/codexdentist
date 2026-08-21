@@ -49,6 +49,37 @@ Self-host storage:
 
 ## Namecheap Shared Hosting
 
+### Automatic deploy from GitHub `main`
+
+The repository deploys to the Namecheap cPanel app after a successful commit to
+`main` through `.github/workflows/deploy-namecheap.yml`. The workflow uploads a
+source archive over SSH, builds in a temporary directory, runs Prisma migrations,
+updates only application files, and restarts the existing CloudLinux Node.js app.
+It never reads, replaces, or commits the production `.env`, PostgreSQL data,
+protected files, backups, or the physical `node_modules` directory.
+
+Configure these GitHub repository secrets once:
+
+| Secret | Value |
+| --- | --- |
+| `NAMECHEAP_HOST` | `premium277.web-hosting.com` |
+| `NAMECHEAP_PORT` | `21098` |
+| `NAMECHEAP_USER` | cPanel account username |
+| `NAMECHEAP_APP_ROOT` | `/home/CPANEL_USER/codexdentist-app` |
+| `NAMECHEAP_DOMAIN` | `codexdentist.com` |
+| `NAMECHEAP_SSH_KEY` | Private Ed25519 key used only by GitHub Actions |
+| `NAMECHEAP_KNOWN_HOSTS` | Pinned `ssh-keyscan` output for the host and port |
+
+In cPanel, import the matching public key under **SSH Access → Manage SSH
+Keys**, authorize it, and confirm that the key can run a non-interactive command.
+Do not put `.env`, database credentials, R2 credentials, or a cPanel password in
+GitHub. A failed deploy does not run `start` on a different application or touch
+S22U.
+
+The deploy workflow performs a public `/api/health` check after restart. The
+hourly production-health workflow remains separate and continues to monitor the
+public site and database.
+
 Current cPanel deployment:
 
 - Domain: `https://codexdentist.com`
@@ -84,6 +115,14 @@ cloudlinux-selector start --json --interpreter nodejs --domain codexdentist.com 
 ```
 
 The current app root uses a physical `node_modules` directory. Do not activate the Node Selector virtual environment before npm commands: its npm wrapper rejects a physical application-level `node_modules`. Recheck `ls -ld node_modules` after any hosting migration before changing this rule.
+
+Shared hosting has an inode quota. After a successful deployment and health check:
+
+- delete the uploaded release archive and its extracted staging directory;
+- run `npm cache clean --force`;
+- remove only the rebuildable `.next/cache` directory, never `.next/server` or `.next/static`;
+- keep database dumps, environment backups, and compressed source bundles, but never back up `node_modules` or a full `.next` directory;
+- review `du --inodes -x -d1 /home/CPANEL_USER | sort -nr | head` and keep total inode usage below the hosting warning threshold.
 
 If the CLI start fails, start the app from cPanel `Setup Node.js App`. Then verify `https://codexdentist.com/api/health`. Do not enable notification cron jobs until the delivery provider and recipient data have been verified. Shared hosting remains a pilot/community-test target; monitor cPanel resource usage before placing real clinic workloads on it.
 

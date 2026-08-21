@@ -1,0 +1,107 @@
+name: Deploy Namecheap production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: namecheap-production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      DEPLOY_HOST: ${{ secrets.NAMECHEAP_HOST }}
+      DEPLOY_PORT: ${{ secrets.NAMECHEAP_PORT }}
+      DEPLOY_USER: ${{ secrets.NAMECHEAP_USER }}
+      DEPLOY_APP_ROOT: ${{ secrets.NAMECHEAP_APP_ROOT }}
+      DEPLOY_DOMAIN: ${{ secrets.NAMECHEAP_DOMAIN }}
+      REMOTE_ARCHIVE: .codexdentist-release-${{ github.sha }}.tar.gz
+
+    steps:
+      - name: Check deployment configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          for variable in DEPLOY_HOST DEPLOY_PORT DEPLOY_USER DEPLOY_APP_ROOT DEPLOY_DOMAIN; do
+            if [[ -z "${!variable}" ]]; then
+              echo "Missing GitHub secret for ${variable}." >&2
+              exit 1
+            fi
+          done
+          case "$DEPLOY_APP_ROOT" in
+            /*) ;;
+            *) echo "NAMECHEAP_APP_ROOT must be an absolute path." >&2; exit 1 ;;
+          esac
+
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 1
+
+      - name: Create source archive
+        shell: bash
+        run: git archive --format=tar.gz --output=release.tar.gz "$GITHUB_SHA"
+
+      - name: Configure pinned SSH host
+        shell: bash
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.NAMECHEAP_SSH_KEY }}
+          DEPLOY_KNOWN_HOSTS: ${{ secrets.NAMECHEAP_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$DEPLOY_SSH_KEY"
+          test -n "$DEPLOY_KNOWN_HOSTS"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$DEPLOY_SSH_KEY" > "$HOME/.ssh/id_ed25519"
+          printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
+
+      - name: Upload source archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          scp -P "$DEPLOY_PORT" \
+            -i "$HOME/.ssh/id_ed25519" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            release.tar.gz \
+            "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_ARCHIVE"
+
+      - name: Build, migrate, and restart cPanel app
+        shell: bash
+        run: |
+          set -euo pipefail
+          ssh -p "$DEPLOY_PORT" \
+            -i "$HOME/.ssh/id_ed25519" \
+            -o BatchMode=yes \
+            -o IdentitiesOnly=yes \
+            "$DEPLOY_USER@$DEPLOY_HOST" \
+            "bash -s -- '$GITHUB_SHA' '$DEPLOY_APP_ROOT' '$REMOTE_ARCHIVE' '$DEPLOY_DOMAIN'" \
+            < scripts/deploy-namecheap.sh
+
+      - name: Verify production health
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..12}; do
+            if response="$(curl --fail --silent --show-error --location --max-time 20 \
+              "https://${DEPLOY_DOMAIN}/api/health")"; then
+              HEALTH_RESPONSE="$response" node <<'NODE'
+          const health = JSON.parse(process.env.HEALTH_RESPONSE);
+          if (health.status !== "ok" || health.database !== "ok") {
+            throw new Error(`Unhealthy production response: ${JSON.stringify(health)}`);
+          }
+          console.log("Production application and database are healthy.");
+          NODE
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "Production health check failed after deployment." >&2
+          exit 1
