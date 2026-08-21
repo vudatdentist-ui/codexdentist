@@ -1,8 +1,8 @@
 name: PR16 Visual Handoff
 
 on:
-  push:
-    branches: [handoff/pr16-visual-capture]
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
