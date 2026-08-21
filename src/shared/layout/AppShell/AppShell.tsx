@@ -7,8 +7,8 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { logoutAction } from "@/app/(app)/actions";
 import { LanguageContext, type Language } from "@/components/AppLanguage";
 import { roleLabels, viewRoutes, type AppRole, type ViewKey } from "@/lib/permissions";
-import type { TaskInboxItemSummary } from "@/lib/task-inbox-types";
 import { appShellNavigation } from "./navigation";
+import type { AppShellNotification } from "./loadAppShellContext";
 import { NotificationButton } from "./NotificationButton";
 import styles from "./AppShell.module.css";
 
@@ -44,7 +44,7 @@ export type AppShellV2Props = {
   allowedViews: ViewKey[];
   children: ReactNode;
   context: AppShellContext;
-  notifications: TaskInboxItemSummary[];
+  notifications: AppShellNotification[];
   title: Record<Language, string>;
 };
 
