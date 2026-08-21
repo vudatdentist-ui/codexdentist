@@ -1,13 +1,18 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
+import {
+  enabledMigrationRoutes,
+  materializePatientRoute,
+  routeNeedsPatientId,
+} from "./qa-route-contract.mjs";
 
 const baseUrl = process.env.BROWSER_QA_BASE_URL ?? "http://127.0.0.1:3000";
 const email = process.env.BROWSER_QA_EMAIL ?? "owner@nhavista.vn";
 const password = process.env.BROWSER_QA_PASSWORD ?? "CodexSmoke2026!";
 const runId = new Date().toISOString().replace(/[:.]/g, "-");
 const outputDir = path.join("output", "playwright", "pilot-browser-qa", runId);
-const routes = [
+const legacyRoutes = [
   "/dashboard",
   "/schedule",
   "/patients",
@@ -25,6 +30,11 @@ const routes = [
   "/reports",
   "/settings",
 ];
+const migrationRoutes = enabledMigrationRoutes(
+  process.env.BROWSER_QA_MIGRATION_ROUTES,
+  "BROWSER_QA_MIGRATION_ROUTES",
+);
+const routes = [...new Set([...legacyRoutes, ...migrationRoutes])];
 const viewports = [
   { name: "desktop", width: 1440, height: 900 },
   { name: "mobile", width: 390, height: 844 },
@@ -41,6 +51,7 @@ const technicalCopyPatterns = [
   /This view could not be loaded/i,
 ];
 const mojibakePattern = /(?:\u00c4[\u0080-\u00bf]|\u00c6[\u0080-\u00bf]|\u00e1[\u00ba-\u00bf]|\u00c2[\u00a0-\u00bf]|\ufffd)/u;
+let discoveredPatientId = process.env.BROWSER_QA_PATIENT_ID ?? process.env.QA_PATIENT_ID ?? null;
 
 await mkdir(outputDir, { recursive: true });
 
@@ -72,6 +83,10 @@ try {
     });
 
     await login(page);
+
+    if (migrationRoutes.length > 0) {
+      console.log(`migration browser routes (${viewport.name}): ${migrationRoutes.join(", ")}`);
+    }
 
     for (const route of routes) {
       const routeResult = await auditRoute(page, viewport, route, consoleErrors, networkErrors);
@@ -125,12 +140,13 @@ async function login(page) {
 async function auditRoute(page, viewport, route, consoleErrors, networkErrors) {
   const beforeConsole = consoleErrors.length;
   const beforeNetwork = networkErrors.length;
-  const url = `${baseUrl}${route}`;
+  let resolvedRoute = route;
   let status = null;
   let navigationError = null;
 
   try {
-    const response = await page.goto(url, {
+    resolvedRoute = await resolveBrowserRoute(page, route);
+    const response = await page.goto(`${baseUrl}${resolvedRoute}`, {
       waitUntil: "domcontentloaded",
       timeout: 30000,
     });
@@ -194,6 +210,7 @@ async function auditRoute(page, viewport, route, consoleErrors, networkErrors) {
 
   return {
     route,
+    resolvedRoute,
     viewport: viewport.name,
     status,
     severity,
@@ -203,6 +220,39 @@ async function auditRoute(page, viewport, route, consoleErrors, networkErrors) {
     consoleErrors: routeConsoleErrors,
     networkErrors: routeNetworkErrors,
   };
+}
+
+async function resolveBrowserRoute(page, route) {
+  if (!routeNeedsPatientId(route)) return route;
+
+  if (!discoveredPatientId) {
+    const response = await page.goto(`${baseUrl}/patients`, {
+      waitUntil: "domcontentloaded",
+      timeout: 30000,
+    });
+    if (!response || response.status() !== 200) {
+      throw new Error(
+        `Cannot discover patient id: /patients returned HTTP ${response?.status() ?? "unknown"}.`,
+      );
+    }
+    await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => null);
+
+    const hrefs = await page.locator('a[href^="/patients/"]').evaluateAll((anchors) =>
+      anchors.map((anchor) => anchor.getAttribute("href")).filter(Boolean),
+    );
+
+    for (const href of hrefs) {
+      const pathname = new URL(href, baseUrl).pathname;
+      const patientMatch = pathname.match(/^\/patients\/([^/]+)$/);
+      const candidate = patientMatch?.[1];
+      if (candidate && !["new", "create"].includes(candidate.toLowerCase())) {
+        discoveredPatientId = decodeURIComponent(candidate);
+        break;
+      }
+    }
+  }
+
+  return materializePatientRoute(route, discoveredPatientId);
 }
 
 function classify(input) {
@@ -247,7 +297,7 @@ function renderMarkdown(summary, items) {
       const issue = [
         item.navigationError,
         item.status && item.status >= 400 ? `HTTP ${item.status}` : null,
-    item.routeError ? "route error copy visible" : null,
+        item.routeError ? "route error copy visible" : null,
         item.mojibake ? `mojibake visible: ${item.mojibakeSnippet}` : null,
         item.horizontalOverflow ? "horizontal overflow" : null,
         item.technicalCopy.length ? `technical copy: ${item.technicalCopy.join(", ")}` : null,
@@ -256,8 +306,11 @@ function renderMarkdown(summary, items) {
       ]
         .filter(Boolean)
         .join("; ");
+      const routeLabel = item.resolvedRoute !== item.route
+        ? `${item.route} -> ${item.resolvedRoute}`
+        : item.route;
 
-      return `| ${item.severity} | ${item.viewport} | ${item.route} | ${issue} | ${item.screenshot} |`;
+      return `| ${item.severity} | ${item.viewport} | ${routeLabel} | ${issue} | ${item.screenshot} |`;
     })
     .join("\n");
 

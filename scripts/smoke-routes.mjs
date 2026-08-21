@@ -1,3 +1,9 @@
+import {
+  enabledMigrationRoutes,
+  materializePatientRoute,
+  routeNeedsPatientId,
+} from "./qa-route-contract.mjs";
+
 const baseUrl = process.env.SMOKE_BASE_URL ?? "http://127.0.0.1:3000";
 const email = process.env.SMOKE_EMAIL ?? "owner@nhavista.vn";
 const password = process.env.SMOKE_PASSWORD ?? process.env.SMOKE_USER_PASSWORD ?? "CodexSmoke2026!";
@@ -22,14 +28,20 @@ const defaultRoutes = [
   "patient-app",
   "settings",
 ];
-const routes = (process.env.SMOKE_ROUTES
+const configuredRoutes = (process.env.SMOKE_ROUTES
   ? process.env.SMOKE_ROUTES.split(",")
   : defaultRoutes
 ).map((route) => route.trim().replace(/^\/+/, "")).filter(Boolean);
+const migrationRoutes = enabledMigrationRoutes(
+  process.env.SMOKE_MIGRATION_ROUTES,
+  "SMOKE_MIGRATION_ROUTES",
+).map((route) => route.replace(/^\/+/, ""));
+const routes = [...new Set([...configuredRoutes, ...migrationRoutes])];
 const routeMarkers = {
   dashboard: ["Group dashboard", "Tổng quan hệ thống"],
   schedule: ["Multi-clinic schedule", "Lịch hẹn đa phòng khám"],
   patients: ["Patient 360", "Hồ sơ bệnh nhân 360"],
+  "patients/[patientId]": ["Patient 360", "Hồ sơ bệnh nhân 360"],
   journey: ["Patient journey", "Hành trình bệnh nhân"],
   clinical: ["Patient journey", "Hành trình bệnh nhân"],
   treatment: ["Patient journey", "Hành trình bệnh nhân"],
@@ -53,6 +65,7 @@ const expectedHeaders = {
   "x-content-type-options": "nosniff",
   "referrer-policy": "strict-origin-when-cross-origin",
 };
+let discoveredPatientId = process.env.SMOKE_PATIENT_ID ?? process.env.QA_PATIENT_ID ?? null;
 
 async function main() {
   await assertHealth();
@@ -85,8 +98,13 @@ async function main() {
     throw new Error("Login did not return a session cookie.");
   }
 
+  if (migrationRoutes.length > 0) {
+    console.log(`migration smoke routes: ${migrationRoutes.map((route) => `/${route}`).join(", ")}`);
+  }
+
   for (const route of routes) {
-    const response = await fetch(`${baseUrl}/${route}`, {
+    const resolvedRoute = await resolveSmokeRoute(route, cookie);
+    const response = await fetch(`${baseUrl}/${resolvedRoute}`, {
       headers: {
         cookie,
       },
@@ -95,21 +113,22 @@ async function main() {
     const html = await response.text();
 
     if (response.status !== 200) {
-      throw new Error(`/${route} returned HTTP ${response.status}.`);
+      throw new Error(`/${resolvedRoute} returned HTTP ${response.status}.`);
     }
 
     if (html.includes("Runtime Error")) {
-      throw new Error(`/${route} rendered a runtime error.`);
+      throw new Error(`/${resolvedRoute} rendered a runtime error.`);
     }
 
     const markers = routeMarkers[route];
 
     if (markers && !markers.some((marker) => html.includes(marker))) {
-      throw new Error(`/${route} did not include expected marker "${markers.join('" or "')}".`);
+      throw new Error(`/${resolvedRoute} did not include expected marker "${markers.join('" or "')}".`);
     }
 
-    assertSecurityHeaders(response, `/${route}`);
-    console.log(`ok /${route}`);
+    assertSecurityHeaders(response, `/${resolvedRoute}`);
+    const contractLabel = resolvedRoute === route ? "" : ` (contract /${route})`;
+    console.log(`ok /${resolvedRoute}${contractLabel}`);
   }
 
   if (routes.includes("billing")) {
@@ -123,6 +142,48 @@ async function main() {
   if (routes.includes("staff")) {
     await assertPayrollPolicyExport(cookie);
   }
+}
+
+async function resolveSmokeRoute(route, cookie) {
+  const normalized = `/${route.replace(/^\/+/, "")}`;
+  if (!routeNeedsPatientId(normalized)) return normalized.replace(/^\//, "");
+
+  if (!discoveredPatientId) {
+    discoveredPatientId = await discoverPatientId(cookie);
+  }
+
+  return materializePatientRoute(normalized, discoveredPatientId).replace(/^\//, "");
+}
+
+async function discoverPatientId(cookie) {
+  const response = await fetch(`${baseUrl}/patients`, {
+    headers: { cookie },
+    redirect: "manual",
+  });
+  const html = await response.text();
+
+  if (response.status !== 200) {
+    throw new Error(`Cannot discover patient id: /patients returned HTTP ${response.status}.`);
+  }
+
+  for (const match of html.matchAll(/href=["']([^"']+)["']/g)) {
+    const rawHref = match[1].replaceAll("&amp;", "&");
+    let pathname;
+    try {
+      pathname = new URL(rawHref, baseUrl).pathname;
+    } catch {
+      continue;
+    }
+    const patientMatch = pathname.match(/^\/patients\/([^/]+)$/);
+    const candidate = patientMatch?.[1];
+    if (candidate && !["new", "create"].includes(candidate.toLowerCase())) {
+      return decodeURIComponent(candidate);
+    }
+  }
+
+  throw new Error(
+    "Cannot discover a patient detail link from /patients. Set QA_PATIENT_ID or SMOKE_PATIENT_ID before enabling /patients/[patientId].",
+  );
 }
 
 async function assertHealth() {
