@@ -1,6 +1,7 @@
+import { logoutAction } from "@/app/(app)/actions";
 import { requireViewSession } from "@/lib/auth";
+import { loadAppShellContext } from "@/server/app-shell/loadAppShellContext";
 import { AppShellV2 } from "@/shared/layout/AppShell/AppShell";
-import { loadAppShellContext } from "@/shared/layout/AppShell/loadAppShellContext";
 import { loadReportsWorkspace } from "@/workspaces/reports/loadReportsWorkspace";
 import { ReportsWorkspace } from "@/workspaces/reports/ReportsWorkspace";
 
@@ -30,6 +31,7 @@ export default async function ReportsPage({
       allowedViews={shell.allowedViews}
       context={shell.context}
       notifications={shell.notifications}
+      signOutAction={logoutAction}
       title={{ vi: "Báo cáo", en: "Reports" }}
     >
       <ReportsWorkspace data={data} />
