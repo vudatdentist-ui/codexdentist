@@ -1,0 +1,151 @@
+name: PR18 Visual Handoff
+
+on:
+  push:
+    branches: [handoff/pr18-visual-capture]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      NODE_ENV: production
+      DEPLOYMENT_MODE: self-hosted
+      DATABASE_URL: postgresql://codexdentist:codexdentist@127.0.0.1:5432/codexdentist?schema=public
+      APP_BASE_URL: https://codexdentist.test
+      AUTH_SECRET: visual-handoff-only-auth-secret-at-least-32-characters
+      JOB_SECRET: visual-handoff-only-job-secret-at-least-32-characters
+      PATIENT_FILE_STORAGE_DRIVER: local
+      SESSION_COOKIE_SECURE: "false"
+      TRUSTED_PROXY_PROVIDER: reverse-proxy
+
+    steps:
+      - name: Checkout approved V2 head exactly
+        uses: actions/checkout@v7
+        with:
+          ref: 3dbbb37457a65ae44e8a35a6934ac1d8de0ab82f
+          fetch-depth: 1
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci --include=dev --no-audit --no-fund
+      - run: npm run build
+
+      - name: Start production server
+        run: |
+          npm start > /tmp/codexdentist-v2-visual.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3000/ > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/codexdentist-v2-visual.log
+          exit 1
+
+      - name: Capture V2 visual states
+        run: |
+          npx playwright install --with-deps chromium
+          mkdir -p output/pr18-visual-handoff
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          import fs from 'node:fs';
+          import path from 'node:path';
+
+          const sourceHead = '3dbbb37457a65ae44e8a35a6934ac1d8de0ab82f';
+          const out = path.join('output', 'pr18-visual-handoff');
+          const url = 'http://127.0.0.1:3000/';
+          const browser = await chromium.launch({ headless: true });
+
+          async function open(viewport) {
+            const context = await browser.newContext({ viewport, deviceScaleFactor: 1 });
+            const page = await context.newPage();
+            await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+            await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => null);
+            return { context, page };
+          }
+
+          async function waitScene(page, scene) {
+            await page.waitForFunction(
+              (expected) => {
+                const stage = document.querySelector('[data-qa="product-stage"]');
+                const image = document.querySelector(`[data-qa="product-stage-image-${expected}"]`);
+                return stage?.getAttribute('data-scene') === expected &&
+                  image instanceof HTMLImageElement &&
+                  image.complete && image.naturalWidth > 0 &&
+                  image.getAttribute('data-active') === 'true' &&
+                  Number.parseFloat(getComputedStyle(image).opacity) > 0.9;
+              },
+              scene,
+              { timeout: 2500 },
+            );
+          }
+
+          async function warmFullPage(page, step) {
+            await page.evaluate(async (scrollStep) => {
+              const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+              const height = document.documentElement.scrollHeight;
+              for (let y = 0; y < height; y += scrollStep) {
+                window.scrollTo(0, y);
+                await delay(80);
+              }
+              window.scrollTo(0, 0);
+              await delay(180);
+            }, step);
+          }
+
+          {
+            const { context, page } = await open({ width: 1440, height: 900 });
+            await waitScene(page, 'today');
+            await page.screenshot({ path: path.join(out, 'desktop-1440x900-first-viewport.png'), fullPage: false });
+
+            const input = page.locator('[data-qa="assistant-input"]');
+            await input.fill('Show me a patient.');
+            await input.press('Enter');
+            await waitScene(page, 'patient');
+            await page.screenshot({ path: path.join(out, 'desktop-1440x900-assistant-patient.png'), fullPage: false });
+
+            await page.locator('[data-scene-prompt="operations"]').click();
+            await waitScene(page, 'operations');
+            await page.screenshot({ path: path.join(out, 'desktop-1440x900-stage-operations.png'), fullPage: false });
+
+            await warmFullPage(page, 760);
+            await page.screenshot({ path: path.join(out, 'desktop-1440x900-full.png'), fullPage: true });
+            await context.close();
+          }
+
+          {
+            const { context, page } = await open({ width: 390, height: 844 });
+            await waitScene(page, 'today');
+            await page.screenshot({ path: path.join(out, 'mobile-390x844-first-viewport.png'), fullPage: false });
+
+            const input = page.locator('[data-qa="assistant-input"]');
+            await input.fill('Show me a patient.');
+            await input.press('Enter');
+            await waitScene(page, 'patient');
+            await page.screenshot({ path: path.join(out, 'mobile-390x844-assistant-patient.png'), fullPage: false });
+
+            await warmFullPage(page, 680);
+            await page.screenshot({ path: path.join(out, 'mobile-390x844-full.png'), fullPage: true });
+            await context.close();
+          }
+
+          await browser.close();
+          fs.writeFileSync(path.join(out, 'SOURCE_HEAD.txt'), `${sourceHead}\n`);
+          NODE
+
+      - name: Upload visual handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr18-visual-handoff-3dbbb374
+          path: output/pr18-visual-handoff
+          retention-days: 1
+          if-no-files-found: error
