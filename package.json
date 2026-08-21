@@ -44,7 +44,7 @@
     "test:seed-users": "node scripts/seed-smoke-users.mjs",
     "monitor:health": "node scripts/monitor-health.mjs",
     "readiness:check": "node scripts/readiness-check.mjs",
-    "browser:qa": "node scripts/browser-qa-audit.mjs",
+    "browser:qa": "node scripts/browser-qa-audit.mjs && node scripts/public-landing-browser-qa.mjs",
     "encoding:check": "node scripts/check-encoding.mjs",
     "agent:health": "node scripts/check-encoding.mjs && node scripts/agent-health-check.mjs",
     "agent:audit": "node scripts/agent-module-audit.mjs",
