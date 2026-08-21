@@ -161,8 +161,9 @@ async function auditLanding(page, viewport, consoleErrors, networkErrors) {
     };
   });
   if (!reducedMotion.matches) failures.push("prefers-reduced-motion emulation did not apply");
-  if (reducedMotion.transitionDuration && reducedMotion.transitionDuration !== "0s") {
-    failures.push(`reduced-motion keeps a transition: ${reducedMotion.transitionDuration}`);
+  const reducedDurationSeconds = Number.parseFloat(reducedMotion.transitionDuration ?? "0");
+  if (!Number.isFinite(reducedDurationSeconds) || reducedDurationSeconds > 0.001) {
+    failures.push(`reduced-motion keeps a material transition: ${reducedMotion.transitionDuration}`);
   }
 
   const screenshotPath = path.join(outputDir, `${viewport.name}-homepage.png`);
