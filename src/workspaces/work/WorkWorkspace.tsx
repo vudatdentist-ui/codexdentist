@@ -4,7 +4,7 @@ import {
   createWorkItemAction,
   retryFailedNotificationAction,
 } from "@/features/work/server/actions";
-import { WorkspaceChrome } from "@/components/workspace/WorkspaceChrome";
+import { WorkspaceChrome } from "@/features/navigation/ui/WorkspaceChrome";
 import type { AppSession } from "@/lib/session";
 import type {
   TaskInboxItemSummary,
