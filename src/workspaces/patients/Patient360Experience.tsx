@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useState } from "react";
 import { LanguageContext } from "@/components/AppLanguage";
 import { formatVnd, type Patient } from "@/lib/data";
 import type { AppSession } from "@/lib/session";
@@ -149,9 +150,29 @@ function PatientChart({
   patient: Patient;
   session: AppSession;
 }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const searchParamString = searchParams.toString();
   const clinicName =
     model.patientWorkspace.clinics.find((clinic) => clinic.id === patient.clinicId)
       ?.name ?? patient.city;
+
+  useEffect(() => {
+    const canonicalPath = `/patients/${encodeURIComponent(patient.id)}`;
+
+    if (pathname === canonicalPath) {
+      return;
+    }
+
+    const nextParams = new URLSearchParams(searchParamString);
+    nextParams.delete("patientId");
+    const query = nextParams.toString();
+
+    router.replace(query ? `${canonicalPath}?${query}` : canonicalPath, {
+      scroll: false,
+    });
+  }, [patient.id, pathname, router, searchParamString]);
 
   return (
     <div className={styles.chartPage}>
