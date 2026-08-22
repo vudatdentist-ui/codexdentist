@@ -76,7 +76,7 @@ function PatientDirectory({ model }: { model: Patient360WorkspaceModel }) {
           <p>{model.patientWorkspace.patients.length} hồ sơ trong phạm vi hiện tại</p>
         </div>
         {model.patientWorkspace.canMutate && (
-          <Link className={styles.secondaryAction} href="/patients/legacy">
+          <Link className={styles.secondaryAction} href="/patient-management">
             Thêm / chỉnh sửa hồ sơ
           </Link>
         )}
