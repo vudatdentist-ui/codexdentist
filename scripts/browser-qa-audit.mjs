@@ -16,6 +16,7 @@ const legacyRoutes = [
   "/dashboard",
   "/schedule",
   "/patients",
+  "/patient-management",
   "/journey",
   "/billing",
   "/accounting",
