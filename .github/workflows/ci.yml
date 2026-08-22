@@ -79,6 +79,7 @@ jobs:
           npm run test:smoke
         env:
           NODE_ENV: test
+          SMOKE_MIGRATION_ROUTES: "/work"
       - name: Runtime security, tenant, billing, and file tests
         run: |
           npm run test:security
@@ -98,4 +99,5 @@ jobs:
           npm run browser:qa
         env:
           NODE_ENV: test
+          BROWSER_QA_MIGRATION_ROUTES: "/today,/work"
       - run: docker build -t codexdentist:ci .
