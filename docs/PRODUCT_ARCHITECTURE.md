@@ -43,6 +43,16 @@ The first migration slice introduces:
 - a text-first, no-permanent-sidebar workspace chrome.
 - compatibility of the legacy `dashboard` permission key while its route resolves to `/today`.
 
+The Patient 360 slice introduces:
+
+- `/patients` as the patient directory inside the new workspace chrome.
+- `/patients/[patientId]` as the canonical Patient 360 route.
+- one patient context that composes schedule, clinical record, treatment planning, odontogram, timeline, files, forms, prescriptions, CRM context and authorized financial context.
+- `/journey`, `/clinical`, and `/treatment` as compatibility aliases over the same Patient 360 workspace while legacy server actions are migrated incrementally.
+- `/patient-management` as a temporary compatibility adapter for create/edit demographics until those mutations move into the new Patient workspace.
+
+The Patient 360 workspace may reuse a legacy module as a temporary compatibility island, but the route and workspace loader must not depend on `DentalSuite` or `AppViewPage`. New mutations should move below the workspace layer rather than adding more route-layer dependencies.
+
 ## Golden flow
 
 `Appointment -> Arrival -> Patient -> Encounter -> Odontogram/Clinical -> Treatment Case -> Service Progress`
