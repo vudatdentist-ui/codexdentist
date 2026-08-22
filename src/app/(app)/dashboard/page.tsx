@@ -1,5 +1,5 @@
-import { AppViewPage } from "../view-page";
+import { redirect } from "next/navigation";
 
 export default function DashboardPage() {
-  return <AppViewPage view="dashboard" />;
+  redirect("/today");
 }

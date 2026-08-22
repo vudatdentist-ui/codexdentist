@@ -26,9 +26,10 @@ const mutableTaskRoles: AppRole[] = [
 
 export async function createWorkItemAction(formData: FormData) {
   const session = await requireViewSession("dashboard");
+  const redirectTo = workRedirect(formData);
 
   if (!canWriteTasks(session)) {
-    redirect("/dashboard?notice=task-denied");
+    redirect(withNotice(redirectTo, "task-denied"));
   }
 
   const title = requiredString(formData.get("title"));
@@ -40,14 +41,14 @@ export async function createWorkItemAction(formData: FormData) {
   const dueAt = parseEndOfDateInVietnam(formData.get("dueAt"), () => new Date());
 
   if (!title || dueAt === "invalid") {
-    redirect("/dashboard?notice=task-missing");
+    redirect(withNotice(redirectTo, "task-missing"));
   }
 
   try {
     const scopedClinicId = await resolveClinicId(session, clinicId, patientId);
 
     if (!scopedClinicId && !canUseAllClinics(session)) {
-      redirect("/dashboard?notice=task-denied");
+      redirect(withNotice(redirectTo, "task-denied"));
     }
 
     if (assignedToId) {
@@ -63,7 +64,7 @@ export async function createWorkItemAction(formData: FormData) {
       });
 
       if (!assignee) {
-        redirect("/dashboard?notice=task-missing");
+        redirect(withNotice(redirectTo, "task-missing"));
       }
     }
 
@@ -104,24 +105,25 @@ export async function createWorkItemAction(formData: FormData) {
     if (isNextRedirect(error)) {
       throw error;
     }
-    redirect("/dashboard?notice=task-database");
+    redirect(withNotice(redirectTo, "task-database"));
   }
 
-  revalidatePath("/dashboard");
-  redirect("/dashboard?notice=task-created");
+  revalidateWorkSurfaces();
+  redirect(withNotice(redirectTo, "task-created"));
 }
 
 export async function completeWorkItemAction(formData: FormData) {
   const session = await requireViewSession("dashboard");
+  const redirectTo = workRedirect(formData);
 
   if (!canWriteTasks(session)) {
-    redirect("/dashboard?notice=task-denied");
+    redirect(withNotice(redirectTo, "task-denied"));
   }
 
   const workItemId = requiredString(formData.get("workItemId"));
 
   if (!workItemId) {
-    redirect("/dashboard?notice=task-missing");
+    redirect(withNotice(redirectTo, "task-missing"));
   }
 
   try {
@@ -146,7 +148,7 @@ export async function completeWorkItemAction(formData: FormData) {
     });
 
     if (!task) {
-      redirect("/dashboard?notice=task-missing");
+      redirect(withNotice(redirectTo, "task-missing"));
     }
 
     await prisma.workItem.update({
@@ -173,24 +175,25 @@ export async function completeWorkItemAction(formData: FormData) {
     if (isNextRedirect(error)) {
       throw error;
     }
-    redirect("/dashboard?notice=task-database");
+    redirect(withNotice(redirectTo, "task-database"));
   }
 
-  revalidatePath("/dashboard");
-  redirect("/dashboard?notice=task-completed");
+  revalidateWorkSurfaces();
+  redirect(withNotice(redirectTo, "task-completed"));
 }
 
 export async function retryFailedNotificationAction(formData: FormData) {
   const session = await requireViewSession("dashboard");
+  const redirectTo = workRedirect(formData);
 
   if (!canWriteTasks(session)) {
-    redirect("/dashboard?notice=task-denied");
+    redirect(withNotice(redirectTo, "task-denied"));
   }
 
   const notificationId = requiredString(formData.get("notificationId"));
 
   if (!notificationId) {
-    redirect("/dashboard?notice=task-missing");
+    redirect(withNotice(redirectTo, "task-missing"));
   }
 
   try {
@@ -216,7 +219,7 @@ export async function retryFailedNotificationAction(formData: FormData) {
     });
 
     if (!notification) {
-      redirect("/dashboard?notice=notification-not-found");
+      redirect(withNotice(redirectTo, "notification-not-found"));
     }
 
     await prisma.notification.update({
@@ -244,11 +247,11 @@ export async function retryFailedNotificationAction(formData: FormData) {
     if (isNextRedirect(error)) {
       throw error;
     }
-    redirect("/dashboard?notice=task-database");
+    redirect(withNotice(redirectTo, "task-database"));
   }
 
-  revalidatePath("/dashboard");
-  redirect("/dashboard?notice=notification-retry-scheduled");
+  revalidateWorkSurfaces();
+  redirect(withNotice(redirectTo, "notification-retry-scheduled"));
 }
 
 async function resolveClinicId(
@@ -298,6 +301,20 @@ function allowedClinicIds(session: AppSession) {
   }
 
   return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
+}
+
+function workRedirect(formData: FormData) {
+  return optionalString(formData.get("redirectTo")) === "/work" ? "/work" : "/today";
+}
+
+function withNotice(path: string, notice: string) {
+  return `${path}?notice=${encodeURIComponent(notice)}`;
+}
+
+function revalidateWorkSurfaces() {
+  revalidatePath("/today");
+  revalidatePath("/work");
+  revalidatePath("/dashboard");
 }
 
 function isNextRedirect(error: unknown) {
