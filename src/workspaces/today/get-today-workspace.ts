@@ -108,7 +108,7 @@ function normalizeStatus(status: string) {
 }
 
 function isActiveAppointment(status: string) {
-  return ["ARRIVED", "IN_CHAIR", "REQUESTED"].includes(normalizeStatus(status));
+  return ["ARRIVED", "IN_CHAIR"].includes(normalizeStatus(status));
 }
 
 function appointmentActionLabel(status: string) {
