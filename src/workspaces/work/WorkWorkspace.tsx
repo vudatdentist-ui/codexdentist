@@ -3,7 +3,7 @@ import {
   completeWorkItemAction,
   createWorkItemAction,
   retryFailedNotificationAction,
-} from "@/app/(app)/dashboard/actions";
+} from "@/features/work/server/actions";
 import { WorkspaceChrome } from "@/components/workspace/WorkspaceChrome";
 import type { AppSession } from "@/lib/session";
 import type {
