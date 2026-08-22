@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { WorkspaceChrome } from "@/components/workspace/WorkspaceChrome";
+import { WorkspaceChrome } from "@/features/navigation/ui/WorkspaceChrome";
 import type { AppSession } from "@/lib/session";
 import type {
   TodayAppointmentRow,
