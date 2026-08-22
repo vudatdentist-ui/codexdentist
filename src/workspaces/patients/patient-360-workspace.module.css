@@ -252,6 +252,21 @@
   min-width: 0;
 }
 
+.patientCanvas :global(.patient-chart > .toolbar),
+.patientCanvas :global(.patient-chart-search-meta),
+.patientCanvas :global(.patient-chart-topline),
+.patientCanvas :global(.patient-chart-stats) {
+  display: none;
+}
+
+.patientCanvas :global(.patient-chart) {
+  gap: 16px;
+}
+
+.patientCanvas :global(.patient-chart-flow) {
+  margin-top: 0;
+}
+
 @media (max-width: 920px) {
   .page,
   .chartPage {
