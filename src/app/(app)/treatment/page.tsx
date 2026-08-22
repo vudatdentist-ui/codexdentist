@@ -1,11 +1,12 @@
-import { AppViewPage } from "../view-page";
+import { redirect } from "next/navigation";
+import { canonicalPatientRoute } from "@/features/patients/server/canonical-patient-route";
 
 export default async function TreatmentPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ patientId?: string }>;
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
 
-  return <AppViewPage view="journey" journeyPatientId={params?.patientId} />;
+  redirect(canonicalPatientRoute(params));
 }
