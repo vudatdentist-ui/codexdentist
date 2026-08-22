@@ -1,0 +1,177 @@
+.shell {
+  min-height: 100vh;
+  background: #fbfaf8;
+  color: #171918;
+}
+
+.chrome {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  min-height: 52px;
+  align-items: center;
+  gap: 18px;
+  padding: 0 28px;
+  border-bottom: 1px solid rgba(23, 25, 24, 0.1);
+  background: rgba(251, 250, 248, 0.94);
+  backdrop-filter: blur(14px);
+}
+
+.brand {
+  color: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  text-decoration: none;
+}
+
+.workspaceSwitcher,
+.accountMenu {
+  position: relative;
+}
+
+.workspaceSwitcher summary,
+.accountMenu summary {
+  display: flex;
+  cursor: pointer;
+  list-style: none;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  color: #4e5350;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.workspaceSwitcher summary::-webkit-details-marker,
+.accountMenu summary::-webkit-details-marker {
+  display: none;
+}
+
+.workspaceSwitcher[open] summary,
+.accountMenu[open] summary {
+  color: #171918;
+}
+
+.workspaceMenu,
+.accountPopover {
+  position: absolute;
+  top: calc(100% + 12px);
+  min-width: 210px;
+  border: 1px solid rgba(23, 25, 24, 0.12);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 16px 40px rgba(23, 25, 24, 0.11);
+  padding: 7px;
+}
+
+.workspaceMenu {
+  left: -8px;
+}
+
+.workspaceMenu nav,
+.accountPopover {
+  display: grid;
+}
+
+.workspaceMenu a,
+.accountPopover a,
+.accountPopover button {
+  width: 100%;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #3e4340;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.2;
+  padding: 9px 10px;
+  text-align: left;
+  text-decoration: none;
+}
+
+.workspaceMenu a:hover,
+.accountPopover a:hover,
+.accountPopover button:hover,
+.activeLink {
+  background: #f2f1ee;
+  color: #171918 !important;
+}
+
+.menuDivider {
+  height: 1px;
+  margin: 6px 4px;
+  background: rgba(23, 25, 24, 0.1);
+}
+
+.chromeSpacer {
+  flex: 1;
+}
+
+.quickFind {
+  color: #5b605d;
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.quickFind:hover {
+  color: #08766f;
+}
+
+.accountMenu summary {
+  max-width: 190px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountPopover {
+  right: -6px;
+  width: 248px;
+  gap: 2px;
+}
+
+.accountPopover strong,
+.accountPopover > span {
+  padding: 4px 10px 0;
+}
+
+.accountPopover > span {
+  overflow: hidden;
+  color: #707572;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountPopover form {
+  margin: 0;
+}
+
+.accountPopover button {
+  cursor: pointer;
+}
+
+.canvas {
+  min-height: calc(100vh - 53px);
+}
+
+@media (max-width: 720px) {
+  .chrome {
+    gap: 12px;
+    padding: 0 16px;
+  }
+
+  .quickFind {
+    display: none;
+  }
+
+  .accountMenu summary {
+    max-width: 92px;
+  }
+
+  .brand {
+    font-size: 14px;
+  }
+}
