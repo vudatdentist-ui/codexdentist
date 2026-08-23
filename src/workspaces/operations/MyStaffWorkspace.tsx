@@ -1,10 +1,10 @@
-import {
-  clockInCurrentStaffAction,
-  clockOutCurrentStaffAction,
-  createCurrentStaffLeaveRequestAction,
-} from "@/app/(app)/employee-app/actions";
 import { WorkspaceChrome } from "@/features/navigation/ui/WorkspaceChrome";
 import type { UnifiedEarningsWorkspaceModel } from "@/features/earnings/server/get-unified-earnings";
+import {
+  clockInSelfAction,
+  clockOutSelfAction,
+  requestLeaveSelfAction,
+} from "@/features/staff-self-service/server/actions";
 import { formatVnd } from "@/lib/data";
 import type { AppSession } from "@/lib/session";
 import styles from "./my-staff-workspace.module.css";
@@ -32,9 +32,7 @@ export function MyStaffWorkspace({
           {person && <span className={styles.employeeCode}>{person.employeeCode}</span>}
         </header>
 
-        {(model.message || notice) && (
-          <p className={styles.notice}>{notice ?? model.message}</p>
-        )}
+        {(model.message || notice) && <p className={styles.notice}>{notice ?? model.message}</p>}
 
         {person ? (
           <>
@@ -70,13 +68,13 @@ export function MyStaffWorkspace({
                       <strong>Đang trong ca</strong>
                       <span>{openAttendance.clockInAt} · {openAttendance.clinicName}</span>
                     </div>
-                    <form action={clockOutCurrentStaffAction}>
+                    <form action={clockOutSelfAction}>
                       <input name="outStatus" type="hidden" value="NORMAL" />
                       <button className={styles.primaryButton} type="submit">Ra ca</button>
                     </form>
                   </div>
                 ) : (
-                  <form action={clockInCurrentStaffAction} className={styles.actionBlock}>
+                  <form action={clockInSelfAction} className={styles.actionBlock}>
                     <div>
                       <strong>Chưa vào ca</strong>
                       <span>{person.clinicName ?? session.organizationName}</span>
@@ -161,7 +159,7 @@ export function MyStaffWorkspace({
                 )}
                 <details className={styles.requestLeave}>
                   <summary>Gửi đơn nghỉ</summary>
-                  <form action={createCurrentStaffLeaveRequestAction}>
+                  <form action={requestLeaveSelfAction}>
                     <label>
                       <span>Loại nghỉ</span>
                       <select name="leaveType" defaultValue="ANNUAL">
