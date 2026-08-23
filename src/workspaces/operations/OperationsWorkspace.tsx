@@ -31,7 +31,7 @@ export function OperationsWorkspace({
 
         <nav aria-label="Vận hành" className={styles.subnav}>
           <span aria-current="page">Nhân sự</span>
-          <Link href="/accounting">Tài chính</Link>
+          <Link href="/operations/finance">Tài chính</Link>
           <Link href="/inventory">Kho</Link>
           <Link href="/reports">Báo cáo</Link>
         </nav>
