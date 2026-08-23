@@ -26,7 +26,7 @@ The phase must improve access and operational visibility without replacing exist
    - invoices and payments,
    - E-invoice operational state,
    - reconciliation findings.
-3. Provider-agnostic E-invoice adapter contract.
+3. Provider-agnostic E-invoice adapter contract with explicit `issue`, `cancel`, `replace`, `lookup`, and `sync` boundaries. Provider-specific implementations are deferred until their credentials, idempotency, callback verification, and legal-state semantics have dedicated tests.
 4. E-invoice state machine:
    - `NOT_REQUIRED`
    - `PENDING`
@@ -34,7 +34,7 @@ The phase must improve access and operational visibility without replacing exist
    - `FAILED`
    - `CANCELLED`
    - `REPLACED`
-5. E-invoice state persisted as append-only `AuditLog` events in v1. This is deliberate until a real provider contract is selected; no provider-specific schema is invented.
+5. E-invoice state persisted as append-only, versioned `AuditLog` events in v1. This is deliberate until a real provider contract is selected; no provider-specific schema is invented.
 6. Manual external reconciliation for invoices issued/cancelled/replaced outside Dental OS.
 7. Provider request/sync actions. If no provider is configured, fail explicitly with `PROVIDER_NOT_CONFIGURED`; never fabricate issuance.
 8. Derived Finance Work signals for:
@@ -44,8 +44,19 @@ The phase must improve access and operational visibility without replacing exist
    - receipt amount not fully allocated,
    - treatment collection not yet invoiced,
    - invoice/item/payment reconciliation mismatch.
-9. Operations navigation exposes Finance without giving Front Desk the manager Operations workspace.
+9. Operations navigation exposes Finance without giving Front Desk the manager Operations workspace. Manager roles keep Staff Operations as their default destination; Billing lands directly in Finance.
 10. Desktop/mobile Browser QA + deterministic Finance/E-invoice E2E coverage.
+
+## E-invoice concurrency contract
+
+- Every E-invoice transition is a serializable compare-and-append operation.
+- Each invoice has a transaction-scoped advisory lock during state transition.
+- Each audit event receives a monotonic per-invoice version.
+- Provider results may finalize only the exact `PENDING` claim that initiated that provider call.
+- A second request cannot race the first request and call the provider from the same prior state.
+- Manual external references are checked for duplicate use inside an additional provider/reference lock.
+- An ambiguous provider failure is not automatically retried as a new issuance. It must be synchronized or manually reconciled first.
+- A provider exception becomes an explicit `FAILED` event with a bounded operator-safe error; raw provider payloads are not persisted.
 
 ## Safety invariants
 
