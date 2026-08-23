@@ -206,8 +206,8 @@ async function assertProviderFailureCreatesWork(browser) {
     await openFinance(page);
     const row = invoiceRow(page);
     await row.getByRole("button", { name: "Yêu cầu HĐĐT", exact: true }).click();
-    await page.waitForURL((url) => url.pathname === "/operations/finance", { timeout: 15000 });
-    await page.waitForLoadState("networkidle").catch(() => null);
+    await waitForAuditAction("einvoice.failed");
+    await reloadFinance(page);
     await expectText(page, "Lỗi");
     await expectText(page, "PROVIDER_NOT_CONFIGURED");
 
@@ -231,8 +231,8 @@ async function assertManualIssuanceResolvesProviderFailure(browser) {
     await form.locator('input[name="lookupCode"]').fill("LOOKUP-SMOKE-001");
     await form.locator('input[name="providerKey"]').fill("external-smoke");
     await form.getByRole("button", { name: "Xác nhận đã phát hành", exact: true }).click();
-    await page.waitForURL((url) => url.pathname === "/operations/finance", { timeout: 15000 });
-    await page.waitForLoadState("networkidle").catch(() => null);
+    await waitForAuditAction("einvoice.issued");
+    await reloadFinance(page);
     await expectText(page, "Đã phát hành");
     await expectText(page, firstExternalId);
 
@@ -271,8 +271,8 @@ async function assertAmountMismatchAndReplacement(browser) {
     await form.locator('input[name="replacementReference"]').fill(firstExternalId);
     await form.locator('input[name="lookupCode"]').fill("LOOKUP-SMOKE-002");
     await form.getByRole("button", { name: "Ghi nhận thay thế", exact: true }).click();
-    await page.waitForURL((url) => url.pathname === "/operations/finance", { timeout: 15000 });
-    await page.waitForLoadState("networkidle").catch(() => null);
+    await waitForAuditAction("einvoice.replaced");
+    await reloadFinance(page);
     await expectText(page, "Đã thay thế");
     await expectText(page, replacementExternalId);
 
@@ -298,8 +298,8 @@ async function assertVoidMismatchAndExternalCancellation(browser) {
     await openFinance(page);
     const row = invoiceRow(page);
     await row.getByRole("button", { name: "Xác nhận đã hủy HĐĐT", exact: true }).click();
-    await page.waitForURL((url) => url.pathname === "/operations/finance", { timeout: 15000 });
-    await page.waitForLoadState("networkidle").catch(() => null);
+    await waitForAuditAction("einvoice.cancelled");
+    await reloadFinance(page);
     await expectText(page, "Đã hủy");
 
     await page.goto(`${baseUrl}/work`, { waitUntil: "domcontentloaded" });
@@ -359,6 +359,33 @@ async function invoiceAuditActions() {
   return events.map((event) => event.action);
 }
 
+async function waitForAuditAction(expectedAction, timeoutMs = 12_000) {
+  const deadline = Date.now() + timeoutMs;
+  let lastAction = null;
+
+  while (Date.now() < deadline) {
+    const latest = await prisma.auditLog.findFirst({
+      where: {
+        organizationId,
+        entityType: "Invoice",
+        entityId: invoiceId,
+        action: { startsWith: "einvoice." },
+      },
+      orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+      select: { action: true },
+    });
+    lastAction = latest?.action ?? null;
+    if (lastAction === expectedAction) {
+      return;
+    }
+    await sleep(200);
+  }
+
+  throw new Error(
+    `Timed out waiting for ${expectedAction}; latest persisted E-invoice action was ${lastAction ?? "none"}.`,
+  );
+}
+
 function assertSequence(actual, expected) {
   if (actual.length !== expected.length || actual.some((value, index) => value !== expected[index])) {
     throw new Error(`Unexpected E-invoice audit sequence: ${actual.join(" → ")}; expected ${expected.join(" → ")}.`);
@@ -371,6 +398,16 @@ async function openFinance(page) {
   if (!response || response.status() >= 400 || new URL(page.url()).pathname !== "/operations/finance") {
     throw new Error(`/operations/finance failed: ${response?.status() ?? "unknown"} ${page.url()}`);
   }
+  await expectText(page, invoiceNo);
+}
+
+async function reloadFinance(page) {
+  if (new URL(page.url()).pathname !== "/operations/finance") {
+    await page.goto(`${baseUrl}/operations/finance`, { waitUntil: "domcontentloaded" });
+  } else {
+    await page.reload({ waitUntil: "domcontentloaded" });
+  }
+  await page.waitForLoadState("networkidle").catch(() => null);
   await expectText(page, invoiceNo);
 }
 
@@ -422,6 +459,10 @@ async function expectAbsent(page, text) {
   if ((await page.getByText(text, { exact: true }).count()) !== 0) {
     throw new Error(`Unexpected visible text remained: ${text}`);
   }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 main()
