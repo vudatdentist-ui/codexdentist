@@ -4,6 +4,7 @@ import { canAccessView, hasAnyRole } from "@/lib/permissions";
 import type { AppSession } from "@/lib/session";
 import {
   getProductWorkspace,
+  productWorkspaceHref,
   productWorkspaces,
   type ProductWorkspaceKey,
 } from "../model/workspaces";
@@ -48,7 +49,7 @@ export function WorkspaceChrome({
                 <Link
                   aria-current={workspace.key === activeWorkspace && !contextLabel ? "page" : undefined}
                   className={workspace.key === activeWorkspace && !contextLabel ? styles.activeLink : undefined}
-                  href={workspace.href}
+                  href={productWorkspaceHref(workspace, session.roles)}
                   key={workspace.key}
                 >
                   {workspace.label}
@@ -59,7 +60,7 @@ export function WorkspaceChrome({
                 <Link
                   aria-current={workspace.key === activeWorkspace && !contextLabel ? "page" : undefined}
                   className={workspace.key === activeWorkspace && !contextLabel ? styles.activeLink : undefined}
-                  href={workspace.href}
+                  href={productWorkspaceHref(workspace, session.roles)}
                   key={workspace.key}
                 >
                   {workspace.label}
