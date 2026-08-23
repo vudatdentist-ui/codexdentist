@@ -59,8 +59,10 @@ export async function getPatientAccessSignals(session: AppSession): Promise<Task
 
   const arrivalAtByAppointment = new Map<string, Date>();
   for (const log of auditLogs) {
-    if (arrivalAtByAppointment.has(log.entityId)) continue;
-    if (metadataStatus(log.metadata) === "ARRIVED") arrivalAtByAppointment.set(log.entityId, log.createdAt);
+    if (!log.entityId || arrivalAtByAppointment.has(log.entityId)) continue;
+    if (metadataStatus(log.metadata) === "ARRIVED") {
+      arrivalAtByAppointment.set(log.entityId, log.createdAt);
+    }
   }
   const resolvedNoShowSubjects = new Set(completedNoShowActivities.map((activity) => activity.subject));
 
