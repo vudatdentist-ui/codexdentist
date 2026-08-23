@@ -12,9 +12,15 @@ const prisma = new PrismaClient({
 });
 
 const organizationId = "org_nhavista";
+const clinicId = "hcm-q1";
+const patientId = "patient-minh-anh";
+const dentistUserId = "user-dentist";
 const source = "STAFF_REFERRAL_SMOKE";
 const policyId = "staff-operations-smoke-policy";
 const accrualId = "staff-operations-smoke-accrual";
+const receiptId = "staff-operations-smoke-receipt";
+const receiptNo = "STAFF-OPS-SMOKE";
+const dentistProfileFixtureId = "staff-operations-smoke-dentist-profile";
 const commissionAmount = 250_000;
 
 async function main() {
@@ -38,40 +44,76 @@ async function main() {
 async function resetFixture() {
   await cleanupFixture();
 
-  const [receipt, dentistProfile] = await Promise.all([
-    prisma.receipt.findFirst({
+  const [dentistUser, patient] = await Promise.all([
+    prisma.user.findFirst({
       where: {
+        id: dentistUserId,
         organizationId,
-        clinicId: "hcm-q1",
+        active: true,
       },
       select: {
         id: true,
-        clinicId: true,
-        patientId: true,
-      },
-      orderBy: {
-        receivedAt: "asc",
+        fullName: true,
       },
     }),
-    prisma.staffProfile.findFirst({
+    prisma.patient.findFirst({
       where: {
+        id: patientId,
         organizationId,
-        userId: "user-dentist",
+        clinicId,
       },
       select: {
-        employeeCode: true,
-        user: {
-          select: {
-            fullName: true,
-          },
-        },
+        id: true,
       },
     }),
   ]);
 
-  if (!receipt || !dentistProfile) {
-    throw new Error("Staff operations smoke prerequisites are missing.");
+  if (!dentistUser || !patient) {
+    throw new Error("Staff operations smoke seed users/patient are missing.");
   }
+
+  const dentistProfile = await prisma.staffProfile.upsert({
+    where: {
+      userId: dentistUserId,
+    },
+    update: {},
+    create: {
+      id: dentistProfileFixtureId,
+      organizationId,
+      userId: dentistUserId,
+      clinicId,
+      employeeCode: "SMOKE-DENT-001",
+      title: "Dentist",
+      department: "Clinical",
+      baseSalary: 0,
+      active: true,
+    },
+    select: {
+      employeeCode: true,
+    },
+  });
+
+  const receipt = await prisma.receipt.create({
+    data: {
+      id: receiptId,
+      organizationId,
+      clinicId,
+      patientId,
+      receiptNo,
+      amount: 1_000_000,
+      allocatedAmount: 0,
+      unallocatedAmount: 1_000_000,
+      method: "CASH",
+      reference: source,
+      note: "Staff operations smoke fixture",
+      receivedAt: new Date(),
+    },
+    select: {
+      id: true,
+      clinicId: true,
+      patientId: true,
+    },
+  });
 
   await prisma.sourceCommissionPolicy.create({
     data: {
@@ -107,7 +149,7 @@ async function resetFixture() {
 
   return {
     dentistEmployeeCode: dentistProfile.employeeCode,
-    dentistName: dentistProfile.user.fullName,
+    dentistName: dentistUser.fullName,
   };
 }
 
@@ -129,6 +171,19 @@ async function cleanupFixture() {
     where: {
       organizationId,
       OR: [{ id: policyId }, { source }],
+    },
+  });
+  await prisma.receipt.deleteMany({
+    where: {
+      organizationId,
+      OR: [{ id: receiptId }, { receiptNo }],
+    },
+  });
+  await prisma.staffProfile.deleteMany({
+    where: {
+      id: dentistProfileFixtureId,
+      organizationId,
+      userId: dentistUserId,
     },
   });
 }
