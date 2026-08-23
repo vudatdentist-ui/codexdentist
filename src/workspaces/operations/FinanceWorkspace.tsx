@@ -219,9 +219,29 @@ function IssueSection({ issues }: { issues: FinanceOperationsIssue[] }) {
 }
 
 function InvoiceRow({ invoice }: { invoice: FinanceInvoiceRow }) {
-  const canRequest = invoice.status !== "VOID" && invoice.eInvoice.state !== "ISSUED" && invoice.eInvoice.state !== "REPLACED";
-  const canSync = invoice.eInvoice.state === "FAILED" || invoice.eInvoice.state === "PENDING";
-  const needsExternalCancellation = invoice.status === "VOID" && (invoice.eInvoice.state === "ISSUED" || invoice.eInvoice.state === "REPLACED");
+  const retrySafeFailure =
+    invoice.eInvoice.state === "FAILED" &&
+    invoice.eInvoice.errorCode === "PROVIDER_NOT_CONFIGURED";
+  const canRequest =
+    invoice.status !== "VOID" &&
+    (invoice.eInvoice.state === "NOT_REQUIRED" || retrySafeFailure);
+  const canSync =
+    invoice.status !== "VOID" &&
+    (invoice.eInvoice.state === "FAILED" || invoice.eInvoice.state === "PENDING");
+  const canMarkNotRequired =
+    invoice.status !== "VOID" &&
+    (invoice.eInvoice.state === "NOT_REQUIRED" || retrySafeFailure);
+  const canManualIssue =
+    invoice.status !== "VOID" &&
+    invoice.eInvoice.state !== "ISSUED" &&
+    invoice.eInvoice.state !== "REPLACED" &&
+    invoice.eInvoice.state !== "CANCELLED";
+  const canReplace =
+    invoice.status !== "VOID" &&
+    (invoice.eInvoice.state === "ISSUED" || invoice.eInvoice.state === "REPLACED");
+  const needsExternalCancellation =
+    invoice.status === "VOID" &&
+    (invoice.eInvoice.state === "ISSUED" || invoice.eInvoice.state === "REPLACED");
 
   return (
     <div className={styles.invoiceRow} id={`invoice-${invoice.id}`} role="row">
@@ -264,55 +284,57 @@ function InvoiceRow({ invoice }: { invoice: FinanceInvoiceRow }) {
             <button type="submit">Xác nhận đã hủy HĐĐT</button>
           </form>
         )}
-        <details className={styles.moreActions}>
-          <summary>Đối soát…</summary>
-          <div className={styles.actionPopover}>
-            {invoice.status !== "VOID" && invoice.eInvoice.state !== "ISSUED" && invoice.eInvoice.state !== "REPLACED" && (
-              <form action={confirmExternalEInvoiceAction}>
-                <input name="invoiceId" type="hidden" value={invoice.id} />
-                <label>
-                  <span>Mã HĐĐT ngoài hệ thống</span>
-                  <input name="externalInvoiceId" required />
-                </label>
-                <label>
-                  <span>Mã tra cứu</span>
-                  <input name="lookupCode" />
-                </label>
-                <label>
-                  <span>Nhà cung cấp</span>
-                  <input defaultValue="external-manual" name="providerKey" />
-                </label>
-                <button type="submit">Xác nhận đã phát hành</button>
-              </form>
-            )}
+        {(canManualIssue || canReplace || canMarkNotRequired) && (
+          <details className={styles.moreActions}>
+            <summary>Đối soát…</summary>
+            <div className={styles.actionPopover}>
+              {canManualIssue && (
+                <form action={confirmExternalEInvoiceAction}>
+                  <input name="invoiceId" type="hidden" value={invoice.id} />
+                  <label>
+                    <span>Mã HĐĐT ngoài hệ thống</span>
+                    <input name="externalInvoiceId" required />
+                  </label>
+                  <label>
+                    <span>Mã tra cứu</span>
+                    <input name="lookupCode" />
+                  </label>
+                  <label>
+                    <span>Nhà cung cấp</span>
+                    <input defaultValue="external-manual" name="providerKey" />
+                  </label>
+                  <button type="submit">Xác nhận đã phát hành</button>
+                </form>
+              )}
 
-            {(invoice.eInvoice.state === "ISSUED" || invoice.eInvoice.state === "REPLACED") && invoice.status !== "VOID" && (
-              <form action={confirmExternalEInvoiceReplacementAction}>
-                <input name="invoiceId" type="hidden" value={invoice.id} />
-                <label>
-                  <span>Mã HĐĐT thay thế</span>
-                  <input name="externalInvoiceId" required />
-                </label>
-                <label>
-                  <span>Tham chiếu thay thế</span>
-                  <input name="replacementReference" required />
-                </label>
-                <label>
-                  <span>Mã tra cứu</span>
-                  <input name="lookupCode" />
-                </label>
-                <button type="submit">Ghi nhận thay thế</button>
-              </form>
-            )}
+              {canReplace && (
+                <form action={confirmExternalEInvoiceReplacementAction}>
+                  <input name="invoiceId" type="hidden" value={invoice.id} />
+                  <label>
+                    <span>Mã HĐĐT thay thế</span>
+                    <input name="externalInvoiceId" required />
+                  </label>
+                  <label>
+                    <span>Tham chiếu thay thế</span>
+                    <input name="replacementReference" required />
+                  </label>
+                  <label>
+                    <span>Mã tra cứu</span>
+                    <input name="lookupCode" />
+                  </label>
+                  <button type="submit">Ghi nhận thay thế</button>
+                </form>
+              )}
 
-            {invoice.eInvoice.state !== "ISSUED" && invoice.eInvoice.state !== "REPLACED" && (
-              <form action={markEInvoiceNotRequiredAction}>
-                <input name="invoiceId" type="hidden" value={invoice.id} />
-                <button type="submit">Đánh dấu không yêu cầu HĐĐT</button>
-              </form>
-            )}
-          </div>
-        </details>
+              {canMarkNotRequired && (
+                <form action={markEInvoiceNotRequiredAction}>
+                  <input name="invoiceId" type="hidden" value={invoice.id} />
+                  <button type="submit">Đánh dấu không yêu cầu HĐĐT</button>
+                </form>
+              )}
+            </div>
+          </details>
+        )}
       </div>
     </div>
   );
