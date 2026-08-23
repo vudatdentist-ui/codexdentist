@@ -9,8 +9,6 @@ export type TaskInboxItemSummary = {
     | "inventory"
     | "hr"
     | "schedule"
-    | "treatment"
-    | "clinical"
     | "learning"
     | "notification";
   priority: TaskInboxPriority;
