@@ -10,7 +10,9 @@ export type FinanceIssueKind =
   | "einvoice_failed"
   | "einvoice_stale"
   | "einvoice_void_mismatch"
+  | "einvoice_cancel_mismatch"
   | "einvoice_amount_mismatch"
+  | "einvoice_external_duplicate"
   | "receipt_unallocated"
   | "receipt_reconciliation"
   | "service_uninvoiced"
@@ -62,6 +64,7 @@ export type FinanceReceiptRow = {
   clinicName: string;
   amount: number;
   allocatedAmount: number;
+  allocationRowTotal: number;
   unallocatedAmount: number;
   method: string;
   reference: string | null;
@@ -145,6 +148,7 @@ export async function getFinanceOperations(
         include: {
           clinic: { select: { name: true } },
           patient: { select: { id: true, fullName: true } },
+          allocations: { select: { amount: true } },
         },
         orderBy: { receivedAt: "desc" },
         take: 300,
@@ -177,10 +181,15 @@ export async function getFinanceOperations(
       const paidAmount = Number(invoice.paidAmount);
       const itemMismatch = invoice.status !== "VOID" && differentMoney(itemTotal, amount);
       const paymentMismatch = invoice.status !== "VOID" && differentMoney(paymentTotal, paidAmount);
-      const eInvoiceMismatch =
+      const externalActiveOnVoid =
+        invoice.status === "VOID" &&
+        (eInvoice.state === "ISSUED" || eInvoice.state === "REPLACED");
+      const externalCancelledOnActive =
+        invoice.status !== "VOID" && eInvoice.state === "CANCELLED";
+      const eInvoiceAmountMismatch =
         (eInvoice.state === "ISSUED" || eInvoice.state === "REPLACED") &&
-        ((eInvoice.amountSnapshot != null && differentMoney(eInvoice.amountSnapshot, amount)) ||
-          invoice.status === "VOID");
+        eInvoice.amountSnapshot != null &&
+        differentMoney(eInvoice.amountSnapshot, amount);
       const needsAction = eInvoice.state === "FAILED" || eInvoice.state === "PENDING";
       const serviceItem = invoice.items.find((item) => item.treatmentService);
 
@@ -204,11 +213,16 @@ export async function getFinanceOperations(
         treatmentServiceId: serviceItem?.treatmentService?.id ?? null,
         treatmentServiceCode: serviceItem?.treatmentService?.serviceCode ?? null,
         eInvoice,
-        reconciliation: itemMismatch || paymentMismatch || eInvoiceMismatch
-          ? "MISMATCH"
-          : needsAction
-            ? "NEEDS_ACTION"
-            : "MATCHED",
+        reconciliation:
+          itemMismatch ||
+          paymentMismatch ||
+          externalActiveOnVoid ||
+          externalCancelledOnActive ||
+          eInvoiceAmountMismatch
+            ? "MISMATCH"
+            : needsAction
+              ? "NEEDS_ACTION"
+              : "MATCHED",
       };
     });
 
@@ -220,6 +234,7 @@ export async function getFinanceOperations(
       clinicName: receipt.clinic.name,
       amount: Number(receipt.amount),
       allocatedAmount: Number(receipt.allocatedAmount),
+      allocationRowTotal: sum(receipt.allocations.map((allocation) => Number(allocation.amount))),
       unallocatedAmount: Number(receipt.unallocatedAmount),
       method: receipt.method,
       reference: receipt.reference,
@@ -293,8 +308,20 @@ function deriveIssues(
 ) {
   const issues: FinanceOperationsIssue[] = [];
   const now = Date.now();
+  const activeExternalRefs = new Map<string, FinanceInvoiceRow[]>();
 
   for (const invoice of invoices) {
+    if (
+      (invoice.eInvoice.state === "ISSUED" || invoice.eInvoice.state === "REPLACED") &&
+      invoice.eInvoice.providerKey &&
+      invoice.eInvoice.externalInvoiceId
+    ) {
+      const key = `${invoice.eInvoice.providerKey}\u0000${invoice.eInvoice.externalInvoiceId}`;
+      const rows = activeExternalRefs.get(key) ?? [];
+      rows.push(invoice);
+      activeExternalRefs.set(key, rows);
+    }
+
     if (invoice.eInvoice.state === "FAILED") {
       issues.push(issue({
         id: `einvoice-failed:${invoice.id}`,
@@ -340,6 +367,18 @@ function deriveIssues(
       }));
     }
 
+    if (invoice.status !== "VOID" && invoice.eInvoice.state === "CANCELLED") {
+      issues.push(issue({
+        id: `einvoice-cancelled-active:${invoice.id}`,
+        kind: "einvoice_cancel_mismatch",
+        priority: "high",
+        title: `HĐĐT đã hủy nhưng hóa đơn nội bộ còn hiệu lực: ${invoice.invoiceNo}`,
+        detail: `${invoice.patientName} · cần đối soát trạng thái hóa đơn nội bộ`,
+        invoice,
+        status: "EINVOICE_EXTERNAL_CANCELLED_LOCAL_ACTIVE",
+      }));
+    }
+
     if (
       (invoice.eInvoice.state === "ISSUED" || invoice.eInvoice.state === "REPLACED") &&
       invoice.eInvoice.amountSnapshot != null &&
@@ -381,6 +420,21 @@ function deriveIssues(
     }
   }
 
+  for (const duplicates of activeExternalRefs.values()) {
+    if (duplicates.length < 2) continue;
+    for (const invoice of duplicates) {
+      issues.push(issue({
+        id: `einvoice-duplicate:${invoice.id}`,
+        kind: "einvoice_external_duplicate",
+        priority: "high",
+        title: `Mã HĐĐT đang gắn nhiều hóa đơn: ${invoice.invoiceNo}`,
+        detail: `${invoice.eInvoice.externalInvoiceId} · ${duplicates.length} hóa đơn nội bộ`,
+        invoice,
+        status: "EINVOICE_EXTERNAL_REFERENCE_DUPLICATE",
+      }));
+    }
+  }
+
   for (const receipt of receipts) {
     if (receipt.unallocatedAmount > moneyTolerance) {
       issues.push({
@@ -398,13 +452,21 @@ function deriveIssues(
       });
     }
 
-    if (differentMoney(receipt.allocatedAmount + receipt.unallocatedAmount, receipt.amount)) {
+    const storedBalanceMismatch = differentMoney(
+      receipt.allocatedAmount + receipt.unallocatedAmount,
+      receipt.amount,
+    );
+    const allocationRowsMismatch = differentMoney(
+      receipt.allocationRowTotal,
+      receipt.allocatedAmount,
+    );
+    if (storedBalanceMismatch || allocationRowsMismatch) {
       issues.push({
         id: `receipt-reconcile:${receipt.id}`,
         kind: "receipt_reconciliation",
         priority: "high",
         title: `Phiếu thu lệch phân bổ: ${receipt.receiptNo}`,
-        detail: `${money(receipt.amount)} thu ↔ ${money(receipt.allocatedAmount + receipt.unallocatedAmount)} phân bổ + dư`,
+        detail: `${money(receipt.amount)} thu · ${money(receipt.allocatedAmount)} đã phân bổ · ${money(receipt.allocationRowTotal)} từ allocation rows · ${money(receipt.unallocatedAmount)} dư`,
         clinicName: receipt.clinicName,
         patientId: receipt.patientId,
         patientName: receipt.patientName,
