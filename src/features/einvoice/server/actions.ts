@@ -50,7 +50,12 @@ export async function requestEInvoiceIssueAction(formData: FormData) {
     },
   });
 
-  const result = await adapter.issue(toProviderInvoice(session, invoice));
+  const result = await adapter.issue(toProviderInvoice(session, invoice)).catch(() => ({
+    state: "FAILED" as const,
+    providerKey: adapter.providerKey,
+    errorCode: "PROVIDER_REQUEST_ERROR",
+    errorMessage: "Không xác nhận được phản hồi phát hành từ nhà cung cấp HĐĐT.",
+  }));
 
   await appendEInvoiceEvent({
     organizationId: session.organizationId,
@@ -92,7 +97,15 @@ export async function syncEInvoiceAction(formData: FormData) {
   const result = await adapter.sync(toProviderInvoice(session, invoice), {
     externalInvoiceId: current.externalInvoiceId,
     lookupCode: current.lookupCode,
-  });
+  }).catch(() => ({
+    state: "FAILED" as const,
+    providerKey: adapter.providerKey,
+    externalInvoiceId: current.externalInvoiceId,
+    lookupCode: current.lookupCode,
+    replacementReference: current.replacementReference,
+    errorCode: "PROVIDER_SYNC_ERROR",
+    errorMessage: "Không xác nhận được phản hồi đồng bộ từ nhà cung cấp HĐĐT.",
+  }));
 
   await appendEInvoiceEvent({
     organizationId: session.organizationId,
