@@ -126,16 +126,31 @@ export async function transitionEInvoiceState({
   invoiceId,
   input,
   allow,
+  lockKeys = [],
+  validate,
 }: {
   organizationId: string;
   actorId: string | null;
   invoiceId: string;
   input: EInvoiceEventInput;
   allow: (current: EInvoiceStateSnapshot) => boolean;
+  lockKeys?: string[];
+  validate?: (
+    tx: Prisma.TransactionClient,
+    current: EInvoiceStateSnapshot,
+  ) => Promise<boolean>;
 }): Promise<EInvoiceStateSnapshot> {
   return runSerializableTransaction(async (tx) => {
+    const transitionLocks = Array.from(
+      new Set([`einvoice:invoice:${organizationId}:${invoiceId}`, ...lockKeys]),
+    ).sort();
+
+    for (const lockKey of transitionLocks) {
+      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+    }
+
     const current = await loadOneState(tx, organizationId, invoiceId);
-    if (!allow(current)) {
+    if (!allow(current) || (validate && !(await validate(tx, current)))) {
       throw new EInvoiceTransitionError();
     }
 
