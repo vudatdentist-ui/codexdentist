@@ -18,6 +18,8 @@ import { canAccessView } from "@/lib/permissions";
 import type { AppSession } from "@/lib/session";
 import styles from "./finance-workspace.module.css";
 
+const pendingSyncMinAgeMs = 30 * 60 * 1000;
+
 export function FinanceWorkspace({
   model,
   notice,
@@ -222,20 +224,24 @@ function InvoiceRow({ invoice }: { invoice: FinanceInvoiceRow }) {
   const retrySafeFailure =
     invoice.eInvoice.state === "FAILED" &&
     invoice.eInvoice.errorCode === "PROVIDER_NOT_CONFIGURED";
+  const pendingCanSync =
+    invoice.eInvoice.state === "PENDING" &&
+    invoice.eInvoice.updatedAtMs != null &&
+    Date.now() - invoice.eInvoice.updatedAtMs >= pendingSyncMinAgeMs;
   const canRequest =
     invoice.status !== "VOID" &&
-    (invoice.eInvoice.state === "NOT_REQUIRED" || retrySafeFailure);
+    invoice.eInvoice.state === "NOT_REQUIRED";
   const canSync =
     invoice.status !== "VOID" &&
-    (invoice.eInvoice.state === "FAILED" || invoice.eInvoice.state === "PENDING");
+    (invoice.eInvoice.state === "FAILED" || pendingCanSync);
   const canMarkNotRequired =
     invoice.status !== "VOID" &&
-    (invoice.eInvoice.state === "NOT_REQUIRED" || retrySafeFailure);
+    ((invoice.eInvoice.state === "NOT_REQUIRED" && invoice.eInvoice.eventId === null) || retrySafeFailure);
   const canManualIssue =
     invoice.status !== "VOID" &&
-    invoice.eInvoice.state !== "ISSUED" &&
-    invoice.eInvoice.state !== "REPLACED" &&
-    invoice.eInvoice.state !== "CANCELLED";
+    (invoice.eInvoice.state === "NOT_REQUIRED" ||
+      (invoice.eInvoice.state === "FAILED" &&
+        (invoice.eInvoice.operation === "ISSUE" || invoice.eInvoice.operation === "SYNC")));
   const canReplace =
     invoice.status !== "VOID" &&
     (invoice.eInvoice.state === "ISSUED" || invoice.eInvoice.state === "REPLACED");
