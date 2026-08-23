@@ -51,16 +51,19 @@ export async function createPatientAccessAppointment(input: {
   endsAt: Date;
   reason: string;
 }) {
+  if (!input.clinicIds.includes(input.clinicId)) {
+    throw new PatientAccessOperationError("invalid-relation");
+  }
+
   return runSerializableTransaction(async (tx) => {
-    await lockProvider(tx, input.providerId, input.organizationId);
     if (input.chairId) await lockChair(tx, input.chairId);
+    await lockProvider(tx, input.providerId, input.organizationId);
 
     const [clinic, patient, provider, chair] = await Promise.all([
       tx.clinic.findFirst({
         where: {
           id: input.clinicId,
           organizationId: input.organizationId,
-          id: { in: input.clinicIds },
           active: true,
         },
         select: { id: true },
