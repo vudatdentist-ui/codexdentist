@@ -3,6 +3,7 @@
 import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { noShowFollowUpSubject } from "@/features/patient-access/model";
 import { canPerformAction } from "@/lib/actions/permissions";
 import { requireViewSession } from "@/lib/auth";
 import { canMutateCrm } from "@/lib/crm";
@@ -30,10 +31,6 @@ const statusTransitions = {
 type AppointmentStatus = keyof typeof statusTransitions;
 type NextAppointmentStatus = (typeof statusTransitions)[AppointmentStatus][number];
 
-export function noShowFollowUpSubject(appointmentId: string) {
-  return `No-show follow-up · ${appointmentId}`;
-}
-
 export async function createPatientAccessAppointmentAction(formData: FormData) {
   const session = await requireViewSession("schedule");
 
@@ -54,11 +51,9 @@ export async function createPatientAccessAppointmentAction(formData: FormData) {
   if (!clinicIds.includes(clinicId)) {
     redirect(patientAccessRedirect("clinic-denied", formData));
   }
-
   if (!patientId || !providerId || !date || !startTime || !reason) {
     redirect(patientAccessRedirect("missing-fields", formData));
   }
-
   if (!Number.isFinite(duration) || duration < 15 || duration > 240) {
     redirect(patientAccessRedirect("bad-duration", formData));
   }
@@ -159,17 +154,13 @@ export async function createPatientAccessAppointmentAction(formData: FormData) {
     notice = "database-unavailable";
   }
 
-  if (notice) {
-    redirect(patientAccessRedirect(notice, formData));
-  }
-
+  if (notice) redirect(patientAccessRedirect(notice, formData));
   revalidatePatientAccess();
   redirect(patientAccessRedirect("created", formData, createdId));
 }
 
 export async function transitionPatientAccessAppointmentAction(formData: FormData) {
   const session = await requireViewSession("schedule");
-
   if (!canPerformAction(session, "appointment.update")) {
     redirect(patientAccessRedirect("denied", formData));
   }
@@ -184,7 +175,6 @@ export async function transitionPatientAccessAppointmentAction(formData: FormDat
   }
 
   let notice: string | null = null;
-
   try {
     const appointment = await prisma.appointment.findFirst({
       where: { id: appointmentId, clinicId: { in: clinicIds } },
@@ -286,17 +276,13 @@ export async function transitionPatientAccessAppointmentAction(formData: FormDat
     notice = "database-unavailable";
   }
 
-  if (notice) {
-    redirect(patientAccessRedirect(notice, formData, appointmentId));
-  }
-
+  if (notice) redirect(patientAccessRedirect(notice, formData, appointmentId));
   revalidatePatientAccess();
   redirect(patientAccessRedirect("updated", formData, appointmentId));
 }
 
 export async function cancelPatientAccessAppointmentAction(formData: FormData) {
   const session = await requireViewSession("schedule");
-
   if (!canPerformAction(session, "appointment.cancel")) {
     redirect(patientAccessRedirect("denied", formData));
   }
@@ -340,7 +326,6 @@ export async function recordNoShowRecoveryAction(formData: FormData) {
   const appointmentId = requiredString(formData.get("appointmentId"));
   const channel = normalizeCareChannel(requiredString(formData.get("channel")));
   const note = optionalString(formData.get("note"));
-
   if (!appointmentId || !channel) redirect(careRedirect("crm-missing", formData));
 
   const clinicIds = allowedClinicIds(session);
@@ -381,11 +366,14 @@ export async function recordNoShowRecoveryAction(formData: FormData) {
           },
           select: { id: true },
         });
-        await writeGenericAudit(session.organizationId, session.userId, "patient_access.no_show_recovered", "CrmActivity", activity.id, {
-          appointmentId: appointment.id,
-          patientId: appointment.patientId,
-          channel,
-        });
+        await writeGenericAudit(
+          session.organizationId,
+          session.userId,
+          "patient_access.no_show_recovered",
+          "CrmActivity",
+          activity.id,
+          { appointmentId: appointment.id, patientId: appointment.patientId, channel },
+        );
       }
     }
   } catch {
@@ -440,7 +428,9 @@ function isAppointmentStatus(value: string): value is AppointmentStatus {
 }
 
 function normalizeCareChannel(value: string) {
-  return ["PHONE", "ZALO", "SMS", "EMAIL", "IN_APP"].includes(value) ? value as "PHONE" | "ZALO" | "SMS" | "EMAIL" | "IN_APP" : null;
+  return ["PHONE", "ZALO", "SMS", "EMAIL", "IN_APP"].includes(value)
+    ? (value as "PHONE" | "ZALO" | "SMS" | "EMAIL" | "IN_APP")
+    : null;
 }
 
 function patientAccessRedirect(notice: string, formData: FormData, appointmentId?: string | null) {
