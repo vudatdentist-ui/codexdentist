@@ -9,7 +9,11 @@ import { databaseActorId, requiredString } from "@/lib/form-validation";
 import { canUseAllClinics } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
-import { resolveEInvoiceAdapter, type EInvoiceProviderInvoice } from "./adapter";
+import {
+  resolveEInvoiceAdapter,
+  type EInvoiceProviderInvoice,
+  type EInvoiceProviderResult,
+} from "./adapter";
 import {
   EInvoiceTransitionError,
   emptyEInvoiceState,
@@ -56,12 +60,16 @@ export async function requestEInvoiceIssueAction(formData: FormData) {
     notice: "einvoice-state-conflict",
   });
 
-  const result = await adapter.issue(toProviderInvoice(session, invoice)).catch(() => ({
-    state: "FAILED" as const,
-    providerKey: adapter.providerKey,
-    errorCode: "PROVIDER_REQUEST_ERROR",
-    errorMessage: "Không xác nhận được phản hồi phát hành từ nhà cung cấp HĐĐT.",
-  }));
+  const result: EInvoiceProviderResult = await adapter
+    .issue(toProviderInvoice(session, invoice))
+    .catch(
+      (): EInvoiceProviderResult => ({
+        state: "FAILED",
+        providerKey: adapter.providerKey,
+        errorCode: "PROVIDER_REQUEST_ERROR",
+        errorMessage: "Không xác nhận được phản hồi phát hành từ nhà cung cấp HĐĐT.",
+      }),
+    );
 
   await guardedTransition({
     organizationId: session.organizationId,
@@ -126,19 +134,23 @@ export async function syncEInvoiceAction(formData: FormData) {
     notice: "einvoice-state-conflict",
   });
 
-  const result = await adapter.sync(toProviderInvoice(session, invoice), {
-    externalInvoiceId: current.externalInvoiceId,
-    lookupCode: current.lookupCode,
-    replacementReference: current.replacementReference,
-  }).catch(() => ({
-    state: "FAILED" as const,
-    providerKey: adapter.providerKey,
-    externalInvoiceId: current.externalInvoiceId,
-    lookupCode: current.lookupCode,
-    replacementReference: current.replacementReference,
-    errorCode: "PROVIDER_SYNC_ERROR",
-    errorMessage: "Không xác nhận được phản hồi đồng bộ từ nhà cung cấp HĐĐT.",
-  }));
+  const result: EInvoiceProviderResult = await adapter
+    .sync(toProviderInvoice(session, invoice), {
+      externalInvoiceId: current.externalInvoiceId,
+      lookupCode: current.lookupCode,
+      replacementReference: current.replacementReference,
+    })
+    .catch(
+      (): EInvoiceProviderResult => ({
+        state: "FAILED",
+        providerKey: adapter.providerKey,
+        externalInvoiceId: current.externalInvoiceId,
+        lookupCode: current.lookupCode,
+        replacementReference: current.replacementReference,
+        errorCode: "PROVIDER_SYNC_ERROR",
+        errorMessage: "Không xác nhận được phản hồi đồng bộ từ nhà cung cấp HĐĐT.",
+      }),
+    );
 
   await guardedTransition({
     organizationId: session.organizationId,
@@ -431,7 +443,7 @@ async function externalReferenceAvailableInTransaction(
 }
 
 function hasExternalReference(
-  events: Array<{ metadata: Prisma.JsonValue | null }>,
+  events: Array<{ metadata: unknown }>,
   providerKey: string,
   externalInvoiceId: string,
 ) {
