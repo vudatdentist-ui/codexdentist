@@ -1,4 +1,4 @@
-import type { ViewKey } from "@/lib/permissions";
+import type { AppRole, ViewKey } from "@/lib/permissions";
 
 export type ProductWorkspaceKey =
   | "today"
@@ -15,6 +15,7 @@ export type ProductWorkspace = {
   label: string;
   href: string;
   permissionView: ViewKey;
+  allowedRoles?: AppRole[];
   group: "daily" | "system";
 };
 
@@ -64,8 +65,9 @@ export const productWorkspaces: ProductWorkspace[] = [
   {
     key: "operations",
     label: "Vận hành",
-    href: "/operations",
-    permissionView: "reports",
+    href: "/operations/finance",
+    permissionView: "billing",
+    allowedRoles: ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "BILLING"],
     group: "system",
   },
   {
