@@ -144,6 +144,7 @@ export async function getPatientAccessSignals(session: AppSession): Promise<Task
 
     if (
       appointment.status === "NO_SHOW" &&
+      startsAt <= now &&
       canAccessView(session, "crm") &&
       !resolvedNoShowSubjects.has(noShowFollowUpSubject(appointment.id))
     ) {
