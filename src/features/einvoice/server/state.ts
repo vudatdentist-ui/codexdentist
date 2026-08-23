@@ -130,12 +130,30 @@ export async function transitionEInvoiceState({
   validate?: (tx: Prisma.TransactionClient, current: EInvoiceStateSnapshot) => Promise<boolean>;
 }): Promise<EInvoiceStateSnapshot> {
   return runSerializableTransaction(async (tx) => {
-    const transitionLocks = Array.from(
-      new Set([`einvoice:invoice:${organizationId}:${invoiceId}`, ...lockKeys]),
-    ).sort();
+    // Every transition serializes on the local Invoice row. Manual external-reference
+    // reconciliation additionally serializes on the Organization row so two invoices
+    // cannot claim the same provider reference between validation and append.
+    if (lockKeys.length > 0) {
+      const organizationLock = await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id"
+        FROM "Organization"
+        WHERE "id" = ${organizationId}
+        FOR UPDATE
+      `;
+      if (organizationLock.length !== 1) {
+        throw new EInvoiceTransitionError();
+      }
+    }
 
-    for (const lockKey of transitionLocks) {
-      await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`;
+    const invoiceLock = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT "id"
+      FROM "Invoice"
+      WHERE "id" = ${invoiceId}
+        AND "organizationId" = ${organizationId}
+      FOR UPDATE
+    `;
+    if (invoiceLock.length !== 1) {
+      throw new EInvoiceTransitionError();
     }
 
     const current = await loadOneState(tx, organizationId, invoiceId);
