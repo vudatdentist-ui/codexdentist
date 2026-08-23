@@ -119,7 +119,7 @@ export async function getClinicalExecutionSignals(
       {
         id: `signal-treatment-stalled-${service.id}`,
         sourceId: service.id,
-        kind: "treatment" as const,
+        kind: "notification" as const,
         priority: "high" as const,
         title: `Ca điều trị chậm: ${service.serviceName}`,
         detail: `${Math.round(Number(service.currentProgressPercent))}% · ${service.serviceCode}`,
@@ -148,7 +148,7 @@ export async function getClinicalExecutionSignals(
       {
         id: `signal-clinical-unsigned-${note.id}`,
         sourceId: note.id,
-        kind: "clinical" as const,
+        kind: "notification" as const,
         priority: "high" as const,
         title: "Hồ sơ lâm sàng chưa ký",
         detail: note.assessment || `Tác giả: ${note.author.fullName}`,
