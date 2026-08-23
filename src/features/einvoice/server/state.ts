@@ -59,7 +59,7 @@ type AuditEvent = {
   id: string;
   entityId: string | null;
   action: string;
-  metadata: Prisma.JsonValue | null;
+  metadata: unknown;
   createdAt: Date;
 };
 
@@ -76,9 +76,7 @@ export async function loadEInvoiceStates(
   session: AppSession,
   invoiceIds: string[],
 ): Promise<Map<string, EInvoiceStateSnapshot>> {
-  if (invoiceIds.length === 0) {
-    return new Map();
-  }
+  if (invoiceIds.length === 0) return new Map();
 
   const events = await prisma.auditLog.findMany({
     where: {
@@ -87,13 +85,7 @@ export async function loadEInvoiceStates(
       entityId: { in: invoiceIds },
       action: { startsWith: "einvoice." },
     },
-    select: {
-      id: true,
-      entityId: true,
-      action: true,
-      metadata: true,
-      createdAt: true,
-    },
+    select: { id: true, entityId: true, action: true, metadata: true, createdAt: true },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   });
 
@@ -135,10 +127,7 @@ export async function transitionEInvoiceState({
   input: EInvoiceEventInput;
   allow: (current: EInvoiceStateSnapshot) => boolean;
   lockKeys?: string[];
-  validate?: (
-    tx: Prisma.TransactionClient,
-    current: EInvoiceStateSnapshot,
-  ) => Promise<boolean>;
+  validate?: (tx: Prisma.TransactionClient, current: EInvoiceStateSnapshot) => Promise<boolean>;
 }): Promise<EInvoiceStateSnapshot> {
   return runSerializableTransaction(async (tx) => {
     const transitionLocks = Array.from(
@@ -155,13 +144,17 @@ export async function transitionEInvoiceState({
     }
 
     const version = current.version + 1;
-    const event = await appendEInvoiceEvent({
-      client: tx,
-      organizationId,
-      actorId,
-      invoiceId,
-      input,
-      version,
+    const metadata = eventMetadata(input, version);
+    const event = await tx.auditLog.create({
+      data: {
+        organizationId,
+        actorId,
+        action: actionByState[input.state],
+        entityType: "Invoice",
+        entityId: invoiceId,
+        metadata: metadata as Prisma.InputJsonValue,
+      },
+      select: { id: true, createdAt: true },
     });
 
     return snapshotFromEvent(
@@ -169,7 +162,7 @@ export async function transitionEInvoiceState({
         id: event.id,
         entityId: invoiceId,
         action: actionByState[input.state],
-        metadata: event.metadata,
+        metadata,
         createdAt: event.createdAt,
       },
       version,
@@ -189,35 +182,15 @@ async function loadOneState(
       entityId: invoiceId,
       action: { startsWith: "einvoice." },
     },
-    select: {
-      id: true,
-      entityId: true,
-      action: true,
-      metadata: true,
-      createdAt: true,
-    },
+    select: { id: true, entityId: true, action: true, metadata: true, createdAt: true },
     orderBy: [{ createdAt: "asc" }, { id: "asc" }],
   });
 
   return reduceStates(events).get(invoiceId) ?? emptyEInvoiceState(invoiceId);
 }
 
-async function appendEInvoiceEvent({
-  client,
-  organizationId,
-  actorId,
-  invoiceId,
-  input,
-  version,
-}: {
-  client: AuditClient;
-  organizationId: string;
-  actorId: string | null;
-  invoiceId: string;
-  input: EInvoiceEventInput;
-  version: number;
-}) {
-  const metadata = {
+function eventMetadata(input: EInvoiceEventInput, version: number) {
+  return {
     version,
     state: input.state,
     operation: input.operation,
@@ -230,40 +203,18 @@ async function appendEInvoiceEvent({
     amountSnapshot: finiteNumber(input.amountSnapshot),
     invoiceStatusSnapshot: boundedText(input.invoiceStatusSnapshot, 40),
     source: input.source ?? "system",
-  } satisfies Record<string, Prisma.InputJsonValue | null>;
-
-  const event = await client.auditLog.create({
-    data: {
-      organizationId,
-      actorId,
-      action: actionByState[input.state],
-      entityType: "Invoice",
-      entityId: invoiceId,
-      metadata: metadata as Prisma.InputJsonValue,
-    },
-    select: { id: true, metadata: true, createdAt: true },
-  });
-
-  return event;
+  };
 }
 
 function reduceStates(events: AuditEvent[]) {
   const states = new Map<string, EInvoiceStateSnapshot>();
 
   for (const event of events) {
-    if (!event.entityId) continue;
-    const state = stateFromAction(event.action);
-    if (!state) continue;
-
+    if (!event.entityId || !stateFromAction(event.action)) continue;
     const current = states.get(event.entityId) ?? emptyEInvoiceState(event.entityId);
     const metadata = metadataRecord(event.metadata);
-    const explicitVersion = positiveInteger(metadata.version);
-    const version = explicitVersion ?? current.version + 1;
-
-    if (version < current.version) {
-      continue;
-    }
-
+    const version = positiveInteger(metadata.version) ?? current.version + 1;
+    if (version < current.version) continue;
     states.set(event.entityId, snapshotFromEvent(event, version));
   }
 
@@ -272,9 +223,7 @@ function reduceStates(events: AuditEvent[]) {
 
 function snapshotFromEvent(event: AuditEvent, version: number): EInvoiceStateSnapshot {
   const state = stateFromAction(event.action);
-  if (!event.entityId || !state) {
-    throw new Error("Invalid E-invoice audit event.");
-  }
+  if (!event.entityId || !state) throw new Error("Invalid E-invoice audit event.");
   const metadata = metadataRecord(event.metadata);
 
   return {
@@ -301,7 +250,7 @@ function stateFromAction(action: string): EInvoiceState | null {
   return (entry?.[0] as EInvoiceState | undefined) ?? null;
 }
 
-function metadataRecord(value: Prisma.JsonValue | null) {
+function metadataRecord(value: unknown) {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return {} as Record<string, unknown>;
   }
