@@ -16,6 +16,7 @@ export type EInvoiceProviderInvoice = {
 export type EInvoiceProviderContext = {
   externalInvoiceId?: string | null;
   lookupCode?: string | null;
+  replacementReference?: string | null;
 };
 
 export type EInvoiceProviderResult = {
@@ -31,6 +32,18 @@ export type EInvoiceProviderResult = {
 export interface EInvoiceAdapter {
   readonly providerKey: string;
   issue(invoice: EInvoiceProviderInvoice): Promise<EInvoiceProviderResult>;
+  cancel(
+    invoice: EInvoiceProviderInvoice,
+    context: EInvoiceProviderContext,
+  ): Promise<EInvoiceProviderResult>;
+  replace(
+    invoice: EInvoiceProviderInvoice,
+    context: EInvoiceProviderContext,
+  ): Promise<EInvoiceProviderResult>;
+  lookup(
+    invoice: EInvoiceProviderInvoice,
+    context: EInvoiceProviderContext,
+  ): Promise<EInvoiceProviderResult>;
   sync(
     invoice: EInvoiceProviderInvoice,
     context: EInvoiceProviderContext,
@@ -45,8 +58,9 @@ export function resolveEInvoiceAdapter(): EInvoiceAdapter {
   }
 
   // Provider-specific adapters should be registered here only after their
-  // contract, credentials, idempotency semantics, and callback verification
-  // have dedicated tests. Unknown providers fail closed.
+  // contract, credentials, idempotency semantics, callback verification,
+  // issue/cancel/replace behavior, and lookup reconciliation have dedicated tests.
+  // Unknown providers fail closed.
   return new UnconfiguredEInvoiceAdapter(configured);
 }
 
@@ -61,6 +75,18 @@ class UnconfiguredEInvoiceAdapter implements EInvoiceAdapter {
     return this.failure();
   }
 
+  async cancel(): Promise<EInvoiceProviderResult> {
+    return this.failure();
+  }
+
+  async replace(): Promise<EInvoiceProviderResult> {
+    return this.failure();
+  }
+
+  async lookup(): Promise<EInvoiceProviderResult> {
+    return this.failure();
+  }
+
   async sync(): Promise<EInvoiceProviderResult> {
     return this.failure();
   }
@@ -71,7 +97,7 @@ class UnconfiguredEInvoiceAdapter implements EInvoiceAdapter {
       providerKey: this.providerKey,
       errorCode: "PROVIDER_NOT_CONFIGURED",
       errorMessage:
-        "Chưa cấu hình nhà cung cấp hóa đơn điện tử. Không có trạng thái phát hành giả được tạo.",
+        "Chưa cấu hình nhà cung cấp hóa đơn điện tử. Không có trạng thái pháp lý giả được tạo.",
     };
   }
 }
