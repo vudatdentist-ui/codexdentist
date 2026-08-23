@@ -1,5 +1,6 @@
 "use server";
 
+import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canPerformAction } from "@/lib/actions/permissions";
@@ -51,6 +52,7 @@ export async function requestEInvoiceIssueAction(formData: FormData) {
       source: "provider",
     },
     allow: canSafelyRequestIssue,
+    validate: (tx) => invoiceStatusMatches(tx, session, invoice.id, false),
     notice: "einvoice-state-conflict",
   });
 
@@ -120,12 +122,14 @@ export async function syncEInvoiceAction(formData: FormData) {
       source: "provider",
     },
     allow: canSafelySync,
+    validate: (tx) => invoiceStatusMatches(tx, session, invoice.id, false),
     notice: "einvoice-state-conflict",
   });
 
   const result = await adapter.sync(toProviderInvoice(session, invoice), {
     externalInvoiceId: current.externalInvoiceId,
     lookupCode: current.lookupCode,
+    replacementReference: current.replacementReference,
   }).catch(() => ({
     state: "FAILED" as const,
     providerKey: adapter.providerKey,
@@ -195,7 +199,17 @@ export async function confirmExternalEInvoiceAction(formData: FormData) {
       current.state === "NOT_REQUIRED" ||
       (current.state === "FAILED" &&
         (current.operation === "ISSUE" || current.operation === "SYNC")),
-    notice: "einvoice-manual-state-invalid",
+    lockKeys: [externalReferenceLockKey(session.organizationId, providerKey, externalInvoiceId)],
+    validate: async (tx) =>
+      (await invoiceStatusMatches(tx, session, invoice.id, false)) &&
+      (await externalReferenceAvailableInTransaction(
+        tx,
+        session.organizationId,
+        invoice.id,
+        providerKey,
+        externalInvoiceId,
+      )),
+    notice: "einvoice-state-conflict",
   });
 
   finish("einvoice-manual-issued", invoice.patientId);
@@ -222,6 +236,7 @@ export async function markEInvoiceNotRequiredAction(formData: FormData) {
       source: "manual",
     },
     allow: canSafelyMarkNotRequired,
+    validate: (tx) => invoiceStatusMatches(tx, session, invoice.id, false),
     notice: "einvoice-issued-cannot-ignore",
   });
 
@@ -256,6 +271,7 @@ export async function confirmExternalEInvoiceCancellationAction(formData: FormDa
       source: "manual",
     },
     allow: (latest) => latest.state === "ISSUED" || latest.state === "REPLACED",
+    validate: (tx) => invoiceStatusMatches(tx, session, invoice.id, true),
     notice: "einvoice-cancel-state-invalid",
   });
 
@@ -296,6 +312,16 @@ export async function confirmExternalEInvoiceReplacementAction(formData: FormDat
     allow: (latest) =>
       (latest.state === "ISSUED" || latest.state === "REPLACED") &&
       latest.externalInvoiceId !== externalInvoiceId,
+    lockKeys: [externalReferenceLockKey(session.organizationId, providerKey, externalInvoiceId)],
+    validate: async (tx) =>
+      (await invoiceStatusMatches(tx, session, invoice.id, false)) &&
+      (await externalReferenceAvailableInTransaction(
+        tx,
+        session.organizationId,
+        invoice.id,
+        providerKey,
+        externalInvoiceId,
+      )),
     notice: "einvoice-replacement-state-invalid",
   });
 
@@ -334,6 +360,8 @@ async function guardedTransition({
   invoiceId,
   input,
   allow,
+  lockKeys,
+  validate,
   notice,
 }: Parameters<typeof transitionEInvoiceState>[0] & { notice: string }) {
   try {
@@ -343,6 +371,8 @@ async function guardedTransition({
       invoiceId,
       input,
       allow,
+      lockKeys,
+      validate,
     });
   } catch (error) {
     if (error instanceof EInvoiceTransitionError) {
@@ -370,11 +400,42 @@ async function assertExternalReferenceAvailable(
       entityId: { not: invoiceId },
       action: { in: ["einvoice.issued", "einvoice.replaced"] },
     },
-    select: { entityId: true, metadata: true },
+    select: { metadata: true },
     take: 5000,
   });
 
-  const duplicate = events.some((event) => {
+  if (hasExternalReference(events, providerKey, externalInvoiceId)) {
+    redirect(financeNotice("einvoice-external-duplicate"));
+  }
+}
+
+async function externalReferenceAvailableInTransaction(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  invoiceId: string,
+  providerKey: string,
+  externalInvoiceId: string,
+) {
+  const events = await tx.auditLog.findMany({
+    where: {
+      organizationId,
+      entityType: "Invoice",
+      entityId: { not: invoiceId },
+      action: { in: ["einvoice.issued", "einvoice.replaced"] },
+    },
+    select: { metadata: true },
+    take: 5000,
+  });
+
+  return !hasExternalReference(events, providerKey, externalInvoiceId);
+}
+
+function hasExternalReference(
+  events: Array<{ metadata: Prisma.JsonValue | null }>,
+  providerKey: string,
+  externalInvoiceId: string,
+) {
+  return events.some((event) => {
     if (!event.metadata || typeof event.metadata !== "object" || Array.isArray(event.metadata)) {
       return false;
     }
@@ -384,10 +445,32 @@ async function assertExternalReferenceAvailable(
       String(metadata.externalInvoiceId ?? "") === externalInvoiceId
     );
   });
+}
 
-  if (duplicate) {
-    redirect(financeNotice("einvoice-external-duplicate"));
-  }
+function externalReferenceLockKey(
+  organizationId: string,
+  providerKey: string,
+  externalInvoiceId: string,
+) {
+  return `einvoice:external:${organizationId}:${providerKey}:${externalInvoiceId}`;
+}
+
+async function invoiceStatusMatches(
+  tx: Prisma.TransactionClient,
+  session: AppSession,
+  invoiceId: string,
+  requireVoid: boolean,
+) {
+  const invoice = await tx.invoice.findFirst({
+    where: {
+      id: invoiceId,
+      organizationId: session.organizationId,
+      clinicId: { in: allowedClinicIds(session) },
+      status: requireVoid ? "VOID" : { not: "VOID" },
+    },
+    select: { id: true },
+  });
+  return Boolean(invoice);
 }
 
 async function scopedInvoice(session: AppSession, invoiceId: string) {
