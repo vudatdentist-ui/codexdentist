@@ -11,6 +11,7 @@ const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) })
 
 const ids = {
   chair: "smoke-patient-access-chair",
+  provider: "smoke-patient-access-provider",
   main: "smoke-patient-access-main",
   noShow: "smoke-patient-access-no-show",
   transitionRace: "smoke-patient-access-transition-race",
@@ -50,7 +51,7 @@ async function resetFixture() {
   });
   if (!organization) throw new Error("Patient access smoke requires an organization.");
 
-  const [clinic, frontDesk, dentist] = await Promise.all([
+  const [clinic, frontDesk, dentistTemplate] = await Promise.all([
     prisma.clinic.findFirst({
       where: { organizationId: organization.id, active: true },
       orderBy: { createdAt: "asc" },
@@ -62,13 +63,13 @@ async function resetFixture() {
     }),
     prisma.user.findUnique({
       where: { email: "dentist@nhavista.vn" },
-      select: { id: true, organizationId: true },
+      select: { organizationId: true, passwordHash: true },
     }),
   ]);
-  if (!clinic || !frontDesk || !dentist) {
+  if (!clinic || !frontDesk || !dentistTemplate) {
     throw new Error("Patient access smoke requires seeded clinic/front desk/dentist records.");
   }
-  if (frontDesk.organizationId !== organization.id || dentist.organizationId !== organization.id) {
+  if (frontDesk.organizationId !== organization.id || dentistTemplate.organizationId !== organization.id) {
     throw new Error("Smoke users are not in the expected organization.");
   }
 
@@ -81,8 +82,31 @@ async function resetFixture() {
 
   await clearFixtureAuditAndActivities(organization.id);
   await prisma.appointment.deleteMany({ where: { id: { in: fixtureAppointmentIds } } });
+  await prisma.userClinic.deleteMany({ where: { userId: ids.provider } });
+  await prisma.user.deleteMany({ where: { id: ids.provider } });
   await prisma.patient.deleteMany({ where: { id: ids.outscopePatient } });
   await prisma.clinic.deleteMany({ where: { id: ids.outscopeClinic } });
+
+  const provider = await prisma.user.create({
+    data: {
+      id: ids.provider,
+      organizationId: organization.id,
+      email: "patient-access-smoke-provider@codexdentist.test",
+      fullName: "Patient Access Smoke Dentist",
+      passwordHash: dentistTemplate.passwordHash,
+      role: "DENTIST",
+      active: true,
+      operationalStatus: "READY",
+      operationalStatusUpdatedAt: new Date(),
+    },
+    select: { id: true },
+  });
+  await prisma.userClinic.create({
+    data: {
+      userId: provider.id,
+      clinicId: clinic.id,
+    },
+  });
 
   await prisma.chair.upsert({
     where: { id: ids.chair },
@@ -101,10 +125,6 @@ async function resetFixture() {
       operationalStatus: "READY",
       operationalStatusUpdatedAt: new Date(),
     },
-  });
-  await prisma.user.update({
-    where: { id: dentist.id },
-    data: { operationalStatus: "READY", operationalStatusUpdatedAt: new Date() },
   });
 
   const outscopeClinic = await prisma.clinic.create({
@@ -134,17 +154,17 @@ async function resetFixture() {
   const starts = [0, 40, 80, -120].map((offset) => new Date(baseStart.getTime() + offset * 60_000));
   await prisma.appointment.createMany({
     data: [
-      appointmentData(ids.main, "REQUESTED", starts[0], clinic.id, patient.id, dentist.id),
-      appointmentData(ids.noShow, "CONFIRMED", starts[1], clinic.id, patient.id, dentist.id),
-      appointmentData(ids.transitionRace, "CONFIRMED", starts[2], clinic.id, patient.id, dentist.id),
-      appointmentData(ids.recoveryRace, "NO_SHOW", starts[3], clinic.id, patient.id, dentist.id),
+      appointmentData(ids.main, "REQUESTED", starts[0], clinic.id, patient.id, provider.id),
+      appointmentData(ids.noShow, "CONFIRMED", starts[1], clinic.id, patient.id, provider.id),
+      appointmentData(ids.transitionRace, "CONFIRMED", starts[2], clinic.id, patient.id, provider.id),
+      appointmentData(ids.recoveryRace, "NO_SHOW", starts[3], clinic.id, patient.id, provider.id),
     ],
   });
 
   return {
     organizationId: organization.id,
     clinicId: clinic.id,
-    dentistId: dentist.id,
+    providerId: provider.id,
     patientId: patient.id,
     patientName: patient.fullName,
     mainDate: vietnamDate(starts[0]),
@@ -426,11 +446,21 @@ async function login(page, email) {
 
 async function submitRowButton(page, appointmentId, label, notice) {
   const row = await expectRow(page, appointmentId);
-  await Promise.all([
-    page.waitForURL((url) => url.searchParams.get("notice") === notice, { timeout: 15000 }),
-    row.getByRole("button", { name: label, exact: true }).click(),
-  ]);
+  const button = row.getByRole("button", { name: label, exact: true });
+  const actionResponse = page.waitForResponse(
+    (response) => response.request().method() === "POST" && response.url().startsWith(baseUrl),
+    { timeout: 15000 },
+  );
+
+  await Promise.all([actionResponse, button.click()]);
   await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => null);
+
+  const actualNotice = new URL(page.url()).searchParams.get("notice");
+  if (actualNotice !== notice) {
+    throw new Error(
+      `${label} for ${appointmentId} expected notice=${notice}, got ${actualNotice ?? "none"}.`,
+    );
+  }
 }
 
 async function expectRow(page, appointmentId) {
@@ -453,7 +483,7 @@ async function expectAppointmentStatus(appointmentId, status) {
 async function assertResourceStatus(fixture, status) {
   const [chair, provider] = await Promise.all([
     prisma.chair.findUnique({ where: { id: ids.chair }, select: { operationalStatus: true } }),
-    prisma.user.findUnique({ where: { id: fixture.dentistId }, select: { operationalStatus: true } }),
+    prisma.user.findUnique({ where: { id: fixture.providerId }, select: { operationalStatus: true } }),
   ]);
   if (chair?.operationalStatus !== status || provider?.operationalStatus !== status) {
     throw new Error(
@@ -520,9 +550,9 @@ async function cleanupFixture(fixture) {
   await clearFixtureAuditAndActivities(fixture.organizationId);
   await prisma.appointment.deleteMany({ where: { id: { in: fixtureAppointmentIds } } });
   await prisma.chair.deleteMany({ where: { id: ids.chair } });
-  await prisma.user.updateMany({
-    where: { id: fixture.dentistId, organizationId: fixture.organizationId },
-    data: { operationalStatus: "READY", operationalStatusUpdatedAt: new Date() },
+  await prisma.userClinic.deleteMany({ where: { userId: fixture.providerId } });
+  await prisma.user.deleteMany({
+    where: { id: fixture.providerId, organizationId: fixture.organizationId },
   });
   await prisma.patient.deleteMany({ where: { id: ids.outscopePatient } });
   await prisma.clinic.deleteMany({ where: { id: ids.outscopeClinic } });
