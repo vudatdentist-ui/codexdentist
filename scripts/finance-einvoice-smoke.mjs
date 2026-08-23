@@ -10,6 +10,7 @@ const connectionString =
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString }),
 });
+const authStateByEmail = new Map();
 
 const organizationId = "org_nhavista";
 const clinicId = "hcm-q1";
@@ -416,10 +417,17 @@ function invoiceRow(page) {
 }
 
 async function withLoggedInPage(browser, email, run) {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const storageState = authStateByEmail.get(email);
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    ...(storageState ? { storageState } : {}),
+  });
   const page = await context.newPage();
   try {
-    await login(page, email);
+    if (!storageState) {
+      await login(page, email);
+      authStateByEmail.set(email, await context.storageState());
+    }
     await run(page);
   } finally {
     await context.close();
