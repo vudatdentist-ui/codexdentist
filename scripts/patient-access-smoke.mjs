@@ -453,6 +453,7 @@ async function submitRowButton(page, appointmentId, label, notice) {
   );
 
   await Promise.all([actionResponse, button.click()]);
+  await page.waitForURL((url) => url.searchParams.get("notice") === notice, { timeout: 15000 });
   await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => null);
 
   const actualNotice = new URL(page.url()).searchParams.get("notice");
