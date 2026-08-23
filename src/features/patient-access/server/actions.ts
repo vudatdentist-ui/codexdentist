@@ -45,6 +45,7 @@ export async function createPatientAccessAppointmentAction(formData: FormData) {
   if (startsAt === "invalid") redirect(patientAccessRedirect("bad-time", formData));
   const endsAt = new Date(startsAt.getTime() + duration * 60_000);
 
+  let appointmentId: string;
   try {
     const appointment = await createPatientAccessAppointment({
       organizationId: session.organizationId,
@@ -58,10 +59,12 @@ export async function createPatientAccessAppointmentAction(formData: FormData) {
       endsAt,
       reason,
     });
-    finishSchedule("created", formData, appointment.id);
+    appointmentId = appointment.id;
   } catch (error) {
     finishSchedule(operationNotice(error, "database-unavailable"), formData);
   }
+
+  finishSchedule("created", formData, appointmentId);
 }
 
 export async function transitionPatientAccessAppointmentAction(formData: FormData) {
@@ -86,10 +89,11 @@ export async function transitionPatientAccessAppointmentAction(formData: FormDat
       requestedStatus,
       requestedChairId: requestedChairId || null,
     });
-    finishSchedule("updated", formData, appointmentId);
   } catch (error) {
     finishSchedule(operationNotice(error, "database-unavailable"), formData, appointmentId);
   }
+
+  finishSchedule("updated", formData, appointmentId);
 }
 
 export async function cancelPatientAccessAppointmentAction(formData: FormData) {
@@ -108,10 +112,11 @@ export async function cancelPatientAccessAppointmentAction(formData: FormData) {
       clinicIds: allowedClinicIds(session),
       appointmentId,
     });
-    finishSchedule("cancelled", formData, appointmentId);
   } catch (error) {
     finishSchedule(operationNotice(error, "database-unavailable"), formData, appointmentId);
   }
+
+  finishSchedule("cancelled", formData, appointmentId);
 }
 
 export async function recordNoShowRecoveryAction(formData: FormData) {
@@ -132,10 +137,11 @@ export async function recordNoShowRecoveryAction(formData: FormData) {
       channel,
       note,
     });
-    finishCare("no-show-recovered", formData);
   } catch (error) {
     finishCare(operationNotice(error, "crm-database"), formData);
   }
+
+  finishCare("no-show-recovered", formData);
 }
 
 export async function completeCareActivityAction(formData: FormData) {
@@ -152,10 +158,11 @@ export async function completeCareActivityAction(formData: FormData) {
       clinicIds: allowedClinicIds(session),
       activityId,
     });
-    finishCare("care-activity-completed", formData);
   } catch (error) {
     finishCare(operationNotice(error, "crm-database"), formData);
   }
+
+  finishCare("care-activity-completed", formData);
 }
 
 function normalizeCareChannel(value: string) {
