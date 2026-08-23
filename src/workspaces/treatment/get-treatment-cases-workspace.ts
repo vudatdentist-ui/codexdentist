@@ -51,6 +51,7 @@ export async function getTreatmentCasesWorkspace(
   const cases = treatmentCasesForAccessiblePatients(
     servicesWorkspace,
     patientById,
+    canAccessView(session, "staff"),
   );
   const treatmentCase = options.treatmentServiceId
     ? cases.find((item) => item.id === options.treatmentServiceId) ?? null
@@ -79,6 +80,7 @@ export async function getTreatmentCasesWorkspace(
 function treatmentCasesForAccessiblePatients(
   workspace: ServicesWorkspace,
   patientById: Map<string, Patient>,
+  canViewCompensation: boolean,
 ): TreatmentCaseListItem[] {
   return workspace.treatmentServices.flatMap((treatmentService) => {
     const patient = patientById.get(treatmentService.patientId);
@@ -90,6 +92,12 @@ function treatmentCasesForAccessiblePatients(
     return [
       {
         ...treatmentService,
+        progressEvents: treatmentService.progressEvents.map((event) => ({
+          ...event,
+          totalCompensationAmount: canViewCompensation
+            ? event.totalCompensationAmount
+            : 0,
+        })),
         patientName: patient.name,
         patientCode: patient.patientCode || null,
       },
