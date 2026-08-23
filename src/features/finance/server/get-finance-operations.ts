@@ -1,7 +1,7 @@
 import "server-only";
 
 import { emptyEInvoiceState, loadEInvoiceStates, type EInvoiceStateSnapshot } from "@/features/einvoice/server/state";
-import { hasAnyRole, type AppRole } from "@/lib/permissions";
+import { canUseAllClinics, hasAnyRole, type AppRole } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { assertDemoFallbackAllowed } from "@/lib/runtime-guards";
 import type { AppSession } from "@/lib/session";
@@ -116,7 +116,7 @@ export async function getFinanceOperations(
   session: AppSession,
 ): Promise<FinanceOperationsModel> {
   try {
-    const clinicIds = session.clinicIds;
+    const clinicIds = allowedClinicIds(session);
     const [invoices, receipts, services] = await Promise.all([
       prisma.invoice.findMany({
         where: {
@@ -245,7 +245,7 @@ export async function getFinanceOperations(
         serviceCode: service.serviceCode,
         serviceName: service.serviceName,
         status: service.status,
-        progressPercent: service.currentProgressPercent,
+        progressPercent: Number(service.currentProgressPercent),
         finalPrice,
         collectedAmount,
         invoicedAmount,
@@ -465,6 +465,11 @@ function issue({
     href: `/operations/finance#invoice-${encodeURIComponent(invoice.id)}`,
     status,
   };
+}
+
+function allowedClinicIds(session: AppSession) {
+  if (canUseAllClinics(session)) return session.clinicIds;
+  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 function differentMoney(left: number, right: number) {
