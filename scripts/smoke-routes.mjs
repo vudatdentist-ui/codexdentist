@@ -1,7 +1,9 @@
 import {
   enabledMigrationRoutes,
   materializePatientRoute,
+  materializeTreatmentCaseRoute,
   routeNeedsPatientId,
+  routeNeedsTreatmentServiceId,
 } from "./qa-route-contract.mjs";
 
 const baseUrl = process.env.SMOKE_BASE_URL ?? "http://127.0.0.1:3000";
@@ -14,6 +16,7 @@ const defaultRoutes = [
   "patients",
   "patient-management",
   "journey",
+  "treatment",
   "billing",
   "accounting",
   "services",
@@ -43,10 +46,11 @@ const routeMarkers = {
   schedule: ["Multi-clinic schedule", "Lịch hẹn đa phòng khám"],
   patients: ["Patient 360", "Hồ sơ bệnh nhân 360"],
   "patients/[patientId]": ["Patient 360", "Hồ sơ bệnh nhân 360"],
+  "patients/[patientId]/treatments/[treatmentServiceId]": ["Ca điều trị"],
   "patient-management": ["Patient 360", "Hồ sơ bệnh nhân 360"],
   journey: ["Patient 360", "Hồ sơ bệnh nhân 360", "Patient journey", "Hành trình bệnh nhân"],
   clinical: ["Patient 360", "Hồ sơ bệnh nhân 360", "Patient journey", "Hành trình bệnh nhân"],
-  treatment: ["Patient 360", "Hồ sơ bệnh nhân 360", "Patient journey", "Hành trình bệnh nhân"],
+  treatment: ["Ca điều trị", "Điều trị"],
   billing: ["Billing and collections", "Thanh toán và công nợ"],
   accounting: ["Accounting", "Kế toán"],
   services: ["Service management", "Quản lý dịch vụ"],
@@ -68,6 +72,8 @@ const expectedHeaders = {
   "referrer-policy": "strict-origin-when-cross-origin",
 };
 let discoveredPatientId = process.env.SMOKE_PATIENT_ID ?? process.env.QA_PATIENT_ID ?? null;
+let discoveredTreatmentServiceId =
+  process.env.SMOKE_TREATMENT_SERVICE_ID ?? process.env.QA_TREATMENT_SERVICE_ID ?? null;
 
 async function main() {
   await assertHealth();
@@ -150,6 +156,19 @@ async function main() {
 
 async function resolveSmokeRoute(route, cookie) {
   const normalized = `/${route.replace(/^\/+/, "")}`;
+
+  if (routeNeedsTreatmentServiceId(normalized)) {
+    if (!discoveredPatientId || !discoveredTreatmentServiceId) {
+      await discoverTreatmentCase(cookie);
+    }
+
+    return materializeTreatmentCaseRoute(
+      normalized,
+      discoveredPatientId,
+      discoveredTreatmentServiceId,
+    ).replace(/^\//, "");
+  }
+
   if (!routeNeedsPatientId(normalized)) return normalized.replace(/^\//, "");
 
   if (!discoveredPatientId) {
@@ -187,6 +206,41 @@ async function discoverPatientId(cookie) {
 
   throw new Error(
     "Cannot discover a patient detail link from /patients. Set QA_PATIENT_ID or SMOKE_PATIENT_ID before enabling /patients/[patientId].",
+  );
+}
+
+async function discoverTreatmentCase(cookie) {
+  const response = await fetch(`${baseUrl}/treatment`, {
+    headers: { cookie },
+    redirect: "manual",
+  });
+  const html = await response.text();
+
+  if (response.status !== 200) {
+    throw new Error(`Cannot discover treatment case: /treatment returned HTTP ${response.status}.`);
+  }
+
+  for (const match of html.matchAll(/href=["']([^"']+)["']/g)) {
+    const rawHref = match[1].replaceAll("&amp;", "&");
+    let pathname;
+    try {
+      pathname = new URL(rawHref, baseUrl).pathname;
+    } catch {
+      continue;
+    }
+
+    const caseMatch = pathname.match(
+      /^\/patients\/([^/]+)\/treatments\/([^/]+)$/,
+    );
+    if (caseMatch?.[1] && caseMatch?.[2]) {
+      discoveredPatientId = decodeURIComponent(caseMatch[1]);
+      discoveredTreatmentServiceId = decodeURIComponent(caseMatch[2]);
+      return;
+    }
+  }
+
+  throw new Error(
+    "Cannot discover a treatment-case link from /treatment. Set QA_PATIENT_ID and QA_TREATMENT_SERVICE_ID or seed a treatment service.",
   );
 }
 
