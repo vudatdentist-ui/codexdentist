@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { canPerformAction } from "@/lib/actions/permissions";
 import { requireViewSession } from "@/lib/auth";
 import { databaseActorId, requiredString } from "@/lib/form-validation";
+import { canUseAllClinics } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 import { resolveEInvoiceAdapter, type EInvoiceProviderInvoice } from "./adapter";
@@ -25,8 +26,15 @@ export async function requestEInvoiceIssueAction(formData: FormData) {
   }
 
   const current = await currentState(session, invoice.id);
-  if (current.state === "ISSUED") {
-    redirect(financeNotice("einvoice-already-issued"));
+  if (current.state === "PENDING") {
+    redirect(financeNotice("einvoice-request-pending"));
+  }
+  if (
+    current.state === "ISSUED" ||
+    current.state === "REPLACED" ||
+    current.state === "CANCELLED"
+  ) {
+    redirect(financeNotice("einvoice-request-state-invalid"));
   }
 
   const adapter = resolveEInvoiceAdapter();
@@ -75,11 +83,15 @@ export async function syncEInvoiceAction(formData: FormData) {
   guardInvoiceIssue(session);
   const invoice = await scopedInvoice(session, requiredString(formData.get("invoiceId")));
 
-  if (!invoice) {
+  if (!invoice || invoice.status === "VOID") {
     redirect(financeNotice("einvoice-invoice-unavailable"));
   }
 
   const current = await currentState(session, invoice.id);
+  if (current.state !== "PENDING" && current.state !== "FAILED") {
+    redirect(financeNotice("einvoice-sync-state-invalid"));
+  }
+
   const adapter = resolveEInvoiceAdapter();
   const result = await adapter.sync(toProviderInvoice(session, invoice), {
     externalInvoiceId: current.externalInvoiceId,
@@ -120,6 +132,15 @@ export async function confirmExternalEInvoiceAction(formData: FormData) {
     redirect(financeNotice("einvoice-manual-missing"));
   }
 
+  const current = await currentState(session, invoice.id);
+  if (
+    current.state === "ISSUED" ||
+    current.state === "REPLACED" ||
+    current.state === "CANCELLED"
+  ) {
+    redirect(financeNotice("einvoice-manual-state-invalid"));
+  }
+
   await appendEInvoiceEvent({
     organizationId: session.organizationId,
     actorId: databaseActorId(session.userId),
@@ -144,12 +165,17 @@ export async function markEInvoiceNotRequiredAction(formData: FormData) {
   guardInvoiceIssue(session);
   const invoice = await scopedInvoice(session, requiredString(formData.get("invoiceId")));
 
-  if (!invoice) {
+  if (!invoice || invoice.status === "VOID") {
     redirect(financeNotice("einvoice-invoice-unavailable"));
   }
 
   const current = await currentState(session, invoice.id);
-  if (current.state === "ISSUED" || current.state === "REPLACED") {
+  if (
+    current.state === "PENDING" ||
+    current.state === "ISSUED" ||
+    current.state === "REPLACED" ||
+    current.state === "CANCELLED"
+  ) {
     redirect(financeNotice("einvoice-issued-cannot-ignore"));
   }
 
@@ -213,7 +239,7 @@ export async function confirmExternalEInvoiceReplacementAction(formData: FormDat
   const externalInvoiceId = requiredString(formData.get("externalInvoiceId"));
   const lookupCode = requiredString(formData.get("lookupCode")) || null;
 
-  if (!invoice || !replacementReference || !externalInvoiceId) {
+  if (!invoice || invoice.status === "VOID" || !replacementReference || !externalInvoiceId) {
     redirect(financeNotice("einvoice-replacement-missing"));
   }
 
@@ -260,7 +286,7 @@ async function scopedInvoice(session: AppSession, invoiceId: string) {
     where: {
       id: invoiceId,
       organizationId: session.organizationId,
-      clinicId: { in: session.clinicIds },
+      clinicId: { in: allowedClinicIds(session) },
     },
     include: {
       organization: { select: { taxCode: true } },
@@ -268,6 +294,11 @@ async function scopedInvoice(session: AppSession, invoiceId: string) {
       patient: { select: { id: true, fullName: true } },
     },
   });
+}
+
+function allowedClinicIds(session: AppSession) {
+  if (canUseAllClinics(session)) return session.clinicIds;
+  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 function toProviderInvoice(
