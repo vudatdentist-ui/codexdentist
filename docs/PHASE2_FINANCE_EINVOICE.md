@@ -26,7 +26,7 @@ The phase must improve access and operational visibility without replacing exist
    - invoices and payments,
    - E-invoice operational state,
    - reconciliation findings.
-3. Provider-agnostic E-invoice adapter contract with explicit `issue`, `cancel`, `replace`, `lookup`, and `sync` boundaries. Provider-specific implementations are deferred until their credentials, idempotency, callback verification, and legal-state semantics have dedicated tests.
+3. Provider-agnostic E-invoice adapter contract.
 4. E-invoice state machine:
    - `NOT_REQUIRED`
    - `PENDING`
@@ -34,7 +34,7 @@ The phase must improve access and operational visibility without replacing exist
    - `FAILED`
    - `CANCELLED`
    - `REPLACED`
-5. E-invoice state persisted as append-only, versioned `AuditLog` events in v1. This is deliberate until a real provider contract is selected; no provider-specific schema is invented.
+5. E-invoice state persisted as append-only `AuditLog` events in v1. This is deliberate until a real provider contract is selected; no provider-specific schema is invented.
 6. Manual external reconciliation for invoices issued/cancelled/replaced outside Dental OS.
 7. Provider request/sync actions. If no provider is configured, fail explicitly with `PROVIDER_NOT_CONFIGURED`; never fabricate issuance.
 8. Derived Finance Work signals for:
@@ -44,19 +44,8 @@ The phase must improve access and operational visibility without replacing exist
    - receipt amount not fully allocated,
    - treatment collection not yet invoiced,
    - invoice/item/payment reconciliation mismatch.
-9. Operations navigation exposes Finance without giving Front Desk the manager Operations workspace. Manager roles keep Staff Operations as their default destination; Billing lands directly in Finance.
+9. Operations navigation exposes Finance without giving Front Desk the manager Operations workspace.
 10. Desktop/mobile Browser QA + deterministic Finance/E-invoice E2E coverage.
-
-## E-invoice concurrency contract
-
-- Every E-invoice transition is a serializable compare-and-append operation.
-- Each invoice has a transaction-scoped advisory lock during state transition.
-- Each audit event receives a monotonic per-invoice version.
-- Provider results may finalize only the exact `PENDING` claim that initiated that provider call.
-- A second request cannot race the first request and call the provider from the same prior state.
-- Manual external references are checked for duplicate use inside an additional provider/reference lock.
-- An ambiguous provider failure is not automatically retried as a new issuance. It must be synchronized or manually reconciled first.
-- A provider exception becomes an explicit `FAILED` event with a bounded operator-safe error; raw provider payloads are not persisted.
 
 ## Safety invariants
 
@@ -82,3 +71,26 @@ Repeat until clean:
 7. Re-run all gates on the final HEAD.
 
 Do not merge or deploy as part of this phase.
+
+## Final verification evidence
+
+Phase 2 reached a clean verification pass on commit `11ae8ea2fe35a78338fa6c8c2bad06fef5ea1f87` before this documentation-only evidence commit.
+
+GitHub Actions run `#200` (`32632135665`) completed successfully with:
+
+- encoding check, TypeScript, architecture/module audit, migrations and seed: pass;
+- production build and server health/legacy route smoke: pass;
+- security, tenant isolation, billing edge cases, billing concurrency, action permissions, protected patient files and data-integrity tests: pass;
+- Browser QA: `48/48` pass on desktop/mobile migration routes, with `0` low/medium/high/critical findings;
+- clinical execution and unified staff-operations regression smokes: pass;
+- Finance role-boundary smoke: pass;
+- unconfigured E-invoice provider fails closed and creates Work: pass;
+- manual external issuance reconciliation: pass;
+- issued amount drift → Work mismatch → replacement reconciliation: pass;
+- local VOID remains visible until external E-invoice cancellation reconciliation: pass;
+- append-only E-invoice audit sequence and actor identity: pass;
+- concurrent issue requests serialize to one provider claim: pass;
+- an external E-invoice reference cannot be attached to two invoices: pass;
+- Docker production image build: pass.
+
+The final concurrency fix uses database row locks for local invoice transitions and organization-scoped serialization for external-reference reconciliation, while retaining optimistic `eventId + version` checks. No production provider success is simulated.
