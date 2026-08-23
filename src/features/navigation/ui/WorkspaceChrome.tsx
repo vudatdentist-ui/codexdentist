@@ -1,6 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { canAccessView } from "@/lib/permissions";
+import { canAccessView, hasAnyRole } from "@/lib/permissions";
 import type { AppSession } from "@/lib/session";
 import {
   getProductWorkspace,
@@ -22,8 +22,10 @@ export function WorkspaceChrome({
   session: AppSession;
 }) {
   const current = getProductWorkspace(activeWorkspace);
-  const visibleWorkspaces = productWorkspaces.filter((workspace) =>
-    canAccessView(session, workspace.permissionView),
+  const visibleWorkspaces = productWorkspaces.filter(
+    (workspace) =>
+      canAccessView(session, workspace.permissionView) &&
+      (!workspace.allowedRoles || hasAnyRole(session, workspace.allowedRoles)),
   );
   const daily = visibleWorkspaces.filter((workspace) => workspace.group === "daily");
   const system = visibleWorkspaces.filter((workspace) => workspace.group === "system");
