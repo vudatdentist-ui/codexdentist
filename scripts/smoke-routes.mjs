@@ -43,7 +43,8 @@ const migrationRoutes = enabledMigrationRoutes(
 const routes = [...new Set([...configuredRoutes, ...migrationRoutes])];
 const routeMarkers = {
   today: ["Hôm nay"],
-  schedule: ["Multi-clinic schedule", "Lịch hẹn đa phòng khám"],
+  schedule: ["Lịch hẹn"],
+  care: ["Chăm sóc"],
   patients: ["Patient 360", "Hồ sơ bệnh nhân 360"],
   "patients/[patientId]": ["Patient 360", "Hồ sơ bệnh nhân 360"],
   "patients/[patientId]/treatments/[treatmentServiceId]": ["Ca điều trị"],
