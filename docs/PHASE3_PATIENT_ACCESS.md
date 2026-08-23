@@ -11,8 +11,8 @@ This phase is not a dashboard redesign. Schedule is a work surface. Abnormal pat
 ## Canonical surfaces
 
 - `/schedule` — patient-access operations for the selected work day.
-- `/care` — follow-up queue and recent no-show recovery.
-- `/crm` — compatibility alias over the Care workspace while legacy CRM mutations remain available.
+- `/care` — canonical operational follow-up queue and recent no-show recovery.
+- `/crm` — the full compatibility CRM surface for lead creation/conversion and advanced CRM workflows while those mutations remain legacy.
 - `/work` — receives derived patient-access exceptions.
 
 ## Operational states
@@ -40,20 +40,21 @@ Signals must respect organization + active-clinic scope and disappear when the u
 
 A no-show is not automatically treated as contacted. Care must show unresolved no-shows until a staff member records a real follow-up outcome. The follow-up event uses existing CRM activity persistence and must be scoped to the patient/clinic.
 
-No SMS/Zalo/email provider success is simulated in this phase.
+No SMS/Zalo/email provider success is simulated in this phase. The Care action records an externally performed contact/outcome; it does not claim that Dental OS sent the message or completed the call.
 
 ## Schedule safety
 
 - keep existing provider/chair conflict checks;
 - keep server-side appointment permissions;
 - enforce tenant/clinic-scoped patient/provider/chair relations;
+- serialize appointment transitions and resource claims so concurrent operators cannot accept incompatible states from the same snapshot;
 - when a patient enters a chair, mark chair/provider operationally busy;
-- when treatment access completes, release operational busy state without deleting appointment history;
+- when treatment access completes, release operational busy state only when no other in-chair appointment still uses that resource;
 - do not modify clinical, treatment-progress, billing, e-invoice, payroll, odontogram, or patient-file semantics.
 
 ## Data-minimization fix in scope
 
-The schedule read model must not serialize patients outside the session's allowed clinic scope. Existing schedule loading is tightened accordingly.
+Both the canonical schedule read model and the legacy schedule compatibility loader must not serialize patients outside the session's allowed clinic scope.
 
 ## Architecture
 
@@ -75,7 +76,7 @@ Phase 3 is complete only when the final HEAD passes:
 3. existing clinical/staff/finance E2E regressions;
 4. desktop/mobile Browser QA for `/schedule` and `/care`;
 5. deterministic patient-access E2E covering confirmation, arrival, chair dispatch, completion/resource release, no-show -> Work/Care, follow-up -> signal cleared;
-6. invalid status regression rejection and role boundaries;
+6. invalid status regression rejection, concurrent incompatible transition serialization, idempotent concurrent no-show recovery, cross-clinic data minimization, and role boundaries;
 7. Docker production image build.
 
 The implementation is intentionally iterative: plan check -> implementation -> audit -> fix -> plan re-check -> audit again until all gates are green on one final HEAD.
