@@ -81,8 +81,7 @@ export function ScheduleWorkspace({
         </details>
 
         <footer className={styles.footer}>
-          <Link href="/schedule/legacy">Điều phối tài nguyên nâng cao</Link>
-          <span>Ghế và trạng thái bác sĩ vẫn được giữ trong compatibility surface trong giai đoạn migration.</span>
+          <Link href="/schedule/legacy">Điều phối tài nguyên nâng cao →</Link>
         </footer>
       </main>
     </WorkspaceChrome>
@@ -142,7 +141,12 @@ function AppointmentActions({ model, row }: { model: PatientAccessModel; row: Pa
 
   return (
     <>
-      {row.status === "REQUESTED" && <TransitionButton date={model.date} row={row} status="CONFIRMED">Xác nhận</TransitionButton>}
+      {row.status === "REQUESTED" && (
+        <>
+          <TransitionButton date={model.date} row={row} status="CONFIRMED">Xác nhận</TransitionButton>
+          <TransitionButton date={model.date} row={row} status="NO_SHOW" tone="quiet">No-show</TransitionButton>
+        </>
+      )}
       {row.status === "CONFIRMED" && (
         <>
           <TransitionButton date={model.date} row={row} status="ARRIVED">Đã đến</TransitionButton>
@@ -287,6 +291,7 @@ function noticeText(notice: string) {
     "missing-chair": "Chọn ghế trước khi đưa bệnh nhân vào ghế.",
     "invalid-chair": "Ghế không thuộc phòng khám này.",
     "chair-busy": "Ghế đang có bệnh nhân khác.",
+    "provider-busy": "Bác sĩ đang xử lý một bệnh nhân khác trên ghế.",
     "database-unavailable": "Chưa lưu được thay đổi.",
   };
   return labels[notice] ?? notice;
