@@ -12,6 +12,10 @@ import type {
   TreatmentServiceSummary,
 } from "@/lib/services-types";
 import type { AppSession } from "@/lib/session";
+import {
+  getTreatmentParticipants,
+  type TreatmentParticipantOption,
+} from "@/features/treatment-progress/server/get-treatment-participants";
 
 export type TreatmentCaseListItem = TreatmentServiceSummary & {
   patientName: string;
@@ -23,6 +27,8 @@ export type TreatmentCasesWorkspaceModel = {
   treatmentCase: TreatmentCaseListItem | null;
   patient: Patient | null;
   clinicalNotes: ClinicalNoteSummary[];
+  participants: TreatmentParticipantOption[];
+  currentUserId: string;
   canProgress: boolean;
   canMutate: boolean;
   canViewClinical: boolean;
@@ -61,15 +67,22 @@ export async function getTreatmentCasesWorkspace(
     : requestedPatient;
   const canViewClinical = canAccessView(session, "clinical");
   const canProgress = canPerformAction(session, "treatment.service.progress");
-  const clinicalWorkspace = treatmentCase && patient && canViewClinical
-    ? await getClinicalWorkspace(session, { patientId: patient.id })
-    : null;
+  const [clinicalWorkspace, participants] = await Promise.all([
+    treatmentCase && patient && canViewClinical
+      ? getClinicalWorkspace(session, { patientId: patient.id })
+      : Promise.resolve(null),
+    treatmentCase && canProgress
+      ? getTreatmentParticipants(session, treatmentCase.clinicId)
+      : Promise.resolve([]),
+  ]);
 
   return {
     cases,
     treatmentCase,
     patient,
     clinicalNotes: clinicalWorkspace?.notes ?? [],
+    participants,
+    currentUserId: session.userId,
     canProgress,
     canMutate: canProgress,
     canViewClinical,
