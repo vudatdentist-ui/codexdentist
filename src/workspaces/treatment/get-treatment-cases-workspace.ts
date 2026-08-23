@@ -1,9 +1,11 @@
 import "server-only";
 
+import { canPerformAction } from "@/lib/actions/permissions";
 import { getClinicalWorkspace } from "@/lib/clinical";
 import type { ClinicalNoteSummary } from "@/lib/clinical-types";
 import type { Patient } from "@/lib/data";
 import { getPatientWorkspace } from "@/lib/patients";
+import { canAccessView } from "@/lib/permissions";
 import { getServicesWorkspace } from "@/lib/services";
 import type {
   ServicesWorkspace,
@@ -21,7 +23,8 @@ export type TreatmentCasesWorkspaceModel = {
   treatmentCase: TreatmentCaseListItem | null;
   patient: Patient | null;
   clinicalNotes: ClinicalNoteSummary[];
-  canMutate: boolean;
+  canProgress: boolean;
+  canViewClinical: boolean;
   message: string | null;
 };
 
@@ -54,7 +57,8 @@ export async function getTreatmentCasesWorkspace(
   const patient = treatmentCase
     ? patientById.get(treatmentCase.patientId) ?? null
     : requestedPatient;
-  const clinicalWorkspace = treatmentCase && patient
+  const canViewClinical = canAccessView(session, "clinical");
+  const clinicalWorkspace = treatmentCase && patient && canViewClinical
     ? await getClinicalWorkspace(session, { patientId: patient.id })
     : null;
 
@@ -63,7 +67,8 @@ export async function getTreatmentCasesWorkspace(
     treatmentCase,
     patient,
     clinicalNotes: clinicalWorkspace?.notes ?? [],
-    canMutate: servicesWorkspace.canMutate,
+    canProgress: canPerformAction(session, "treatment.service.progress"),
+    canViewClinical,
     message: servicesWorkspace.message,
   };
 }
