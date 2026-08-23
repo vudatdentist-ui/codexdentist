@@ -13,10 +13,12 @@ import styles from "./workspace-chrome.module.css";
 export function WorkspaceChrome({
   activeWorkspace,
   children,
+  contextLabel,
   session,
 }: {
   activeWorkspace: ProductWorkspaceKey;
   children: ReactNode;
+  contextLabel?: string;
   session: AppSession;
 }) {
   const current = getProductWorkspace(activeWorkspace);
@@ -35,15 +37,15 @@ export function WorkspaceChrome({
 
         <details className={styles.workspaceSwitcher}>
           <summary>
-            <span>{current.label}</span>
+            <span>{contextLabel ?? current.label}</span>
             <span aria-hidden="true">⌄</span>
           </summary>
           <div className={styles.workspaceMenu}>
             <nav aria-label="Không gian làm việc">
               {daily.map((workspace) => (
                 <Link
-                  aria-current={workspace.key === activeWorkspace ? "page" : undefined}
-                  className={workspace.key === activeWorkspace ? styles.activeLink : undefined}
+                  aria-current={workspace.key === activeWorkspace && !contextLabel ? "page" : undefined}
+                  className={workspace.key === activeWorkspace && !contextLabel ? styles.activeLink : undefined}
                   href={workspace.href}
                   key={workspace.key}
                 >
@@ -53,8 +55,8 @@ export function WorkspaceChrome({
               {system.length > 0 && <div className={styles.menuDivider} />}
               {system.map((workspace) => (
                 <Link
-                  aria-current={workspace.key === activeWorkspace ? "page" : undefined}
-                  className={workspace.key === activeWorkspace ? styles.activeLink : undefined}
+                  aria-current={workspace.key === activeWorkspace && !contextLabel ? "page" : undefined}
+                  className={workspace.key === activeWorkspace && !contextLabel ? styles.activeLink : undefined}
                   href={workspace.href}
                   key={workspace.key}
                 >
