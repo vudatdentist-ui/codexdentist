@@ -48,8 +48,16 @@ The Patient 360 slice introduces:
 - `/patients` as the patient directory inside the new workspace chrome.
 - `/patients/[patientId]` as the canonical Patient 360 route.
 - one patient context that composes schedule, clinical record, treatment planning, odontogram, timeline, files, forms, prescriptions, CRM context and authorized financial context.
-- `/journey`, `/clinical`, and `/treatment` as compatibility aliases over the same Patient 360 workspace while legacy server actions are migrated incrementally.
+- `/journey` and `/clinical` as compatibility aliases over the same Patient 360 workspace while legacy server actions are migrated incrementally.
 - `/patient-management` as a temporary compatibility adapter for create/edit demographics until those mutations move into the new Patient workspace.
+
+The Treatment Case slice introduces:
+
+- `/treatment` as the treatment-case directory instead of another Patient 360 alias.
+- `/patients/[patientId]/treatments/[treatmentServiceId]` as the canonical Treatment Case route.
+- `TreatmentService` as the operational case object because it already owns teeth/target context, service steps, progress events, collections, invoice links and compensation impact.
+- a case page that exposes progress, steps, progress history, financial state and scoped clinical context while linking back to Patient 360.
+- no new treatment persistence model and no change to the existing `TreatmentPlan` planning model.
 
 The Patient 360 workspace may reuse a legacy module as a temporary compatibility island, but the route and workspace loader must not depend on `DentalSuite` or `AppViewPage`. New mutations should move below the workspace layer rather than adding more route-layer dependencies.
 
