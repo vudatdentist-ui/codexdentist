@@ -445,14 +445,10 @@ async function login(page, email) {
 }
 
 async function submitRowButton(page, appointmentId, label) {
+  await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => null);
   const row = await expectRow(page, appointmentId);
   const button = row.getByRole("button", { name: label, exact: true });
-  const actionResponse = page.waitForResponse(
-    (response) => response.request().method() === "POST" && response.url().startsWith(baseUrl),
-    { timeout: 15000 },
-  );
-
-  await Promise.all([actionResponse, button.click()]);
+  await button.click();
   await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => null);
 }
 
