@@ -4,7 +4,9 @@ export const migrationQaRoutes = Object.freeze([
   "/patients/[patientId]",
   "/treatment",
   "/patients/[patientId]/treatments/[treatmentServiceId]",
+  "/operations",
   "/operations/finance",
+  "/employee-app",
 ]);
 
 const migrationQaRouteSet = new Set(migrationQaRoutes);
