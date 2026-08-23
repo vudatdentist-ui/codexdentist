@@ -1,10 +1,10 @@
 import "server-only";
 
+import { noShowFollowUpSubject } from "@/features/patient-access/model";
 import { getCrmWorkspace } from "@/lib/crm";
 import { allowedClinicIds } from "@/lib/patient-access";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
-import { noShowFollowUpSubject } from "./actions";
 
 export type CareOperationsModel = {
   message: string | null;
