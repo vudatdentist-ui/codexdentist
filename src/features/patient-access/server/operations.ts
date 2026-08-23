@@ -56,8 +56,10 @@ export async function createPatientAccessAppointment(input: {
   }
 
   return runSerializableTransaction(async (tx) => {
-    if (input.chairId) await lockChair(tx, input.chairId);
-    await lockProvider(tx, input.providerId, input.organizationId);
+    if (input.chairId) {
+      await lockChair(tx, input.chairId, input.clinicId, "invalid-relation");
+    }
+    await lockProvider(tx, input.providerId, input.organizationId, input.clinicId);
 
     const [clinic, patient, provider, chair] = await Promise.all([
       tx.clinic.findFirst({
@@ -166,7 +168,7 @@ export async function transitionPatientAccessAppointment(input: {
   requestedChairId: string | null;
 }) {
   return runSerializableTransaction(async (tx) => {
-    await lockAppointment(tx, input.appointmentId);
+    await lockAppointment(tx, input.appointmentId, input.clinicIds);
     const appointment = await tx.appointment.findFirst({
       where: { id: input.appointmentId, clinicId: { in: input.clinicIds } },
       select: {
@@ -192,7 +194,7 @@ export async function transitionPatientAccessAppointment(input: {
     let nextChairId = appointment.chairId;
     if (input.requestedStatus === "IN_CHAIR") {
       if (!input.requestedChairId) throw new PatientAccessOperationError("missing-chair");
-      await lockChair(tx, input.requestedChairId);
+      await lockChair(tx, input.requestedChairId, appointment.clinicId, "invalid-chair");
       await lockProvider(tx, appointment.providerId, input.organizationId);
 
       const chair = await tx.chair.findFirst({
@@ -227,7 +229,9 @@ export async function transitionPatientAccessAppointment(input: {
     }
 
     if (input.requestedStatus === "COMPLETED") {
-      if (appointment.chairId) await lockChair(tx, appointment.chairId);
+      if (appointment.chairId) {
+        await lockChair(tx, appointment.chairId, appointment.clinicId, "invalid-chair");
+      }
       await lockProvider(tx, appointment.providerId, input.organizationId);
     }
 
@@ -312,7 +316,7 @@ export async function cancelPatientAccessAppointment(input: {
   appointmentId: string;
 }) {
   return runSerializableTransaction(async (tx) => {
-    await lockAppointment(tx, input.appointmentId);
+    await lockAppointment(tx, input.appointmentId, input.clinicIds);
     const appointment = await tx.appointment.findFirst({
       where: { id: input.appointmentId, clinicId: { in: input.clinicIds } },
       select: { id: true, status: true, startsAt: true },
@@ -349,7 +353,7 @@ export async function recordNoShowRecovery(input: {
   note: string | null;
 }) {
   return runSerializableTransaction(async (tx) => {
-    await lockAppointment(tx, input.appointmentId);
+    await lockAppointment(tx, input.appointmentId, input.clinicIds, "no-show-not-found");
     const appointment = await tx.appointment.findFirst({
       where: {
         id: input.appointmentId,
@@ -410,6 +414,16 @@ export async function completeCareActivity(input: {
   activityId: string;
 }) {
   return runSerializableTransaction(async (tx) => {
+    const scopedActivity = await tx.crmActivity.findFirst({
+      where: {
+        id: input.activityId,
+        organizationId: input.organizationId,
+        OR: [{ clinicId: null }, { clinicId: { in: input.clinicIds } }],
+      },
+      select: { id: true },
+    });
+    if (!scopedActivity) throw new PatientAccessOperationError("crm-patient-not-found");
+
     const activityLock = await tx.$queryRaw<Array<{ id: string }>>`
       SELECT "id" FROM "CrmActivity" WHERE "id" = ${input.activityId} FOR UPDATE
     `;
@@ -450,21 +464,60 @@ function canTransition(from: PatientAccessAppointmentStatus, to: PatientAccessAp
   return (statusTransitions[from] as readonly string[]).includes(to);
 }
 
-async function lockAppointment(tx: Prisma.TransactionClient, appointmentId: string) {
+async function lockAppointment(
+  tx: Prisma.TransactionClient,
+  appointmentId: string,
+  clinicIds: string[],
+  notFoundCode: "not-found" | "no-show-not-found" = "not-found",
+) {
+  const scoped = await tx.appointment.findFirst({
+    where: { id: appointmentId, clinicId: { in: clinicIds } },
+    select: { id: true },
+  });
+  if (!scoped) throw new PatientAccessOperationError(notFoundCode);
+
   const locked = await tx.$queryRaw<Array<{ id: string }>>`
     SELECT "id" FROM "Appointment" WHERE "id" = ${appointmentId} FOR UPDATE
   `;
-  if (locked.length !== 1) throw new PatientAccessOperationError("not-found");
+  if (locked.length !== 1) throw new PatientAccessOperationError(notFoundCode);
 }
 
-async function lockChair(tx: Prisma.TransactionClient, chairId: string) {
+async function lockChair(
+  tx: Prisma.TransactionClient,
+  chairId: string,
+  clinicId: string,
+  scopeErrorCode: "invalid-chair" | "invalid-relation",
+) {
+  const scoped = await tx.chair.findFirst({
+    where: { id: chairId, clinicId },
+    select: { id: true },
+  });
+  if (!scoped) throw new PatientAccessOperationError(scopeErrorCode);
+
   const locked = await tx.$queryRaw<Array<{ id: string }>>`
     SELECT "id" FROM "Chair" WHERE "id" = ${chairId} FOR UPDATE
   `;
-  if (locked.length !== 1) throw new PatientAccessOperationError("invalid-chair");
+  if (locked.length !== 1) throw new PatientAccessOperationError(scopeErrorCode);
 }
 
-async function lockProvider(tx: Prisma.TransactionClient, providerId: string, organizationId: string) {
+async function lockProvider(
+  tx: Prisma.TransactionClient,
+  providerId: string,
+  organizationId: string,
+  clinicId?: string,
+) {
+  if (clinicId) {
+    const scoped = await tx.user.findFirst({
+      where: {
+        id: providerId,
+        organizationId,
+        clinics: { some: { clinicId } },
+      },
+      select: { id: true },
+    });
+    if (!scoped) throw new PatientAccessOperationError("invalid-relation");
+  }
+
   const locked = await tx.$queryRaw<Array<{ id: string }>>`
     SELECT "id" FROM "User"
     WHERE "id" = ${providerId} AND "organizationId" = ${organizationId}
