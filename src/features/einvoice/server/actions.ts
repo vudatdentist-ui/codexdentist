@@ -55,7 +55,7 @@ export async function requestEInvoiceIssueAction(formData: FormData) {
       invoiceStatusSnapshot: invoice.status,
       source: "provider",
     },
-    allow: canSafelyRequestIssue,
+    allow: (latest) => sameSnapshot(latest, current) && canSafelyRequestIssue(latest),
     validate: (tx) => invoiceStatusMatches(tx, session, invoice.id, false),
     notice: "einvoice-state-conflict",
   });
@@ -90,6 +90,7 @@ export async function requestEInvoiceIssueAction(formData: FormData) {
     },
     allow: (latest) =>
       latest.eventId === claim.eventId &&
+      latest.version === claim.version &&
       latest.state === "PENDING" &&
       latest.operation === "ISSUE",
     notice: "einvoice-state-conflict",
@@ -129,7 +130,7 @@ export async function syncEInvoiceAction(formData: FormData) {
       invoiceStatusSnapshot: invoice.status,
       source: "provider",
     },
-    allow: canSafelySync,
+    allow: (latest) => sameSnapshot(latest, current) && canSafelySync(latest),
     validate: (tx) => invoiceStatusMatches(tx, session, invoice.id, false),
     notice: "einvoice-state-conflict",
   });
@@ -171,6 +172,7 @@ export async function syncEInvoiceAction(formData: FormData) {
     },
     allow: (latest) =>
       latest.eventId === claim.eventId &&
+      latest.version === claim.version &&
       latest.state === "PENDING" &&
       latest.operation === "SYNC",
     notice: "einvoice-state-conflict",
@@ -191,6 +193,7 @@ export async function confirmExternalEInvoiceAction(formData: FormData) {
     redirect(financeNotice("einvoice-manual-missing"));
   }
 
+  const current = await currentState(session, invoice.id);
   await assertExternalReferenceAvailable(session, invoice.id, providerKey, externalInvoiceId);
 
   await guardedTransition({
@@ -207,10 +210,11 @@ export async function confirmExternalEInvoiceAction(formData: FormData) {
       invoiceStatusSnapshot: invoice.status,
       source: "manual",
     },
-    allow: (current) =>
-      current.state === "NOT_REQUIRED" ||
-      (current.state === "FAILED" &&
-        (current.operation === "ISSUE" || current.operation === "SYNC")),
+    allow: (latest) =>
+      sameSnapshot(latest, current) &&
+      (latest.state === "NOT_REQUIRED" ||
+        (latest.state === "FAILED" &&
+          (latest.operation === "ISSUE" || latest.operation === "SYNC"))),
     lockKeys: [externalReferenceLockKey(session.organizationId, providerKey, externalInvoiceId)],
     validate: async (tx) =>
       (await invoiceStatusMatches(tx, session, invoice.id, false)) &&
@@ -236,6 +240,7 @@ export async function markEInvoiceNotRequiredAction(formData: FormData) {
     redirect(financeNotice("einvoice-invoice-unavailable"));
   }
 
+  const current = await currentState(session, invoice.id);
   await guardedTransition({
     organizationId: session.organizationId,
     actorId: databaseActorId(session.userId),
@@ -247,7 +252,7 @@ export async function markEInvoiceNotRequiredAction(formData: FormData) {
       invoiceStatusSnapshot: invoice.status,
       source: "manual",
     },
-    allow: canSafelyMarkNotRequired,
+    allow: (latest) => sameSnapshot(latest, current) && canSafelyMarkNotRequired(latest),
     validate: (tx) => invoiceStatusMatches(tx, session, invoice.id, false),
     notice: "einvoice-issued-cannot-ignore",
   });
@@ -282,7 +287,9 @@ export async function confirmExternalEInvoiceCancellationAction(formData: FormDa
       invoiceStatusSnapshot: invoice.status,
       source: "manual",
     },
-    allow: (latest) => latest.state === "ISSUED" || latest.state === "REPLACED",
+    allow: (latest) =>
+      sameSnapshot(latest, current) &&
+      (latest.state === "ISSUED" || latest.state === "REPLACED"),
     validate: (tx) => invoiceStatusMatches(tx, session, invoice.id, true),
     notice: "einvoice-cancel-state-invalid",
   });
@@ -322,6 +329,7 @@ export async function confirmExternalEInvoiceReplacementAction(formData: FormDat
       source: "manual",
     },
     allow: (latest) =>
+      sameSnapshot(latest, current) &&
       (latest.state === "ISSUED" || latest.state === "REPLACED") &&
       latest.externalInvoiceId !== externalInvoiceId,
     lockKeys: [externalReferenceLockKey(session.organizationId, providerKey, externalInvoiceId)],
@@ -364,6 +372,10 @@ function canSafelyMarkNotRequired(state: EInvoiceStateSnapshot) {
     (state.state === "NOT_REQUIRED" && state.eventId === null) ||
     (state.state === "FAILED" && state.errorCode === "PROVIDER_NOT_CONFIGURED")
   );
+}
+
+function sameSnapshot(current: EInvoiceStateSnapshot, expected: EInvoiceStateSnapshot) {
+  return current.eventId === expected.eventId && current.version === expected.version;
 }
 
 async function guardedTransition({
