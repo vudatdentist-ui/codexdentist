@@ -24,6 +24,7 @@ export type TreatmentCasesWorkspaceModel = {
   patient: Patient | null;
   clinicalNotes: ClinicalNoteSummary[];
   canProgress: boolean;
+  canMutate: boolean;
   canViewClinical: boolean;
   message: string | null;
 };
@@ -58,6 +59,7 @@ export async function getTreatmentCasesWorkspace(
     ? patientById.get(treatmentCase.patientId) ?? null
     : requestedPatient;
   const canViewClinical = canAccessView(session, "clinical");
+  const canProgress = canPerformAction(session, "treatment.service.progress");
   const clinicalWorkspace = treatmentCase && patient && canViewClinical
     ? await getClinicalWorkspace(session, { patientId: patient.id })
     : null;
@@ -67,7 +69,8 @@ export async function getTreatmentCasesWorkspace(
     treatmentCase,
     patient,
     clinicalNotes: clinicalWorkspace?.notes ?? [],
-    canProgress: canPerformAction(session, "treatment.service.progress"),
+    canProgress,
+    canMutate: canProgress,
     canViewClinical,
     message: servicesWorkspace.message,
   };
