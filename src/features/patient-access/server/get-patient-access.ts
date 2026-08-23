@@ -81,7 +81,6 @@ export async function getPatientAccessModel(
       where: {
         organizationId: session.organizationId,
         clinicId: { in: clinicIds },
-        archivedAt: null,
       },
       select: { id: true, clinicId: true, fullName: true, phone: true },
       orderBy: { fullName: "asc" },
