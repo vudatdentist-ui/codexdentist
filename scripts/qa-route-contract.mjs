@@ -1,6 +1,8 @@
 export const migrationQaRoutes = Object.freeze([
   "/today",
   "/work",
+  "/schedule",
+  "/care",
   "/patients/[patientId]",
   "/treatment",
   "/patients/[patientId]/treatments/[treatmentServiceId]",
