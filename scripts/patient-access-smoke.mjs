@@ -150,8 +150,13 @@ async function resetFixture() {
     },
   });
 
-  const baseStart = new Date(Date.now() + 45 * 60_000);
-  const starts = [0, 40, 80, -120].map((offset) => new Date(baseStart.getTime() + offset * 60_000));
+  const now = Date.now();
+  const starts = [
+    new Date(now + 45 * 60_000),
+    new Date(now - 30 * 60_000),
+    new Date(now + 85 * 60_000),
+    new Date(now - 75 * 60_000),
+  ];
   await prisma.appointment.createMany({
     data: [
       appointmentData(ids.main, "REQUESTED", starts[0], clinic.id, patient.id, provider.id),
