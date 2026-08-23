@@ -19,6 +19,7 @@ const ids = {
   outscopePatient: "smoke-patient-access-outscope-patient",
 };
 const fixtureAppointmentIds = [ids.main, ids.noShow, ids.transitionRace, ids.recoveryRace];
+const recoverySubjects = fixtureAppointmentIds.map((id) => `No-show follow-up · ${id}`);
 const outscopeName = "Patient Access Out-of-scope Sentinel";
 
 async function main() {
@@ -72,38 +73,13 @@ async function resetFixture() {
   }
 
   const patient = await prisma.patient.findFirst({
-    where: { organizationId: organization.id, clinicId: clinic.id, archivedAt: null },
+    where: { organizationId: organization.id, clinicId: clinic.id },
     orderBy: { createdAt: "asc" },
     select: { id: true, fullName: true },
   });
   if (!patient) throw new Error("Patient access smoke requires an in-scope patient.");
 
-  await prisma.auditLog.deleteMany({
-    where: {
-      organizationId: organization.id,
-      OR: [
-        { entityType: "Appointment", entityId: { in: fixtureAppointmentIds } },
-        {
-          action: "patient_access.no_show_recovered",
-          metadata: { path: ["appointmentId"], array_contains: fixtureAppointmentIds },
-        },
-      ],
-    },
-  }).catch(async () => {
-    await prisma.auditLog.deleteMany({
-      where: {
-        organizationId: organization.id,
-        entityType: "Appointment",
-        entityId: { in: fixtureAppointmentIds },
-      },
-    });
-  });
-  await prisma.crmActivity.deleteMany({
-    where: {
-      organizationId: organization.id,
-      subject: { in: fixtureAppointmentIds.map((id) => `No-show follow-up · ${id}`) },
-    },
-  });
+  await clearFixtureAuditAndActivities(organization.id);
   await prisma.appointment.deleteMany({ where: { id: { in: fixtureAppointmentIds } } });
   await prisma.patient.deleteMany({ where: { id: ids.outscopePatient } });
   await prisma.clinic.deleteMany({ where: { id: ids.outscopeClinic } });
@@ -171,8 +147,10 @@ async function resetFixture() {
     dentistId: dentist.id,
     patientId: patient.id,
     patientName: patient.fullName,
-    date: vietnamDate(starts[0]),
+    mainDate: vietnamDate(starts[0]),
+    noShowDate: vietnamDate(starts[1]),
     raceDate: vietnamDate(starts[2]),
+    recoveryDate: vietnamDate(starts[3]),
   };
 }
 
@@ -195,7 +173,7 @@ async function assertScopeAndOperationalFlow(browser, storageState, fixture) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, storageState });
   const page = await context.newPage();
   try {
-    await page.goto(`${baseUrl}/schedule?date=${fixture.date}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${baseUrl}/schedule?date=${fixture.mainDate}`, { waitUntil: "domcontentloaded" });
     await page.waitForLoadState("networkidle").catch(() => null);
     assertNotSerialized(await page.content(), outscopeName, "canonical Schedule");
     await expectRow(page, ids.main);
@@ -208,7 +186,7 @@ async function assertScopeAndOperationalFlow(browser, storageState, fixture) {
     await page.waitForLoadState("networkidle").catch(() => null);
     await expectText(page, "Lịch hẹn cần xác nhận");
 
-    await page.goto(`${baseUrl}/schedule?date=${fixture.date}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${baseUrl}/schedule?date=${fixture.mainDate}`, { waitUntil: "domcontentloaded" });
     await submitRowButton(page, ids.main, "Xác nhận", "updated");
     await expectAppointmentStatus(ids.main, "CONFIRMED");
 
@@ -233,7 +211,7 @@ async function assertScopeAndOperationalFlow(browser, storageState, fixture) {
     ]);
     await expectAppointmentStatus(ids.main, "IN_CHAIR");
 
-    await page.goto(`${baseUrl}/schedule?date=${fixture.date}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${baseUrl}/schedule?date=${fixture.mainDate}`, { waitUntil: "domcontentloaded" });
     await submitRowButton(page, ids.main, "Hoàn tất", "updated");
     await expectAppointmentStatus(ids.main, "COMPLETED");
     await assertResourceStatus(fixture, "READY");
@@ -310,7 +288,7 @@ async function assertNoShowRecovery(browser, storageState, fixture) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, storageState });
   const page = await context.newPage();
   try {
-    await page.goto(`${baseUrl}/schedule?date=${fixture.date}`, { waitUntil: "domcontentloaded" });
+    await page.goto(`${baseUrl}/schedule?date=${fixture.noShowDate}`, { waitUntil: "domcontentloaded" });
     await submitRowButton(page, ids.noShow, "No-show", "updated");
     await expectAppointmentStatus(ids.noShow, "NO_SHOW");
 
@@ -324,7 +302,7 @@ async function assertNoShowRecovery(browser, storageState, fixture) {
     await row.locator('input[name="note"]').fill("Đã gọi, bệnh nhân sẽ đặt lại lịch.");
     await Promise.all([
       page.waitForURL((url) => url.searchParams.get("notice") === "no-show-recovered", { timeout: 15000 }),
-      row.getByRole("button", { name: "Đã liên hệ", exact: true }).click(),
+      row.getByRole("button", { name: "Ghi nhận đã liên hệ", exact: true }).click(),
     ]);
 
     const subject = `No-show follow-up · ${ids.noShow}`;
@@ -332,13 +310,7 @@ async function assertNoShowRecovery(browser, storageState, fixture) {
       prisma.crmActivity.count({
         where: { organizationId: fixture.organizationId, patientId: fixture.patientId, subject, completedAt: { not: null } },
       }),
-      prisma.auditLog.count({
-        where: {
-          organizationId: fixture.organizationId,
-          action: "patient_access.no_show_recovered",
-          metadata: { path: ["appointmentId"], equals: ids.noShow },
-        },
-      }),
+      countRecoveryAudits(fixture.organizationId, ids.noShow),
     ]);
     if (activityCount !== 1 || auditCount !== 1) {
       throw new Error(`No-show recovery persistence mismatch: activities=${activityCount}, audits=${auditCount}.`);
@@ -380,8 +352,8 @@ async function assertConcurrentRecovery(browser, storageState, fixture) {
       rowB.locator('input[name="note"]').fill("Concurrent recovery B"),
     ]);
     await Promise.allSettled([
-      rowA.getByRole("button", { name: "Đã liên hệ", exact: true }).click(),
-      rowB.getByRole("button", { name: "Đã liên hệ", exact: true }).click(),
+      rowA.getByRole("button", { name: "Ghi nhận đã liên hệ", exact: true }).click(),
+      rowB.getByRole("button", { name: "Ghi nhận đã liên hệ", exact: true }).click(),
     ]);
 
     const subject = `No-show follow-up · ${ids.recoveryRace}`;
@@ -391,13 +363,7 @@ async function assertConcurrentRecovery(browser, storageState, fixture) {
     );
     const [activityCount, auditCount] = await Promise.all([
       prisma.crmActivity.count({ where: { organizationId: fixture.organizationId, subject } }),
-      prisma.auditLog.count({
-        where: {
-          organizationId: fixture.organizationId,
-          action: "patient_access.no_show_recovered",
-          metadata: { path: ["appointmentId"], equals: ids.recoveryRace },
-        },
-      }),
+      countRecoveryAudits(fixture.organizationId, ids.recoveryRace),
     ]);
     if (activityCount !== 1 || auditCount !== 1) {
       throw new Error(`Concurrent recovery was not idempotent: activities=${activityCount}, audits=${auditCount}.`);
@@ -502,6 +468,36 @@ function assertNotSerialized(html, sentinel, surface) {
   }
 }
 
+async function countRecoveryAudits(organizationId, appointmentId) {
+  return prisma.auditLog.count({
+    where: {
+      organizationId,
+      action: "patient_access.no_show_recovered",
+      metadata: { path: ["appointmentId"], equals: appointmentId },
+    },
+  });
+}
+
+async function clearFixtureAuditAndActivities(organizationId) {
+  const activities = await prisma.crmActivity.findMany({
+    where: { organizationId, subject: { in: recoverySubjects } },
+    select: { id: true },
+  });
+  const activityIds = activities.map((activity) => activity.id);
+  await prisma.auditLog.deleteMany({
+    where: {
+      organizationId,
+      OR: [
+        { entityType: "Appointment", entityId: { in: fixtureAppointmentIds } },
+        ...(activityIds.length ? [{ entityType: "CrmActivity", entityId: { in: activityIds } }] : []),
+      ],
+    },
+  });
+  await prisma.crmActivity.deleteMany({
+    where: { organizationId, subject: { in: recoverySubjects } },
+  });
+}
+
 async function waitFor(check, label, timeoutMs = 10000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -521,21 +517,7 @@ function vietnamDate(value) {
 }
 
 async function cleanupFixture(fixture) {
-  await prisma.crmActivity.deleteMany({
-    where: {
-      organizationId: fixture.organizationId,
-      subject: { in: fixtureAppointmentIds.map((id) => `No-show follow-up · ${id}`) },
-    },
-  });
-  await prisma.auditLog.deleteMany({
-    where: {
-      organizationId: fixture.organizationId,
-      OR: [
-        { entityType: "Appointment", entityId: { in: fixtureAppointmentIds } },
-        { action: "patient_access.no_show_recovered" },
-      ],
-    },
-  });
+  await clearFixtureAuditAndActivities(fixture.organizationId);
   await prisma.appointment.deleteMany({ where: { id: { in: fixtureAppointmentIds } } });
   await prisma.chair.deleteMany({ where: { id: ids.chair } });
   await prisma.user.updateMany({
