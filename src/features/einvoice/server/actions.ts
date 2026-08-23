@@ -10,11 +10,14 @@ import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 import { resolveEInvoiceAdapter, type EInvoiceProviderInvoice } from "./adapter";
 import {
-  appendEInvoiceEvent,
+  EInvoiceTransitionError,
   emptyEInvoiceState,
   loadEInvoiceStates,
+  transitionEInvoiceState,
   type EInvoiceStateSnapshot,
 } from "./state";
+
+const pendingSyncMinAgeMs = 30 * 60 * 1000;
 
 export async function requestEInvoiceIssueAction(formData: FormData) {
   const session = await requireViewSession("billing");
@@ -35,8 +38,7 @@ export async function requestEInvoiceIssueAction(formData: FormData) {
 
   const adapter = resolveEInvoiceAdapter();
   const actorId = databaseActorId(session.userId);
-
-  await appendEInvoiceEvent({
+  const claim = await guardedTransition({
     organizationId: session.organizationId,
     actorId,
     invoiceId: invoice.id,
@@ -48,6 +50,8 @@ export async function requestEInvoiceIssueAction(formData: FormData) {
       invoiceStatusSnapshot: invoice.status,
       source: "provider",
     },
+    allow: canSafelyRequestIssue,
+    notice: "einvoice-state-conflict",
   });
 
   const result = await adapter.issue(toProviderInvoice(session, invoice)).catch(() => ({
@@ -57,7 +61,7 @@ export async function requestEInvoiceIssueAction(formData: FormData) {
     errorMessage: "Không xác nhận được phản hồi phát hành từ nhà cung cấp HĐĐT.",
   }));
 
-  await appendEInvoiceEvent({
+  await guardedTransition({
     organizationId: session.organizationId,
     actorId,
     invoiceId: invoice.id,
@@ -74,6 +78,11 @@ export async function requestEInvoiceIssueAction(formData: FormData) {
       invoiceStatusSnapshot: invoice.status,
       source: "provider",
     },
+    allow: (latest) =>
+      latest.eventId === claim.eventId &&
+      latest.state === "PENDING" &&
+      latest.operation === "ISSUE",
+    notice: "einvoice-state-conflict",
   });
 
   finish(result.state === "FAILED" ? "einvoice-provider-failed" : "einvoice-requested", invoice.patientId);
@@ -89,11 +98,31 @@ export async function syncEInvoiceAction(formData: FormData) {
   }
 
   const current = await currentState(session, invoice.id);
-  if (current.state !== "PENDING" && current.state !== "FAILED") {
+  if (!canSafelySync(current)) {
     redirect(financeNotice("einvoice-sync-state-invalid"));
   }
 
   const adapter = resolveEInvoiceAdapter();
+  const actorId = databaseActorId(session.userId);
+  const claim = await guardedTransition({
+    organizationId: session.organizationId,
+    actorId,
+    invoiceId: invoice.id,
+    input: {
+      state: "PENDING",
+      operation: "SYNC",
+      providerKey: current.providerKey ?? adapter.providerKey,
+      externalInvoiceId: current.externalInvoiceId,
+      lookupCode: current.lookupCode,
+      replacementReference: current.replacementReference,
+      amountSnapshot: Number(invoice.amount),
+      invoiceStatusSnapshot: invoice.status,
+      source: "provider",
+    },
+    allow: canSafelySync,
+    notice: "einvoice-state-conflict",
+  });
+
   const result = await adapter.sync(toProviderInvoice(session, invoice), {
     externalInvoiceId: current.externalInvoiceId,
     lookupCode: current.lookupCode,
@@ -107,9 +136,9 @@ export async function syncEInvoiceAction(formData: FormData) {
     errorMessage: "Không xác nhận được phản hồi đồng bộ từ nhà cung cấp HĐĐT.",
   }));
 
-  await appendEInvoiceEvent({
+  await guardedTransition({
     organizationId: session.organizationId,
-    actorId: databaseActorId(session.userId),
+    actorId,
     invoiceId: invoice.id,
     input: {
       state: result.state,
@@ -124,6 +153,11 @@ export async function syncEInvoiceAction(formData: FormData) {
       invoiceStatusSnapshot: invoice.status,
       source: "provider",
     },
+    allow: (latest) =>
+      latest.eventId === claim.eventId &&
+      latest.state === "PENDING" &&
+      latest.operation === "SYNC",
+    notice: "einvoice-state-conflict",
   });
 
   finish(result.state === "FAILED" ? "einvoice-provider-failed" : "einvoice-synced", invoice.patientId);
@@ -133,24 +167,17 @@ export async function confirmExternalEInvoiceAction(formData: FormData) {
   const session = await requireViewSession("billing");
   guardInvoiceIssue(session);
   const invoice = await scopedInvoice(session, requiredString(formData.get("invoiceId")));
-  const externalInvoiceId = requiredString(formData.get("externalInvoiceId"));
-  const lookupCode = requiredString(formData.get("lookupCode")) || null;
-  const providerKey = requiredString(formData.get("providerKey")) || "external-manual";
+  const externalInvoiceId = boundedInput(formData.get("externalInvoiceId"), 180);
+  const lookupCode = boundedInput(formData.get("lookupCode"), 180) || null;
+  const providerKey = boundedInput(formData.get("providerKey"), 80) || "external-manual";
 
   if (!invoice || invoice.status === "VOID" || !externalInvoiceId) {
     redirect(financeNotice("einvoice-manual-missing"));
   }
 
-  const current = await currentState(session, invoice.id);
-  if (
-    current.state === "ISSUED" ||
-    current.state === "REPLACED" ||
-    current.state === "CANCELLED"
-  ) {
-    redirect(financeNotice("einvoice-manual-state-invalid"));
-  }
+  await assertExternalReferenceAvailable(session, invoice.id, providerKey, externalInvoiceId);
 
-  await appendEInvoiceEvent({
+  await guardedTransition({
     organizationId: session.organizationId,
     actorId: databaseActorId(session.userId),
     invoiceId: invoice.id,
@@ -164,6 +191,11 @@ export async function confirmExternalEInvoiceAction(formData: FormData) {
       invoiceStatusSnapshot: invoice.status,
       source: "manual",
     },
+    allow: (current) =>
+      current.state === "NOT_REQUIRED" ||
+      (current.state === "FAILED" &&
+        (current.operation === "ISSUE" || current.operation === "SYNC")),
+    notice: "einvoice-manual-state-invalid",
   });
 
   finish("einvoice-manual-issued", invoice.patientId);
@@ -178,12 +210,7 @@ export async function markEInvoiceNotRequiredAction(formData: FormData) {
     redirect(financeNotice("einvoice-invoice-unavailable"));
   }
 
-  const current = await currentState(session, invoice.id);
-  if (!canSafelyMarkNotRequired(current)) {
-    redirect(financeNotice("einvoice-issued-cannot-ignore"));
-  }
-
-  await appendEInvoiceEvent({
+  await guardedTransition({
     organizationId: session.organizationId,
     actorId: databaseActorId(session.userId),
     invoiceId: invoice.id,
@@ -194,6 +221,8 @@ export async function markEInvoiceNotRequiredAction(formData: FormData) {
       invoiceStatusSnapshot: invoice.status,
       source: "manual",
     },
+    allow: canSafelyMarkNotRequired,
+    notice: "einvoice-issued-cannot-ignore",
   });
 
   finish("einvoice-not-required", invoice.patientId);
@@ -211,11 +240,7 @@ export async function confirmExternalEInvoiceCancellationAction(formData: FormDa
   }
 
   const current = await currentState(session, invoice.id);
-  if (current.state !== "ISSUED" && current.state !== "REPLACED") {
-    redirect(financeNotice("einvoice-cancel-state-invalid"));
-  }
-
-  await appendEInvoiceEvent({
+  await guardedTransition({
     organizationId: session.organizationId,
     actorId: databaseActorId(session.userId),
     invoiceId: invoice.id,
@@ -230,6 +255,8 @@ export async function confirmExternalEInvoiceCancellationAction(formData: FormDa
       invoiceStatusSnapshot: invoice.status,
       source: "manual",
     },
+    allow: (latest) => latest.state === "ISSUED" || latest.state === "REPLACED",
+    notice: "einvoice-cancel-state-invalid",
   });
 
   finish("einvoice-cancelled", invoice.patientId);
@@ -239,27 +266,26 @@ export async function confirmExternalEInvoiceReplacementAction(formData: FormDat
   const session = await requireViewSession("billing");
   guardInvoiceIssue(session);
   const invoice = await scopedInvoice(session, requiredString(formData.get("invoiceId")));
-  const replacementReference = requiredString(formData.get("replacementReference"));
-  const externalInvoiceId = requiredString(formData.get("externalInvoiceId"));
-  const lookupCode = requiredString(formData.get("lookupCode")) || null;
+  const replacementReference = boundedInput(formData.get("replacementReference"), 180);
+  const externalInvoiceId = boundedInput(formData.get("externalInvoiceId"), 180);
+  const lookupCode = boundedInput(formData.get("lookupCode"), 180) || null;
 
   if (!invoice || invoice.status === "VOID" || !replacementReference || !externalInvoiceId) {
     redirect(financeNotice("einvoice-replacement-missing"));
   }
 
   const current = await currentState(session, invoice.id);
-  if (current.state !== "ISSUED" && current.state !== "REPLACED") {
-    redirect(financeNotice("einvoice-replacement-state-invalid"));
-  }
+  const providerKey = current.providerKey ?? "external-manual";
+  await assertExternalReferenceAvailable(session, invoice.id, providerKey, externalInvoiceId);
 
-  await appendEInvoiceEvent({
+  await guardedTransition({
     organizationId: session.organizationId,
     actorId: databaseActorId(session.userId),
     invoiceId: invoice.id,
     input: {
       state: "REPLACED",
       operation: "REPLACE",
-      providerKey: current.providerKey ?? "external-manual",
+      providerKey,
       externalInvoiceId,
       lookupCode,
       replacementReference,
@@ -267,6 +293,10 @@ export async function confirmExternalEInvoiceReplacementAction(formData: FormDat
       invoiceStatusSnapshot: invoice.status,
       source: "manual",
     },
+    allow: (latest) =>
+      (latest.state === "ISSUED" || latest.state === "REPLACED") &&
+      latest.externalInvoiceId !== externalInvoiceId,
+    notice: "einvoice-replacement-state-invalid",
   });
 
   finish("einvoice-replaced", invoice.patientId);
@@ -279,22 +309,85 @@ function guardInvoiceIssue(session: AppSession) {
 }
 
 function canSafelyRequestIssue(state: EInvoiceStateSnapshot) {
+  return state.state === "NOT_REQUIRED";
+}
+
+function canSafelySync(state: EInvoiceStateSnapshot) {
+  if (state.state === "FAILED") return true;
   return (
-    state.state === "NOT_REQUIRED" ||
-    (state.state === "FAILED" && state.errorCode === "PROVIDER_NOT_CONFIGURED")
+    state.state === "PENDING" &&
+    state.updatedAtMs != null &&
+    Date.now() - state.updatedAtMs >= pendingSyncMinAgeMs
   );
 }
 
 function canSafelyMarkNotRequired(state: EInvoiceStateSnapshot) {
   return (
-    state.state === "NOT_REQUIRED" ||
+    (state.state === "NOT_REQUIRED" && state.eventId === null) ||
     (state.state === "FAILED" && state.errorCode === "PROVIDER_NOT_CONFIGURED")
   );
+}
+
+async function guardedTransition({
+  organizationId,
+  actorId,
+  invoiceId,
+  input,
+  allow,
+  notice,
+}: Parameters<typeof transitionEInvoiceState>[0] & { notice: string }) {
+  try {
+    return await transitionEInvoiceState({
+      organizationId,
+      actorId,
+      invoiceId,
+      input,
+      allow,
+    });
+  } catch (error) {
+    if (error instanceof EInvoiceTransitionError) {
+      redirect(financeNotice(notice));
+    }
+    throw error;
+  }
 }
 
 async function currentState(session: AppSession, invoiceId: string): Promise<EInvoiceStateSnapshot> {
   const states = await loadEInvoiceStates(session, [invoiceId]);
   return states.get(invoiceId) ?? emptyEInvoiceState(invoiceId);
+}
+
+async function assertExternalReferenceAvailable(
+  session: AppSession,
+  invoiceId: string,
+  providerKey: string,
+  externalInvoiceId: string,
+) {
+  const events = await prisma.auditLog.findMany({
+    where: {
+      organizationId: session.organizationId,
+      entityType: "Invoice",
+      entityId: { not: invoiceId },
+      action: { in: ["einvoice.issued", "einvoice.replaced"] },
+    },
+    select: { entityId: true, metadata: true },
+    take: 5000,
+  });
+
+  const duplicate = events.some((event) => {
+    if (!event.metadata || typeof event.metadata !== "object" || Array.isArray(event.metadata)) {
+      return false;
+    }
+    const metadata = event.metadata as Record<string, unknown>;
+    return (
+      String(metadata.providerKey ?? "") === providerKey &&
+      String(metadata.externalInvoiceId ?? "") === externalInvoiceId
+    );
+  });
+
+  if (duplicate) {
+    redirect(financeNotice("einvoice-external-duplicate"));
+  }
 }
 
 async function scopedInvoice(session: AppSession, invoiceId: string) {
@@ -317,6 +410,10 @@ async function scopedInvoice(session: AppSession, invoiceId: string) {
 function allowedClinicIds(session: AppSession) {
   if (canUseAllClinics(session)) return session.clinicIds;
   return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
+}
+
+function boundedInput(value: FormDataEntryValue | null, maxLength: number) {
+  return requiredString(value).slice(0, maxLength);
 }
 
 function toProviderInvoice(
