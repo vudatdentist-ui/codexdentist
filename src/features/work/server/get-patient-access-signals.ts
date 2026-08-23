@@ -1,6 +1,6 @@
 import "server-only";
 
-import { noShowFollowUpSubject } from "@/features/patient-access/server/actions";
+import { noShowFollowUpSubject } from "@/features/patient-access/model";
 import { allowedClinicIds } from "@/lib/patient-access";
 import { canAccessView } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
