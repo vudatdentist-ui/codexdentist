@@ -147,6 +147,7 @@ export async function getPatientAccessModel(
 
   const statusTimes = new Map<string, { arrivedAt: Date | null; inChairAt: Date | null }>();
   for (const log of auditLogs) {
+    if (!log.entityId) continue;
     const status = metadataStatus(log.metadata);
     const current = statusTimes.get(log.entityId) ?? { arrivedAt: null, inChairAt: null };
     if (status === "ARRIVED") current.arrivedAt = log.createdAt;
@@ -186,36 +187,38 @@ export async function getPatientAccessModel(
     };
   });
 
-  const exceptions = rows.flatMap((row) => {
+  const exceptions: PatientAccessModel["exceptions"] = [];
+  for (const row of rows) {
     if (row.status === "REQUESTED") {
-      return [{
+      exceptions.push({
         appointmentId: row.id,
         patientId: row.patientId,
-        kind: "needs-confirmation" as const,
+        kind: "needs-confirmation",
         label: "Cần xác nhận",
         detail: `${row.timeLabel} · ${row.patientName}`,
-      }];
+      });
+      continue;
     }
     if (row.status === "CONFIRMED" && new Date(row.startsAt).getTime() < now.getTime() - 15 * 60_000) {
-      return [{
+      exceptions.push({
         appointmentId: row.id,
         patientId: row.patientId,
-        kind: "late" as const,
+        kind: "late",
         label: "Chưa check-in",
         detail: `${row.timeLabel} · ${row.patientName}`,
-      }];
+      });
+      continue;
     }
     if (row.status === "ARRIVED" && (row.waitMinutes ?? 0) >= 20) {
-      return [{
+      exceptions.push({
         appointmentId: row.id,
         patientId: row.patientId,
-        kind: "waiting" as const,
+        kind: "waiting",
         label: "Đang chờ lâu",
         detail: `${row.waitMinutes} phút · ${row.patientName}`,
-      }];
+      });
     }
-    return [];
-  });
+  }
 
   return {
     date,
