@@ -97,6 +97,7 @@ jobs:
         run: |
           npx playwright install --with-deps chromium
           npm run browser:qa
+          node scripts/clinical-execution-smoke.mjs
         env:
           NODE_ENV: test
           BROWSER_QA_MIGRATION_ROUTES: "/today,/work,/patients/[patientId],/treatment,/patients/[patientId]/treatments/[treatmentServiceId]"
