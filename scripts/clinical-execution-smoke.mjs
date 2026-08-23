@@ -238,11 +238,22 @@ async function login(page, email) {
   }
 
   const form = page.locator("form.login-form").first();
-  await form.locator('input[type="email"]').fill(email);
+  const emailInput = form.locator('input[type="email"]').first();
+  await emailInput.click();
+  await emailInput.pressSequentially(email);
   await form.locator('input[name="password"]').fill(password);
   await form.locator('button[type="submit"]').click();
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"), { timeout: 15000 });
-  await page.waitForLoadState("networkidle").catch(() => null);
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"), { timeout: 15000 }).catch(() => null);
+  await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => null);
+  await page.waitForTimeout(1500);
+
+  const currentPath = new URL(page.url()).pathname;
+  if (currentPath.endsWith("/login")) {
+    const bodyText = await page.locator("body").innerText().catch(() => "");
+    throw new Error(
+      `Login failed for ${email}; still on ${page.url()}. ${bodyText.slice(0, 300)}`,
+    );
+  }
 }
 
 async function expectText(page, text) {
