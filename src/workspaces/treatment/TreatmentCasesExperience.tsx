@@ -7,6 +7,7 @@ import type {
   TreatmentCaseListItem,
   TreatmentCasesWorkspaceModel,
 } from "./get-treatment-cases-workspace";
+import { TreatmentProgressForm } from "./TreatmentProgressForm";
 import styles from "./treatment-cases-workspace.module.css";
 
 export function TreatmentCasesExperience({
@@ -168,15 +169,16 @@ function TreatmentCase({
             style={{ width: `${Math.min(Math.max(treatmentCase.currentProgressPercent, 0), 100)}%` }}
           />
         </div>
-        {model.canMutate && (
-          <Link
-            className={styles.textAction}
-            href={`/patients/${encodeURIComponent(patient.id)}`}
-          >
-            Ghi nhận tiến độ trong hồ sơ →
-          </Link>
-        )}
       </section>
+
+      {model.canProgress && (
+        <TreatmentProgressForm
+          currentUserId={model.currentUserId}
+          participants={model.participants}
+          patientId={patient.id}
+          treatmentCase={treatmentCase}
+        />
+      )}
 
       <section className={styles.section}>
         <div className={styles.sectionHeading}>
@@ -289,32 +291,34 @@ function TreatmentCase({
         </dl>
       </section>
 
-      <section className={styles.section}>
-        <div className={styles.sectionHeading}>
-          <h2>Lâm sàng</h2>
-          <Link href={`/patients/${encodeURIComponent(patient.id)}`}>Toàn bộ hồ sơ →</Link>
-        </div>
-
-        {latestClinicalNotes.length > 0 ? (
-          <div className={styles.clinicalRows}>
-            {latestClinicalNotes.map((note) => (
-              <div className={styles.clinicalRow} key={note.id}>
-                <div>
-                  <time dateTime={note.createdAtIso ?? undefined}>{note.createdAt}</time>
-                  <span>{note.author}</span>
-                </div>
-                <div>
-                  <strong>{note.assessment || note.objective || "Ghi nhận lâm sàng"}</strong>
-                  {note.plan && <p>{note.plan}</p>}
-                </div>
-                <span>{note.lockedAt ? "Đã ký" : "Chưa ký"}</span>
-              </div>
-            ))}
+      {model.canViewClinical && (
+        <section className={styles.section}>
+          <div className={styles.sectionHeading}>
+            <h2>Lâm sàng</h2>
+            <Link href={`/patients/${encodeURIComponent(patient.id)}`}>Toàn bộ hồ sơ →</Link>
           </div>
-        ) : (
-          <p className={styles.emptyInline}>Chưa có ghi nhận lâm sàng cho bệnh nhân này.</p>
-        )}
-      </section>
+
+          {latestClinicalNotes.length > 0 ? (
+            <div className={styles.clinicalRows}>
+              {latestClinicalNotes.map((note) => (
+                <div className={styles.clinicalRow} key={note.id}>
+                  <div>
+                    <time dateTime={note.createdAtIso ?? undefined}>{note.createdAt}</time>
+                    <span>{note.author}</span>
+                  </div>
+                  <div>
+                    <strong>{note.assessment || note.objective || "Ghi nhận lâm sàng"}</strong>
+                    {note.plan && <p>{note.plan}</p>}
+                  </div>
+                  <span>{note.lockedAt ? "Đã ký" : "Chưa ký"}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className={styles.emptyInline}>Chưa có ghi nhận lâm sàng cho bệnh nhân này.</p>
+          )}
+        </section>
+      )}
     </article>
   );
 }
