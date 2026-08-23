@@ -59,7 +59,7 @@ export const productWorkspaces: ProductWorkspace[] = [
   {
     key: "care",
     label: "Chăm sóc",
-    href: "/crm",
+    href: "/care",
     permissionView: "crm",
     group: "daily",
   },
