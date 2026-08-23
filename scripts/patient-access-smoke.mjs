@@ -153,7 +153,7 @@ async function resetFixture() {
   const now = Date.now();
   const starts = [
     new Date(now + 45 * 60_000),
-    new Date(now - 30 * 60_000),
+    new Date(now),
     new Date(now + 85 * 60_000),
     new Date(now - 75 * 60_000),
   ];
@@ -212,15 +212,15 @@ async function assertScopeAndOperationalFlow(browser, storageState, fixture) {
     await expectText(page, "Lịch hẹn cần xác nhận");
 
     await page.goto(`${baseUrl}/schedule?date=${fixture.mainDate}`, { waitUntil: "domcontentloaded" });
-    await submitRowButton(page, ids.main, "Xác nhận", "updated");
+    await submitRowButton(page, ids.main, "Xác nhận");
     await expectAppointmentStatus(ids.main, "CONFIRMED");
 
-    await submitRowButton(page, ids.main, "Đã đến", "updated");
+    await submitRowButton(page, ids.main, "Đã đến");
     await expectAppointmentStatus(ids.main, "ARRIVED");
 
     let row = await expectRow(page, ids.main);
     await row.locator('select[name="chairId"]').selectOption(ids.chair);
-    await submitRowButton(page, ids.main, "Vào ghế", "updated");
+    await submitRowButton(page, ids.main, "Vào ghế");
     await expectAppointmentStatus(ids.main, "IN_CHAIR");
     await assertResourceStatus(fixture, "BUSY");
 
@@ -237,7 +237,7 @@ async function assertScopeAndOperationalFlow(browser, storageState, fixture) {
     await expectAppointmentStatus(ids.main, "IN_CHAIR");
 
     await page.goto(`${baseUrl}/schedule?date=${fixture.mainDate}`, { waitUntil: "domcontentloaded" });
-    await submitRowButton(page, ids.main, "Hoàn tất", "updated");
+    await submitRowButton(page, ids.main, "Hoàn tất");
     await expectAppointmentStatus(ids.main, "COMPLETED");
     await assertResourceStatus(fixture, "READY");
 
@@ -314,7 +314,7 @@ async function assertNoShowRecovery(browser, storageState, fixture) {
   const page = await context.newPage();
   try {
     await page.goto(`${baseUrl}/schedule?date=${fixture.noShowDate}`, { waitUntil: "domcontentloaded" });
-    await submitRowButton(page, ids.noShow, "No-show", "updated");
+    await submitRowButton(page, ids.noShow, "No-show");
     await expectAppointmentStatus(ids.noShow, "NO_SHOW");
 
     await page.goto(`${baseUrl}/work`, { waitUntil: "domcontentloaded" });
