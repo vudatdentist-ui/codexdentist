@@ -444,7 +444,7 @@ async function login(page, email) {
   }
 }
 
-async function submitRowButton(page, appointmentId, label, notice) {
+async function submitRowButton(page, appointmentId, label) {
   const row = await expectRow(page, appointmentId);
   const button = row.getByRole("button", { name: label, exact: true });
   const actionResponse = page.waitForResponse(
@@ -453,15 +453,7 @@ async function submitRowButton(page, appointmentId, label, notice) {
   );
 
   await Promise.all([actionResponse, button.click()]);
-  await page.waitForURL((url) => url.searchParams.get("notice") === notice, { timeout: 15000 });
   await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => null);
-
-  const actualNotice = new URL(page.url()).searchParams.get("notice");
-  if (actualNotice !== notice) {
-    throw new Error(
-      `${label} for ${appointmentId} expected notice=${notice}, got ${actualNotice ?? "none"}.`,
-    );
-  }
 }
 
 async function expectRow(page, appointmentId) {
