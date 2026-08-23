@@ -75,7 +75,7 @@ export function CareWorkspace({
                       <option value="IN_APP">Trong app</option>
                     </select>
                     <input aria-label={`Kết quả chăm sóc ${item.patientName}`} name="note" placeholder="Kết quả / bước tiếp theo" type="text" />
-                    <button disabled={!model.canMutate} type="submit">Đã liên hệ</button>
+                    <button disabled={!model.canMutate} type="submit">Ghi nhận đã liên hệ</button>
                   </form>
                 </article>
               ))}
