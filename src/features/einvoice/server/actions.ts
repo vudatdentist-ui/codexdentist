@@ -29,11 +29,7 @@ export async function requestEInvoiceIssueAction(formData: FormData) {
   if (current.state === "PENDING") {
     redirect(financeNotice("einvoice-request-pending"));
   }
-  if (
-    current.state === "ISSUED" ||
-    current.state === "REPLACED" ||
-    current.state === "CANCELLED"
-  ) {
+  if (!canSafelyRequestIssue(current)) {
     redirect(financeNotice("einvoice-request-state-invalid"));
   }
 
@@ -170,12 +166,7 @@ export async function markEInvoiceNotRequiredAction(formData: FormData) {
   }
 
   const current = await currentState(session, invoice.id);
-  if (
-    current.state === "PENDING" ||
-    current.state === "ISSUED" ||
-    current.state === "REPLACED" ||
-    current.state === "CANCELLED"
-  ) {
+  if (!canSafelyMarkNotRequired(current)) {
     redirect(financeNotice("einvoice-issued-cannot-ignore"));
   }
 
@@ -272,6 +263,20 @@ function guardInvoiceIssue(session: AppSession) {
   if (!canPerformAction(session, "billing.invoice.issue")) {
     redirect(financeNotice("einvoice-denied"));
   }
+}
+
+function canSafelyRequestIssue(state: EInvoiceStateSnapshot) {
+  return (
+    state.state === "NOT_REQUIRED" ||
+    (state.state === "FAILED" && state.errorCode === "PROVIDER_NOT_CONFIGURED")
+  );
+}
+
+function canSafelyMarkNotRequired(state: EInvoiceStateSnapshot) {
+  return (
+    state.state === "NOT_REQUIRED" ||
+    (state.state === "FAILED" && state.errorCode === "PROVIDER_NOT_CONFIGURED")
+  );
 }
 
 async function currentState(session: AppSession, invoiceId: string): Promise<EInvoiceStateSnapshot> {
