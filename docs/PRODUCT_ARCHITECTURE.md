@@ -94,8 +94,11 @@ The stack `#20 -> #26` is merged into `main`.
 
 - Patient 360 still embeds the legacy `PatientJourneyPanel` as a compatibility island.
 - `/crm` still owns legacy lead/create/convert capability not yet converged into Care.
-- `/billing`, `/accounting`, `/inventory`, `/reports`, `/staff` still have primary legacy surfaces even though Finance/Staff canonical operations exist.
-- `/settings`, `/services`, `/forms`, `/pharmacy` still require migration/convergence.
+- `/billing` and `/accounting` still own large compatibility surfaces even though canonical Finance exists.
+- `/staff` still owns legacy management/payroll surface even though Operations/Employee self-service exist.
+- `/inventory` and `/reports` are not yet converged into Operations.
+- `/settings` and `/services` remain module-first configuration surfaces.
+- `/forms` and `/pharmacy` remain standalone module-first clinical-support surfaces.
 - `/patient-app` remains a separate legacy patient-facing experience.
 - Learning/Community remain deferred product surfaces.
 
@@ -174,33 +177,45 @@ Rules:
 
 ## Architecture roadmap
 
-The detailed scope/exit criteria live in `PROJECT_CONTEXT.md`. Architectural intent is:
+Detailed scope and exit criteria live in `PROJECT_CONTEXT.md`. The architecture sequence is intentionally split by high-risk domain so a single phase does not mix unrelated invariants.
 
 ### Phase 4 — Patient 360 Core Extraction
 
-Replace the embedded `PatientJourneyPanel` monolith with native Patient 360 sections/features. Move patient demographics create/edit into canonical Patients. Preserve Journey/clinical compatibility until parity.
+Replace the embedded `PatientJourneyPanel` monolith with native Patient 360 sections/features. Move patient demographics create/edit into canonical Patients. Preserve Journey/Clinical compatibility until parity.
 
 ### Phase 5 — Care / CRM Convergence
 
 Move lead intake, conversion, recall/follow-up and communication outcomes into canonical Care. Retire CRM to compatibility after parity.
 
-### Phase 6 — Operations Completion
+### Phase 6 — Finance Surface Convergence
 
-Move Inventory and Reports into Operations; converge Billing/Accounting entry points into canonical Finance; reduce Staff legacy surface without changing ledger/payroll semantics.
+Converge the large legacy Billing and Accounting surfaces into canonical `/operations/finance` while preserving ledger, Serializable transaction, reconciliation and e-invoice invariants.
 
-### Phase 7 — Settings and Clinical-Support Consolidation
+### Phase 7 — Workforce Management Convergence
 
-Make Settings native and canonical; converge Services/catalog configuration and patient-context Forms/Pharmacy workflows.
+Converge remaining Staff/Payroll management into Operations while preserving compensation, source commission and persisted PayrollRun semantics; `/employee-app` remains self-service.
 
-### Phase 8 — Patient Portal
+### Phase 8 — Inventory and Reporting Operations
 
-Rebuild the external patient experience with strict patient-self authorization after staff core stabilizes.
+Move Inventory and Reports into Operations with existing stock/material and role/clinic semantics, independent from Finance/Staff migration risk.
 
-### Phase 9 — Legacy Shell Extinction
+### Phase 9 — Settings and Service Catalog
+
+Make Settings native and canonical; converge Services/catalog configuration with role, compensation-policy and treatment-step safety preserved.
+
+### Phase 10 — Clinical Support Convergence
+
+Move Forms/consent and Pharmacy/prescription workflows into Patient 360/clinical context while keeping compatibility routes until parity.
+
+### Phase 11 — Patient Portal
+
+Rebuild the external patient experience with strict patient-self authorization after staff core and clinical support stabilize.
+
+### Phase 12 — Legacy Shell Extinction
 
 Remove remaining protected-route dependence on `AppViewPage` / `DentalSuite`, retire extracted module islands, and make architecture route guards strict in CI.
 
-### Phase 10 — Productization / Knowledge / Public Surface
+### Phase 13 — Productization / Knowledge / Public Surface
 
 Only after staff architecture stabilizes: refresh public product storytelling from current `main`, decide Learning/Community/Knowledge/RAG direction, and harden community/release experience.
 
