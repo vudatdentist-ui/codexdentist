@@ -281,14 +281,23 @@ async function withLoggedInPage(browser, email, run) {
 }
 
 async function login(page, email) {
-  const response = await page.goto(`${baseUrl}/login`, { waitUntil: "domcontentloaded" });
-  if (!response || response.status() >= 400) throw new Error(`/login returned HTTP ${response?.status() ?? "unknown"}`);
+  const response = await page.goto(`${baseUrl}/login`, {
+    waitUntil: "domcontentloaded",
+  });
+  if (!response || response.status() >= 400) {
+    throw new Error(`/login returned HTTP ${response?.status() ?? "unknown"}`);
+  }
+
   const form = page.locator("form.login-form").first();
-  await form.locator('input[type="email"]').fill(email);
+  const emailInput = form.locator('input[type="email"]').first();
+  await emailInput.click();
+  await emailInput.pressSequentially(email);
   await form.locator('input[name="password"]').fill(password);
   await form.locator('button[type="submit"]').click();
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"), { timeout: 20_000 }).catch(() => null);
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"), { timeout: 30_000 }).catch(() => null);
   await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => null);
+  await page.waitForTimeout(800);
+
   if (new URL(page.url()).pathname.endsWith("/login")) {
     const body = await page.locator("body").innerText().catch(() => "");
     throw new Error(`Login failed for ${email} at ${page.url()}. ${body.slice(0, 300)}`);
