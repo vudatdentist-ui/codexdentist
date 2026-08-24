@@ -10,30 +10,142 @@ const connectionString =
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 const authStateByEmail = new Map();
 const organizationId = "org_nhavista";
+const actors = {
+  manager: {
+    id: "phase4-smoke-manager",
+    email: "phase4-manager@nhavista.vn",
+    templateEmail: "manager@nhavista.vn",
+    fullName: "Phase 4 Smoke Manager",
+  },
+  clinical: {
+    id: "phase4-smoke-hygienist",
+    email: "phase4-hygienist@nhavista.vn",
+    templateEmail: "hygienist@nhavista.vn",
+    fullName: "Phase 4 Smoke Hygienist",
+  },
+  billing: {
+    id: "phase4-smoke-billing",
+    email: "phase4-billing@nhavista.vn",
+    templateEmail: "billing@nhavista.vn",
+    fullName: "Phase 4 Smoke Billing",
+  },
+};
 let patientId = null;
 
 async function main() {
-  const browser = await chromium.launch({ headless: true });
+  let browser = null;
   const suffix = String(Date.now()).slice(-8);
   const initialName = `Phase 4 Smoke ${suffix}`;
   const updatedName = `${initialName} Updated`;
   const phone = `09${suffix}`;
 
   try {
+    await seedActorFixtures();
+    browser = await chromium.launch({ headless: true });
     patientId = await assertCanonicalIntakeAndEdit(browser, { initialName, updatedName, phone });
     await assertClinicalTimelineAndCompatibility(browser, { patientId, updatedName });
     await assertBillingIsReadOnly(browser, patientId);
+    console.log("ok Patient 360 Phase 4 native workflow smoke");
   } finally {
-    await browser.close();
+    if (browser) await browser.close();
     if (patientId) await cleanupFixture(patientId);
-    await prisma.$disconnect();
+    await cleanupActorFixtures();
+  }
+}
+
+async function seedActorFixtures() {
+  await cleanupActorFixtures();
+
+  for (const actor of Object.values(actors)) {
+    const template = await prisma.user.findUnique({
+      where: { email: actor.templateEmail },
+      select: {
+        organizationId: true,
+        passwordHash: true,
+        role: true,
+        clinics: { select: { clinicId: true } },
+        roleAssignments: {
+          where: { active: true },
+          select: {
+            organizationId: true,
+            clinicId: true,
+            scopeKey: true,
+            role: true,
+            active: true,
+          },
+        },
+      },
+    });
+
+    if (!template || template.organizationId !== organizationId) {
+      throw new Error(`Phase 4 smoke template user is missing or out of scope: ${actor.templateEmail}`);
+    }
+
+    await prisma.user.create({
+      data: {
+        id: actor.id,
+        organizationId: template.organizationId,
+        email: actor.email,
+        fullName: actor.fullName,
+        passwordHash: template.passwordHash,
+        role: template.role,
+        active: true,
+        mustChangePassword: false,
+      },
+    });
+
+    if (template.clinics.length > 0) {
+      await prisma.userClinic.createMany({
+        data: template.clinics.map(({ clinicId }) => ({ userId: actor.id, clinicId })),
+      });
+    }
+
+    if (template.roleAssignments.length > 0) {
+      await prisma.userRoleAssignment.createMany({
+        data: template.roleAssignments.map((assignment) => ({
+          organizationId: assignment.organizationId,
+          userId: actor.id,
+          clinicId: assignment.clinicId,
+          scopeKey: assignment.scopeKey,
+          role: assignment.role,
+          active: assignment.active,
+        })),
+      });
+    }
   }
 
-  console.log("ok Patient 360 Phase 4 native workflow smoke");
+  console.log("ok isolated Patient 360 smoke actors");
+}
+
+async function cleanupActorFixtures() {
+  const actorIds = Object.values(actors).map((actor) => actor.id);
+  const actorEmails = Object.values(actors).map((actor) => actor.email);
+  const existing = await prisma.user.findMany({
+    where: { OR: [{ id: { in: actorIds } }, { email: { in: actorEmails } }] },
+    select: { id: true },
+  });
+  const ids = existing.map((user) => user.id);
+
+  if (ids.length === 0) return;
+
+  await prisma.auditLog.deleteMany({
+    where: {
+      organizationId,
+      OR: [
+        { actorId: { in: ids } },
+        { entityType: "User", entityId: { in: ids } },
+      ],
+    },
+  });
+  await prisma.session.deleteMany({ where: { userId: { in: ids } } });
+  await prisma.userRoleAssignment.deleteMany({ where: { userId: { in: ids } } });
+  await prisma.userClinic.deleteMany({ where: { userId: { in: ids } } });
+  await prisma.user.deleteMany({ where: { id: { in: ids } } });
+  authStateByEmail.clear();
 }
 
 async function assertCanonicalIntakeAndEdit(browser, { initialName, updatedName, phone }) {
-  return withLoggedInPage(browser, "manager@nhavista.vn", async (page) => {
+  return withLoggedInPage(browser, actors.manager.email, async (page) => {
     await open(page, "/patients");
     await expectText(page, "Hồ sơ bệnh nhân 360");
 
@@ -84,7 +196,7 @@ async function assertCanonicalIntakeAndEdit(browser, { initialName, updatedName,
 }
 
 async function assertClinicalTimelineAndCompatibility(browser, { patientId: id, updatedName }) {
-  await withLoggedInPage(browser, "hygienist@nhavista.vn", async (page) => {
+  await withLoggedInPage(browser, actors.clinical.email, async (page) => {
     await open(page, `/journey?patientId=${encodeURIComponent(id)}`);
     await page.waitForURL((url) => url.pathname === `/patients/${encodeURIComponent(id)}`, { timeout: 15_000 });
     await expectText(page, updatedName);
@@ -136,7 +248,7 @@ async function assertClinicalTimelineAndCompatibility(browser, { patientId: id, 
 }
 
 async function assertBillingIsReadOnly(browser, id) {
-  await withLoggedInPage(browser, "billing@nhavista.vn", async (page) => {
+  await withLoggedInPage(browser, actors.billing.email, async (page) => {
     await open(page, `/patients/${encodeURIComponent(id)}`);
     if (new URL(page.url()).pathname !== `/patients/${encodeURIComponent(id)}`) {
       throw new Error("Billing could not open authorized Patient 360 context.");
@@ -216,9 +328,11 @@ async function cleanupFixture(id) {
   await prisma.patient.deleteMany({ where: { id, organizationId } });
 }
 
-main().catch(async (error) => {
-  console.error(error);
-  if (patientId) await cleanupFixture(patientId).catch(() => null);
-  await prisma.$disconnect().catch(() => null);
-  process.exitCode = 1;
-});
+main()
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    await prisma.$disconnect();
+  });
