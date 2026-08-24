@@ -199,8 +199,14 @@ function isMigrationRouteFile(path) {
   return (
     /^src\/app\/(?:[^/]+\/)*today(?:\/|$)/.test(path) ||
     /^src\/app\/(?:[^/]+\/)*work(?:\/|$)/.test(path) ||
-    /^src\/app\/(?:[^/]+\/)*patients\/\[[^/]*patientId[^/]*\](?:\/|$)/i.test(path) ||
-    /^src\/app\/(?:[^/]+\/)*operations\/finance(?:\/|$)/.test(path)
+    /^src\/app\/(?:[^/]+\/)*schedule(?!(?:\/legacy)(?:\/|$))(?:\/|$)/.test(path) ||
+    /^src\/app\/(?:[^/]+\/)*care(?:\/|$)/.test(path) ||
+    /^src\/app\/(?:[^/]+\/)*patients(?:\/|$)/.test(path) ||
+    /^src\/app\/(?:[^/]+\/)*journey(?:\/|$)/.test(path) ||
+    /^src\/app\/(?:[^/]+\/)*clinical(?:\/|$)/.test(path) ||
+    /^src\/app\/(?:[^/]+\/)*treatment(?:\/|$)/.test(path) ||
+    /^src\/app\/(?:[^/]+\/)*operations(?:\/|$)/.test(path) ||
+    /^src\/app\/(?:[^/]+\/)*employee-app(?:\/|$)/.test(path)
   );
 }
 
