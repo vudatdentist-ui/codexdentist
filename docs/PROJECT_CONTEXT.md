@@ -5,7 +5,7 @@ Last updated: 2026-08-24
 This file answers four questions for every contributor or coding agent:
 
 1. What product are we building?
-2. What architecture is true on `main` now?
+2. What architecture is true on current `main`?
 3. Which business and safety invariants must not change accidentally?
 4. What work comes next, in what order, and what proves each phase is complete?
 
@@ -13,13 +13,21 @@ For layer rules read `PRODUCT_ARCHITECTURE.md`. For verification read `QA_PLAYBO
 
 ## Current baseline
 
-The workflow-first refactor stack `#20 -> #26` has been merged into `main` in dependency order. The post-Phase-3 integration baseline is merge commit:
+The workflow-first refactor is integrated through **Phase 4 — Patient 360 Core Extraction**. The completed sequence is:
 
-`389f98f587bc871dfc12718a3b96fca76949910f`
+- `#20` workflow-first Dental OS shell;
+- `#21` Patient 360 route/read-model shell;
+- `#22` Treatment Case workspace;
+- `#23` clinical execution loop;
+- `#24` unified earnings and staff operations;
+- `#25` Finance / E-invoice operations;
+- `#26` Patient Access / Front Desk loop;
+- `#27` post-Phase-3 context/architecture reset;
+- `#29` native Patient 360 core extraction.
 
-The Phase-3 branch tree that passed full CI and the merged `main` tree were identical. Treat Phase 3 as **implemented and integrated**, not as an open migration branch.
+New architecture work must branch from the latest `main`, not from those historical implementation branches.
 
-Do not revive old stacked branches as a base for new work. New architecture work branches from the latest `main`.
+The default next architecture phase is **Phase 5 — Care / CRM Convergence**, tracked by issue **#30**.
 
 ## Product direction
 
@@ -34,7 +42,7 @@ Primary staff workspaces are:
 3. `Patients` — Patient 360 and longitudinal patient context.
 4. `Treatment` — Treatment Cases and execution progress.
 5. `Work` — unified operational exceptions/tasks/signals.
-6. `Care` — lead/follow-up/recall/no-show recovery and communication outcomes.
+6. `Care` — leads, follow-up, recall, no-show recovery and communication outcomes.
 7. `Operations` — staff, finance, inventory, reports.
 8. `Settings` — clinic configuration, roles, services, compensation, templates, integrations, audit.
 
@@ -50,7 +58,7 @@ A domain capability does not automatically deserve a primary navigation item.
 - `app.codexdentist.com` is the neutral hosted application host.
 - Hosted production deploys must preserve environment configuration, PostgreSQL data, and protected-file storage. Follow `OPERATIONS.md`; do not improvise production reset/reseed flows.
 
-## Architecture after Phase 3
+## Architecture after Phase 4
 
 New architecture follows:
 
@@ -61,60 +69,79 @@ The new architecture lives primarily under:
 - `src/shared/**` — business-agnostic presentation primitives/contracts;
 - `src/features/**` — cohesive workflow capability, read-model adapters, server actions;
 - `src/workspaces/**` — route-level workflow composition and UI;
-- `src/domains/**` — reserved for stable domain contracts when extraction genuinely benefits from it; currently not a required destination for every legacy module.
+- `src/domains/**` — reserved for stable domain contracts when extraction genuinely benefits from it; not a mandatory destination for legacy files.
 
-`src/lib/**`, `src/modules/**`, and large legacy components remain migration territory. They contain valuable, tested business behavior and must be extracted incrementally rather than rewritten for folder purity.
+`src/lib/**`, `src/modules/**`, `src/components/DentalSuite.tsx`, and `src/app/(app)/view-page.tsx` remain migration territory. They contain valuable tested behavior and must be extracted incrementally rather than rewritten for folder purity.
 
 ### Canonical / migrated surfaces
 
 | Product surface | Canonical route(s) | Current state |
 | --- | --- | --- |
-| Today | `/today` | Migrated workspace. `/dashboard` is compatibility entry/redirect. |
+| Today | `/today` | Migrated workspace. `/dashboard` remains compatibility entry/redirect. |
 | Work | `/work` | Migrated unified operational queue with derived domain signals. |
 | Schedule | `/schedule` | Migrated Patient Access workspace. `/schedule/legacy` preserves the old dispatch surface temporarily. |
-| Care | `/care` | Migrated follow-up/no-show operational workspace; full legacy CRM capability is not yet fully converged. |
-| Patients | `/patients`, `/patients/[patientId]` | Migrated directory + Patient 360 shell/read model. Internal Patient 360 still contains a large Journey compatibility island. |
-| Journey / Clinical | `/journey`, `/clinical` | Compatibility entries that compose the canonical Patient 360 workspace. |
+| Care | `/care` | Migrated follow-up/no-show workspace; lead intake/conversion still needs CRM convergence in Phase 5. |
+| Patients | `/patients`, `/patients/[patientId]` | **Native Patient 360**: directory/intake, demographics, consent/source governance, clinical/plan, odontogram, treatment services and derived longitudinal timeline. No `PatientJourneyPanel` dependency. |
+| Journey / Clinical | `/journey`, `/clinical` | Compatibility entries that resolve the same authorized patient into canonical Patient 360. |
+| Patient management | `/patient-management` | Retired module entry; redirects to canonical `/patients`. |
 | Treatment | `/treatment`, `/patients/[patientId]/treatments/[treatmentServiceId]` | Migrated Treatment Case directory/case and clinical execution. |
-| Operations | `/operations` | Migrated staff-operations workspace. Inventory/reports are not yet converged into canonical Operations. |
-| Finance | `/operations/finance` | Migrated finance/e-invoice operational workspace. Legacy `/billing` and `/accounting` remain compatibility module routes. |
+| Operations | `/operations` | Migrated staff-operations workspace; workforce/inventory/reports convergence is still pending. |
+| Finance | `/operations/finance` | Migrated finance/e-invoice operational workspace; `/billing` and `/accounting` remain compatibility module routes. |
 | Employee self-service | `/employee-app` | Migrated staff self-service workspace. |
-| Settings | `/settings` | Still legacy `AppViewPage -> DentalSuite`; canonical product destination is known but migration is pending. |
+| Settings | `/settings` | Still legacy `AppViewPage -> DentalSuite`; canonical destination known, migration pending. |
 
-The migration QA contract also protects the canonical new routes listed in `scripts/qa-route-contract.mjs`.
+The migration QA contract is encoded in `scripts/qa-route-contract.mjs`, the general architecture guard in `scripts/agent-module-audit.mjs`, and the Patient 360 extraction boundary in `scripts/patient-360-architecture-audit.mjs`.
 
-### Remaining legacy frontier
+## Native Patient 360 ownership
 
-The shell migration is successful, but the legacy core has **not** been eliminated.
+Phase 4 changed ownership, not high-risk domain semantics.
 
-Important migration debt on current `main`:
+### Workspace composition
 
-- `src/components/DentalSuite.tsx` is still the large legacy product renderer for unmigrated routes.
-- `src/app/(app)/view-page.tsx` / `AppViewPage` still centralizes many legacy loaders and renders `DentalSuite`.
-- `src/modules/journey/PatientJourneyPanel.tsx` remains a very large compatibility island inside Patient 360.
-- Legacy routes still using `AppViewPage` include Billing, Accounting, Inventory, Reports, Settings, Services, Staff, CRM, Patient App, Pharmacy, Forms, Learning and other compatibility surfaces.
-- `src/modules/**` still contains the old module-first implementation for many domains.
-- Large global/legacy CSS remains migration debt; styling cleanup should follow workspace extraction rather than trigger a visual rewrite by itself.
+`src/workspaces/patients/**` now owns the Patient 360 presentation:
+
+- patient directory/search and intake;
+- profile/demographics, consent and lead-source governance;
+- clinical exam/note and treatment-plan presentation;
+- odontogram and treatment-service composition;
+- longitudinal timeline derived from appointments, finalized clinical history, treatment plans/progress, invoices/receipts, prescriptions, forms, protected files, Care/CRM activity and Journey comments.
+
+The timeline is a **read-model composition**, not a new persistence source. Do not create duplicate timeline/task rows just to mirror existing domain state.
+
+### Server mutation ownership
+
+Patient 360 mutations live under:
+
+- `src/features/patient-360/server/patient-actions.ts`;
+- `src/features/patient-360/server/clinical-actions.ts`;
+- `src/features/patient-360/server/journey-actions.ts`;
+- `src/features/patient-360/server/odontogram-actions.ts`;
+- `src/features/patient-360/server/patient-file-actions.ts`.
+
+Old route action files under `/patients`, `/clinical`, `/journey`, Journey odontogram and `/patient-files` are thin async compatibility forwarding adapters. Do not put new business behavior back into them.
+
+`PatientOdontogramEditor` binds directly to the Patient 360 odontogram feature actions. This preserves its existing debounce, revision-conflict, reset/copy-stage and history contract while removing the transitive workspace -> Journey-route dependency.
+
+### Frozen Patient Journey monolith
+
+`src/modules/journey/PatientJourneyPanel.tsx` is no longer part of canonical Patient 360 composition. Treat it as frozen legacy/migration source only. Do not import it from new workspaces/features or add new product capability to it.
+
+## Remaining legacy frontier
+
+The workflow migration is substantial, but the legacy shell is not extinct.
+
+Important remaining migration debt:
+
+- `/crm` and `src/modules/crm/CrmPanel.tsx` still own lead/create/convert capability not yet converged into Care.
+- `/billing` and `/accounting` still own large compatibility surfaces despite canonical Finance.
+- `/staff` still owns legacy management/payroll capability despite Operations and Employee self-service.
+- `/inventory` and `/reports` are not yet native Operations surfaces.
+- `/settings` and `/services` remain module-first configuration surfaces.
+- `/forms` and `/pharmacy` remain standalone clinical-support surfaces even though their patient context can already appear in Patient 360.
+- `/patient-app` remains a legacy patient-facing application.
+- `src/components/DentalSuite.tsx`, `AppViewPage`, many `src/modules/**` files and global/legacy styling remain migration territory.
 
 New work must **shrink this frontier, never expand it**.
-
-### Why the remaining roadmap is split by risk domain
-
-The largest compatibility panels are not a safe single rewrite unit. Representative current sizes are roughly:
-
-- Patient Journey: ~142 KB;
-- Billing: ~131 KB;
-- Settings: ~114 KB;
-- Pharmacy: ~77 KB;
-- Inventory: ~73 KB;
-- Staff/Payroll: ~71 KB;
-- Services: ~40 KB;
-- Forms: ~39 KB;
-- Accounting: ~32 KB;
-- Reports: ~30 KB;
-- CRM: ~23 KB.
-
-Phase boundaries therefore follow **business risk, dependency and auditability**, not file size alone. Each phase may use several small stacked extraction PRs, but it must finish on one final HEAD that satisfies the phase exit criteria.
 
 ## Completed refactor phases
 
@@ -126,7 +153,7 @@ Completed:
 - canonical Today/Work;
 - Patient 360 route/read-model shell;
 - canonical Treatment Case directory and case route;
-- architecture guardrails preventing new migrated code from depending on `DentalSuite` / `AppViewPage`.
+- architecture guardrails preventing migrated code from depending on `DentalSuite` / `AppViewPage`.
 
 ### Clinical execution (`#23`)
 
@@ -149,7 +176,7 @@ Completed:
 
 ### Phase 2 — Finance / E-invoice (`#25`)
 
-Completed:
+Completed operational loop:
 
 `Treatment service -> Collection -> Receipt allocation -> Invoice -> E-invoice state -> Reconciliation -> Work`
 
@@ -157,11 +184,25 @@ The provider adapter fails closed when unconfigured, E-invoice state is auditabl
 
 ### Phase 3 — Patient Access (`#26`)
 
-Completed:
+Completed operational loop:
 
 `Booking -> Confirmation -> Arrival -> Chair dispatch -> Completed / No-show -> Patient 360 / Care -> Work`
 
 The server enforces status transitions, resource serialization, organization/clinic scope, provider/chair lifecycle and no-show recovery. No-show signals clear only after a real CRM follow-up outcome is recorded.
+
+### Phase 4 — Patient 360 Core Extraction (`#29`)
+
+Completed:
+
+- removed `PatientJourneyPanel` from canonical Patient 360 composition;
+- made `/patients` own directory/search, patient intake, demographics edit, consent and lead-source governance;
+- built native Patient 360 profile, clinical/plan, odontogram/treatment-service and longitudinal timeline sections;
+- moved patient/clinical/journey/odontogram/patient-file mutations below the workspace into `src/features/patient-360/server/**` while keeping route actions as compatibility forwarders;
+- preserved the existing odontogram editor behavior but bound it to feature actions directly;
+- converted `/patient-management` to a compatibility redirect;
+- kept `/journey` and `/clinical` as compatibility entries into the same scoped Patient 360 context;
+- added a Phase-4-specific architecture audit and end-to-end smoke covering canonical intake/edit, audited clinical/timeline writes, compatibility routing and Billing read-only behavior;
+- preserved clinical signing/history, odontogram revision/stage, protected-file, treatment-progress, tenant/clinic and role boundaries without Prisma-schema redesign.
 
 ## Non-negotiable business and safety invariants
 
@@ -179,19 +220,21 @@ The refactor changes composition and information architecture. It does **not** g
 
 ### Clinical, Patient 360 and odontogram
 
-- Patient 360 is the canonical longitudinal patient context; `/journey` and `/clinical` are compatibility entries while extraction continues.
-- Timeline history, clinical signing/amendment, patient files and odontogram revision behavior must remain auditable.
+- Patient 360 is the canonical longitudinal patient context.
+- `/journey` and `/clinical` are compatibility entries, not alternate product implementations.
+- Timeline history, clinical signing/amendment, patient files and odontogram revision behavior remain auditable.
 - Odontogram uses FDI codes and independent `INITIAL`, `CURRENT`, `EXPECTED` stages with revision/history semantics.
 - Treatment-target selection must never overwrite clinical odontogram snapshots.
 - Treatment progress cannot regress and must preserve participant, inventory, compensation and audit invariants.
 - Billing/Front Desk must not gain clinical mutation rights through workspace composition.
+- Protected files remain authorization-scoped records even when surfaced in the Patient 360 timeline.
 
 ### Billing and E-invoice
 
 - Ledger mutations use retryable PostgreSQL `Serializable` transactions; calculation reads used by a write belong in the same transaction.
 - Receipt collection, allocation and invoice issuance are distinct concepts.
 - Partial invoices remain separate issued records; overpayment remains unapplied/advance balance rather than inventing invoice value.
-- Existing reconciliation/database constraints and tenant ownership checks must remain in force.
+- Existing reconciliation/database constraints and tenant ownership checks remain in force.
 - E-invoice provider operations fail closed when no provider is configured; do not simulate provider success.
 - External reconciliation is explicit/audited; E-invoice references cannot be shared across invoices.
 
@@ -209,201 +252,129 @@ The refactor changes composition and information architecture. It does **not** g
 - Live/estimated earnings are not the same object as approved/paid payroll runs.
 - Do not invent payroll tax/social-insurance automation as part of architecture cleanup.
 
-### Patient Access
+### Patient Access and Care
 
 - Appointment/provider/chair claims remain server-serialized and clinic-scoped.
 - Invalid status regression and reopening final appointment states remain rejected.
 - BUSY resource state is released only according to the real in-chair usage contract.
 - No-show recovery clears only after a persisted follow-up outcome, not after merely viewing Care/Work.
+- Phase 5 must preserve these Patient Access rules while converging CRM lead/follow-up workflows into Care.
 
 ### Work / Today signals
 
 Operational exceptions should normally be **derived from domain state** and adapted into Work/Today. Do not persist duplicate task rows only to mirror another source of truth.
 
-## Roadmap after Phase 3
+## Roadmap after Phase 4
 
 Security or production-data incidents can preempt this roadmap. Otherwise, architecture work should proceed in this order.
 
-### Phase 4 — Patient 360 Core Extraction
+### Phase 5 — Care / CRM Convergence — NEXT (`#30`)
 
-**Why next:** Patient 360 is canonical, but its core still embeds the giant legacy `PatientJourneyPanel`. This is the highest-leverage architectural bottleneck because clinical, odontogram, timeline, forms, files, prescriptions and treatment planning converge there.
+**Why next:** `/care` owns no-show/follow-up operations, but lead intake, conversion and parts of CRM remain in the legacy module. This splits one patient-acquisition/recovery workflow across two architectures.
 
-**Goal:** make Patient 360 a native composition of scoped features instead of a wrapper around the legacy Journey monolith.
+**Goal:** make `/care` own:
 
-Scope:
-
-- extract encounter/clinical-plan presentation and actions below the workspace layer;
-- extract timeline composition without changing historical semantics;
-- preserve the odontogram editor/data contract while giving it a clear Patient 360 boundary;
-- compose protected files and authorized financial context through explicit Patient 360 sections/read models;
-- migrate patient create/edit demographics out of `/patient-management` into the canonical Patients workspace;
-- keep `/journey` and `/clinical` as compatibility entries until parity is proven.
-
-Exit criteria:
-
-- `src/workspaces/patients/**` no longer imports `src/modules/journey/PatientJourneyPanel`;
-- canonical Patients handles directory, create/edit and patient chart flows;
-- Journey/clinical compatibility routes still work or have reviewed redirects;
-- clinical, odontogram, file, tenant, role, mobile and browser regression gates are green on one final HEAD.
-
-### Phase 5 — Care / CRM Convergence
-
-**Why next:** Phase 3 already made Care part of the no-show/front-desk loop. The remaining legacy CRM surface is comparatively small but leaves patient acquisition and follow-up split between two architectures.
-
-**Goal:** make `/care` own the full patient-acquisition and follow-up loop.
+`Lead intake -> qualification/follow-up -> conversion to Patient -> recall / communication outcome / no-show recovery -> Patient 360 -> Today / Work`
 
 Scope:
 
 - lead intake and lead-to-patient conversion;
 - recall/follow-up queues and communication outcomes;
-- no-show recovery introduced in Phase 3;
-- move new CRM mutations/read models below route/workspace boundaries;
-- adapt resulting exceptions into Today/Work without duplicate state;
-- retire `/crm` to a compatibility adapter/redirect only after parity.
+- Phase-3 no-show recovery;
+- feature/server ownership for new CRM mutations/read models;
+- derived Today/Work signals without duplicate persistent task state;
+- compatibility retirement of `/crm` only after parity.
 
-Exit criteria: core lead/create/convert/follow-up workflows no longer require `DentalSuite` and CRM compatibility behavior remains covered.
+Exit criteria:
+
+- core lead/create/convert/follow-up workflows no longer require `DentalSuite` / legacy CRM rendering;
+- tenant/clinic, patient-source, consent, notification and action-permission rules stay server enforced;
+- `/crm` compatibility behavior is explicit and tested;
+- targeted Care/CRM conversion/follow-up/no-show smoke and Patient Access regressions pass on one final HEAD.
+
+Detailed work contract: GitHub issue #30.
 
 ### Phase 6 — Finance Surface Convergence
 
-**Why separate:** Finance/e-invoice is canonical, but legacy Billing is still one of the largest monoliths and carries the highest transaction/concurrency risk. It must not be mixed with Inventory/Reports cleanup.
+Converge legacy Billing and Accounting into `/operations/finance` without rewriting ledger semantics.
 
-**Goal:** make `/operations/finance` the complete management entry for collection, allocation, invoices, e-invoice and accounting-facing workflow without changing ledger semantics.
-
-Scope:
-
-- extract required legacy Billing UI/workflows into Finance features/read models/actions;
-- converge Accounting presentation/reporting that belongs to Finance;
-- preserve every Serializable transaction, reconciliation and permission invariant;
-- keep legacy `/billing` and `/accounting` as thin compatibility routes until parity;
-- remove duplicated navigation/read-model calculations rather than rewrite the ledger.
-
-Exit criteria:
-
-- primary Billing/Accounting workflows no longer render through `AppViewPage -> DentalSuite`;
-- `/billing` and `/accounting` are compatibility adapters/redirects only;
-- billing, billing-concurrency, finance/e-invoice, e-invoice-concurrency, tenant and data-integrity suites pass on one final HEAD.
+Exit requires those primary workflows to stop depending on `AppViewPage -> DentalSuite`, while billing, concurrency, reconciliation and E-invoice gates remain green.
 
 ### Phase 7 — Workforce Management Convergence
 
-**Why separate:** Phase 24 added canonical live earnings and employee self-service, but the legacy Staff/Payroll management panel still has substantial management functionality and payroll risk.
+Converge remaining Staff/Payroll management into Operations while preserving live earnings vs persisted PayrollRun separation, compensation attribution, source commission and management permissions.
 
-**Goal:** converge remaining staff management into `/operations` while keeping live earnings distinct from persisted payroll approval/payment semantics.
+### Phase 8 — Inventory & Reporting Operations
 
-Scope:
+Move Inventory and Reports into Operations while preserving stock/material effects, clinic scope, role boundaries and data integrity.
 
-- migrate remaining staff directory/scheduling/attendance/leave/payroll management workflows that belong in Operations;
-- preserve compensation/source-commission attribution and PayrollRun semantics;
-- keep `/employee-app` as the staff self-service context;
-- reduce `/staff` to a compatibility adapter/redirect after parity.
+### Phase 9 — Settings & Service Catalog
 
-Exit criteria: primary staff/payroll management no longer requires `DentalSuite`; staff-operations, tenant, action-permission, compensation/source-commission and payroll regression coverage stays green.
-
-### Phase 8 — Inventory and Reporting Operations
-
-**Goal:** complete the non-finance management surfaces inside canonical Operations without coupling them to Finance/Staff migrations.
-
-Scope:
-
-- migrate Inventory into Operations with existing stock, material-consumption and low-stock semantics;
-- migrate Reports into Operations using explicit read models rather than direct UI-to-legacy-module composition;
-- preserve role/clinic scope and Treatment Progress material effects;
-- retire `/inventory` and `/reports` to compatibility adapters/redirects after parity.
-
-Exit criteria: Inventory/Reports primary workflows no longer use `AppViewPage -> DentalSuite`; inventory/treatment/data-integrity/browser gates pass.
-
-### Phase 9 — Settings and Service Catalog
-
-**Goal:** make Settings the native canonical home for configuration before migrating secondary clinical-support tools.
-
-Scope:
-
-- rebuild `/settings` as a native workspace for clinic configuration, roles, templates, integrations and audit;
-- converge `/services` into Settings/service-catalog configuration;
-- preserve owner/role safety, compensation policies and service-step semantics;
-- avoid schema churn that exists only to support navigation cleanup.
-
-Exit criteria: Settings/Services primary workflows no longer require `DentalSuite`; role, tenant, action-permission and service/treatment regressions remain green.
+Rebuild Settings natively for clinic configuration, roles, services/catalog, compensation policies, templates, integrations and audit. Converge `/services` only with treatment-step compatibility proven.
 
 ### Phase 10 — Clinical Support Convergence
 
-**Goal:** move patient-context support tools to the workflow where clinicians use them rather than keep module-first standalone experiences.
-
-Scope:
-
-- integrate Forms/consent into Patient 360 context;
-- integrate Pharmacy/prescription workflow into Patient 360/clinical context while preserving inventory/medication safety semantics;
-- keep `/forms` and `/pharmacy` as compatibility routes until parity;
-- avoid duplicating patient context or authorization checks.
-
-Exit criteria: Forms/Pharmacy primary patient workflows no longer require `DentalSuite`; clinical, files, tenant, role and medication/inventory regressions pass.
+Move Forms/consent and Pharmacy/prescription workflows into Patient 360/clinical context while keeping standalone compatibility routes until parity. Phase 4 already makes their patient state visible in the longitudinal timeline; Phase 10 migrates their primary workflows.
 
 ### Phase 11 — Patient Portal / External Experience
 
-**Goal:** redesign the patient-facing application only after the staff core and patient support context are stable.
-
-Scope:
-
-- future appointments/self-service actions;
-- treatment-plan actions;
-- open invoice/balance context;
-- consent/forms/files/notification experience;
-- strict `portalUserId` authorization and terminal-state transition rules.
-
-Exit criteria: `/patient-app` is independent of `AppViewPage/DentalSuite` and all portal isolation/security tests pass.
+Rebuild `/patient-app` after staff core stabilizes. Preserve strict `portalUserId` patient-self authorization, terminal-state rules, protected files and consent boundaries.
 
 ### Phase 12 — Legacy Shell Extinction and Architecture Freeze
 
-**Goal:** finish the migration rather than carrying two architectures indefinitely.
-
-Scope:
-
-- remove the last protected-route dependencies on `AppViewPage` and `DentalSuite`;
-- retire compatibility islands in `src/modules/**` once their behavior is owned by stable features/workspaces;
-- split large legacy/global styling only where ownership is clear;
-- make migrated-route architecture delegation strict/blocking in CI;
-- remove obsolete compatibility-route QA only together with reviewed redirect/removal behavior.
+Remove the last protected-route dependencies on `AppViewPage` / `DentalSuite`, retire extracted compatibility islands and make strict route architecture delegation blocking in CI.
 
 Exit criteria:
 
-- no protected staff workflow route imports or renders `AppViewPage` / `DentalSuite`;
-- no new product behavior is implemented in frozen legacy modules;
+- no protected staff workflow route imports/renders `AppViewPage` / `DentalSuite`;
+- no new product behavior lives in frozen legacy modules;
 - strict architecture audit passes on every canonical workspace route;
 - full CI and Docker build are green.
 
 ### Phase 13 — Productization, Knowledge and Public Surface
 
-Only after the staff architecture is stable:
+Only after staff architecture stabilizes:
 
-- recreate public landing/product storytelling from current `main` rather than transplanting stale design branches;
+- recreate public product storytelling from current `main`, not stale design branches;
 - decide Learning/Community/Knowledge/RAG direction;
 - improve release notes, upgrade compatibility and support intake;
 - expand community beta/self-host validation.
-
-These are productization tasks, not reasons to postpone removal of known staff-core architecture debt.
 
 ## Parallel maintenance lane
 
 Maintenance is not a numbered architecture phase:
 
-- dependency updates (`Dependabot` PRs) should be rebased/reviewed separately and run through the same safety gates;
+- dependency updates should be rebased/reviewed separately and pass the same safety gates;
 - critical security fixes may preempt any phase;
 - backup/restore, Windows/Linux/NAS and deployment work follow `OPERATIONS.md`;
-- public landing experiments should not be merged from branches based on the pre-Phase-3 product tree.
+- public landing experiments should not transplant branches based on an obsolete app tree.
 
 ## Agent decision rules
 
 When a task is ambiguous:
 
 1. Protect production/security/data invariants first.
-2. If it is architecture/refactor work and no phase is specified, continue **Phase 4**.
+2. If it is architecture/refactor work and no phase is specified, continue **Phase 5 / issue #30**.
 3. Extract behavior from legacy code; do not rewrite stable business logic merely to change folders.
-4. Do not create a new primary workspace unless the product architecture is explicitly changed.
+4. Do not create a new primary workspace unless product architecture is explicitly changed.
 5. Do not retire a compatibility route until canonical parity and QA evidence exist.
-6. Do not weaken a test to make a migration pass. Fix the implementation or the test harness without weakening production behavior.
-7. Update this file when the current phase, canonical route, or invariant changes.
+6. Do not weaken production behavior or a safety test to make a migration pass; fix implementation or isolate the test harness.
+7. Update this file when the current phase, canonical route, invariant or next-phase decision changes.
 
 ## Project-level Definition of Done for a phase
 
-A phase is complete only when one final HEAD satisfies its contract and the applicable full verification chain: architecture/type/build, security and tenant isolation, high-risk domain regressions, route/browser QA, targeted end-to-end smoke, and Docker/release checks required by `QA_PLAYBOOK.md`.
+A phase is complete only when one final HEAD satisfies its contract and applicable full verification chain:
 
-After merge, update active context so the next agent starts from the new `main`, not from the completed branch.
+- encoding, TypeScript, architecture audit and production build;
+- route/health smoke;
+- security, tenant isolation, action permissions, protected patient files and data integrity;
+- billing/concurrency or other high-risk domain gates where applicable;
+- desktop/mobile Browser QA;
+- targeted workflow regression smoke for the phase plus adjacent established regressions;
+- Docker production image build;
+- diff audit confirms no accidental schema/domain/security redesign;
+- active context is refreshed on that same merge candidate.
+
+The loop is:
+
+`Understand -> goal -> execute -> audit -> fix -> audit -> merge -> refresh context`
