@@ -80,6 +80,7 @@ jobs:
           npm run test:smoke || { cat /tmp/codexdentist.log; exit 1; }
         env:
           NODE_ENV: test
+          SMOKE_ROUTES: "today,schedule,patients,journey,treatment,billing,accounting,services,staff,crm,inventory,pharmacy,forms,learning,employee-app,reports,community,patient-app,settings"
           SMOKE_MIGRATION_ROUTES: "/work,/schedule,/care,/patients/[patientId],/treatment,/patients/[patientId]/treatments/[treatmentServiceId],/operations,/operations/finance"
       - name: Runtime security, tenant, billing, and file tests
         run: |
