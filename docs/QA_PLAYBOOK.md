@@ -1,325 +1,196 @@
 # QA Playbook
 
-Last updated: 2026-08-24
+Last updated: 2026-08-21
 
-This file defines how architecture/refactor work is proven safe. The authoritative CI sequence is `.github/workflows/ci.yml`; this playbook explains which gates matter and when targeted coverage is required.
-
-## Core rule
-
-A refactor is not complete when the new page renders. It is complete only when **one final HEAD** passes the applicable architecture, security, tenant, high-risk domain, browser and workflow regression gates without weakening production behavior.
-
-Do not disable a test to make a migration pass. Fix the implementation or isolate the test harness while preserving the production contract.
-
-## Fast local check
+## Fast Check
 
 ```powershell
 npm run encoding:check
 npm run typecheck
-node scripts/agent-module-audit.mjs
-node scripts/patient-360-architecture-audit.mjs
 npm run test:security
 node scripts/agent-health-check.mjs
+node scripts/agent-module-audit.mjs
 ```
 
-Run targeted tests for the area being changed before starting the full gate.
+`agent-module-audit` hard-enforces dependency boundaries only for the new architecture directories (`src/shared`, `src/domains`, `src/features`, `src/workspaces`) and for new migration-route dependencies. Existing `src/components`, `src/modules`, and `src/lib` code remains migration territory rather than a retroactive boundary failure. Migration route pages that do not yet delegate to a workspace emit an advisory by default; use `ARCHITECTURE_AUDIT_STRICT_ROUTES=1` when Agent 0 is ready to make that route-shape check blocking.
 
-## Current canonical migration routes
-
-The current route contract in `scripts/qa-route-contract.mjs` is:
-
-```text
-/today
-/work
-/schedule
-/care
-/patients/[patientId]
-/treatment
-/patients/[patientId]/treatments/[treatmentServiceId]
-/operations
-/operations/finance
-/employee-app
-```
-
-`/patients` is canonical and is exercised by normal route/browser discovery and the Patient 360 workflow smoke.
-
-Compatibility behavior:
-
-- `/journey` and `/clinical` resolve authorized patient context into canonical Patient 360;
-- `/patient-management` must redirect to `/patients` and is tested by `patient-360-smoke.mjs`, not as a legacy 200-rendering route;
-- `/schedule/legacy` is deliberately legacy and must not be treated as a canonical migrated route.
-
-When running manually:
+## Route And Browser Checks
 
 ```powershell
-$env:SMOKE_MIGRATION_ROUTES = "/work,/schedule,/care,/patients/[patientId],/treatment,/patients/[patientId]/treatments/[treatmentServiceId],/operations,/operations/finance"
-$env:BROWSER_QA_MIGRATION_ROUTES = "/today,/work,/schedule,/care,/patients/[patientId],/treatment,/patients/[patientId]/treatments/[treatmentServiceId],/operations,/operations/finance,/employee-app"
+npm run test:seed-users
 npm run test:smoke
 npm run browser:qa
 ```
 
-Dynamic route ids are discovered from canonical links where possible; use documented QA patient/treatment-service env values only when discovery is unavailable.
+`browser:qa` checks desktop `1440x900` and mobile `390x844` for protected routes. Review failures for route errors, console/network errors, horizontal overflow, broken modal/form layout, technical copy, and mojibake.
 
-## Legacy compatibility route coverage
-
-Until a route is explicitly retired/redirected with parity evidence, keep smoke coverage for compatibility surfaces such as:
+Legacy route coverage stays mandatory during migration:
 
 ```text
 /dashboard
+/schedule
+/patients
 /journey
-/clinical
 /billing
 /accounting
 /services
 /staff
 /crm
-inventory
-pharmacy
-forms
-learning
-reports
-settings
-patient-app
+/inventory
+/pharmacy
+/forms
+/learning
+/reports
+/settings
 ```
 
-Retired routes should be covered by a targeted exact redirect assertion rather than left in a generic “must return 200” list. `/patient-management -> /patients` is the current example.
+Do not retire a legacy route gate until Agent 0 explicitly approves its redirect or removal.
 
-Do not remove a compatibility gate merely because a canonical workspace exists. Retirement is part of the phase contract that proves equivalent workflow, authorization and navigation behavior.
-
-## Current full CI contract
-
-Every PR runs the core verification chain. Pull requests additionally run Browser QA and workflow E2E smoke suites.
-
-### Build and architecture
-
-- `npm ci --include=dev --no-audit --no-fund`
-- `npm run encoding:check`
-- `npm run typecheck`
-- `node scripts/agent-module-audit.mjs`
-- `node scripts/patient-360-architecture-audit.mjs`
-- Prisma migrations + deterministic seed/test users
-- `npm run build`
-- production server health check
-- `node scripts/agent-health-check.mjs`
-- `npm run test:smoke`
-
-`patient-360-architecture-audit.mjs` is now a permanent regression boundary. It requires:
-
-- no `PatientJourneyPanel` dependency under `src/workspaces/patients/**`;
-- no Patient workspace import from app-route action modules;
-- `/patient-management` not to delegate to `AppViewPage` / `DentalSuite`;
-- Patient 360 feature action ownership to exist;
-- `PatientOdontogramEditor` to bind directly to Patient 360 feature actions rather than Journey route actions.
-
-### Security and data integrity
-
-- `npm run test:security`
-- `npm run test:security-runtime`
-- `npm run test:tenant`
-- `npm run test:billing`
-- `npm run test:billing-concurrency`
-- `npm run test:actions`
-- `npm run test:patient-files`
-- `npm run test:data-integrity`
-
-`action-permission-smoke.mjs` audits Patient 360 permission markers at their new feature ownership boundary, including patient create/update, file governance, treatment planning/progress, clinical note create/sign and odontogram update/revision/scope guards.
-
-### Browser and workflow regression
-
-On pull requests/scheduled/manual CI:
-
-- `npm run browser:qa`
-- `node scripts/clinical-execution-smoke.mjs`
-- `node scripts/patient-360-smoke.mjs`
-- `node scripts/staff-operations-smoke.mjs`
-- `node scripts/finance-einvoice-smoke.mjs`
-- `node scripts/einvoice-concurrency-smoke.mjs`
-- `node scripts/patient-access-smoke.mjs`
-
-The Phase 4 Patient 360 smoke proves real behavior through the production login UI and test database:
-
-1. a management-scoped actor creates and edits a patient through canonical `/patients`;
-2. persisted patient values are checked in the database;
-3. `/patient-management` is required to redirect to `/patients`;
-4. a clinical actor enters through `/journey` and `/clinical`, resolves to canonical `/patients/[patientId]`, creates an audited clinical note and timeline comment;
-5. a Billing actor can see authorized Patient 360 context but the clinical mutation action remains disabled;
-6. deterministic fixture patients, sessions, role assignments, memberships and audit/user fixtures are cleaned after the suite.
-
-Phase 4 smoke actors use isolated test-only users cloned from the seeded role/clinic/password-hash contract. They still authenticate through the real `/login` UI. The browser interaction uses the same proven sequential-email entry pattern as other role-heavy smoke suites. This isolates test harness state without weakening production authentication or rate limiting.
-
-Persistent login-rate-limit buckets may be cleared **only under `NODE_ENV=test`** between independent browser suites. Never weaken production auth/rate-limit behavior to fix CI collisions.
-
-### Packaging
-
-- `docker build -t codexdentist:ci .`
-
-A change affecting self-host packaging should also validate compose/install/backup/restore expectations from `OPERATIONS.md`.
-
-## General architecture migration gate
-
-`agent-module-audit` protects new architecture boundaries under `src/shared`, `src/domains`, `src/features`, `src/workspaces` and canonical migrated routes.
-
-Required properties:
-
-- shared is business-agnostic;
-- features do not depend upward on workspaces/app routes;
-- workspaces do not depend on app routes;
-- migrated routes/features/workspaces do not import `DentalSuite` or `AppViewPage`;
-- canonical route pages delegate to workspace-specific composition;
-- technical/database/demo diagnostic copy does not leak into workflow UI.
-
-Legacy `src/components`, `src/modules` and much of `src/lib` remain migration territory. Existing legacy behavior is not automatically an architecture failure, but **new dependencies into the legacy shell are failures**.
-
-During Phases 5-11, route-shape strictness may be enabled with:
+Migration routes are opt-in so a route can be prepared in QA before its implementation merges. Supported contracts are `/today`, `/work`, `/patients/[patientId]`, and `/operations/finance`. Enable only routes implemented by the PR under test:
 
 ```powershell
-$env:ARCHITECTURE_AUDIT_STRICT_ROUTES = "1"
-node scripts/agent-module-audit.mjs
+$env:SMOKE_MIGRATION_ROUTES = "today,work,patients/[patientId],operations/finance"
+$env:BROWSER_QA_MIGRATION_ROUTES = "today,work,patients/[patientId],operations/finance"
+npm run test:smoke
+npm run browser:qa
 ```
 
-Phase 12 exit criteria require strict route delegation to be blocking in CI.
+For `/patients/[patientId]`, the harness first tries to discover an existing patient detail link from `/patients`. If the UI does not expose one, set `$env:QA_PATIENT_ID = "<patient-id>"` (or the script-specific `SMOKE_PATIENT_ID` / `BROWSER_QA_PATIENT_ID`). Agent 0 should add the relevant migration route to these env gates in the route PR once that route exists; leaving an unimplemented route disabled must not fail `main`.
 
-## Gate matrix by change type
+## Migration PR Gates
 
-| Change type | Minimum targeted gates in addition to core build/architecture |
+Use existing scripts rather than inventing a parallel test framework. Minimum review matrix:
+
+| PR type | Required gates |
 | --- | --- |
-| Shared UI / shell / navigation | Browser QA desktop/mobile, smoke, security when auth/navigation visibility changes. |
-| Patient 360 / Journey / clinical | Patient 360 architecture audit + Patient 360 smoke + tenant/actions/patient-files + Browser QA + clinical execution + odontogram contract. |
-| Treatment progress | Clinical execution smoke, billing/data integrity, tenant/actions; compensation/inventory tests when those contracts change. |
-| Patient Access / Schedule / Care | Patient-access smoke, tenant/actions/security, browser QA; preserve transition/concurrency/resource checks. |
-| CRM / Care convergence | Patient Access + targeted lead/convert/follow-up/no-show smoke, tenant/actions/security, source/consent/notification checks. |
-| Billing / Finance / E-invoice | Billing + billing concurrency + data integrity + finance/e-invoice + e-invoice concurrency smoke. |
-| Staff / earnings / payroll | Staff-operations smoke, tenant/actions, source-commission/compensation tests when affected. |
-| Inventory / reports | Inventory/treatment material effects, tenant/role scope, data integrity and browser QA. |
-| Settings / roles / clinics / service catalog | Roles/actions/tenant/security; verify equal-or-higher role protections, owner preservation and treatment-step compatibility. |
-| Forms / pharmacy / prescriptions | Patient/clinical scope, files where applicable, tenant/actions, medication/inventory regressions and browser QA. |
-| Patient Portal | Security/tenant/actions plus patient-self isolation and terminal-state transitions. |
-| Public/self-host/deploy | Docker, host routing, demo behavior and `OPERATIONS.md` packaging/readiness checks. |
+| Shared UI / primitives | `encoding:check`, `typecheck`, `build`, `agent-module-audit`; add `browser:qa` when globals, shell layout, responsive behavior, or shared interaction primitives change. |
+| Route / AppShell / workspace | `encoding:check`, `typecheck`, `build`, `agent-module-audit`, `test:smoke`, `browser:qa`, `test:security`; enable the PR's migration route contract in smoke/browser QA. |
+| Permission / tenant boundary | `test:roles`, `test:actions`, `test:tenant`, `test:security`, plus affected smoke/browser coverage. |
+| Billing-affecting | `test:billing`, `test:billing-concurrency`, `test:data-integrity`, `test:security`; add tenant/browser checks when route or scoping behavior changes. |
+| Patient files / Patient 360 / Journey | `test:patient-files`, `test:tenant`, `test:security`, Journey integration and odontogram checks below, plus `browser:qa` on desktop/mobile. |
+| Treatment compensation / progress | `test:compensation`, `test:data-integrity`, `test:tenant`, affected Journey/odontogram checks. |
 
-## Permanent Patient 360 regression contract
+A frontend refactor must never disable, bypass, or weaken `test:security`, `test:tenant`, `test:billing`, `test:billing-concurrency`, `test:patient-files`, `test:data-integrity`, `test:roles`, `test:compensation`, or the Journey/odontogram checks. If a migration appears to require suppressing one of these gates, treat that as an architectural red flag and escalate to Agent 0 instead of merging around it.
 
-Phase 4 is complete, so these checks are now regression constraints rather than temporary migration notes.
+## Targeted Checks
 
-At minimum preserve:
+Use when touching the relevant area:
 
-1. Patient directory search and canonical patient links.
-2. Patient create/edit remains tenant/clinic scoped under canonical Patients.
-3. Consent and lead-source governance retain server-side permission/audit behavior.
-4. `/patients/[patientId]`, `/journey` and `/clinical` resolve the same authorized patient context during compatibility.
-5. `/patient-management` redirects to `/patients`.
-6. Finalized timeline events remain derived, chronological and scoped; unfinished clinical notes do not silently become finalized history.
-7. Clinical exam/plan actions preserve permission, audit and signing/amendment semantics.
-8. Odontogram stages, revisions, reset/copy behavior and treatment-target isolation remain intact.
-9. Protected files/forms/prescriptions/pharmacy and authorized financial context serialize only for permitted roles.
-10. Billing/Front Desk cannot gain clinical mutation affordances through composition.
-11. Mobile `390x844` and small-screen clinical dialogs do not horizontally overflow.
-12. `src/workspaces/patients/**` must never regain a `PatientJourneyPanel` or app-route-action dependency.
-13. `PatientOdontogramEditor` must not regain a Journey route-action dependency.
+```powershell
+npm run test:billing
+npm run test:billing-concurrency
+npm run test:compensation
+npm run test:roles
+npm run test:actions
+npm run test:hardening
+npm run test:tenant
+npm run test:patient-files
+npm run test:pilot-workflows
+npm run test:data-integrity
+npm run test:source-commission
+npm run readiness:check
+```
 
-## High-risk invariant checks
+Full pilot gate:
 
-### Tenant and permissions
+```powershell
+npm run pilot:qa
+```
 
-Preserve negative tests:
+## Public And Self-Host Checks
 
-- Org A cannot list/read/edit Org B patients, invoices, payments or files.
-- Tenant subdomain cannot authenticate/reset another tenant's user.
-- Clinic-scoped users cannot access records outside allowed clinics.
-- Every protected mutation re-checks action permission and scopes the target server-side.
-- Patient self-scope uses `portalUserId`, never email.
+- `/` shows the product site on the root domain and redirects tenant/app hosts to the application.
+- `/features` presents the feature guide and links to the public demo and installation docs.
+- `/docs` renders a Windows-first beginner flow with official download sources, expected results, LAN/firewall setup, backup, restore, update, troubleshooting, and security guidance.
+- `https://demo.codexdentist.com/` creates an isolated expiring organization, signs in, and displays the expiry banner; `/demo` on that host redirects to `/`.
+- `https://odontogram.codexdentist.com/` keeps the root URL; displays `Hiện trạng ban đầu` -> `Tình trạng hiện tại` -> `Kết quả kỳ vọng`; persists each stage independently in browser local storage; migrates an existing single snapshot into the initial/current stages; switches between 32 permanent and 20 primary FDI teeth; renders every generated anatomical SVG asset without fallback or distortion; exposes five surfaces through keyboard controls; shows M/D/B/L/O-I inside the large surface map without a duplicate list; limits surface colors to `Sâu răng`, `Mối hàn`, and `Inlay / Onlay`; keeps crown/root clicks as target selection without painting the tooth; renders the black caries clinical marker against the selected crown/root contour; supports compatible simultaneous clinical symbols per tooth; retains the bone/gum block for missing teeth; lowers that block when bone loss is added; labels the whole-mouth control `Đánh giá tổng quát`; persists gingiva, calculus, plaque, oral-hygiene, occlusion, arch findings, and notes for the appropriate scope; keeps tooth marks isolated by dentition; and has no horizontal overflow at `390x844`.
+- Odontogram structural-state checks: marking a tooth missing removes its artwork and clears/disables its five surfaces; marking an implant replaces the tooth artwork and clears/disables surfaces; selecting a conflicting state removes the old state; one undo restores the complete pre-action tooth state.
+- Odontogram anatomy check: crown/root zones are clicked directly on the current tooth artwork without rendering a second tooth image; fill, hover target, selection target, and outline must use the exact source contour and matching SVG viewBox for incisor, canine, premolar, molar, and the dedicated primary-tooth artwork. Selecting a zone records the active clinical target: root selection enables root-canal, periapical, fracture, and whole-tooth actions but disables crown-only actions; crown selection enables crown, fracture, and whole-tooth actions but disables root-only actions. Root versus crown fracture must render in the selected region and survive reload. Missing teeth and implants clear/disable both zones, and one undo restores the previous anatomy and target state.
+- Odontogram data-model check: every saved snapshot is `version: 2` with bounded entries that separate concept, status, and target. A valid `version: 1` snapshot migrates without visible loss, invalid tooth/surface/region/span targets are rejected server-side, duplicate entry ids are rejected, and structurally valid unknown entries survive normalization and subsequent chart edits.
+- Odontogram prosthetic check: an implant and its crown can be selected together in either order, both artwork layers remain visible, and removing either state preserves the other.
+- Odontogram multi-select is always active and has no separate mode control. The initial state may contain no selected tooth. Clicking another tooth adds it, clicking a selected tooth removes it, and clicking the last selected tooth returns to an empty selection. Tooth-specific clinical markers and bridges stay disabled while selection is empty; clicking a tooth surface or anatomy region directly selects that tooth before applying the mark. Editing one surface preserves the selected group. A clinical marker must apply or remove atomically across all selected teeth, show a mixed state when only some selected teeth carry it, and undo as one action. The bridge control stays disabled for fewer than two teeth and invalid cross-arch or non-contiguous selections; a valid bridge persists, exports, renders across natural, implant, and pontic units, and can be removed without changing individual tooth markers.
+- Journey odontogram stage check: the control order is `Hiện trạng ban đầu` -> `Tình trạng hiện tại` -> `Kết quả kỳ vọng`; a new patient starts at `INITIAL`, and the later stages unlock after the first save. `CURRENT` initially displays the initial state as a working base, while `EXPECTED` displays its saved state or the current state. The copy action is explicit and never changes the source stage.
+- Journey odontogram persistence check: edit one distinguishable condition in each stage, wait for autosave, refresh, and verify all three snapshots remain different. Only the edited stage revision may increment; stale revision writes conflict rather than overwrite. Existing pre-migration charts must appear unchanged in both `INITIAL` and `CURRENT`, with `EXPECTED` empty. Select at least two teeth and verify `Bỏ chọn tất cả` changes no clinical data; `Xóa trạng thái` requires confirmation and removes every entry for the selected teeth plus intersecting bridges. Verify `Xóa mốc đang mở` changes only that stage, `Xóa cả 3 mốc` clears all stages, and both operations remain cleared after refresh.
+- Journey odontogram integration check: selecting teeth updates temporary treatment targets without changing clinical marks or stage snapshots. The tooth/arch selection summary, diagnosis, service catalog, and add-service action stay directly below both arches inside the chart column. Switching stages clears the temporary tooth selection but does not collapse the planner. Creating treatment services may clear `PatientJourneyState.odontogramTeeth` but must not alter any `PatientOdontogram` stage or its revision history.
+- Journey odontogram permission/isolation check: clinical roles can edit, front desk and billing are read-only, and an inaccessible clinic patient cannot read or write any stage.
+- Odontogram general-assessment dialog check: at desktop, tablet, `390x844`, and `320x568`, the dialog stays inside the viewport without horizontal scrolling; long labels wrap and tall content scrolls vertically.
+- Journey treatment-progress dialog check: long service names and step transitions wrap without squeezing the title or creating horizontal scrolling; form controls and actions remain inside the viewport at desktop, `390x844`, and `320x568`, with vertical scrolling only when needed.
+- Journey clinical-plan check: `Thông tin hành chính` and `Khám và kế hoạch điều trị` share the top two-column layout on desktop. The clinical panel has no repeated section heading and ends with one `Thêm vào timeline` button. Submitting atomically creates one finalized exam event with prognosis and a goal/plan snapshot, updates the current journey goal/plan, and writes both audit records.
+- Journey timeline check: finalized events remain chronological ascending and are grouped by Viet Nam calendar day; compact rows show time/type/title/status and reveal detail only when expanded. Unlocked clinical notes appear only in `Ghi chú chưa hoàn tất`; completing one requires confirmation, returns to the same patient, and moves it into the finalized timeline.
+- Demo sessions stop working after expiry; cleanup removes only expired demo organizations.
+- Demo mode blocks patient-file uploads and outbound notification delivery.
+- A clean `docker build` succeeds without a local `.env` or database.
+- A fresh self-host stack applies migrations, exposes `/setup`, creates the first owner, then locks `/setup`.
+- `doctor` reports health and LAN addresses; `backup` produces a valid PostgreSQL custom dump and patient-file archive.
 
-### Billing / Finance / E-invoice
+Self-host packaging gate:
 
-Verify:
+```powershell
+docker compose --env-file .env.selfhost.example -f compose.selfhost.yml config --quiet
+docker build -t codexdentist:qa .
+```
 
-- concurrent receipt/allocation/invoice flows do not overpay or over-allocate;
-- partial invoices remain distinct and reconcile to service value;
-- void/refund requires role, reason and audit;
-- external E-invoice state is auditable and fail-closed without a provider;
-- concurrent issue/reconciliation cannot create duplicate provider claims or shared external references;
-- Work finance exceptions are derived and clear only after real reconciliation.
+## Security And Isolation Checklist
 
-### Patient Access / Care
+- Login and password reset use both network and account/token rate limits; spoofed proxy headers do not reset the account/token bucket.
+- Credential notifications never store raw setup/reset URLs and never appear in the shared task inbox.
+- Staff-management actions reject targets with an equal or higher effective role and preserve at least one active owner.
+- CSV exports neutralize spreadsheet formula prefixes.
+- `npm run test:security-runtime` verifies manager/owner hierarchy, credential-notification isolation, and atomic single-use password reset.
+- Session cookie is `httpOnly`; production uses secure cookies.
+- Demo auth/fallback is disabled in production.
+- Every protected route uses session/view checks.
+- Every mutation enforces action-level permission server-side.
+- Every mutation fetches target resource by tenant scope before writing.
+- Export routes check role and resource access.
+- Patient portal is scoped only by `portalUserId`, never email; appointment and treatment-plan state transitions reject terminal/source-invalid records.
+- Billing concurrency tests preserve both receipts without overpaying or over-allocating an invoice; ledger constraints and tenant-scope triggers are installed.
+- Uploads enforce size, MIME, extension, storage, and unsafe scan status rules.
+- Upload content signatures match declared image/PDF/video/Office types before storage.
+- Production readiness rejects requests without `JOB_SECRET`.
+- Unsupported HTTP methods and untrusted Host headers are rejected before route handling.
+- Login throttling persists across application restarts.
+- Billing void/refund requires role, reason, and audit.
 
-Verify:
+Tenant negative tests to preserve:
 
-- confirmation -> arrival -> in-chair -> completion releases resources correctly;
-- incompatible concurrent transitions serialize;
-- final states cannot be reopened/regressed;
-- cross-clinic patient/provider/chair references are rejected;
-- no-show creates Care/Work attention and clears only after a persisted follow-up outcome;
-- concurrent recovery is idempotent;
-- Billing cannot access Patient Access mutation surfaces.
+- Org A cannot list/edit Org B patients, invoices, payments, or files.
+- Tenant subdomain cannot authenticate a user from another tenant.
+- Patient account cannot access another patient, including a patient in the same organization with the same email.
+- Patient-file tests cover another organization, inaccessible clinic, `QUARANTINED`, and `INFECTED`.
 
-Phase 5 CRM convergence must not bypass these rules when adding lead/follow-up behavior to Care.
+## Browser Manual Targets
 
-### Treatment / staff economics
+Minimum protected routes:
 
-Verify:
+```text
+/dashboard
+/schedule
+/patients
+/journey
+/billing
+/accounting
+/services
+/staff
+/crm
+/inventory
+/pharmacy
+/forms
+/learning
+/employee-app
+/reports
+/settings
+```
 
-- treatment progress cannot regress;
-- participant validation and compensation event attribution remain correct;
-- material consumption/low-stock behavior remains tied to real progress;
-- unresolved referral beneficiary becomes a management Work signal rather than guessed attribution;
-- live earnings are not presented as approved/paid payroll.
+Core manual workflow:
 
-### Protected files
-
-Verify another organization, inaccessible clinic, patient-self mismatch and unsafe/quarantined/infected states. Content type/extension/signature validation must remain enforced before storage/serving.
-
-## Odontogram / clinical contract
-
-The implementation may be refactored, but these behaviors are invariant:
-
-- standard FDI mapping for permanent and primary teeth;
-- `INITIAL`, `CURRENT`, `EXPECTED` are independent stages with revision/history semantics;
-- legacy snapshot migration preserves visible data;
-- stale revisions conflict rather than overwrite;
-- switching stages only clears temporary treatment-target selection, not clinical entries;
-- treatment service creation may clear temporary targets but must not mutate any clinical-stage snapshot;
-- crown/root/surface targets preserve clinical meaning;
-- missing/implant/prosthetic/bridge states remain structurally valid and undoable;
-- multi-tooth selection can be empty, applies grouped clinical actions atomically, and validates bridge span/arch rules;
-- clinical roles edit; Front Desk/Billing remain read-only; inaccessible-clinic patients cannot read/write stages.
-
-## Browser QA expectations
-
-Browser QA covers desktop `1440x900` and mobile `390x844` and should fail/review for:
-
-- route/server errors;
-- console/network failures caused by the page;
-- horizontal overflow;
-- broken modal/form layout;
-- inaccessible primary controls or missing focus behavior;
-- raw enum/technical copy/mojibake;
-- canonical links that point back into retired module navigation.
-
-A visual refactor does not justify suppressing a behavioral/browser finding.
-
-## Public and self-host checks
-
-When relevant preserve:
-
-- root/docs/demo/odontogram hostname routing;
-- demo organization expiry/isolation and no patient-file upload/outbound notification;
-- production health/readiness secret boundaries;
-- clean Docker build without local `.env` or database;
-- fresh self-host setup creates first owner then locks setup;
-- backup produces a valid PostgreSQL dump plus patient-file archive;
-- restore/upgrade work follows `OPERATIONS.md`.
-
-## Definition of Done
-
-Before merging a refactor phase:
-
-1. Define the phase contract and exit criteria in active context.
-2. Run targeted gates while implementing.
-3. Run the complete applicable CI chain on one final HEAD.
-4. Audit diff for accidental domain/schema/security changes.
-5. Fix findings and repeat until green.
-6. Merge only after canonical/compatibility behavior is explicit.
-7. Refresh `PROJECT_CONTEXT.md`, `PRODUCT_ARCHITECTURE.md`, this playbook and `AGENTS.md` when the merge changes what the next agent should believe.
-8. Re-run the full CI on the final **code + context** HEAD.
-
-The correct loop is:
-
-`Understand -> goal -> execute -> audit -> fix -> audit -> merge -> refresh context`
+1. Create patient.
+2. Book appointment.
+3. Open Journey.
+4. Save clinical note.
+5. Create treatment service from odontogram/catalog.
+6. Record progress.
+7. Record patient payment and allocate to service.
+8. Issue invoice.
+9. Upload/open protected patient file.
+10. Verify Dashboard task signals where applicable.

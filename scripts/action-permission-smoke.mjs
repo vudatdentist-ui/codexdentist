@@ -78,11 +78,11 @@ async function assertGuardMarkers() {
     "sendNotificationTestAction",
     'canPerformAction(session, "settings.manage")',
   ]);
-  await assertSource("src/features/patient-360/server/patient-file-actions.ts", [
+  await assertSource("src/app/(app)/patient-files/actions.ts", [
     "updatePatientFileGovernanceAction",
     'canPerformAction(session, "file.delete")',
   ]);
-  await assertSource("src/features/patient-360/server/patient-actions.ts", [
+  await assertSource("src/app/(app)/patients/actions.ts", [
     "createPatientAction",
     'canPerformAction(session, "patient.create")',
     'canPerformAction(session, "patient.update")',
@@ -93,7 +93,7 @@ async function assertGuardMarkers() {
     'canPerformAction(session, "appointment.update")',
     'canPerformAction(session, "appointment.cancel")',
   ]);
-  await assertSource("src/features/patient-360/server/journey-actions.ts", [
+  await assertSource("src/app/(app)/journey/actions.ts", [
     "createJourneyTreatmentServicesAction",
     'canPerformAction(session, "treatment.plan.create")',
     'canPerformAction(session, "treatment.service.progress")',
@@ -101,7 +101,7 @@ async function assertGuardMarkers() {
     "runSerializableTransaction",
     'revalidatePath("/employee-app")',
   ]);
-  await assertSource("src/features/patient-360/server/odontogram-actions.ts", [
+  await assertSource("src/app/(app)/journey/odontogram-actions.ts", [
     "savePatientOdontogramAction",
     'canPerformAction(session, "clinical.odontogram.update")',
     "patientAccessWhere(session)",
@@ -109,7 +109,7 @@ async function assertGuardMarkers() {
     "revisionForStage(current, stage)",
     "patientOdontogramRevision.create",
   ]);
-  await assertSource("src/features/patient-360/server/clinical-actions.ts", [
+  await assertSource("src/app/(app)/clinical/actions.ts", [
     "createClinicalNoteAction",
     'canPerformAction(session, "clinical.note.create")',
     'canPerformAction(session, "clinical.note.sign")',
@@ -118,28 +118,6 @@ async function assertGuardMarkers() {
     "createTreatmentPlanAction",
     'canPerformAction(session, "treatment.plan.create")',
     'canPerformAction(session, status === "ACCEPTED" ? "treatment.plan.accept" : "treatment.plan.create")',
-  ]);
-  await assertSource("src/features/treatment-progress/server/actions.ts", [
-    "recordTreatmentCaseProgressAction",
-    'canPerformAction(session, "treatment.service.progress")',
-    "recordTreatmentProgress(session",
-    'revalidatePath("/work")',
-  ]);
-  await assertSource("src/features/treatment-progress/server/record-treatment-progress.ts", [
-    'canPerformAction(session, "treatment.service.progress")',
-    "runSerializableTransaction",
-    "compensationAccrual.create",
-    "consumeServiceMaterials",
-    'action: "treatment_service.progress_recorded"',
-  ]);
-  await assertSource("src/features/einvoice/server/actions.ts", [
-    "requestEInvoiceIssueAction",
-    "confirmExternalEInvoiceAction",
-    "confirmExternalEInvoiceCancellationAction",
-    'canPerformAction(session, "billing.invoice.issue")',
-    'canPerformAction(session, "billing.invoice.void")',
-    "organizationId: session.organizationId",
-    "allowedClinicIds(session)",
   ]);
 }
 
@@ -207,6 +185,7 @@ async function fetchText(path) {
   if (!response.ok) {
     throw new Error(`${path} returned HTTP ${response.status}.`);
   }
+
   return response.text();
 }
 

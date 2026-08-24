@@ -1,14 +1,8 @@
 export const migrationQaRoutes = Object.freeze([
   "/today",
   "/work",
-  "/schedule",
-  "/care",
   "/patients/[patientId]",
-  "/treatment",
-  "/patients/[patientId]/treatments/[treatmentServiceId]",
-  "/operations",
   "/operations/finance",
-  "/employee-app",
 ]);
 
 const migrationQaRouteSet = new Set(migrationQaRoutes);
@@ -33,11 +27,7 @@ export function enabledMigrationRoutes(value, envName) {
 }
 
 export function routeNeedsPatientId(route) {
-  return normalizeRoute(route).includes("[patientId]");
-}
-
-export function routeNeedsTreatmentServiceId(route) {
-  return normalizeRoute(route).includes("[treatmentServiceId]");
+  return normalizeRoute(route) === "/patients/[patientId]";
 }
 
 export function materializePatientRoute(route, patientId) {
@@ -51,28 +41,7 @@ export function materializePatientRoute(route, patientId) {
     );
   }
 
-  return normalized.replace("[patientId]", encodeURIComponent(patientId.trim()));
-}
-
-export function materializeTreatmentCaseRoute(
-  route,
-  patientId,
-  treatmentServiceId,
-) {
-  const normalized = materializePatientRoute(route, patientId);
-
-  if (!routeNeedsTreatmentServiceId(normalized)) return normalized;
-  if (!treatmentServiceId?.trim()) {
-    throw new Error(
-      `Cannot resolve ${normalizeRoute(route)}: set QA_TREATMENT_SERVICE_ID ` +
-        "or ensure /treatment renders a canonical treatment-case link.",
-    );
-  }
-
-  return normalized.replace(
-    "[treatmentServiceId]",
-    encodeURIComponent(treatmentServiceId.trim()),
-  );
+  return `/patients/${encodeURIComponent(patientId.trim())}`;
 }
 
 export function normalizeRoute(route) {

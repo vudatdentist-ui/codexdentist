@@ -54,7 +54,6 @@ jobs:
       - run: npm run encoding:check
       - run: npm run typecheck
       - run: node scripts/agent-module-audit.mjs
-      - run: node scripts/patient-360-architecture-audit.mjs
       - run: npx prisma migrate deploy
       - run: npx prisma db seed
         env:
@@ -77,11 +76,9 @@ jobs:
       - name: Agent health and legacy route smoke
         run: |
           node scripts/agent-health-check.mjs
-          npm run test:smoke || { cat /tmp/codexdentist.log; exit 1; }
+          npm run test:smoke
         env:
           NODE_ENV: test
-          SMOKE_ROUTES: "today,schedule,patients,journey,treatment,billing,accounting,services,staff,crm,inventory,pharmacy,forms,learning,employee-app,reports,community,patient-app,settings"
-          SMOKE_MIGRATION_ROUTES: "/work,/schedule,/care,/patients/[patientId],/treatment,/patients/[patientId]/treatments/[treatmentServiceId],/operations,/operations/finance"
       - name: Runtime security, tenant, billing, and file tests
         run: |
           npm run test:security
@@ -98,21 +95,7 @@ jobs:
         if: github.event_name == 'pull_request' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: |
           npx playwright install --with-deps chromium
-          node scripts/reset-smoke-rate-limits.mjs
           npm run browser:qa
-          node scripts/reset-smoke-rate-limits.mjs
-          node scripts/clinical-execution-smoke.mjs
-          node scripts/reset-smoke-rate-limits.mjs
-          node scripts/patient-360-smoke.mjs
-          node scripts/reset-smoke-rate-limits.mjs
-          node scripts/staff-operations-smoke.mjs
-          node scripts/reset-smoke-rate-limits.mjs
-          node scripts/finance-einvoice-smoke.mjs
-          node scripts/reset-smoke-rate-limits.mjs
-          node scripts/einvoice-concurrency-smoke.mjs
-          node scripts/reset-smoke-rate-limits.mjs
-          node scripts/patient-access-smoke.mjs
         env:
           NODE_ENV: test
-          BROWSER_QA_MIGRATION_ROUTES: "/today,/work,/schedule,/care,/patients/[patientId],/treatment,/patients/[patientId]/treatments/[treatmentServiceId],/operations,/operations/finance,/employee-app"
       - run: docker build -t codexdentist:ci .

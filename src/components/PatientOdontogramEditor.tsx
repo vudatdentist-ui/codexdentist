@@ -16,7 +16,7 @@ import {
 import {
   resetPatientOdontogramStagesAction,
   savePatientOdontogramAction,
-} from "@/features/patient-360/server/odontogram-actions";
+} from "@/app/(app)/journey/odontogram-actions";
 import type { Language } from "@/components/AppLanguage";
 import {
   odontogramStages,
@@ -777,7 +777,7 @@ function differenceLabel(
   if (language === "vi") {
     return `${teeth.length} răng thay đổi: ${toothList}${
       remaining > 0 ? ` và ${remaining} răng khác` : ""
-    }${archChanged ? " · Có thay đổi đánh giá tổng quát" : ""}`;
+  }${archChanged ? " · Có thay đổi đánh giá tổng quát" : ""}`;
   }
   return `${teeth.length} changed teeth: ${toothList}${
     remaining > 0 ? ` and ${remaining} more` : ""

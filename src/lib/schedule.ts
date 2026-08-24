@@ -93,9 +93,6 @@ export async function getScheduleWorkspace(
         prisma.patient.findMany({
           where: {
             organizationId: session.organizationId,
-            clinicId: {
-              in: clinicIds,
-            },
             ...(options.patientId ? { id: options.patientId } : {}),
           },
           select: {

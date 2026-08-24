@@ -33,7 +33,7 @@ export type ViewKey =
   | "settings";
 
 export const viewRoutes: Record<ViewKey, string> = {
-  dashboard: "/today",
+  dashboard: "/dashboard",
   schedule: "/schedule",
   patients: "/patients",
   journey: "/journey",
@@ -78,15 +78,7 @@ const rolePriority: AppRole[] = [
 ];
 
 const viewAccess: Record<ViewKey, AppRole[]> = {
-  dashboard: [
-    "OWNER",
-    "AREA_MANAGER",
-    "CLINIC_MANAGER",
-    "DENTIST",
-    "HYGIENIST",
-    "FRONT_DESK",
-    "BILLING",
-  ],
+  dashboard: ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],
   schedule: ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST", "FRONT_DESK"],
   patients: ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST", "FRONT_DESK", "BILLING"],
   journey: ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST", "FRONT_DESK", "BILLING"],
