@@ -79,7 +79,7 @@ jobs:
           npm run test:smoke
         env:
           NODE_ENV: test
-          SMOKE_MIGRATION_ROUTES: "/work,/patients/[patientId],/treatment,/patients/[patientId]/treatments/[treatmentServiceId]"
+          SMOKE_MIGRATION_ROUTES: "/work,/patients/[patientId],/treatment,/patients/[patientId]/treatments/[treatmentServiceId],/operations"
       - name: Runtime security, tenant, billing, and file tests
         run: |
           npm run test:security
@@ -98,7 +98,8 @@ jobs:
           npx playwright install --with-deps chromium
           npm run browser:qa
           node scripts/clinical-execution-smoke.mjs
+          node scripts/staff-operations-smoke.mjs
         env:
           NODE_ENV: test
-          BROWSER_QA_MIGRATION_ROUTES: "/today,/work,/patients/[patientId],/treatment,/patients/[patientId]/treatments/[treatmentServiceId]"
+          BROWSER_QA_MIGRATION_ROUTES: "/today,/work,/patients/[patientId],/treatment,/patients/[patientId]/treatments/[treatmentServiceId],/operations,/employee-app"
       - run: docker build -t codexdentist:ci .

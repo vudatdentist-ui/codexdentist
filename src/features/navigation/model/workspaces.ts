@@ -64,7 +64,7 @@ export const productWorkspaces: ProductWorkspace[] = [
   {
     key: "operations",
     label: "Vận hành",
-    href: "/reports",
+    href: "/operations",
     permissionView: "reports",
     group: "system",
   },
