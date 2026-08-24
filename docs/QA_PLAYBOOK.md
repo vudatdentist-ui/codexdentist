@@ -116,7 +116,7 @@ On pull requests/scheduled/manual CI:
 - `node scripts/einvoice-concurrency-smoke.mjs`
 - `node scripts/patient-access-smoke.mjs`
 
-The test harness clears persistent login rate-limit buckets **only under `NODE_ENV=test`** between independent browser suites. Never weaken production auth/rate-limit behavior to fix a CI login collision.
+The test harness clears persistent login rate-limit buckets **only under `NODE_ENV=test`** between independent browser suites. Role-heavy smoke suites should authenticate each role normally once and reuse Playwright `storageState` for fresh isolated contexts rather than repeatedly consuming the login flow. Never weaken production auth/rate-limit behavior to fix a CI login collision.
 
 ### Packaging
 
@@ -139,14 +139,14 @@ Required properties:
 
 Legacy `src/components`, `src/modules` and much of `src/lib` remain migration territory. Existing legacy behavior is not automatically an architecture failure, but **new dependencies into the legacy shell are failures**.
 
-During Phases 4-8, route-shape strictness may be enabled with:
+During Phases 4-11, route-shape strictness may be enabled with:
 
 ```powershell
 $env:ARCHITECTURE_AUDIT_STRICT_ROUTES = "1"
 node scripts/agent-module-audit.mjs
 ```
 
-Phase 9 exit criteria require strict route delegation to be blocking in CI.
+Phase 12 exit criteria require strict route delegation to be blocking in CI.
 
 ## Gate matrix by change type
 
@@ -158,8 +158,9 @@ Phase 9 exit criteria require strict route delegation to be blocking in CI.
 | Patient Access / Schedule / Care | Patient-access smoke, tenant/actions/security, browser QA; preserve transition/concurrency/resource checks. |
 | Billing / Finance / E-invoice | Billing + billing concurrency + data integrity + finance/e-invoice + e-invoice concurrency smoke. |
 | Staff / earnings / payroll | Staff-operations smoke, tenant/actions, source-commission/compensation tests when affected. |
-| Patient files / upload | Patient-files + security + tenant plus browser access checks. |
-| Settings / roles / clinics | Roles/actions/tenant/security; verify equal-or-higher role protections and owner preservation. |
+| Inventory / reports | Inventory/treatment material effects, tenant/role scope, data integrity and browser QA. |
+| Settings / roles / clinics / service catalog | Roles/actions/tenant/security; verify equal-or-higher role protections, owner preservation and treatment-step compatibility. |
+| Forms / pharmacy / prescriptions | Patient/clinical scope, files where applicable, tenant/actions, medication/inventory regressions and browser QA. |
 | Patient Portal | Security/tenant/actions plus patient-self isolation and terminal-state transitions. |
 | Public/self-host/deploy | Docker, host routing, demo behavior and `OPERATIONS.md` packaging/readiness checks. |
 
