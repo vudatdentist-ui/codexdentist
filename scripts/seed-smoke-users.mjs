@@ -180,7 +180,170 @@ async function main() {
     });
   }
 
+  await seedTreatmentCase(organization.id, clinics[0].id);
+
   console.log(`Seeded ${users.length} smoke users with password from SMOKE_USER_PASSWORD.`);
+}
+
+async function seedTreatmentCase(organizationId, clinicId) {
+  const [owner, patient] = await Promise.all([
+    prisma.user.findUnique({
+      where: { email: "owner@nhavista.vn" },
+      select: { id: true },
+    }),
+    prisma.patient.findFirst({
+      where: {
+        organizationId,
+        clinicId,
+      },
+      orderBy: { createdAt: "asc" },
+      select: { id: true },
+    }),
+  ]);
+
+  if (!owner || !patient) {
+    throw new Error("Cannot seed treatment case without an owner and patient.");
+  }
+
+  const category = await prisma.serviceCategory.upsert({
+    where: {
+      organizationId_code: {
+        organizationId,
+        code: "smoke-restorative",
+      },
+    },
+    update: {
+      name: "Phục hồi kiểm thử",
+      active: true,
+    },
+    create: {
+      organizationId,
+      code: "smoke-restorative",
+      name: "Phục hồi kiểm thử",
+      active: true,
+      sortOrder: 900,
+    },
+    select: { id: true },
+  });
+
+  const catalogItem = await prisma.serviceCatalogItem.upsert({
+    where: {
+      organizationId_code: {
+        organizationId,
+        code: "SMOKE-COMPOSITE",
+      },
+    },
+    update: {
+      categoryId: category.id,
+      name: "Trám Composite kiểm thử",
+      defaultPrice: 800000,
+      status: "ACTIVE",
+      targetMode: "TOOTH",
+    },
+    create: {
+      organizationId,
+      categoryId: category.id,
+      code: "SMOKE-COMPOSITE",
+      name: "Trám Composite kiểm thử",
+      defaultPrice: 800000,
+      defaultDurationMinutes: 45,
+      targetMode: "TOOTH",
+      status: "ACTIVE",
+      version: "smoke-v1",
+    },
+    select: { id: true },
+  });
+
+  const steps = [
+    [1, "Khám & chuẩn bị", 20, 15],
+    [2, "Trám Composite", 70, 30],
+    [3, "Hoàn tất & kiểm tra khớp cắn", 100, 15],
+  ];
+
+  for (const [sequence, name, defaultProgress, expectedMinutes] of steps) {
+    await prisma.serviceStep.upsert({
+      where: {
+        serviceId_sequence: {
+          serviceId: catalogItem.id,
+          sequence,
+        },
+      },
+      update: {
+        name,
+        defaultProgress,
+        expectedMinutes,
+      },
+      create: {
+        organizationId,
+        serviceId: catalogItem.id,
+        sequence,
+        name,
+        defaultProgress,
+        expectedMinutes,
+      },
+    });
+  }
+
+  const treatmentService = await prisma.treatmentService.upsert({
+    where: { id: "smoke-treatment-case" },
+    update: {
+      organizationId,
+      clinicId,
+      patientId: patient.id,
+      serviceCatalogItemId: catalogItem.id,
+      createdById: owner.id,
+      serviceCode: "SMOKE-CASE-001",
+      serviceName: "Trám Composite kiểm thử",
+      targetSummary: "Răng 16 · sâu mặt O",
+      teeth: ["R16"],
+      status: "IN_PROGRESS",
+      finalPrice: 800000,
+      currentProgressPercent: 40,
+      currentStepSequence: 2,
+    },
+    create: {
+      id: "smoke-treatment-case",
+      organizationId,
+      clinicId,
+      patientId: patient.id,
+      serviceCatalogItemId: catalogItem.id,
+      createdById: owner.id,
+      serviceCode: "SMOKE-CASE-001",
+      serviceName: "Trám Composite kiểm thử",
+      targetSummary: "Răng 16 · sâu mặt O",
+      teeth: ["R16"],
+      status: "IN_PROGRESS",
+      finalPrice: 800000,
+      currentProgressPercent: 40,
+      currentStepSequence: 2,
+    },
+    select: { id: true },
+  });
+
+  await prisma.treatmentServiceProgressEvent.upsert({
+    where: { id: "smoke-treatment-progress" },
+    update: {
+      organizationId,
+      clinicId,
+      treatmentServiceId: treatmentService.id,
+      performedById: owner.id,
+      fromProgressPercent: 20,
+      toProgressPercent: 40,
+      progressDeltaPercent: 20,
+      note: "Smoke treatment progress",
+    },
+    create: {
+      id: "smoke-treatment-progress",
+      organizationId,
+      clinicId,
+      treatmentServiceId: treatmentService.id,
+      performedById: owner.id,
+      fromProgressPercent: 20,
+      toProgressPercent: 40,
+      progressDeltaPercent: 20,
+      note: "Smoke treatment progress",
+    },
+  });
 }
 
 function hashPassword(value, salt = randomBytes(16).toString("hex")) {

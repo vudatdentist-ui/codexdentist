@@ -4,7 +4,9 @@ import { chromium } from "playwright";
 import {
   enabledMigrationRoutes,
   materializePatientRoute,
+  materializeTreatmentCaseRoute,
   routeNeedsPatientId,
+  routeNeedsTreatmentServiceId,
 } from "./qa-route-contract.mjs";
 
 const baseUrl = process.env.BROWSER_QA_BASE_URL ?? "http://127.0.0.1:3000";
@@ -18,6 +20,7 @@ const legacyRoutes = [
   "/patients",
   "/patient-management",
   "/journey",
+  "/treatment",
   "/billing",
   "/accounting",
   "/services",
@@ -53,6 +56,10 @@ const technicalCopyPatterns = [
 ];
 const mojibakePattern = /(?:\u00c4[\u0080-\u00bf]|\u00c6[\u0080-\u00bf]|\u00e1[\u00ba-\u00bf]|\u00c2[\u00a0-\u00bf]|\ufffd)/u;
 let discoveredPatientId = process.env.BROWSER_QA_PATIENT_ID ?? process.env.QA_PATIENT_ID ?? null;
+let discoveredTreatmentServiceId =
+  process.env.BROWSER_QA_TREATMENT_SERVICE_ID ??
+  process.env.QA_TREATMENT_SERVICE_ID ??
+  null;
 
 await mkdir(outputDir, { recursive: true });
 
@@ -224,6 +231,18 @@ async function auditRoute(page, viewport, route, consoleErrors, networkErrors) {
 }
 
 async function resolveBrowserRoute(page, route) {
+  if (routeNeedsTreatmentServiceId(route)) {
+    if (!discoveredPatientId || !discoveredTreatmentServiceId) {
+      await discoverTreatmentCase(page);
+    }
+
+    return materializeTreatmentCaseRoute(
+      route,
+      discoveredPatientId,
+      discoveredTreatmentServiceId,
+    );
+  }
+
   if (!routeNeedsPatientId(route)) return route;
 
   if (!discoveredPatientId) {
@@ -254,6 +273,39 @@ async function resolveBrowserRoute(page, route) {
   }
 
   return materializePatientRoute(route, discoveredPatientId);
+}
+
+async function discoverTreatmentCase(page) {
+  const response = await page.goto(`${baseUrl}/treatment`, {
+    waitUntil: "domcontentloaded",
+    timeout: 30000,
+  });
+  if (!response || response.status() !== 200) {
+    throw new Error(
+      `Cannot discover treatment case: /treatment returned HTTP ${response?.status() ?? "unknown"}.`,
+    );
+  }
+  await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => null);
+
+  const hrefs = await page.locator('a[data-treatment-case-link], a[href*="/treatments/"]').evaluateAll((anchors) =>
+    anchors.map((anchor) => anchor.getAttribute("href")).filter(Boolean),
+  );
+
+  for (const href of hrefs) {
+    const pathname = new URL(href, baseUrl).pathname;
+    const caseMatch = pathname.match(
+      /^\/patients\/([^/]+)\/treatments\/([^/]+)$/,
+    );
+    if (caseMatch?.[1] && caseMatch?.[2]) {
+      discoveredPatientId = decodeURIComponent(caseMatch[1]);
+      discoveredTreatmentServiceId = decodeURIComponent(caseMatch[2]);
+      return;
+    }
+  }
+
+  throw new Error(
+    "Cannot discover a treatment-case link from /treatment. Set QA_PATIENT_ID and QA_TREATMENT_SERVICE_ID or seed a treatment service.",
+  );
 }
 
 function classify(input) {

@@ -1,6 +1,6 @@
 import { requireViewSession } from "@/lib/auth";
-import { getPatient360Workspace } from "@/workspaces/patients/get-patient-360-workspace";
-import { Patient360Workspace } from "@/workspaces/patients/Patient360Workspace";
+import { getTreatmentCasesWorkspace } from "@/workspaces/treatment/get-treatment-cases-workspace";
+import { TreatmentCasesWorkspace } from "@/workspaces/treatment/TreatmentCasesWorkspace";
 
 export default async function TreatmentPage({
   searchParams,
@@ -9,10 +9,10 @@ export default async function TreatmentPage({
 }) {
   const params = await searchParams;
   const patientId = firstValue(params?.patientId);
-  const session = await requireViewSession("journey");
-  const model = await getPatient360Workspace(session, patientId);
+  const session = await requireViewSession("treatment");
+  const model = await getTreatmentCasesWorkspace(session, { patientId });
 
-  return <Patient360Workspace model={model} session={session} />;
+  return <TreatmentCasesWorkspace model={model} session={session} />;
 }
 
 function firstValue(value: string | string[] | undefined) {
