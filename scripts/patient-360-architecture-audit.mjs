@@ -21,6 +21,14 @@ if (legacyPatientManagement.includes("AppViewPage") || legacyPatientManagement.i
   findings.push("/patient-management still delegates to AppViewPage/DentalSuite");
 }
 
+const odontogramEditor = readFileSync("src/components/PatientOdontogramEditor.tsx", "utf8");
+if (odontogramEditor.includes("@/app/(app)/journey/odontogram-actions")) {
+  findings.push("PatientOdontogramEditor still depends on Journey route actions instead of Patient 360 feature actions");
+}
+if (!odontogramEditor.includes("@/features/patient-360/server/odontogram-actions")) {
+  findings.push("PatientOdontogramEditor is not bound to the Patient 360 odontogram feature boundary");
+}
+
 const requiredFeatureActions = [
   "src/features/patient-360/server/patient-actions.ts",
   "src/features/patient-360/server/clinical-actions.ts",
