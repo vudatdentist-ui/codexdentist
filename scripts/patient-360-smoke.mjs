@@ -84,7 +84,7 @@ async function assertCanonicalIntakeAndEdit(browser, { initialName, updatedName,
 }
 
 async function assertClinicalTimelineAndCompatibility(browser, { patientId: id, updatedName }) {
-  await withLoggedInPage(browser, "dentist@nhavista.vn", async (page) => {
+  await withLoggedInPage(browser, "hygienist@nhavista.vn", async (page) => {
     await open(page, `/journey?patientId=${encodeURIComponent(id)}`);
     await page.waitForURL((url) => url.pathname === `/patients/${encodeURIComponent(id)}`, { timeout: 15_000 });
     await expectText(page, updatedName);
@@ -95,7 +95,7 @@ async function assertClinicalTimelineAndCompatibility(browser, { patientId: id, 
 
     const clinicalForm = page.locator("form").filter({ has: page.locator('textarea[name="subjective"]') }).first();
     const clinicalButton = clinicalForm.getByRole("button", { name: "Thêm vào timeline", exact: true });
-    if (await clinicalButton.isDisabled()) throw new Error("Dentist unexpectedly cannot add a Patient 360 clinical note.");
+    if (await clinicalButton.isDisabled()) throw new Error("Hygienist unexpectedly cannot add a Patient 360 clinical note.");
     await clinicalForm.locator('textarea[name="subjective"]').fill("Phase 4 clinical smoke");
     await clinicalForm.locator('textarea[name="assessment"]').fill("Phase 4 assessment");
     await Promise.all([
@@ -179,7 +179,7 @@ async function login(page, email) {
   await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => null);
   if (new URL(page.url()).pathname.endsWith("/login")) {
     const body = await page.locator("body").innerText().catch(() => "");
-    throw new Error(`Login failed for ${email}. ${body.slice(0, 300)}`);
+    throw new Error(`Login failed for ${email} at ${page.url()}. ${body.slice(0, 300)}`);
   }
 }
 
