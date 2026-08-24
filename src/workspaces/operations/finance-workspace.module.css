@@ -1,0 +1,477 @@
+.page {
+  width: min(1260px, calc(100% - 64px));
+  margin: 0 auto;
+  padding: 52px 0 88px;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.pageHeader > div {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.pageHeader h1 {
+  margin: 0;
+  color: #171918;
+  font-size: clamp(30px, 3vw, 42px);
+  font-weight: 640;
+  letter-spacing: -0.045em;
+}
+
+.pageHeader span,
+.sectionHeading span,
+.compactRow span,
+.receiptRow span,
+.invoiceRow span {
+  color: #747976;
+  font-size: 12px;
+}
+
+.primaryAction,
+.sectionHeading a,
+.issueRow a,
+.compactRow a {
+  color: #075f5a;
+  font-size: 13px;
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.subnav {
+  display: flex;
+  gap: 22px;
+  margin-top: 26px;
+  border-bottom: 1px solid rgba(23, 25, 24, 0.11);
+}
+
+.subnav a,
+.subnav span {
+  border-bottom: 2px solid transparent;
+  color: #747976;
+  font-size: 13px;
+  font-weight: 620;
+  padding: 0 0 11px;
+  text-decoration: none;
+}
+
+.subnav span[aria-current="page"] {
+  border-bottom-color: #08766f;
+  color: #171918;
+}
+
+.notice {
+  margin: 22px 0 0;
+  color: #8a5d16;
+  font-size: 13px;
+}
+
+.statusLine {
+  display: flex;
+  flex-wrap: wrap;
+  margin-top: 34px;
+  border-top: 1px solid rgba(23, 25, 24, 0.1);
+  border-bottom: 1px solid rgba(23, 25, 24, 0.1);
+}
+
+.fact {
+  display: grid;
+  gap: 5px;
+  min-width: 146px;
+  margin-right: 22px;
+  padding: 15px 22px 15px 0;
+  border-right: 1px solid rgba(23, 25, 24, 0.08);
+}
+
+.fact:last-child {
+  border-right: 0;
+}
+
+.fact span {
+  color: #7a7f7c;
+  font-size: 11px;
+  font-weight: 620;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.fact strong {
+  color: #1c1f1d;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.section {
+  margin-top: 40px;
+}
+
+.sectionHeading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid rgba(23, 25, 24, 0.12);
+  padding-bottom: 10px;
+}
+
+.sectionHeading > div {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.sectionHeading h2 {
+  margin: 0;
+  color: #202321;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.issueRows,
+.compactRows,
+.receiptRows {
+  border-bottom: 1px solid rgba(23, 25, 24, 0.1);
+}
+
+.issueRow {
+  display: grid;
+  grid-template-columns: 8px minmax(320px, 1fr) minmax(140px, auto) auto;
+  align-items: center;
+  gap: 18px;
+  min-height: 66px;
+  border-top: 1px solid rgba(23, 25, 24, 0.08);
+}
+
+.issueRow:first-child,
+.compactRow:first-child,
+.receiptRow:first-child {
+  border-top: 0;
+}
+
+.issueRow > div,
+.compactRow > div,
+.receiptRow > div,
+.invoiceRow > div {
+  display: grid;
+  gap: 4px;
+}
+
+.issueRow strong,
+.compactRow strong,
+.receiptRow strong,
+.invoiceRow strong {
+  color: #1e211f;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.issueRow > span:not(.priority) {
+  color: #747976;
+  font-size: 12px;
+}
+
+.priority {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #8a8f8c;
+}
+
+.high {
+  background: #a73a2d;
+}
+
+.medium {
+  background: #b8812f;
+}
+
+.low {
+  background: #7c827f;
+}
+
+.invoiceTable {
+  width: 100%;
+  overflow: visible;
+}
+
+.invoiceRow {
+  display: grid;
+  grid-template-columns: 148px minmax(170px, 1fr) 138px 150px 148px minmax(165px, auto);
+  align-items: center;
+  gap: 14px;
+  min-height: 72px;
+  border-bottom: 1px solid rgba(23, 25, 24, 0.08);
+  color: #4f5551;
+  font-size: 12px;
+  scroll-margin-top: 70px;
+}
+
+.invoiceIdentity {
+  min-width: 0;
+}
+
+.tableHeader {
+  min-height: 38px;
+  color: #828784;
+  font-size: 11px;
+  font-weight: 650;
+  text-transform: uppercase;
+  letter-spacing: 0.035em;
+}
+
+.tableHeader > span {
+  color: inherit;
+  font-size: inherit;
+}
+
+.state {
+  justify-self: start;
+  width: fit-content;
+  border: 1px solid rgba(23, 25, 24, 0.12);
+  border-radius: 999px;
+  color: #666c68 !important;
+  font-size: 11px !important;
+  font-weight: 650;
+  padding: 4px 7px;
+  white-space: nowrap;
+}
+
+.stateISSUED,
+.stateREPLACED,
+.stateMATCHED {
+  border-color: rgba(8, 118, 111, 0.22);
+  color: #075f5a !important;
+}
+
+.stateFAILED,
+.stateMISMATCH {
+  border-color: rgba(167, 58, 45, 0.25);
+  color: #943529 !important;
+}
+
+.statePENDING,
+.stateNEEDS_ACTION {
+  border-color: rgba(184, 129, 47, 0.25);
+  color: #8a5d16 !important;
+}
+
+.actions {
+  display: flex !important;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 7px !important;
+  position: relative;
+}
+
+.actions form {
+  margin: 0;
+}
+
+.actions button,
+.moreActions summary {
+  border: 0;
+  background: transparent;
+  color: #075f5a;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  padding: 4px 0;
+}
+
+.moreActions {
+  position: relative;
+}
+
+.moreActions summary {
+  list-style: none;
+}
+
+.moreActions summary::-webkit-details-marker {
+  display: none;
+}
+
+.actionPopover {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 8px);
+  right: 0;
+  width: min(320px, calc(100vw - 40px));
+  border: 1px solid rgba(23, 25, 24, 0.13);
+  background: #fbfbf8;
+  box-shadow: 0 14px 36px rgba(24, 28, 26, 0.1);
+  padding: 14px;
+}
+
+.actionPopover form {
+  display: grid;
+  gap: 10px;
+  padding: 10px 0;
+  border-top: 1px solid rgba(23, 25, 24, 0.08);
+}
+
+.actionPopover form:first-child {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.actionPopover label {
+  display: grid;
+  gap: 5px;
+}
+
+.actionPopover label span {
+  font-size: 11px;
+}
+
+.actionPopover input {
+  min-width: 0;
+  border: 1px solid rgba(23, 25, 24, 0.16);
+  border-radius: 4px;
+  background: #fff;
+  color: #1e211f;
+  font: inherit;
+  font-size: 12px;
+  padding: 8px 9px;
+}
+
+.actionPopover button {
+  justify-self: start;
+}
+
+.twoColumn {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 36px;
+}
+
+.compactRow {
+  display: flex;
+  min-height: 62px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-top: 1px solid rgba(23, 25, 24, 0.08);
+}
+
+.rowEnd {
+  align-items: end;
+  text-align: right;
+}
+
+.receiptRow {
+  display: grid;
+  grid-template-columns: 180px minmax(220px, 1fr) 150px 140px;
+  align-items: center;
+  gap: 18px;
+  min-height: 64px;
+  border-top: 1px solid rgba(23, 25, 24, 0.08);
+}
+
+.receiptRow > strong {
+  text-align: right;
+}
+
+.empty {
+  margin: 16px 0 0;
+  color: #8a8f8c;
+  font-size: 13px;
+}
+
+@media (max-width: 1080px) {
+  .invoiceTable {
+    overflow-x: auto;
+  }
+
+  .invoiceRow {
+    min-width: 1040px;
+  }
+}
+
+@media (max-width: 900px) {
+  .page {
+    width: min(100% - 32px, 780px);
+    padding-top: 36px;
+  }
+
+  .twoColumn {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .issueRow {
+    grid-template-columns: 8px 1fr auto;
+    padding: 13px 0;
+  }
+
+  .issueRow > span:not(.priority) {
+    display: none;
+  }
+
+  .receiptRow {
+    grid-template-columns: 150px 1fr 130px;
+  }
+
+  .receiptRow > span {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .page {
+    width: calc(100% - 28px);
+  }
+
+  .pageHeader {
+    align-items: flex-start;
+  }
+
+  .pageHeader > div,
+  .sectionHeading > div {
+    display: grid;
+    gap: 4px;
+  }
+
+  .subnav {
+    gap: 16px;
+    overflow-x: auto;
+  }
+
+  .fact {
+    min-width: 118px;
+    margin-right: 16px;
+    padding-right: 16px;
+  }
+
+  .sectionHeading {
+    align-items: flex-start;
+  }
+
+  .issueRow {
+    grid-template-columns: 8px 1fr;
+  }
+
+  .issueRow a {
+    grid-column: 2;
+  }
+
+  .compactRow {
+    align-items: flex-start;
+    padding: 12px 0;
+  }
+
+  .receiptRow {
+    grid-template-columns: 1fr auto;
+    padding: 11px 0;
+  }
+
+  .receiptRow > div:nth-child(2) {
+    display: none;
+  }
+}

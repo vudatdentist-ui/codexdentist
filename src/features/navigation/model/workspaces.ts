@@ -1,4 +1,4 @@
-import type { ViewKey } from "@/lib/permissions";
+import type { AppRole, ViewKey } from "@/lib/permissions";
 
 export type ProductWorkspaceKey =
   | "today"
@@ -15,6 +15,8 @@ export type ProductWorkspace = {
   label: string;
   href: string;
   permissionView: ViewKey;
+  allowedRoles?: AppRole[];
+  roleHrefs?: Array<{ roles: AppRole[]; href: string }>;
   group: "daily" | "system";
 };
 
@@ -65,7 +67,18 @@ export const productWorkspaces: ProductWorkspace[] = [
     key: "operations",
     label: "Vận hành",
     href: "/operations",
-    permissionView: "reports",
+    permissionView: "billing",
+    allowedRoles: ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "BILLING"],
+    roleHrefs: [
+      {
+        roles: ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],
+        href: "/operations",
+      },
+      {
+        roles: ["BILLING"],
+        href: "/operations/finance",
+      },
+    ],
     group: "system",
   },
   {
@@ -79,4 +92,11 @@ export const productWorkspaces: ProductWorkspace[] = [
 
 export function getProductWorkspace(key: ProductWorkspaceKey) {
   return productWorkspaces.find((workspace) => workspace.key === key) ?? productWorkspaces[0];
+}
+
+export function productWorkspaceHref(workspace: ProductWorkspace, roles: AppRole[]) {
+  return (
+    workspace.roleHrefs?.find((candidate) => candidate.roles.some((role) => roles.includes(role)))?.href ??
+    workspace.href
+  );
 }

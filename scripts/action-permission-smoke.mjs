@@ -132,6 +132,15 @@ async function assertGuardMarkers() {
     "consumeServiceMaterials",
     'action: "treatment_service.progress_recorded"',
   ]);
+  await assertSource("src/features/einvoice/server/actions.ts", [
+    "requestEInvoiceIssueAction",
+    "confirmExternalEInvoiceAction",
+    "confirmExternalEInvoiceCancellationAction",
+    'canPerformAction(session, "billing.invoice.issue")',
+    'canPerformAction(session, "billing.invoice.void")',
+    "organizationId: session.organizationId",
+    "allowedClinicIds(session)",
+  ]);
 }
 
 async function assertSource(path, markers) {
@@ -198,7 +207,6 @@ async function fetchText(path) {
   if (!response.ok) {
     throw new Error(`${path} returned HTTP ${response.status}.`);
   }
-
   return response.text();
 }
 
