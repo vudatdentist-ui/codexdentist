@@ -119,6 +119,19 @@ async function assertGuardMarkers() {
     'canPerformAction(session, "treatment.plan.create")',
     'canPerformAction(session, status === "ACCEPTED" ? "treatment.plan.accept" : "treatment.plan.create")',
   ]);
+  await assertSource("src/features/treatment-progress/server/actions.ts", [
+    "recordTreatmentCaseProgressAction",
+    'canPerformAction(session, "treatment.service.progress")',
+    "recordTreatmentProgress(session",
+    'revalidatePath("/work")',
+  ]);
+  await assertSource("src/features/treatment-progress/server/record-treatment-progress.ts", [
+    'canPerformAction(session, "treatment.service.progress")',
+    "runSerializableTransaction",
+    "compensationAccrual.create",
+    "consumeServiceMaterials",
+    'action: "treatment_service.progress_recorded"',
+  ]);
 }
 
 async function assertSource(path, markers) {
