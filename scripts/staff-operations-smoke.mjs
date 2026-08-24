@@ -10,6 +10,7 @@ const connectionString =
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString }),
 });
+const authStateByEmail = new Map();
 
 const organizationId = "org_nhavista";
 const clinicId = "hcm-q1";
@@ -189,26 +190,16 @@ async function cleanupFixture() {
 }
 
 async function assertManagerSeesUnresolvedReferral(browser) {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-  const page = await context.newPage();
-
-  try {
-    await login(page, "manager@nhavista.vn");
+  await withLoggedInPage(browser, "manager@nhavista.vn", async (page) => {
     await page.goto(`${baseUrl}/work`, { waitUntil: "domcontentloaded" });
     await page.waitForLoadState("networkidle").catch(() => null);
     await expectText(page, "Hoa hồng giới thiệu chưa gán nhân sự");
     console.log("ok unresolved referral becomes manager Work signal");
-  } finally {
-    await context.close();
-  }
+  });
 }
 
 async function assertManagerResolutionAndOperations(browser, dentistName) {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
-  const page = await context.newPage();
-
-  try {
-    await login(page, "manager@nhavista.vn");
+  await withLoggedInPage(browser, "manager@nhavista.vn", async (page) => {
     await page.goto(`${baseUrl}/work`, { waitUntil: "domcontentloaded" });
     await page.waitForLoadState("networkidle").catch(() => null);
 
@@ -225,44 +216,59 @@ async function assertManagerResolutionAndOperations(browser, dentistName) {
     await expectText(page, dentistName);
     await expectText(page, "Hoa hồng giới thiệu");
     console.log("ok referral resolution feeds canonical Operations workspace");
-  } finally {
-    await context.close();
-  }
+  });
 }
 
 async function assertDentistSeesUnifiedReferralIncome(browser, dentistName) {
-  const context = await browser.newContext({ viewport: { width: 1080, height: 900 } });
-  const page = await context.newPage();
-
-  try {
-    await login(page, "dentist@nhavista.vn");
-    const response = await page.goto(`${baseUrl}/employee-app`, { waitUntil: "domcontentloaded" });
-    await page.waitForLoadState("networkidle").catch(() => null);
-    if (!response || response.status() >= 400) {
-      throw new Error(`/employee-app returned HTTP ${response?.status() ?? "unknown"}.`);
-    }
-    await expectText(page, dentistName);
-    await expectText(page, `Giới thiệu · ${source}`);
-    await expectText(page, "Thu nhập phát sinh");
-    console.log("ok employee self view includes resolved referral earnings");
-  } finally {
-    await context.close();
-  }
+  await withLoggedInPage(
+    browser,
+    "dentist@nhavista.vn",
+    async (page) => {
+      const response = await page.goto(`${baseUrl}/employee-app`, { waitUntil: "domcontentloaded" });
+      await page.waitForLoadState("networkidle").catch(() => null);
+      if (!response || response.status() >= 400) {
+        throw new Error(`/employee-app returned HTTP ${response?.status() ?? "unknown"}.`);
+      }
+      await expectText(page, dentistName);
+      await expectText(page, `Giới thiệu · ${source}`);
+      await expectText(page, "Thu nhập phát sinh");
+      console.log("ok employee self view includes resolved referral earnings");
+    },
+    { width: 1080, height: 900 },
+  );
 }
 
 async function assertBillingCannotOpenOperations(browser) {
-  const context = await browser.newContext({ viewport: { width: 1080, height: 900 } });
+  await withLoggedInPage(
+    browser,
+    "billing@nhavista.vn",
+    async (page) => {
+      await page.goto(`${baseUrl}/operations`, { waitUntil: "domcontentloaded" });
+      await page.waitForLoadState("networkidle").catch(() => null);
+      const path = new URL(page.url()).pathname;
+      if (path === "/operations") {
+        throw new Error("Billing role unexpectedly received Operations management workspace.");
+      }
+      console.log("ok Operations remains management-only");
+    },
+    { width: 1080, height: 900 },
+  );
+}
+
+async function withLoggedInPage(browser, email, run, viewport = { width: 1280, height: 900 }) {
+  const storageState = authStateByEmail.get(email);
+  const context = await browser.newContext({
+    viewport,
+    ...(storageState ? { storageState } : {}),
+  });
   const page = await context.newPage();
 
   try {
-    await login(page, "billing@nhavista.vn");
-    await page.goto(`${baseUrl}/operations`, { waitUntil: "domcontentloaded" });
-    await page.waitForLoadState("networkidle").catch(() => null);
-    const path = new URL(page.url()).pathname;
-    if (path === "/operations") {
-      throw new Error("Billing role unexpectedly received Operations management workspace.");
+    if (!storageState) {
+      await login(page, email);
+      authStateByEmail.set(email, await context.storageState());
     }
-    console.log("ok Operations remains management-only");
+    await run(page);
   } finally {
     await context.close();
   }
@@ -283,13 +289,13 @@ async function login(page, email) {
   await emailInput.pressSequentially(email);
   await form.locator('input[name="password"]').fill(password);
   await form.locator('button[type="submit"]').click();
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"), { timeout: 15000 }).catch(() => null);
-  await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => null);
-  await page.waitForTimeout(1200);
+  await page.waitForURL((url) => !url.pathname.endsWith("/login"), { timeout: 30000 }).catch(() => null);
+  await page.waitForLoadState("networkidle", { timeout: 10000 }).catch(() => null);
+  await page.waitForTimeout(800);
 
   if (new URL(page.url()).pathname.endsWith("/login")) {
     const bodyText = await page.locator("body").innerText().catch(() => "");
-    throw new Error(`Login failed for ${email}. ${bodyText.slice(0, 300)}`);
+    throw new Error(`Login failed for ${email} at ${page.url()}. ${bodyText.slice(0, 300)}`);
   }
 }
 
