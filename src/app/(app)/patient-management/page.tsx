@@ -1,5 +1,5 @@
-import { AppViewPage } from "../view-page";
+import { redirect } from "next/navigation";
 
 export default function PatientManagementPage() {
-  return <AppViewPage view="patients" />;
+  redirect("/patients");
 }
