@@ -38,7 +38,7 @@ export function PatientTreatmentSection({
   session: AppSession;
 }) {
   const [toothTargets, setToothTargets] = useState<string[]>([]);
-  const [archTarget, setArchTarget] = useState<string>("");
+  const [archTarget, setArchTarget] = useState("");
   const [diagnosis, setDiagnosis] = useState("");
   const [serviceCatalogItemId, setServiceCatalogItemId] = useState("");
   const [pendingProgress, setPendingProgress] = useState<PendingProgress | null>(null);
@@ -143,7 +143,10 @@ export function PatientTreatmentSection({
 
       <section className={native.card} id="patient-services">
         <header className={native.cardHeader}>
-          <div><h2>Dịch vụ điều trị</h2><p>Tiến độ chỉ đi tới; billing/receipt activity khóa discount và xóa trực tiếp.</p></div>
+          <div>
+            <h2>Dịch vụ điều trị</h2>
+            <p>Tiến độ chỉ đi tới; hoạt động tài chính khóa giảm giá và xóa trực tiếp.</p>
+          </div>
           <span className={native.badge}>{services.length} dịch vụ</span>
         </header>
 
@@ -154,13 +157,14 @@ export function PatientTreatmentSection({
               const financiallyLocked = service.invoicedAmount > 0 || service.collectedAmount > 0 || service.creditAllocatedAmount > 0;
               const deleteLocked = financiallyLocked || service.currentProgressPercent > 0 || service.progressEvents.length > 0 || service.status !== "PLANNED";
               const progressOptions = serviceProgressOptions(service.currentProgressPercent, service.steps);
+              const targetLabel = service.targetSummary ?? (service.teeth.join(", ") || "Chưa ghi mục tiêu");
 
               return (
                 <article className={native.service} key={service.id}>
                   <div className={native.serviceHeader}>
                     <div>
                       <strong>{service.serviceCode} · {service.serviceName}</strong>
-                      <p>{service.targetSummary ?? service.teeth.join(", ") || "Chưa ghi mục tiêu"}</p>
+                      <p>{targetLabel}</p>
                     </div>
                     <span className={native.badge}>{serviceProgressLabel(service.currentProgressPercent, service.status, service.steps)}</span>
                   </div>
@@ -170,9 +174,11 @@ export function PatientTreatmentSection({
                     <span>Giá cuối<strong>{formatVnd(service.finalPrice)}</strong></span>
                     <span>Đã thu/phân bổ<strong>{formatVnd(service.collectedAmount + service.creditAllocatedAmount)}</strong></span>
                   </div>
-                  <div className={native.progressTrack}><span style={{ width: `${Math.min(Math.max(service.currentProgressPercent, 0), 100)}%` }} /></div>
+                  <div className={native.progressTrack}>
+                    <span style={{ width: `${Math.min(Math.max(service.currentProgressPercent, 0), 100)}%` }} />
+                  </div>
                   <div className={native.actions}>
-                    {service.status !== "CANCELLED" && service.currentProgressPercent < 100 && (
+                    {service.status !== "CANCELLED" && service.currentProgressPercent < 100 ? (
                       <select
                         aria-label={`Tiến độ ${service.serviceCode}`}
                         onChange={(event) => {
@@ -184,25 +190,27 @@ export function PatientTreatmentSection({
                         value={String(Math.round(service.currentProgressPercent))}
                       >
                         {progressOptions.map((percent) => (
-                          <option key={percent} value={percent}>{serviceProgressLabel(percent, undefined, service.steps)}</option>
+                          <option key={percent} value={percent}>
+                            {serviceProgressLabel(percent, undefined, service.steps)}
+                          </option>
                         ))}
                       </select>
-                    )}
-                    {!financiallyLocked && (
+                    ) : null}
+                    {!financiallyLocked ? (
                       <form action={updateJourneyTreatmentServiceDiscountAction} className={native.actions}>
                         <input name="patientId" type="hidden" value={patient.id} />
                         <input name="treatmentServiceId" type="hidden" value={service.id} />
                         <input aria-label={`Giảm giá ${service.serviceCode}`} name="discount" defaultValue={String(discount)} inputMode="numeric" />
                         <button className={native.buttonSecondary} type="submit">Lưu giảm giá</button>
                       </form>
-                    )}
-                    {canDelete && (
+                    ) : null}
+                    {canDelete ? (
                       <form action={deleteJourneyTreatmentServiceAction}>
                         <input name="patientId" type="hidden" value={patient.id} />
                         <input name="treatmentServiceId" type="hidden" value={service.id} />
                         <button className={native.buttonDanger} disabled={deleteLocked} type="submit">Xóa</button>
                       </form>
-                    )}
+                    ) : null}
                   </div>
                 </article>
               );
@@ -213,13 +221,9 @@ export function PatientTreatmentSection({
         )}
       </section>
 
-      {pendingProgress && (
+      {pendingProgress ? (
         <div className={native.modalBackdrop} onClick={() => setPendingProgress(null)} role="presentation">
-          <form
-            action={recordJourneyServiceProgressAction}
-            className={native.modal}
-            onClick={(event) => event.stopPropagation()}
-          >
+          <form action={recordJourneyServiceProgressAction} className={native.modal} onClick={(event) => event.stopPropagation()}>
             <header className={native.modalHeader}>
               <div>
                 <span className={native.meta}>{pendingProgress.service.serviceCode}</span>
@@ -244,7 +248,7 @@ export function PatientTreatmentSection({
             </div>
           </form>
         </div>
-      )}
+      ) : null}
     </section>
   );
 }
