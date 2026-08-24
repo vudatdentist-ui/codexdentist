@@ -78,11 +78,11 @@ async function assertGuardMarkers() {
     "sendNotificationTestAction",
     'canPerformAction(session, "settings.manage")',
   ]);
-  await assertSource("src/app/(app)/patient-files/actions.ts", [
+  await assertSource("src/features/patient-360/server/patient-file-actions.ts", [
     "updatePatientFileGovernanceAction",
     'canPerformAction(session, "file.delete")',
   ]);
-  await assertSource("src/app/(app)/patients/actions.ts", [
+  await assertSource("src/features/patient-360/server/patient-actions.ts", [
     "createPatientAction",
     'canPerformAction(session, "patient.create")',
     'canPerformAction(session, "patient.update")',
@@ -93,7 +93,7 @@ async function assertGuardMarkers() {
     'canPerformAction(session, "appointment.update")',
     'canPerformAction(session, "appointment.cancel")',
   ]);
-  await assertSource("src/app/(app)/journey/actions.ts", [
+  await assertSource("src/features/patient-360/server/journey-actions.ts", [
     "createJourneyTreatmentServicesAction",
     'canPerformAction(session, "treatment.plan.create")',
     'canPerformAction(session, "treatment.service.progress")',
@@ -101,7 +101,7 @@ async function assertGuardMarkers() {
     "runSerializableTransaction",
     'revalidatePath("/employee-app")',
   ]);
-  await assertSource("src/app/(app)/journey/odontogram-actions.ts", [
+  await assertSource("src/features/patient-360/server/odontogram-actions.ts", [
     "savePatientOdontogramAction",
     'canPerformAction(session, "clinical.odontogram.update")',
     "patientAccessWhere(session)",
@@ -109,7 +109,7 @@ async function assertGuardMarkers() {
     "revisionForStage(current, stage)",
     "patientOdontogramRevision.create",
   ]);
-  await assertSource("src/app/(app)/clinical/actions.ts", [
+  await assertSource("src/features/patient-360/server/clinical-actions.ts", [
     "createClinicalNoteAction",
     'canPerformAction(session, "clinical.note.create")',
     'canPerformAction(session, "clinical.note.sign")',
