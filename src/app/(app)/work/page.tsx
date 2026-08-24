@@ -1,5 +1,6 @@
 import { getClinicalExecutionSignals } from "@/features/work/server/get-clinical-execution-signals";
 import { getFinanceOperationsSignals } from "@/features/work/server/get-finance-operations-signals";
+import { getPatientAccessSignals } from "@/features/work/server/get-patient-access-signals";
 import { getStaffOperationsSignals } from "@/features/work/server/get-staff-operations-signals";
 import { requireViewSession } from "@/lib/auth";
 import { getTaskInboxWorkspace } from "@/lib/task-inbox";
@@ -12,11 +13,13 @@ export default async function WorkPage() {
     executionSignals,
     staffOperationsSignals,
     financeOperationsSignals,
+    patientAccessSignals,
   ] = await Promise.all([
     getTaskInboxWorkspace(session),
     getClinicalExecutionSignals(session),
     getStaffOperationsSignals(session),
     getFinanceOperationsSignals(session),
+    getPatientAccessSignals(session),
   ]);
 
   return (
@@ -25,6 +28,7 @@ export default async function WorkPage() {
       workspace={{
         ...workspace,
         items: [
+          ...patientAccessSignals,
           ...financeOperationsSignals,
           ...staffOperationsSignals,
           ...executionSignals,

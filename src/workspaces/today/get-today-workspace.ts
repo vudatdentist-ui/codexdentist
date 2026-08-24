@@ -1,5 +1,6 @@
 import "server-only";
 
+import { getPatientAccessSignals } from "@/features/work/server/get-patient-access-signals";
 import { getDashboardWorkspace } from "@/lib/dashboard";
 import type { DashboardAppointmentSummary } from "@/lib/dashboard-types";
 import type { AppSession } from "@/lib/session";
@@ -36,9 +37,10 @@ export type TodayWorkspaceModel = {
 };
 
 export async function getTodayWorkspace(session: AppSession): Promise<TodayWorkspaceModel> {
-  const [dashboard, inbox] = await Promise.all([
+  const [dashboard, inbox, patientAccessSignals] = await Promise.all([
     getDashboardWorkspace(session),
     getTaskInboxWorkspace(session),
+    getPatientAccessSignals(session),
   ]);
 
   const activeAppointments = dashboard.appointments
@@ -55,7 +57,7 @@ export async function getTodayWorkspace(session: AppSession): Promise<TodayWorks
     .slice(0, 8)
     .map(toAppointmentRow);
 
-  const attention = inbox.items
+  const attention = [...patientAccessSignals, ...inbox.items]
     .filter((item) => item.kind !== "learning")
     .sort((left, right) => priorityRank(left.priority) - priorityRank(right.priority))
     .slice(0, 7)
