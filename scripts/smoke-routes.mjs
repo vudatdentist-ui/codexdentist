@@ -9,7 +9,7 @@ const email = process.env.SMOKE_EMAIL ?? "owner@nhavista.vn";
 const password = process.env.SMOKE_PASSWORD ?? process.env.SMOKE_USER_PASSWORD ?? "CodexSmoke2026!";
 
 const defaultRoutes = [
-  "dashboard",
+  "today",
   "schedule",
   "patients",
   "journey",
@@ -38,7 +38,7 @@ const migrationRoutes = enabledMigrationRoutes(
 ).map((route) => route.replace(/^\/+/, ""));
 const routes = [...new Set([...configuredRoutes, ...migrationRoutes])];
 const routeMarkers = {
-  dashboard: ["Group dashboard", "Tổng quan hệ thống"],
+  today: ["Hôm nay"],
   schedule: ["Multi-clinic schedule", "Lịch hẹn đa phòng khám"],
   patients: ["Patient 360", "Hồ sơ bệnh nhân 360"],
   "patients/[patientId]": ["Patient 360", "Hồ sơ bệnh nhân 360"],
@@ -131,6 +131,8 @@ async function main() {
     console.log(`ok /${resolvedRoute}${contractLabel}`);
   }
 
+  await assertLegacyDashboardRedirect(cookie);
+
   if (routes.includes("billing")) {
     await assertBillingExportAndPrint(cookie);
   }
@@ -196,6 +198,24 @@ async function assertHealth() {
 
   assertSecurityHeaders(response, "/api/health");
   console.log("ok /api/health");
+}
+
+async function assertLegacyDashboardRedirect(cookie) {
+  const response = await fetch(`${baseUrl}/dashboard`, {
+    headers: { cookie },
+    redirect: "manual",
+  });
+  const location = response.headers.get("location");
+  const pathname = location ? new URL(location, baseUrl).pathname : null;
+
+  if (![303, 307, 308].includes(response.status) || pathname !== "/today") {
+    throw new Error(
+      `/dashboard compatibility route expected redirect to /today, received HTTP ${response.status} -> ${location ?? "no location"}.`,
+    );
+  }
+
+  assertSecurityHeaders(response, "/dashboard");
+  console.log("ok /dashboard -> /today");
 }
 
 async function fetchText(path) {
