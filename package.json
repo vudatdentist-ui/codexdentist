@@ -25,7 +25,7 @@
     "test:integration": "node scripts/integration-actions.mjs",
     "test:integration-substrate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types scripts/integration-substrate-smoke.mjs",
     "test:file-lifecycle": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types scripts/patient-file-lifecycle-smoke.mjs",
-    "test:journey-file-command": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types scripts/journey-file-command-smoke.mjs",
+    "test:journey-file-command": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/journey-file-command-smoke.mjs",
     "test:phase2": "npm run test:integration-substrate && npm run test:journey-file-command && npm run test:file-lifecycle",
     "test:billing": "node scripts/billing-edge-smoke.mjs",
     "test:billing-concurrency": "node scripts/billing-concurrency-smoke.mjs",
