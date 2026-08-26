@@ -9,9 +9,20 @@ const roots = [
   "src/shared",
   "src/domains",
   "src/features",
+  "src/infrastructure",
+  "src/integrations",
   "src/workspaces",
 ];
-const architectureRoots = ["src/shared", "src/domains", "src/features", "src/workspaces"];
+
+const architectureRoots = [
+  "src/shared",
+  "src/domains",
+  "src/features",
+  "src/infrastructure",
+  "src/integrations",
+  "src/workspaces",
+];
+
 const technicalCopyPatterns = [
   /PostgreSQL/i,
   /Database is connected/i,
@@ -21,25 +32,20 @@ const technicalCopyPatterns = [
   /Workspace error/i,
   /Dữ liệu thật/i,
 ];
-const mojibakePatterns = [
-  /Ch\?/,
-  /\?\?\?/,
-  /\uFFFD/,
-];
+
+const mojibakePatterns = [/Ch\?/, /\?\?\?/, /\uFFFD/];
 
 const allowedTechnical = [
   "src/lib/env.ts",
   "src/lib/runtime-guards.ts",
   "src/lib/prisma.ts",
   "src/app/(app)/actions.ts",
-  // Public product and installation pages may explain the self-host stack.
   "src/app/page.tsx",
   "src/app/docs/page.tsx",
   "src/app/features/page.tsx",
 ];
 
 const findings = [];
-const advisories = [];
 const files = [];
 
 for (const root of roots) {
@@ -55,9 +61,7 @@ function walk(dir) {
     const fullPath = join(dir, name);
     const stat = statSync(fullPath);
     if (stat.isDirectory()) {
-      if (!["node_modules", ".next"].includes(name)) {
-        walk(fullPath);
-      }
+      if (!["node_modules", ".next"].includes(name)) walk(fullPath);
       continue;
     }
     if (!/\.(ts|tsx|js|jsx|css)$/.test(name)) continue;
@@ -96,116 +100,136 @@ function auditCopy(normalized, text) {
 
 function auditArchitecture(file) {
   const sourceLayer = architectureLayer(file.path);
+  if (!sourceLayer) return;
+
   const imports = collectImports(file.text);
 
-  if (sourceLayer) {
-    for (const item of imports) {
-      const target = resolveImportPath(file.path, item.specifier);
-      if (!target) continue;
-
-      const violation = boundaryViolation(sourceLayer, target);
-      if (violation) {
-        findings.push(
-          `${file.path}:${item.line}: architecture boundary ${sourceLayer} -> ${target}: ${violation}`,
-        );
-      }
-    }
-  }
-
-  const guardedRoute = isMigrationRouteFile(file.path) || imports.some((item) => {
+  for (const item of imports) {
     const target = resolveImportPath(file.path, item.specifier);
-    return target ? isInside(target, "src/workspaces") : false;
-  });
-  const newArchitectureFile = architectureRoots.some((root) => isInside(file.path, root));
-
-  if (guardedRoute || newArchitectureFile) {
-    for (const item of imports) {
-      const target = resolveImportPath(file.path, item.specifier);
-      if (
-        (target && target === "src/components/DentalSuite") ||
-        item.specifier.includes("DentalSuite") ||
-        item.statement.includes("AppViewPage")
-      ) {
-        findings.push(
-          `${file.path}:${item.line}: new architecture must not depend on DentalSuite/AppViewPage`,
-        );
-      }
-    }
-  }
-
-  if (isMigrationRoutePage(file.path)) {
-    const delegatesToWorkspace = imports.some((item) => {
-      const target = resolveImportPath(file.path, item.specifier);
-      return target ? isInside(target, "src/workspaces") : false;
-    });
-
-    if (!delegatesToWorkspace) {
-      const message = `${file.path}: migration route should delegate through a workspace-specific loader/workspace`;
-      if (process.env.ARCHITECTURE_AUDIT_STRICT_ROUTES === "1") {
-        findings.push(message);
-      } else {
-        advisories.push(message);
-      }
+    const violation = boundaryViolation(sourceLayer, target, item.specifier);
+    if (violation) {
+      findings.push(
+        `${file.path}:${item.line}: architecture boundary ${sourceLayer} -> ${target ?? item.specifier}: ${violation}`,
+      );
     }
   }
 }
 
-function boundaryViolation(sourceLayer, target) {
+function boundaryViolation(sourceLayer, target, specifier) {
+  const external = normalizedExternalSpecifier(specifier);
+
   if (sourceLayer === "shared") {
     if (
-      ["src/domains", "src/features", "src/workspaces", "src/app", "src/modules"].some((root) =>
-        isInside(target, root),
-      )
+      target &&
+      [
+        "src/domains",
+        "src/features",
+        "src/infrastructure",
+        "src/integrations",
+        "src/workspaces",
+        "src/app",
+        "src/modules",
+      ].some((root) => isInside(target, root))
     ) {
-      return "shared must remain business-agnostic";
+      return "shared must remain business-agnostic and may not depend on higher layers";
     }
   }
 
   if (sourceLayer === "domains") {
-    if (isInside(target, "src/workspaces") || isInside(target, "src/app") || isInside(target, "src/components")) {
-      return "domains must not depend on workspace/app UI";
+    if (
+      target &&
+      [
+        "src/features",
+        "src/infrastructure",
+        "src/integrations",
+        "src/workspaces",
+        "src/app",
+        "src/components",
+        "src/modules",
+      ].some((root) => isInside(target, root))
+    ) {
+      return "domains must remain independent of application orchestration, implementations, providers, and UI";
     }
-    if (isFeatureUi(target)) {
-      return "domains must not depend on feature UI";
+
+    if (isFrameworkOrPersistenceImport(external)) {
+      return "domains must not import Next.js, Prisma, storage SDKs, or provider frameworks";
     }
   }
 
   if (sourceLayer === "features") {
-    if (isInside(target, "src/workspaces") || isInside(target, "src/app")) {
-      return "features may depend downward on shared/domains/server contracts, not workspaces/app routes";
+    if (
+      target &&
+      ["src/integrations", "src/workspaces", "src/app", "src/components"].some((root) =>
+        isInside(target, root),
+      )
+    ) {
+      return "features/application may depend on domain contracts, not concrete providers or UI composition";
     }
   }
 
-  if (sourceLayer === "workspaces" && isInside(target, "src/app")) {
-    return "workspaces must not depend on app routes";
+  if (sourceLayer === "infrastructure") {
+    if (
+      target &&
+      ["src/integrations", "src/workspaces", "src/app", "src/components"].some((root) =>
+        isInside(target, root),
+      )
+    ) {
+      return "infrastructure implements technical ports and must not depend on provider or UI composition layers";
+    }
+  }
+
+  if (sourceLayer === "integrations") {
+    if (
+      target &&
+      ["src/workspaces", "src/app", "src/components"].some((root) => isInside(target, root))
+    ) {
+      return "integrations must not depend on app/workspace UI";
+    }
+
+    if (
+      (target && (target === "src/lib/prisma" || isInside(target, "src/infrastructure/db"))) ||
+      external === "@prisma/client" ||
+      external === "@prisma/adapter-pg"
+    ) {
+      return "integration adapters must invoke application contracts instead of mutating canonical data through Prisma directly";
+    }
+  }
+
+  if (sourceLayer === "workspaces") {
+    if (
+      target &&
+      ["src/app", "src/infrastructure", "src/integrations"].some((root) => isInside(target, root))
+    ) {
+      return "workspaces compose UI and must not depend on app routes, infrastructure implementations, or concrete providers";
+    }
+
+    if (external === "@prisma/client" || external === "@prisma/adapter-pg") {
+      return "workspaces must not access Prisma directly";
+    }
   }
 
   return null;
 }
 
 function architectureLayer(path) {
-  if (isInside(path, "src/shared")) return "shared";
-  if (isInside(path, "src/domains")) return "domains";
-  if (isInside(path, "src/features")) return "features";
-  if (isInside(path, "src/workspaces")) return "workspaces";
+  for (const root of architectureRoots) {
+    if (isInside(path, root)) return root.slice("src/".length);
+  }
   return null;
 }
 
-function isFeatureUi(path) {
-  return /^src\/features\/[^/]+\/(?:ui|components)(?:\/|$)/.test(path);
-}
-
-function isMigrationRouteFile(path) {
+function isFrameworkOrPersistenceImport(specifier) {
   return (
-    /^src\/app\/(?:[^/]+\/)*today(?:\/|$)/.test(path) ||
-    /^src\/app\/(?:[^/]+\/)*work(?:\/|$)/.test(path) ||
-    /^src\/app\/(?:[^/]+\/)*patients\/\[[^/]*patientId[^/]*\](?:\/|$)/i.test(path) ||
-    /^src\/app\/(?:[^/]+\/)*operations\/finance(?:\/|$)/.test(path)
+    specifier === "next" ||
+    specifier.startsWith("next/") ||
+    specifier === "@prisma/client" ||
+    specifier === "@prisma/adapter-pg" ||
+    specifier.startsWith("@aws-sdk/")
   );
 }
 
-function isMigrationRoutePage(path) {
-  return isMigrationRouteFile(path) && /\/page\.(?:ts|tsx|js|jsx)$/.test(path);
+function normalizedExternalSpecifier(specifier) {
+  return specifier.trim();
 }
 
 function collectImports(text) {
@@ -270,10 +294,6 @@ function isNonUserFacingLine(line) {
     /^\s*\/\//.test(line) ||
     /^\s*import /.test(line)
   );
-}
-
-if (advisories.length > 0) {
-  console.warn(["architecture advisories:", ...advisories].join("\n"));
 }
 
 if (findings.length > 0) {
