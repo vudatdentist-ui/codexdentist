@@ -417,12 +417,16 @@ export async function dispatchIntegrationOutbox(
   db: PrismaClient,
   transport: IntegrationOutboxTransport,
   options: {
+    topic: string;
+    organizationId?: string;
     limit?: number;
     maxAttempts?: number;
     retryDelayMs?: number;
     staleLockMs?: number;
-  } = {},
+  },
 ): Promise<OutboxDispatchResult> {
+  const topic = requiredToken(options.topic, "topic");
+  const organizationId = options.organizationId?.trim() || null;
   const limit = Math.max(1, Math.min(options.limit ?? 20, 100));
   const maxAttempts = options.maxAttempts ?? 5;
   const retryDelayMs = options.retryDelayMs ?? 1_000;
@@ -433,7 +437,9 @@ export async function dispatchIntegrationOutbox(
     `WITH picked AS (
        SELECT "id"
        FROM "IntegrationOutbox"
-       WHERE (("status" IN ('PENDING', 'RETRY') AND "availableAt" <= CURRENT_TIMESTAMP)
+       WHERE "topic" = $4
+         AND ($5::text IS NULL OR "organizationId" = $5)
+         AND (("status" IN ('PENDING', 'RETRY') AND "availableAt" <= CURRENT_TIMESTAMP)
           OR ("status" = 'PROCESSING' AND "lockedAt" < $3))
        ORDER BY "createdAt"
        FOR UPDATE SKIP LOCKED
@@ -451,6 +457,8 @@ export async function dispatchIntegrationOutbox(
     limit,
     lockToken,
     staleBefore,
+    topic,
+    organizationId,
   );
 
   const result: OutboxDispatchResult = {
@@ -545,7 +553,7 @@ async function assertConnectionScope(
   if (
     connection.organizationId !== input.organizationId ||
     connection.provider !== input.provider ||
-    (input.clinicId && connection.clinicId && connection.clinicId !== input.clinicId)
+    (connection.clinicId !== null && connection.clinicId !== input.clinicId)
   ) {
     throw new IntegrationScopeError("integration-tenant-mismatch");
   }
