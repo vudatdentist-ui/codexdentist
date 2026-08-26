@@ -129,6 +129,7 @@ function boundaryViolation(sourceLayer, target, specifier) {
         "src/workspaces",
         "src/app",
         "src/modules",
+        "src/components",
       ].some((root) => isInside(target, root))
     ) {
       return "shared must remain business-agnostic and may not depend on higher layers";
@@ -159,11 +160,11 @@ function boundaryViolation(sourceLayer, target, specifier) {
   if (sourceLayer === "features") {
     if (
       target &&
-      ["src/integrations", "src/workspaces", "src/app", "src/components"].some((root) =>
-        isInside(target, root),
+      ["src/infrastructure", "src/integrations", "src/workspaces", "src/app", "src/components"].some(
+        (root) => isInside(target, root),
       )
     ) {
-      return "features/application may depend on domain contracts, not concrete providers or UI composition";
+      return "features/application may depend on domain contracts and ports, not concrete implementations, providers, or UI composition";
     }
   }
 
