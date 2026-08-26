@@ -79,7 +79,7 @@ jobs:
           npm run test:smoke
         env:
           NODE_ENV: test
-      - name: Runtime security, tenant, billing, journey, and file tests
+      - name: Runtime security, tenant, billing, journey, integration, and file tests
         run: |
           npm run test:security
           npm run test:security-runtime
@@ -87,7 +87,10 @@ jobs:
           npm run test:billing
           npm run test:billing-concurrency
           npm run test:actions
+          npm run test:integration
+          npm run test:integration-substrate
           npm run test:patient-files
+          npm run test:file-lifecycle
           npm run test:data-integrity
           npm run test:compensation
           npm run test:pilot-workflows
