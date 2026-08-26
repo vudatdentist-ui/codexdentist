@@ -97,6 +97,8 @@ jobs:
           npm run test:pilot-workflows
         env:
           NODE_ENV: test
+          INTEGRATION_OWNER_PASSWORD: "CodexSmoke2026!"
+          INTEGRATION_PATIENT_PASSWORD: "CodexSmoke2026!"
       - name: Browser QA
         if: github.event_name == 'pull_request' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: |
