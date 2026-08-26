@@ -82,18 +82,56 @@ async function assertGuardMarkers() {
     "updatePatientFileGovernanceAction",
     'canPerformAction(session, "file.delete")',
   ]);
+
   await assertSource("src/app/(app)/patients/actions.ts", [
     "createPatientAction",
-    'canPerformAction(session, "patient.create")',
-    'canPerformAction(session, "patient.update")',
+    "createPatientCommand",
+    "updatePatientCommand",
   ]);
+  await assertSource("src/lib/application/patient/commands.ts", [
+    'requireAction(session, "patient.create"',
+    'requireAction(session, "patient.update"',
+    "organizationId: session.organizationId",
+    "clinicId: { in: session.clinicIds }",
+  ]);
+  await assertSourceMissing("src/app/(app)/patients/actions.ts", [
+    "canPerformAction(",
+    '@/lib/prisma',
+  ]);
+
   await assertSource("src/app/(app)/schedule/actions.ts", [
     "createAppointmentAction",
-    'canPerformAction(session, "appointment.create")',
-    'canPerformAction(session, "appointment.update")',
-    'canPerformAction(session, "appointment.cancel")',
+    "createAppointmentCommand",
+    "updateAppointmentStatusCommand",
+    "cancelAppointmentCommand",
   ]);
+  await assertSource("src/lib/application/scheduling/commands.ts", [
+    'requireAction(session, "appointment.create")',
+    'requireAction(session, "appointment.update")',
+    'requireAction(session, "appointment.cancel")',
+    "allowedClinicIds(session)",
+  ]);
+  await assertSourceMissing("src/app/(app)/schedule/actions.ts", [
+    "canPerformAction(",
+    '@/lib/prisma',
+  ]);
+
   await assertSource("src/app/(app)/journey/actions.ts", [
+    "updateJourneyStateCommand",
+    "createJourneyCommentCommand",
+    "createJourneyTreatmentServicesTransport",
+  ]);
+  await assertSource("src/lib/application/journey/commands.ts", [
+    'canPerformAction(session, "treatment.plan.create")',
+    'canPerformAction(session, "patient.update")',
+    "patientAccessWhere(session)",
+  ]);
+  await assertSourceMissing("src/app/(app)/journey/actions.ts", [
+    "canPerformAction(",
+    '@/lib/prisma',
+    "runSerializableTransaction",
+  ]);
+  await assertSource("src/app/(app)/journey/treatment-actions.ts", [
     "createJourneyTreatmentServicesAction",
     'canPerformAction(session, "treatment.plan.create")',
     'canPerformAction(session, "treatment.service.progress")',
@@ -109,11 +147,22 @@ async function assertGuardMarkers() {
     "revisionForStage(current, stage)",
     "patientOdontogramRevision.create",
   ]);
+
   await assertSource("src/app/(app)/clinical/actions.ts", [
     "createClinicalNoteAction",
+    "finalizeClinicalNoteCommand",
+    "lockClinicalNoteCommand",
+  ]);
+  await assertSource("src/lib/application/clinical/commands.ts", [
     'canPerformAction(session, "clinical.note.create")',
     'canPerformAction(session, "clinical.note.sign")',
+    "patientAccessWhere(session)",
   ]);
+  await assertSourceMissing("src/app/(app)/clinical/actions.ts", [
+    "canPerformAction(",
+    '@/lib/prisma',
+  ]);
+
   await assertSource("src/app/(app)/treatment/actions.ts", [
     "createTreatmentPlanAction",
     'canPerformAction(session, "treatment.plan.create")',
@@ -131,6 +180,18 @@ async function assertSource(path, markers) {
   }
 
   console.log(`ok guard ${path}`);
+}
+
+async function assertSourceMissing(path, markers) {
+  const source = await readFile(path, "utf8");
+
+  for (const marker of markers) {
+    if (source.includes(marker)) {
+      throw new Error(`${path} contains forbidden guard marker "${marker}".`);
+    }
+  }
+
+  console.log(`ok thin transport ${path}`);
 }
 
 async function assertHealth() {
