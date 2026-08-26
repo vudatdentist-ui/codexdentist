@@ -1,0 +1,93 @@
+model IntegrationConnection {
+  id             String   @id
+  organizationId String
+  clinicId       String?
+  provider       String
+  status         String   @default("ACTIVE")
+  capabilities   Json     @default("{}")
+  secretRef      String?
+  metadata       Json     @default("{}")
+  lastVerifiedAt DateTime?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now())
+}
+
+model ExternalReference {
+  id             String   @id
+  organizationId String
+  clinicId       String?
+  connectionId   String?
+  provider       String
+  entityType     String
+  internalId     String
+  externalId     String
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @default(now())
+}
+
+model IntegrationInbox {
+  id              String   @id
+  organizationId  String
+  clinicId        String?
+  connectionId    String?
+  provider        String
+  externalEventId String
+  eventType       String
+  payload         Json     @default("{}")
+  payloadHash     String
+  status          String   @default("RECEIVED")
+  attempts        Int      @default(0)
+  availableAt     DateTime @default(now())
+  lastErrorCode   String?
+  processedAt     DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @default(now())
+}
+
+model IntegrationOutbox {
+  id            String   @id
+  organizationId String
+  clinicId      String?
+  topic         String
+  eventType     String
+  aggregateType String?
+  aggregateId   String?
+  payload       Json     @default("{}")
+  dedupeKey     String?
+  status        String   @default("PENDING")
+  attempts      Int      @default(0)
+  availableAt   DateTime @default(now())
+  lockToken     String?
+  lockedAt      DateTime?
+  lastErrorCode String?
+  dispatchedAt  DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @default(now())
+}
+
+model PatientFileObjectStage {
+  id                     String   @id
+  organizationId         String
+  clinicId               String
+  patientId              String
+  uploadedById           String?
+  targetPatientFileId    String   @unique
+  committedPatientFileId String?  @unique
+  fileName               String
+  mimeType               String
+  sizeBytes              Int
+  storageProvider        String
+  storageKey             String
+  previewStorageKey      String?
+  thumbnailStorageKey    String?
+  checksumSha256         String?
+  state                   String   @default("STAGED")
+  storedAt                DateTime?
+  committedAt             DateTime?
+  gcAfter                 DateTime
+  lastErrorCode           String?
+  deletedAt               DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @default(now())
+}
