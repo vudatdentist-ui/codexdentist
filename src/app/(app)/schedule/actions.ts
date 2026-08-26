@@ -17,17 +17,15 @@ import {
 
 const allowedStatusUpdates = ["REQUESTED", "CONFIRMED", "ARRIVED", "IN_CHAIR", "COMPLETED", "NO_SHOW"] as const;
 
-function scheduleRedirect(
-  notice: string,
-  patientId?: string | null,
-  context: {
-    clinicId?: string | null;
-    date?: string | null;
-    dateTo?: string | null;
-    providerId?: string | null;
-    status?: string | null;
-  } = {},
-) {
+type ScheduleContext = {
+  clinicId?: string | null;
+  date?: string | null;
+  dateTo?: string | null;
+  providerId?: string | null;
+  status?: string | null;
+};
+
+function scheduleRedirect(notice: string, patientId?: string | null, context: ScheduleContext = {}) {
   const params = new URLSearchParams({ notice });
   if (patientId) params.set("patientId", patientId);
   if (context.clinicId) params.set("clinicId", context.clinicId);
@@ -68,11 +66,12 @@ export async function createAppointmentAction(formData: FormData) {
       endsAt: new Date(startsAt.getTime() + duration * 60000),
       reason,
     });
-    revalidatePath("/schedule");
-    redirect(scheduleRedirect("created", patientId, { clinicId, date }));
   } catch (error) {
     redirect(scheduleRedirect(applicationErrorCode(error, "database-unavailable"), patientId, { clinicId, date }));
   }
+
+  revalidatePath("/schedule");
+  redirect(scheduleRedirect("created", patientId, { clinicId, date }));
 }
 
 export async function updateAppointmentStatusAction(formData: FormData) {
@@ -86,20 +85,22 @@ export async function updateAppointmentStatusAction(formData: FormData) {
     redirect(scheduleRedirect("bad-status", postedPatientId, redirectContext));
   }
 
+  let result: { clinicId: string; patientId: string; startsAt: Date };
   try {
-    const appointment = await updateAppointmentStatusCommand(session, {
+    result = await updateAppointmentStatusCommand(session, {
       appointmentId,
       status,
       requestedChairId: requiredString(formData.get("chairId")) || null,
       releaseChair: requiredString(formData.get("releaseChair")) === "1",
     });
-    redirectContext.clinicId = redirectContext.clinicId ?? appointment.clinicId;
-    redirectContext.date = redirectContext.date ?? vietnamDateInput(appointment.startsAt);
-    revalidatePath("/schedule");
-    redirect(scheduleRedirect("updated", appointment.patientId, redirectContext));
   } catch (error) {
     redirect(scheduleRedirect(applicationErrorCode(error, "database-unavailable"), postedPatientId, redirectContext));
   }
+
+  redirectContext.clinicId = redirectContext.clinicId ?? result.clinicId;
+  redirectContext.date = redirectContext.date ?? vietnamDateInput(result.startsAt);
+  revalidatePath("/schedule");
+  redirect(scheduleRedirect("updated", result.patientId, redirectContext));
 }
 
 export async function cancelAppointmentAction(formData: FormData) {
@@ -109,15 +110,17 @@ export async function cancelAppointmentAction(formData: FormData) {
   const redirectContext = scheduleContextFromForm(formData);
   if (!appointmentId) redirect(scheduleRedirect("not-found", postedPatientId, redirectContext));
 
+  let result: { clinicId: string; patientId: string; startsAt: Date };
   try {
-    const appointment = await cancelAppointmentCommand(session, appointmentId);
-    redirectContext.clinicId = redirectContext.clinicId ?? appointment.clinicId;
-    redirectContext.date = redirectContext.date ?? vietnamDateInput(appointment.startsAt);
-    revalidatePath("/schedule");
-    redirect(scheduleRedirect("cancelled", appointment.patientId, redirectContext));
+    result = await cancelAppointmentCommand(session, appointmentId);
   } catch (error) {
     redirect(scheduleRedirect(applicationErrorCode(error, "database-unavailable"), postedPatientId, redirectContext));
   }
+
+  redirectContext.clinicId = redirectContext.clinicId ?? result.clinicId;
+  redirectContext.date = redirectContext.date ?? vietnamDateInput(result.startsAt);
+  revalidatePath("/schedule");
+  redirect(scheduleRedirect("cancelled", result.patientId, redirectContext));
 }
 
 export async function updateChairOperationalStatusAction(formData: FormData) {
@@ -134,11 +137,12 @@ export async function updateChairOperationalStatusAction(formData: FormData) {
       status,
       appointmentId: requiredString(formData.get("appointmentId")) || null,
     });
-    revalidatePath("/schedule");
-    redirect(scheduleRedirect("updated", postedPatientId, redirectContext));
   } catch (error) {
     redirect(scheduleRedirect(applicationErrorCode(error, "database-unavailable"), postedPatientId, redirectContext));
   }
+
+  revalidatePath("/schedule");
+  redirect(scheduleRedirect("updated", postedPatientId, redirectContext));
 }
 
 export async function updateProviderOperationalStatusAction(formData: FormData) {
@@ -151,11 +155,12 @@ export async function updateProviderOperationalStatusAction(formData: FormData) 
 
   try {
     await updateProviderOperationalStatusCommand(session, { providerId, status });
-    revalidatePath("/schedule");
-    redirect(scheduleRedirect("updated", postedPatientId, redirectContext));
   } catch (error) {
     redirect(scheduleRedirect(applicationErrorCode(error, "database-unavailable"), postedPatientId, redirectContext));
   }
+
+  revalidatePath("/schedule");
+  redirect(scheduleRedirect("updated", postedPatientId, redirectContext));
 }
 
 function isAllowedStatus(status: string): status is AppointmentStatus {
@@ -166,7 +171,7 @@ function normalizeOperationalStatus(status: string): OperationalStatus | null {
   return status === "READY" || status === "BUSY" ? status : null;
 }
 
-function scheduleContextFromForm(formData: FormData) {
+function scheduleContextFromForm(formData: FormData): ScheduleContext {
   const postedProviderId = requiredString(formData.get("providerFilter"));
   const postedStatus = requiredString(formData.get("statusFilter"));
   return {
