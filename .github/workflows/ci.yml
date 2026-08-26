@@ -54,6 +54,7 @@ jobs:
       - run: npm run encoding:check
       - run: npm run typecheck
       - run: node scripts/agent-module-audit.mjs
+      - run: node scripts/phase2-architecture-check.mjs
       - run: npx prisma migrate deploy
       - run: npx prisma db seed
         env:
