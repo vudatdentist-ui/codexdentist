@@ -23,6 +23,27 @@ const architectureRoots = [
   "src/workspaces",
 ];
 
+const migratedTransportFiles = new Set([
+  "src/app/(app)/billing/actions.ts",
+  "src/app/(app)/clinical/actions.ts",
+  "src/app/(app)/journey/actions.ts",
+  "src/app/(app)/patients/actions.ts",
+  "src/app/(app)/schedule/actions.ts",
+]);
+
+const applicationRoot = "src/lib/application";
+const forbiddenTransportImports = new Set([
+  "@/lib/actions/permissions",
+  "@/lib/document-sequence",
+  "@/lib/notification-templates",
+  "@/lib/patient-access",
+  "@/lib/patient-file-storage",
+  "@/lib/prisma",
+  "@/lib/transaction",
+  "@prisma/client",
+  "@prisma/adapter-pg",
+]);
+
 const technicalCopyPatterns = [
   /PostgreSQL/i,
   /Database is connected/i,
@@ -99,10 +120,11 @@ function auditCopy(normalized, text) {
 }
 
 function auditArchitecture(file) {
+  const imports = collectImports(file.text);
+  auditApplicationBoundary(file, imports);
+
   const sourceLayer = architectureLayer(file.path);
   if (!sourceLayer) return;
-
-  const imports = collectImports(file.text);
 
   for (const item of imports) {
     const target = resolveImportPath(file.path, item.specifier);
@@ -111,6 +133,40 @@ function auditArchitecture(file) {
       findings.push(
         `${file.path}:${item.line}: architecture boundary ${sourceLayer} -> ${target ?? item.specifier}: ${violation}`,
       );
+    }
+  }
+}
+
+function auditApplicationBoundary(file, imports) {
+  if (migratedTransportFiles.has(file.path)) {
+    const hasApplicationCommand = imports.some((item) => {
+      const target = resolveImportPath(file.path, item.specifier);
+      return target ? isInside(target, applicationRoot) : false;
+    });
+    if (!hasApplicationCommand) {
+      findings.push(`${file.path}: migrated transport must delegate to src/lib/application commands`);
+    }
+
+    for (const item of imports) {
+      if (forbiddenTransportImports.has(item.specifier)) {
+        findings.push(
+          `${file.path}:${item.line}: migrated transport must not import ${item.specifier}; delegate through the application boundary`,
+        );
+      }
+    }
+  }
+
+  if (isInside(file.path, applicationRoot)) {
+    for (const item of imports) {
+      const specifier = item.specifier.trim();
+      if (specifier === "next" || specifier.startsWith("next/")) {
+        findings.push(
+          `${file.path}:${item.line}: application commands must be reusable outside Next.js transports`,
+        );
+      }
+    }
+    if (/\bFormData\b/.test(file.text)) {
+      findings.push(`${file.path}: application commands must accept typed inputs, not FormData`);
     }
   }
 }
