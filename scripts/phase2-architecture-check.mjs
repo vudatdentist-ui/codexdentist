@@ -26,6 +26,10 @@ assertMarkers("src/infrastructure/integrations/substrate.ts", substrate, [
   "processIntegrationInbox",
   "enqueueIntegrationOutbox",
   "dispatchIntegrationOutbox",
+  "topic: string;",
+  'WHERE "topic" = $4',
+  "organizationId?: string;",
+  "connection.clinicId !== null && connection.clinicId !== input.clinicId",
   "FOR UPDATE SKIP LOCKED",
   "integration.outbox_retry_scheduled",
   "integration.inbox_retry_scheduled",
@@ -39,6 +43,14 @@ assertMarkers("src/infrastructure/patient-files/staging.ts", staging, [
   '"state" = \'DELETED\'',
   "reconcilePatientFileStages",
   "FOR UPDATE SKIP LOCKED",
+]);
+
+const objectGc = source("src/infrastructure/patient-files/object-gc.ts");
+assertMarkers("src/infrastructure/patient-files/object-gc.ts", objectGc, [
+  "patientFileStageStoragePrefix",
+  'stage.storageKey.endsWith("-")',
+  "ListObjectsV2Command",
+  "DeleteObjectCommand",
 ]);
 
 const gcRoute = source("src/app/api/jobs/patient-file-gc/route.ts");
