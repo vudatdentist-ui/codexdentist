@@ -207,7 +207,7 @@ export async function updatePatientLeadSourceCommand(
     throw new ApplicationCommandError("patient-source-denied");
   }
 
-  const patient = await requireScopedPatient(session, patientId, { leadSource: true });
+  const patient = await requireScopedPatientWithLeadSource(session, patientId);
   if (patient.leadSource === leadSource) {
     throw new ApplicationCommandError("patient-source-unchanged");
   }
@@ -230,21 +230,30 @@ function requireClinicAccess(session: AppSession, clinicId: string) {
   if (!session.clinicIds.includes(clinicId)) throw new ApplicationCommandError("clinic-denied");
 }
 
-async function requireScopedPatient<T extends Prisma.PatientSelect | undefined = undefined>(
-  session: AppSession,
-  patientId: string,
-  extraSelect?: T,
-) {
+async function requireScopedPatient(session: AppSession, patientId: string) {
   const patient = await prisma.patient.findFirst({
     where: {
       id: patientId,
       organizationId: session.organizationId,
       clinicId: { in: session.clinicIds },
     },
-    select: { id: true, ...(extraSelect ?? {}) } as Prisma.PatientSelect,
+    select: { id: true },
   });
   if (!patient) throw new ApplicationCommandError("patient-not-found");
-  return patient as { id: string } & (T extends { leadSource: true } ? { leadSource: PatientLeadSource } : Record<string, unknown>);
+  return patient;
+}
+
+async function requireScopedPatientWithLeadSource(session: AppSession, patientId: string) {
+  const patient = await prisma.patient.findFirst({
+    where: {
+      id: patientId,
+      organizationId: session.organizationId,
+      clinicId: { in: session.clinicIds },
+    },
+    select: { id: true, leadSource: true },
+  });
+  if (!patient) throw new ApplicationCommandError("patient-not-found");
+  return patient;
 }
 
 async function writePatientAuditLog(
