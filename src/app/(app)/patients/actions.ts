@@ -45,6 +45,7 @@ export async function createPatientAction(formData: FormData) {
   if (!fullName || !phone) redirect("/patients?notice=patient-missing");
   if (dateOfBirth === "invalid") redirect("/patients?notice=patient-bad-date");
 
+  let patientId: string;
   try {
     const patient = await createPatientCommand(session, {
       clinicId,
@@ -60,12 +61,14 @@ export async function createPatientAction(formData: FormData) {
       nationalId: optionalString(formData.get("nationalId")),
       medicalAlerts: splitList(formData.get("medicalAlerts")),
     });
-    revalidatePath("/patients");
-    revalidatePath("/journey");
-    redirect(patientRedirect("patient-created", patient.id));
+    patientId = patient.id;
   } catch (error) {
     redirect(`/patients?notice=${applicationErrorCode(error, "patient-database")}`);
   }
+
+  revalidatePath("/patients");
+  revalidatePath("/journey");
+  redirect(patientRedirect("patient-created", patientId));
 }
 
 export async function updatePatientAction(formData: FormData) {
@@ -93,12 +96,13 @@ export async function updatePatientAction(formData: FormData) {
       nationalId: optionalString(formData.get("nationalId")),
       medicalAlerts: splitList(formData.get("medicalAlerts")),
     });
-    revalidatePath("/patients");
-    revalidatePath("/journey");
-    redirect(patientRedirect("patient-updated", patientId));
   } catch (error) {
     redirect(patientRedirect(applicationErrorCode(error, "patient-database"), patientId));
   }
+
+  revalidatePath("/patients");
+  revalidatePath("/journey");
+  redirect(patientRedirect("patient-updated", patientId));
 }
 
 export async function updatePatientConsentAction(formData: FormData) {
@@ -112,11 +116,12 @@ export async function updatePatientConsentAction(formData: FormData) {
 
   try {
     await updatePatientConsentCommand(session, patientId, status);
-    revalidatePath("/patients");
-    redirect(patientRedirect("patient-consent-updated", patientId));
   } catch (error) {
     redirect(patientRedirect(applicationErrorCode(error, "patient-database"), patientId));
   }
+
+  revalidatePath("/patients");
+  redirect(patientRedirect("patient-consent-updated", patientId));
 }
 
 export async function updatePatientLeadSourceAction(formData: FormData) {
@@ -131,12 +136,13 @@ export async function updatePatientLeadSourceAction(formData: FormData) {
 
   try {
     await updatePatientLeadSourceCommand(session, patientId, leadSource, reason);
-    revalidatePath("/patients");
-    revalidatePath("/reports");
-    redirect(patientRedirect("patient-source-updated", patientId));
   } catch (error) {
     redirect(patientRedirect(applicationErrorCode(error, "patient-database"), patientId));
   }
+
+  revalidatePath("/patients");
+  revalidatePath("/reports");
+  redirect(patientRedirect("patient-source-updated", patientId));
 }
 
 function patientRedirect(notice: string, patientId?: string | null) {
