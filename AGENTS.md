@@ -1,47 +1,72 @@
 # Codexdentist Agent Guide
 
-Last updated: 2026-05-29
+Last updated: 2026-08-27
 
-This repo intentionally keeps active documentation small. Read only these files before substantial work:
+This repository intentionally keeps active documentation small. Before substantial work, read:
 
-1. `docs/PROJECT_CONTEXT.md`
-2. `docs/QA_PLAYBOOK.md`
-3. `docs/OPERATIONS.md` when deploy, backup, S22U, go-live, or production config is involved
+1. `docs/PROJECT_CONTEXT.md` — canonical product direction, architecture, invariants, and phase gates.
+2. `docs/QA_PLAYBOOK.md` — required verification and audit loops.
+3. `docs/OPERATIONS.md` — only when deploy, backup/restore, hosting, runtime jobs, go-live, or production configuration is involved.
 
-Repo code plus these docs beats chat history. Do not recreate long refactor logs, session handoffs, CLI continuation plans, or audit dumps.
+`docs/PROJECT_CONTEXT.md` replaces all previous product/refactor context. Git history, old chats, retired migration plans, and deleted documents are historical evidence only and must not be revived as active instructions unless the canonical context explicitly reintroduces them.
+
+Repository code plus the active docs above beats chat history.
 
 ## Core Rules
 
-- Preserve real data. Do not reset, reseed, delete, or blank data unless the user explicitly asks.
-- Treat Vietnamese text as UTF-8. Avoid PowerShell bulk `Get-Content`/`Set-Content`; use `apply_patch`, Node UTF-8 APIs, or safe formatters.
+- Preserve real data. Do not reset, reseed, delete, truncate, or blank operational data unless the user explicitly asks and the restore path is understood.
+- Treat Vietnamese text as UTF-8. Avoid unsafe bulk text rewrites; use patch/update operations or UTF-8-safe tooling.
 - Run `npm run encoding:check` after bulk text edits and whenever Vietnamese UI copy changes.
-- Enforce permissions in loaders/actions, not only in UI.
-- Scope operational data by `organizationId`; clinic records must also respect accessible clinic ids.
-- Patient files, auth, tenant isolation, billing, payroll/commission, AI audit, notifications, and PHI/PII are high-risk.
-- User-facing workflow UI must not mention PostgreSQL, database connectivity, demo mode, seed data, or server console.
+- Enforce permissions server-side. UI visibility is never authorization.
+- Scope business data by `organizationId`; clinic-owned records must also respect accessible clinic IDs.
+- Patient files, auth, tenant isolation, billing, payroll/commission, clinical history, AI audit, notifications, integrations, and PHI/PII are high-risk.
+- User-facing workflow UI must not expose PostgreSQL, database connectivity, seed/demo implementation details, server console, or architecture terminology.
+- External providers must enter through application/integration boundaries and must not write canonical core domain tables directly.
+- Prefer strangler refactors with preserved behavior and tests over broad rewrites.
+- A phase is not complete when implementation is written; follow the audit -> fix -> re-audit loop and satisfy every exit criterion in `docs/PROJECT_CONTEXT.md`.
+- Never weaken, skip, or delete a safety test merely to make a refactor pass.
+
+## Architecture Direction
+
+Target layers are:
+
+```text
+shared -> domains -> features/application -> workspaces -> app
+                    ^
+                    |
+              infrastructure
+                    ^
+                    |
+               integrations
+```
+
+Read the precise dependency rules in `docs/PROJECT_CONTEXT.md`. Existing `src/components`, `src/modules`, and broad `src/lib` code are migration territory, not proof that new code may ignore the target boundaries.
 
 ## Common Commands
 
 ```bash
 docker compose up -d
 npm run dev
-npm run build
-npm run typecheck
 npm run encoding:check
-npm run test:seed-users
+npm run typecheck
+npm run agent:audit
+npm run test:security
+npm run test:tenant
 npm run test:smoke
 npm run browser:qa
-npm run agent:health
+npm run build
 ```
+
+Use the focused test matrix in `docs/QA_PLAYBOOK.md` for billing, Journey/files, permissions, compensation, integrations, schema changes, and release work.
 
 Local app: `http://127.0.0.1:3000`
 
-Smoke owner after seeding: `owner@nhavista.vn / CodexSmoke2026!`
+Smoke credentials are test-only and must never be treated as production onboarding credentials.
 
 ## Documentation Rules
 
-- Keep active Markdown under 8 files.
-- Prefer updating one of the active docs over adding a new file.
-- If a product or safety rule changes, update `docs/PROJECT_CONTEXT.md`.
-- If a verification or release rule changes, update `docs/QA_PLAYBOOK.md` or `docs/OPERATIONS.md`.
-- Use Git history for change history; do not create a separate work log.
+- Keep active Markdown small; prefer updating one of the three active operational/context documents over creating parallel plans.
+- Product, architecture, invariant, integration, or phase changes belong in `docs/PROJECT_CONTEXT.md`.
+- Verification/gate changes belong in `docs/QA_PLAYBOOK.md`.
+- Deploy, hosting, backup, restore, job, and production configuration changes belong in `docs/OPERATIONS.md`.
+- Use Git history for change history; do not create session handoff logs, long audit dumps, or a second product context.
