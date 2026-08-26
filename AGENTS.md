@@ -28,17 +28,17 @@ Repository code plus the active docs above beats chat history.
 
 ## Architecture Direction
 
-Target layers are:
+Dependency direction for new architecture code:
 
 ```text
-shared -> domains -> features/application -> workspaces -> app
-                    ^
-                    |
-              infrastructure
-                    ^
-                    |
-               integrations
+app -> workspaces -> features -> domains -> shared
+ |                     ^
+ +-> infrastructure ---+
+ |
+ +-> integrations ----->+
 ```
+
+`infrastructure` and `integrations` implement or invoke application/domain contracts; `features` must not import their concrete implementations. `app` is the composition/transport layer allowed to wire implementations to use-cases.
 
 Read the precise dependency rules in `docs/PROJECT_CONTEXT.md`. Existing `src/components`, `src/modules`, and broad `src/lib` code are migration territory, not proof that new code may ignore the target boundaries.
 
