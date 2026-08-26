@@ -1,10 +1,14 @@
 "use server";
 
 import type { Prisma } from "@prisma/client";
-import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canPerformAction } from "@/lib/actions/permissions";
+import { applicationErrorCode } from "@/lib/application/errors";
+import {
+  createJourneyCommentCommand,
+  updateJourneyStateCommand,
+} from "@/lib/application/journey/commands";
 import { requireViewSession } from "@/lib/auth";
 import {
   calculateServiceProgressCompensation,
@@ -12,17 +16,11 @@ import {
   type ServiceCompensationRuleInput,
 } from "@/lib/compensation";
 import { databaseActorId, optionalString, parseMoney, requiredString, splitList } from "@/lib/form-validation";
-import {
-  isUploadedPatientFile,
-  patientFileValidationError,
-  storePatientUpload,
-} from "@/lib/patient-file-storage";
+import { isUploadedPatientFile } from "@/lib/patient-file-storage";
 import { patientAccessWhere } from "@/lib/patient-access";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 import { runSerializableTransaction } from "@/lib/transaction";
-
-const MAX_JOURNEY_COMMENT_FILES = 10;
 
 function journeyRedirect(notice: string, patientId?: string | null) {
   const params = new URLSearchParams({ notice });
@@ -36,87 +34,24 @@ function journeyRedirect(notice: string, patientId?: string | null) {
 
 export async function updateJourneyStateAction(formData: FormData) {
   const session = await requireViewSession("journey");
-
-  if (!canPerformAction(session, "treatment.plan.create")) {
-    redirect("/journey?notice=journey-denied");
-  }
-
   const patientId = requiredString(formData.get("patientId"));
   const stateRedirect = (notice: string) => journeyRedirect(notice, patientId);
   const treatmentGoal = optionalString(formData.get("treatmentGoal"));
   const treatmentPlan = optionalString(formData.get("treatmentPlan"));
   const odontogramTeeth = splitList(formData.get("odontogramTeeth"), /[\n,]/);
 
-  if (!patientId) {
-    redirect(stateRedirect("journey-state-missing"));
-  }
+  if (!patientId) redirect(stateRedirect("journey-state-missing"));
 
   try {
-    const patient = await prisma.patient.findFirst({
-      where: {
-        ...patientAccessWhere(session),
-        id: patientId,
-      },
-      select: {
-        id: true,
-        clinicId: true,
-      },
-    });
-
-    if (!patient) {
-      redirect(stateRedirect("journey-state-missing"));
-    }
-
-    const state = await prisma.patientJourneyState.upsert({
-      where: {
-        patientId: patient.id,
-      },
-      update: {
-        clinicId: patient.clinicId,
-        treatmentGoal,
-        treatmentPlan,
-        odontogramTeeth,
-        odontogramSnapshot: {
-          selectedTargets: odontogramTeeth,
-        } as Prisma.InputJsonValue,
-        updatedById: databaseActorId(session.userId),
-      },
-      create: {
-        organizationId: session.organizationId,
-        clinicId: patient.clinicId,
-        patientId: patient.id,
-        treatmentGoal,
-        treatmentPlan,
-        odontogramTeeth,
-        odontogramSnapshot: {
-          selectedTargets: odontogramTeeth,
-        } as Prisma.InputJsonValue,
-        updatedById: databaseActorId(session.userId),
-      },
-      select: {
-        id: true,
-      },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        organizationId: session.organizationId,
-        actorId: databaseActorId(session.userId),
-        action: "journey.state_updated",
-        entityType: "PatientJourneyState",
-        entityId: state.id,
-        metadata: {
-          patientId: patient.id,
-          odontogramTeeth,
-        } as Prisma.InputJsonValue,
-      },
+    await updateJourneyStateCommand(session, {
+      patientId,
+      treatmentGoal,
+      treatmentPlan,
+      odontogramTeeth,
     });
   } catch (error) {
-    if (isNextRedirect(error)) {
-      throw error;
-    }
     console.error("journey.state_update_failed", error);
-    redirect(stateRedirect("journey-database"));
+    redirect(stateRedirect(applicationErrorCode(error, "journey-database")));
   }
 
   revalidatePath("/journey");
@@ -125,177 +60,20 @@ export async function updateJourneyStateAction(formData: FormData) {
 
 export async function createJourneyCommentAction(formData: FormData) {
   const session = await requireViewSession("journey");
-
-  if (!canPerformAction(session, "patient.update")) {
-    redirect("/journey?notice=journey-denied");
-  }
-
   const patientId = requiredString(formData.get("patientId"));
   const commentRedirect = (notice: string) => journeyRedirect(notice, patientId);
   const body = requiredString(formData.get("body"));
-  const uploadedFiles = formData
-    .getAll("file")
-    .filter(isUploadedPatientFile);
-  const hasUpload = uploadedFiles.length > 0;
+  const files = formData.getAll("file").filter(isUploadedPatientFile);
 
-  if (!patientId || (!body && !hasUpload)) {
+  if (!patientId || (!body && files.length === 0)) {
     redirect(commentRedirect("journey-comment-missing"));
   }
 
-  if (uploadedFiles.length > MAX_JOURNEY_COMMENT_FILES) {
-    redirect(commentRedirect("files-too-many"));
-  }
-
-  const uploadValidationError = uploadedFiles
-    .map(patientFileValidationError)
-    .find(Boolean);
-
-  if (uploadValidationError) {
-    redirect(commentRedirect(uploadValidationError));
-  }
-
   try {
-    const patient = await prisma.patient.findFirst({
-      where: {
-        ...patientAccessWhere(session),
-        id: patientId,
-      },
-      select: {
-        id: true,
-        clinicId: true,
-      },
-    });
-
-    if (!patient) {
-      redirect(commentRedirect("journey-comment-missing"));
-    }
-
-    const commentId = randomUUID();
-    const storedAttachments = await Promise.all(
-      uploadedFiles.map(async (uploadedFile, index) => {
-        const patientFileId = randomUUID();
-        const storedUpload = await storePatientUpload({
-          file: uploadedFile,
-          organizationId: session.organizationId,
-          patientId: patient.id,
-          patientFileId,
-        });
-
-        return {
-          index,
-          patientFileId,
-          storedUpload,
-          attachmentUrl: `/patient-files/${patientFileId}`,
-        };
-      }),
-    );
-    const firstStoredAttachment = storedAttachments[0] ?? null;
-    const commentBody =
-      body ||
-      uploadedFiles
-        .map((file) => file.name)
-        .filter(Boolean)
-        .join(", ") ||
-      "File đính kèm";
-
-    await prisma.$transaction(async (tx) => {
-      const createdFiles = await Promise.all(
-        storedAttachments.map((attachment) =>
-          tx.patientFile.create({
-            data: {
-              id: attachment.patientFileId,
-              organizationId: session.organizationId,
-              clinicId: patient.clinicId,
-              patientId: patient.id,
-              uploadedById: databaseActorId(session.userId),
-              category: "TIMELINE_COMMENT",
-              title: commentBody.slice(0, 80),
-              url: attachment.attachmentUrl,
-              fileName: attachment.storedUpload.fileName,
-              mimeType: attachment.storedUpload.mimeType,
-              sizeBytes: attachment.storedUpload.sizeBytes,
-              notes: commentBody,
-              sourceType:
-                attachment.storedUpload.storageProvider === "r2"
-                  ? "R2_UPLOAD"
-                  : "LOCAL_UPLOAD",
-              sourceId: attachment.storedUpload.relativePath,
-              storageProvider: attachment.storedUpload.storageProvider,
-              storageKey: attachment.storedUpload.storageKey,
-              checksumSha256: attachment.storedUpload.checksumSha256,
-              previewUrl: attachment.storedUpload.preview
-                ? `${attachment.attachmentUrl}?variant=preview`
-                : null,
-              previewMimeType: attachment.storedUpload.preview?.mimeType ?? null,
-              previewSizeBytes: attachment.storedUpload.preview?.sizeBytes ?? null,
-              previewStorageKey: attachment.storedUpload.preview?.storageKey ?? null,
-              thumbnailUrl: attachment.storedUpload.thumbnail
-                ? `${attachment.attachmentUrl}?variant=thumbnail`
-                : null,
-              thumbnailMimeType: attachment.storedUpload.thumbnail?.mimeType ?? null,
-              thumbnailSizeBytes: attachment.storedUpload.thumbnail?.sizeBytes ?? null,
-              thumbnailStorageKey: attachment.storedUpload.thumbnail?.storageKey ?? null,
-              virusScanStatus: "NOT_SCANNED",
-            },
-            select: {
-              id: true,
-            },
-          }),
-        ),
-      );
-
-      await tx.journeyComment.create({
-        data: {
-          id: commentId,
-          organizationId: session.organizationId,
-          clinicId: patient.clinicId,
-          patientId: patient.id,
-          authorId: databaseActorId(session.userId),
-          body: commentBody,
-          attachmentUrl: firstStoredAttachment?.attachmentUrl ?? null,
-          attachmentName: firstStoredAttachment?.storedUpload.fileName ?? null,
-          attachmentMime: firstStoredAttachment?.storedUpload.mimeType ?? null,
-          patientFileId: createdFiles[0]?.id ?? null,
-          attachments: {
-            create: storedAttachments.map((attachment, index) => ({
-              patientFileId: createdFiles[index]?.id ?? attachment.patientFileId,
-              url: attachment.attachmentUrl,
-              name: attachment.storedUpload.fileName,
-              mimeType: attachment.storedUpload.mimeType,
-              fileKind: attachment.storedUpload.fileKind,
-              sizeBytes: attachment.storedUpload.sizeBytes,
-              previewUrl: attachment.storedUpload.preview
-                ? `${attachment.attachmentUrl}?variant=preview`
-                : null,
-              thumbnailUrl: attachment.storedUpload.thumbnail
-                ? `${attachment.attachmentUrl}?variant=thumbnail`
-                : null,
-              sortOrder: attachment.index,
-            })),
-          },
-        },
-      });
-
-      await tx.auditLog.create({
-        data: {
-          organizationId: session.organizationId,
-          actorId: databaseActorId(session.userId),
-          action: "journey.comment_created",
-          entityType: "JourneyComment",
-          entityId: commentId,
-          metadata: {
-            patientId: patient.id,
-            patientFileIds: createdFiles.map((file) => file.id),
-          } as Prisma.InputJsonValue,
-        },
-      });
-    });
+    await createJourneyCommentCommand(session, { patientId, body, files });
   } catch (error) {
-    if (isNextRedirect(error)) {
-      throw error;
-    }
     console.error("journey.comment_create_failed", error);
-    redirect(commentRedirect("journey-database"));
+    redirect(commentRedirect(applicationErrorCode(error, "journey-database")));
   }
 
   revalidatePath("/journey");
