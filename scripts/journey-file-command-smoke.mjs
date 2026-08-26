@@ -34,7 +34,7 @@ try {
   });
   const organization = await prisma.organization.findUniqueOrThrow({
     where: { id: owner.organizationId },
-    select: { id: true, name: true, slug: true, domain: true },
+    select: { id: true, name: true, slug: true, primaryDomain: true },
   });
   const clinic = await prisma.clinic.findFirstOrThrow({
     where: { organizationId: owner.organizationId },
@@ -62,7 +62,7 @@ try {
     organizationId: owner.organizationId,
     organizationName: organization.name,
     organizationSlug: organization.slug,
-    organizationDomain: organization.domain,
+    organizationDomain: organization.primaryDomain,
     isDemo: false,
     workspaceExpiresAt: null,
     clinicIds: [clinic.id],
