@@ -9,12 +9,11 @@ import {
 } from "@/lib/application/journey/commands";
 import { requireViewSession } from "@/lib/auth";
 import { optionalString, requiredString, splitList } from "@/lib/form-validation";
-
-export {
-  createJourneyTreatmentServicesAction,
-  deleteJourneyTreatmentServiceAction,
-  recordJourneyServiceProgressAction,
-  updateJourneyTreatmentServiceDiscountAction,
+import {
+  createJourneyTreatmentServicesAction as createJourneyTreatmentServicesTransport,
+  deleteJourneyTreatmentServiceAction as deleteJourneyTreatmentServiceTransport,
+  recordJourneyServiceProgressAction as recordJourneyServiceProgressTransport,
+  updateJourneyTreatmentServiceDiscountAction as updateJourneyTreatmentServiceDiscountTransport,
 } from "./treatment-actions";
 
 function journeyRedirect(notice: string, patientId?: string | null) {
@@ -69,6 +68,22 @@ export async function createJourneyCommentAction(formData: FormData) {
 
   revalidatePath("/journey");
   redirect(commentRedirect("journey-comment-created"));
+}
+
+export async function createJourneyTreatmentServicesAction(formData: FormData) {
+  return createJourneyTreatmentServicesTransport(formData);
+}
+
+export async function deleteJourneyTreatmentServiceAction(formData: FormData) {
+  return deleteJourneyTreatmentServiceTransport(formData);
+}
+
+export async function recordJourneyServiceProgressAction(formData: FormData) {
+  return recordJourneyServiceProgressTransport(formData);
+}
+
+export async function updateJourneyTreatmentServiceDiscountAction(formData: FormData) {
+  return updateJourneyTreatmentServiceDiscountTransport(formData);
 }
 
 function isUploadedFile(value: FormDataEntryValue): value is File {
