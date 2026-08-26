@@ -88,8 +88,8 @@ jobs:
           npm run test:billing
           npm run test:billing-concurrency
           npm run test:actions
-          npm run test:integration
           npm run test:integration-substrate
+          npm run test:journey-file-command
           npm run test:patient-files
           npm run test:file-lifecycle
           npm run test:data-integrity
@@ -97,8 +97,6 @@ jobs:
           npm run test:pilot-workflows
         env:
           NODE_ENV: test
-          INTEGRATION_OWNER_PASSWORD: "CodexSmoke2026!"
-          INTEGRATION_PATIENT_PASSWORD: "CodexSmoke2026!"
       - name: Browser QA
         if: github.event_name == 'pull_request' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: |
