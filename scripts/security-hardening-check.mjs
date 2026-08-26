@@ -66,8 +66,21 @@ assertSource("src/lib/patient-access.ts", [
   'session.role === "PATIENT"',
   "portalUserId: session.userId",
 ]);
-assertSource("src/app/(app)/billing/actions.ts", [
+assertSource("src/lib/application/revenue/commands.ts", [
   "runSerializableTransaction",
+  "recordInvoicePaymentCommand",
+  "recordPatientReceiptCommand",
+  "recordServiceCollectionCommand",
+  "issueServiceInvoiceCommand",
+  "voidInvoiceCommand",
+  "recordInvoiceRefundCommand",
+]);
+assertSource("src/app/(app)/billing/actions.ts", [
+  '@/lib/application/revenue/commands',
+]);
+assertSourceMissing("src/app/(app)/billing/actions.ts", [
+  "runSerializableTransaction",
+  '@/lib/prisma',
 ]);
 assertSource("src/app/(app)/patient-app/actions.ts", [
   'status: "REQUESTED"',
