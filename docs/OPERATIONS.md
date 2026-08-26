@@ -1,6 +1,6 @@
 # Operations
 
-Last updated: 2026-07-25
+Last updated: 2026-08-27
 
 ## Local PC
 
@@ -51,13 +51,9 @@ Self-host storage:
 
 ### Automatic deploy from GitHub `main`
 
-The repository deploys to the Namecheap cPanel app after a successful commit to
-`main` through `.github/workflows/deploy-namecheap.yml`. The workflow uploads a
-source archive over SSH, stages it outside the live app, builds with the physical
-dependency tree in the cPanel app root, runs Prisma migrations, updates only
-application files, and restarts the existing CloudLinux Node.js app.
-It never reads, replaces, or commits the production `.env`, PostgreSQL data,
-protected files, backups, or the physical `node_modules` directory.
+The repository deploys to the Namecheap cPanel app after a successful commit to `main` through `.github/workflows/deploy-namecheap.yml`. The workflow uploads a source archive over SSH, stages it outside the live app, builds with the physical dependency tree in the cPanel app root, runs Prisma migrations, updates only application files, and restarts the existing CloudLinux Node.js app.
+
+It never reads, replaces, or commits the production `.env`, PostgreSQL data, protected files, backups, or the physical `node_modules` directory.
 
 Configure these GitHub repository secrets once:
 
@@ -71,15 +67,9 @@ Configure these GitHub repository secrets once:
 | `NAMECHEAP_SSH_KEY` | Private Ed25519 key used only by GitHub Actions |
 | `NAMECHEAP_KNOWN_HOSTS` | Pinned `ssh-keyscan` output for the host and port |
 
-In cPanel, import the matching public key under **SSH Access → Manage SSH
-Keys**, authorize it, and confirm that the key can run a non-interactive command.
-Do not put `.env`, database credentials, R2 credentials, or a cPanel password in
-GitHub. A failed deploy does not run `start` on a different application or touch
-S22U.
+In cPanel, import the matching public key under **SSH Access → Manage SSH Keys**, authorize it, and confirm that the key can run a non-interactive command. Do not put `.env`, database credentials, R2 credentials, or a cPanel password in GitHub. A failed deploy must not start or mutate any unrelated application.
 
-The deploy workflow performs a public `/api/health` check after restart. The
-hourly production-health workflow remains separate and continues to monitor the
-public site and database.
+The deploy workflow performs a public `/api/health` check after restart. The hourly production-health workflow remains separate and continues to monitor the public site and database.
 
 Current cPanel deployment:
 
@@ -143,7 +133,7 @@ Public host routing:
 - root/`www`: product site, feature guide at `/features`, and compatibility demo entry at `/demo`;
 - `demo`: 24-hour demo entry directly at `/`;
 - `docs`: redirects to `/docs`;
-- `odontogram`: rewrites `/` internally to the standalone five-surface odontogram prototype;
+- `odontogram`: rewrites `/` internally to the standalone odontogram entry;
 - `app`/`admin`: neutral application entry;
 - other supported subdomains: tenant application.
 
@@ -218,14 +208,18 @@ Run before connecting real patient data:
 ```powershell
 npm run encoding:check
 npm run typecheck
+npm run agent:audit
 npm run build
 npm run test:smoke
 npm run test:roles
 npm run test:actions
 npm run test:tenant
 npm run test:hardening
+npm run test:security
 npm run test:billing
+npm run test:billing-concurrency
 npm run test:patient-files
+npm run test:data-integrity
 npm run browser:qa
 npm run go-live:check
 ```
@@ -239,7 +233,7 @@ Go-live is blocked by:
 - unauthorized file access;
 - demo fallback in production;
 - no verified backup/restore drill;
-- active users still accepting `demo1234`.
+- active users still accepting test/demo passwords.
 
 ## Manual Pilot Smoke
 
