@@ -19,6 +19,7 @@ const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) })
 const suffix = randomUUID();
 const provider = `qa-phase2-${suffix}`;
 const topic = `qa-phase2-${suffix}`;
+const unrelatedTopic = `qa-phase2-unrelated-${suffix}`;
 let secondOrganizationId = null;
 
 try {
@@ -55,6 +56,24 @@ try {
     externalId: `external-patient-${suffix}`,
   });
   assert(reference.internalId === patient.id, "external reference mapping");
+
+  let missingClinicDenied = false;
+  try {
+    await createExternalReference(prisma, {
+      organizationId: owner.organizationId,
+      clinicId: null,
+      connectionId: connection.id,
+      provider,
+      entityType: "Patient",
+      internalId: `missing-clinic-${suffix}`,
+      externalId: `missing-clinic-external-${suffix}`,
+    });
+  } catch (error) {
+    missingClinicDenied =
+      error instanceof IntegrationScopeError &&
+      error.code === "integration-tenant-mismatch";
+  }
+  assert(missingClinicDenied, "clinic-scoped connection requires matching clinic");
 
   const otherOrganization = await prisma.organization.create({
     data: { name: `QA Phase2 Tenant ${suffix}` },
@@ -202,6 +221,15 @@ try {
   assert(committedMutationCount === 1, "domain mutation committed exactly once");
   assert(outboxRows.length === 1, "outbox committed exactly once with domain mutation");
 
+  const unrelated = await enqueueIntegrationOutbox(prisma, {
+    organizationId: owner.organizationId,
+    clinicId: clinic.id,
+    topic: unrelatedTopic,
+    eventType: "qa.unrelated",
+    dedupeKey: `qa-unrelated:${suffix}`,
+    payload: { marker: suffix },
+  });
+
   const dispatchFailure = await dispatchIntegrationOutbox(
     prisma,
     async () => {
@@ -209,9 +237,24 @@ try {
       error.code = "qa-provider-down";
       throw error;
     },
-    { retryDelayMs: 1 },
+    {
+      topic,
+      organizationId: owner.organizationId,
+      retryDelayMs: 1,
+    },
   );
+  assert(dispatchFailure.claimed === 1, "dispatcher claims only requested topic");
   assert(dispatchFailure.retried === 1, "provider failure scheduled outbox retry");
+
+  const unrelatedAfterDispatch = await prisma.$queryRawUnsafe(
+    `SELECT "status", "attempts" FROM "IntegrationOutbox" WHERE "id" = $1`,
+    unrelated.event.id,
+  );
+  assert(
+    unrelatedAfterDispatch[0]?.status === "PENDING" &&
+      Number(unrelatedAfterDispatch[0]?.attempts) === 0,
+    "dispatcher leaves unrelated topic untouched",
+  );
 
   const afterFailure = await prisma.$queryRawUnsafe(
     `SELECT "status", "attempts" FROM "IntegrationOutbox" WHERE "id" = $1`,
@@ -241,9 +284,13 @@ try {
     outboxRows[0].id,
   );
   const deliveredIds = [];
-  const dispatchSuccess = await dispatchIntegrationOutbox(prisma, async (event) => {
-    deliveredIds.push(event.id);
-  });
+  const dispatchSuccess = await dispatchIntegrationOutbox(
+    prisma,
+    async (event) => {
+      deliveredIds.push(event.id);
+    },
+    { topic, organizationId: owner.organizationId },
+  );
   assert(dispatchSuccess.sent === 1, "outbox retry dispatched successfully");
   assert(deliveredIds.length === 1, "transport invoked exactly once on successful retry");
 
@@ -269,7 +316,11 @@ try {
     `DELETE FROM "AuditLog" WHERE "entityType" IN ('IntegrationInbox', 'IntegrationOutbox') AND "organizationId" IN (SELECT "organizationId" FROM "IntegrationConnection" WHERE "provider" = $1)`,
     provider,
   ).catch(() => {});
-  await prisma.$executeRawUnsafe(`DELETE FROM "IntegrationOutbox" WHERE "topic" = $1`, topic).catch(() => {});
+  await prisma.$executeRawUnsafe(
+    `DELETE FROM "IntegrationOutbox" WHERE "topic" IN ($1, $2)`,
+    topic,
+    unrelatedTopic,
+  ).catch(() => {});
   await prisma.$executeRawUnsafe(`DELETE FROM "IntegrationInbox" WHERE "provider" = $1`, provider).catch(() => {});
   await prisma.$executeRawUnsafe(`DELETE FROM "ExternalReference" WHERE "provider" = $1`, provider).catch(() => {});
   await prisma.$executeRawUnsafe(`DELETE FROM "IntegrationConnection" WHERE "provider" = $1`, provider).catch(() => {});
