@@ -1,4 +1,3 @@
-import { File } from "node:buffer";
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
@@ -18,6 +17,7 @@ import {
   processIntegrationInbox,
 } from "@/infrastructure/integrations/substrate";
 import {
+  type ExternalReferenceRecord,
   getExternalReferenceByExternalId,
   getExternalReferenceByInternalId,
   getIntegrationConnectionById,
@@ -77,13 +77,14 @@ export async function POST(
   const envelopeId = minimal.envelopeId;
   if (!envelopeId) return error("documenso-envelope-id-missing", 400);
 
-  let envelopeRef = await getExternalReferenceByExternalId(prisma, {
-    organizationId: connection.organizationId,
-    connectionId: connection.id,
-    provider: "documenso",
-    entityType: "DOCUMENSO_ENVELOPE",
-    externalId: envelopeId,
-  });
+  let envelopeRef: ExternalReferenceRecord | null =
+    await getExternalReferenceByExternalId(prisma, {
+      organizationId: connection.organizationId,
+      connectionId: connection.id,
+      provider: "documenso",
+      entityType: "DOCUMENSO_ENVELOPE",
+      externalId: envelopeId,
+    });
 
   // Recovery path: provider may have created the envelope while Codex crashed
   // before saving the returned envelope id. externalId is the opaque PatientForm id.
@@ -234,7 +235,9 @@ export async function POST(
     patientId: patientForm.patientId,
     patientFileId,
   });
-  const file = new File([new Uint8Array(signedPdf.bytes)], signedPdf.fileName, {
+  const pdfBuffer = new ArrayBuffer(signedPdf.bytes.byteLength);
+  new Uint8Array(pdfBuffer).set(signedPdf.bytes);
+  const file = new File([pdfBuffer], signedPdf.fileName, {
     type: "application/pdf",
   });
 
@@ -266,6 +269,7 @@ export async function POST(
       thumbnailStorageKey: storedUpload.thumbnail?.storageKey ?? null,
     });
 
+    const scopedClinicId = envelopeRef.clinicId;
     const result = await processIntegrationInbox(
       prisma,
       accepted.event.id,
@@ -288,7 +292,7 @@ export async function POST(
 
         const reconciled = await reconcileSignedPatientFormCommand(tx, {
           organizationId: connection.organizationId,
-          clinicId: envelopeRef!.clinicId!,
+          clinicId: scopedClinicId,
           patientId: patientForm.patientId,
           patientFormId: patientForm.id,
           stageId,
