@@ -57,6 +57,12 @@ assertOrder(
   "Documenso creates DB stage before object write",
 );
 assert(
+  source.documensoWebhook.includes('entityType: "DOCUMENSO_REQUEST"') &&
+    source.documensoWebhook.includes("internalId: minimal.externalId") &&
+    source.documensoWebhook.includes("initiatedRequest?.clinicId"),
+  "Documenso recovery requires a previously initiated Codex request",
+);
+assert(
   source.documensoRequest.includes("readStoredPatientFile(sourceFile)") &&
     source.documensoRequest.includes("externalId: patientForm.id") &&
     source.documensoRequest.includes("fileName: `form-${patientForm.formNo}.pdf`") &&
