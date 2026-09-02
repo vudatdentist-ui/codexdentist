@@ -1,4 +1,4 @@
-import { createHmac, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
@@ -268,14 +268,9 @@ function sign(data) {
 }
 
 function eventId(payload) {
-  const { createHash } = awaitImportCryptoHack();
   return createHash("sha256")
     .update(`${payload.signature.toLowerCase()}:${payload.data.orderCode}`)
     .digest("hex");
-}
-
-function awaitImportCryptoHack() {
-  return { createHash: (algorithm) => new (requireUnavailable())(algorithm) };
 }
 
 async function postWebhook(connectionIdValue, payload) {
@@ -311,8 +306,4 @@ async function receiptCountByReferences(references) {
 function assert(condition, label) {
   if (!condition) throw new Error(`Phase3 payOS smoke failed: ${label}`);
   console.log(`ok ${label}`);
-}
-
-function requireUnavailable() {
-  throw new Error("unreachable");
 }
