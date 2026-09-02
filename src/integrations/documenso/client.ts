@@ -82,7 +82,7 @@ export async function createDocumensoSigningEnvelope(
   form.append("payload", JSON.stringify(payload));
   form.append(
     "files",
-    new Blob([input.pdfBytes], { type: "application/pdf" }),
+    new Blob([copyToArrayBuffer(input.pdfBytes)], { type: "application/pdf" }),
     sanitizePdfName(input.fileName),
   );
 
@@ -245,6 +245,12 @@ export async function downloadDocumensoSignedPdf(
       dispositionName ? decodeURIComponent(dispositionName) : `${envelopeId}-signed.pdf`,
     ),
   };
+}
+
+function copyToArrayBuffer(bytes: Uint8Array) {
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  return buffer;
 }
 
 function safeTextEqual(left: string, right: string) {
