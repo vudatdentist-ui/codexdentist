@@ -84,19 +84,25 @@ export async function POST(request: Request) {
   });
   if (!connection) return error("documenso-connection-not-configured", 503);
 
-  const requestInternalId = requestedIdempotencyKey || patientForm.id;
+  // A PatientForm owns exactly one managed Documenso signing ceremony. Caller
+  // idempotency keys are recorded only as request metadata and cannot create a
+  // second envelope for the same form.
   const existingRequest = await getExternalReferenceByInternalId(prisma, {
     organizationId: session.organizationId,
     connectionId: connection.id,
     provider: "documenso",
     entityType: "DOCUMENSO_REQUEST",
-    internalId: requestInternalId,
+    internalId: patientForm.id,
   });
   if (existingRequest) {
     const metadata = referenceMetadata(existingRequest);
+    if (metadata.sourcePatientFileId !== sourceFile.id) {
+      return error("documenso-source-pdf-conflict", 409);
+    }
     if (
-      metadata.patientFormId !== patientForm.id ||
-      metadata.sourcePatientFileId !== sourceFile.id
+      requestedIdempotencyKey &&
+      typeof metadata.idempotencyKey === "string" &&
+      metadata.idempotencyKey !== requestedIdempotencyKey
     ) {
       return error("documenso-idempotency-key-conflict", 409);
     }
@@ -117,11 +123,12 @@ export async function POST(request: Request) {
     connectionId: connection.id,
     provider: "documenso",
     entityType: "DOCUMENSO_REQUEST",
-    internalId: requestInternalId,
+    internalId: patientForm.id,
     externalId: randomUUID(),
     metadata: {
       patientFormId: patientForm.id,
       sourcePatientFileId: sourceFile.id,
+      idempotencyKey: requestedIdempotencyKey || null,
       status: "CREATING",
     },
   });
@@ -157,6 +164,7 @@ export async function POST(request: Request) {
     await updateExternalReferenceMetadata(prisma, requestReference.id, {
       patientFormId: patientForm.id,
       sourcePatientFileId: sourceFile.id,
+      idempotencyKey: requestedIdempotencyKey || null,
       status: "PENDING",
       envelopeId: envelope.envelopeId,
       signingUrl: envelope.signingUrl,
@@ -185,6 +193,7 @@ export async function POST(request: Request) {
     await updateExternalReferenceMetadata(prisma, requestReference.id, {
       patientFormId: patientForm.id,
       sourcePatientFileId: sourceFile.id,
+      idempotencyKey: requestedIdempotencyKey || null,
       status: "ERROR",
       errorCode: errorCode(cause, "documenso-signing-request-failed"),
     }).catch(() => {});
