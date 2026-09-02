@@ -86,34 +86,54 @@ export async function POST(
       externalId: envelopeId,
     });
 
-  // Recovery path: provider may have created the envelope while Codex crashed
-  // before saving the returned envelope id. externalId is the opaque PatientForm id.
+  // Recovery is allowed only for a PatientForm that Codex previously submitted.
+  // This covers provider-success/DB-failure without allowing a valid webhook
+  // secret to claim an arbitrary form in the tenant.
   if (!envelopeRef && minimal.externalId) {
-    const patientForm = await prisma.patientForm.findFirst({
-      where: {
-        id: minimal.externalId,
-        organizationId: connection.organizationId,
-      },
-      select: { id: true, clinicId: true, patientId: true },
+    const initiatedRequest = await getExternalReferenceByInternalId(prisma, {
+      organizationId: connection.organizationId,
+      connectionId: connection.id,
+      provider: "documenso",
+      entityType: "DOCUMENSO_REQUEST",
+      internalId: minimal.externalId,
     });
-    if (patientForm?.clinicId) {
-      try {
-        envelopeRef = await createExternalReference(prisma, {
+    if (initiatedRequest?.clinicId) {
+      const patientForm = await prisma.patientForm.findFirst({
+        where: {
+          id: minimal.externalId,
           organizationId: connection.organizationId,
-          clinicId: patientForm.clinicId,
-          connectionId: connection.id,
-          provider: "documenso",
-          entityType: "DOCUMENSO_ENVELOPE",
-          internalId: patientForm.id,
-          externalId: envelopeId,
-          metadata: {
-            patientFormId: patientForm.id,
-            patientId: patientForm.patientId,
+          clinicId: initiatedRequest.clinicId,
+        },
+        select: { id: true, clinicId: true, patientId: true },
+      });
+      if (patientForm?.clinicId) {
+        try {
+          envelopeRef = await createExternalReference(prisma, {
+            organizationId: connection.organizationId,
+            clinicId: patientForm.clinicId,
+            connectionId: connection.id,
+            provider: "documenso",
+            entityType: "DOCUMENSO_ENVELOPE",
+            internalId: patientForm.id,
+            externalId: envelopeId,
+            metadata: {
+              patientFormId: patientForm.id,
+              patientId: patientForm.patientId,
+              sourcePatientFileId:
+                typeof referenceMetadata(initiatedRequest).sourcePatientFileId === "string"
+                  ? referenceMetadata(initiatedRequest).sourcePatientFileId
+                  : null,
+              status: "RECOVERED_WEBHOOK",
+            },
+          });
+          await updateExternalReferenceMetadata(prisma, initiatedRequest.id, {
+            ...referenceMetadata(initiatedRequest),
             status: "RECOVERED_WEBHOOK",
-          },
-        });
-      } catch {
-        envelopeRef = null;
+            envelopeId,
+          });
+        } catch {
+          envelopeRef = null;
+        }
       }
     }
   }
