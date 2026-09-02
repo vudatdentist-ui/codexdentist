@@ -39,6 +39,9 @@ jobs:
       PATIENT_FILE_STORAGE_DRIVER: local
       SESSION_COOKIE_SECURE: "false"
       TRUSTED_PROXY_PROVIDER: reverse-proxy
+      PAYOS_CI_CLIENT_ID: phase3-ci-client
+      PAYOS_CI_API_KEY: phase3-ci-api-key
+      PAYOS_CI_CHECKSUM_KEY: ci-phase3-payos-checksum-secret
 
     steps:
       - uses: actions/checkout@v7
@@ -55,6 +58,7 @@ jobs:
       - run: npm run typecheck
       - run: node scripts/agent-module-audit.mjs
       - run: node scripts/phase2-architecture-check.mjs
+      - run: node scripts/phase3-architecture-check.mjs
       - run: npx prisma migrate deploy
       - run: npx prisma db seed
         env:
@@ -90,6 +94,7 @@ jobs:
           npm run test:actions
           npm run test:integration-substrate
           npm run test:journey-file-command
+          npm run test:phase3
           npm run test:patient-files
           npm run test:file-lifecycle
           npm run test:data-integrity
