@@ -245,7 +245,7 @@ npm run build
 
 Phase 5 is complete on the continuation branch: both native operations slices pass tenant/clinic, permission, audit, transition, architecture, and production-build gates.
 
-## 11. Phase 6 Gate — Optional Communication / FHIR
+## 11. Phase 6 Gate — Optional Communication / FHIR — COMPLETE
 
 Verify:
 
@@ -266,7 +266,7 @@ node scripts/phase6-architecture-check.mjs
 npm run test:phase6
 ```
 
-The FHIR export slice passes. Phase 6 remains open for optional communication/provider adapters and any verified inbound interoperability path.
+The FHIR export and disabled-by-default provider gates pass. Phase 6 is complete on the continuation branch; no unverified inbound provider mutation path was introduced.
 
 ## 12. Release Hardening Gate
 

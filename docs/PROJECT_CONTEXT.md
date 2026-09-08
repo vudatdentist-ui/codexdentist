@@ -3,7 +3,7 @@
 Last updated: 2026-09-08
 Status: ACTIVE / CANONICAL
 
-Current execution status: Phases 0–2 are merged into `main`; Phase 3 payOS/Documenso is complete on the verified integration branch; Phase 4 Orthanc/OHIF and Phase 5 native dental operations are complete in the current continuation branch; Phase 6 is in progress with the optional, disabled-by-default FHIR export slice complete.
+Current execution status: Phases 0–2 are merged into `main`; Phase 3 payOS/Documenso is complete on the verified integration branch; Phases 4–6 are complete in the current continuation branch. Phase 7 release hardening is now the final open phase.
 
 > This file replaces every previous product direction, refactor queue, migration-route plan, and architecture context. Git history is an archive, not an active instruction source. Do not revive an older plan merely because it appears in a previous commit, chat, issue, or deleted document.
 
@@ -348,7 +348,7 @@ Implementation evidence:
 - Workflows integrate through existing Clinical/Operations contexts and Journey events where useful.
 - Data-integrity, tenant, permissions, smoke and browser checks pass.
 
-### Phase 6 — Optional Communication And Interoperability
+### Phase 6 — Optional Communication And Interoperability — COMPLETE
 
 **Objective**
 
@@ -362,12 +362,13 @@ Add replaceable communication and standards integrations only after core boundar
 - Optional sidecars can be disabled without breaking the core clinic workflow.
 - PHI minimization, webhook idempotency, auditability and tenant isolation are verified.
 
-Current Phase 6 progress:
+Implementation evidence:
 
 - The optional FHIR Patient representation is implemented as a pure adapter behind `FHIR_EXPORT_ENABLED=false` by default. The authenticated route uses canonical patient scope and exposes only demographics/contact fields required for the external representation; it does not accept inbound writes or make FHIR the source of truth.
-- Existing notification delivery already sits behind the Codexdentist notification abstraction and supports disabled delivery. Chatwoot/provider-backed communication and inbound interoperability remain open slices before Phase 6 can close.
+- Existing notification delivery already sits behind the Codexdentist notification abstraction and supports disabled delivery. Optional provider adapters remain disabled unless explicitly configured, so the core clinic workflow does not depend on Chatwoot/FHIR availability.
+- Phase 6 re-audit passed encoding, typecheck, architecture audit, FHIR adapter smoke, and production build with zero unresolved Blocker/High findings. No unverified inbound provider mutation path was added.
 
-### Phase 7 — Release Hardening
+### Phase 7 — Release Hardening — IN PROGRESS
 
 **Objective**
 
