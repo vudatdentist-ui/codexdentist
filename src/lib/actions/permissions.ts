@@ -30,6 +30,9 @@ export type ActionKey =
   | "file.export"
   | "imaging.study.view"
   | "imaging.study.link"
+  | "lab.case.view"
+  | "lab.case.create"
+  | "lab.case.update"
   | "staff.manage"
   | "payroll.manage"
   | "settings.manage";
@@ -61,6 +64,9 @@ const actionRoles: Record<ActionKey, AppRole[]> = {
   "file.export": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST"],
   "imaging.study.view": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST", "FRONT_DESK"],
   "imaging.study.link": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST"],
+  "lab.case.view": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST", "FRONT_DESK"],
+  "lab.case.create": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST"],
+  "lab.case.update": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST"],
   "staff.manage": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],
   "payroll.manage": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],
   "settings.manage": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],

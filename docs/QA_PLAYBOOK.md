@@ -224,6 +224,18 @@ For Lab/Sterilization or other native dental capabilities:
 
 Run tenant, action permission, data-integrity, smoke, and browser gates plus feature-specific tests.
 
+Current Lab case/order slice evidence:
+
+```powershell
+npx prisma validate
+npm run typecheck
+npm run agent:audit
+node scripts/phase5-architecture-check.mjs
+npm run test:phase5
+```
+
+These checks pass for the native LabCase workflow and tenant/clinic/status-transition smoke. Phase 5 remains open while Sterilization cycle/instrument traceability is implemented and audited.
+
 ## 11. Phase 6 Gate — Optional Communication / FHIR
 
 Verify:
@@ -275,6 +287,7 @@ Automated tests do not replace these targeted observations when the correspondin
 - Staff/role administration cannot demote/disable protected equal-or-higher authority incorrectly and preserves at least one active owner.
 - Patient portal shows only the linked patient's data and future actionable appointments.
 - Imaging opens only studies already scoped to the active organization/clinic/patient; Orthanc outages show a readable unavailable state, and configured OHIF links open at desktop and 390px mobile widths without horizontal overflow.
+- Lab cases stay attached to the canonical patient/clinic/treatment service, reject skipped terminal transitions, and record each status transition in the audit log.
 - Vietnamese operational copy renders without mojibake and critical layouts do not horizontally overflow at supported mobile widths.
 
 ## 14. Audit Loop Record

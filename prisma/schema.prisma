@@ -280,6 +280,7 @@ model Organization {
   patientForms                   PatientForm[]
   patientFiles                   PatientFile[]
   imagingStudies                 ImagingStudy[]
+  labCases                       LabCase[]
   patientJourneyStates           PatientJourneyState[]
   patientOdontograms             PatientOdontogram[]
   patientOdontogramRevisions     PatientOdontogramRevision[]
@@ -380,6 +381,7 @@ model Clinic {
   patientForms                   PatientForm[]
   patientFiles                   PatientFile[]
   imagingStudies                 ImagingStudy[]
+  labCases                       LabCase[]
   patientJourneyStates           PatientJourneyState[]
   patientOdontograms             PatientOdontogram[]
   patientOdontogramRevisions     PatientOdontogramRevision[]
@@ -442,6 +444,7 @@ model User {
   requestedPatientForms             PatientForm[]                   @relation("PatientFormRequester")
   uploadedPatientFiles              PatientFile[]                   @relation("PatientFileUploader")
   createdImagingStudies             ImagingStudy[]                  @relation("ImagingStudyCreator")
+  createdLabCases                   LabCase[]                       @relation("LabCaseCreator")
   createdPaymentPlans               PaymentPlan[]                   @relation("PaymentPlanCreator")
   updatedJourneyStates              PatientJourneyState[]           @relation("PatientJourneyStateUpdater")
   updatedPatientOdontograms         PatientOdontogram[]             @relation("PatientOdontogramUpdater")
@@ -586,6 +589,7 @@ model Patient {
   forms                    PatientForm[]
   files                    PatientFile[]
   imagingStudies           ImagingStudy[]
+  labCases                 LabCase[]
   journeyState             PatientJourneyState?
   odontogram               PatientOdontogram?
   odontogramRevisions      PatientOdontogramRevision[]
@@ -1656,6 +1660,7 @@ model TreatmentService {
   invoiceItems            InvoiceItem[]
   receiptAllocations      ReceiptAllocation[]
   compensationAccruals    CompensationAccrual[]
+  labCases                LabCase[]
   createdAt               DateTime                        @default(now())
   updatedAt               DateTime                        @updatedAt
 
@@ -1987,6 +1992,36 @@ model ImagingStudy {
   @@index([organizationId, clinicId, patientId, studyDate])
   @@index([patientId, createdAt])
   @@index([connectionId, externalPatientId])
+}
+
+model LabCase {
+  id                 String            @id @default(cuid())
+  organizationId     String
+  organization       Organization      @relation(fields: [organizationId], references: [id])
+  clinicId           String
+  clinic             Clinic            @relation(fields: [clinicId], references: [id])
+  patientId          String
+  patient            Patient           @relation(fields: [patientId], references: [id])
+  treatmentServiceId String?
+  treatmentService   TreatmentService? @relation(fields: [treatmentServiceId], references: [id], onDelete: SetNull)
+  caseNo             String
+  title              String
+  laboratoryName     String?
+  workType           String
+  status             String            @default("DRAFT")
+  dueAt              DateTime?
+  sentAt             DateTime?
+  receivedAt         DateTime?
+  notes              String?
+  createdById        String?
+  createdBy          User?             @relation("LabCaseCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@unique([organizationId, caseNo])
+  @@index([organizationId, clinicId, status, dueAt])
+  @@index([patientId, createdAt])
+  @@index([treatmentServiceId])
 }
 
 model PatientJourneyState {

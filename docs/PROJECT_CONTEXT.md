@@ -3,7 +3,7 @@
 Last updated: 2026-09-08
 Status: ACTIVE / CANONICAL
 
-Current execution status: Phases 0–2 are merged into `main`; Phase 3 payOS/Documenso is complete on the verified integration branch; Phase 4 Orthanc/OHIF is complete in the current continuation branch. The next open product phase is Phase 5.
+Current execution status: Phases 0–2 are merged into `main`; Phase 3 payOS/Documenso is complete on the verified integration branch; Phase 4 Orthanc/OHIF is complete in the current continuation branch; Phase 5 is in progress with the native Lab case/order slice complete and Sterilization still open.
 
 > This file replaces every previous product direction, refactor queue, migration-route plan, and architecture context. Git history is an archive, not an active instruction source. Do not revive an older plan merely because it appears in a previous commit, chat, issue, or deleted document.
 
@@ -334,6 +334,11 @@ Implement dental-specific gaps natively instead of importing another PMS archite
 
 - Lab case/order workflow.
 - Sterilization cycle/instrument traceability where operationally justified.
+
+Current Phase 5 progress:
+
+- Lab case/order workflow is implemented as the native `LabCase` bounded model with canonical Patient/Clinic/TreatmentService references, ordered status transitions (`DRAFT` → `SENT` → `IN_PROGRESS` → `READY` → `DELIVERED`), cancellation path, server-side scope/permissions, audit records, API routes, and a responsive `/lab` view.
+- Sterilization cycle/instrument traceability remains the next open slice; Phase 5 stays open until its exit criteria and re-audit are satisfied.
 
 **Exit criteria**
 
