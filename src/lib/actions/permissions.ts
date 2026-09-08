@@ -33,6 +33,9 @@ export type ActionKey =
   | "lab.case.view"
   | "lab.case.create"
   | "lab.case.update"
+  | "sterilization.view"
+  | "sterilization.create"
+  | "sterilization.update"
   | "staff.manage"
   | "payroll.manage"
   | "settings.manage";
@@ -67,6 +70,9 @@ const actionRoles: Record<ActionKey, AppRole[]> = {
   "lab.case.view": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST", "FRONT_DESK"],
   "lab.case.create": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST"],
   "lab.case.update": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST"],
+  "sterilization.view": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST", "FRONT_DESK"],
+  "sterilization.create": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "HYGIENIST"],
+  "sterilization.update": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "HYGIENIST"],
   "staff.manage": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],
   "payroll.manage": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],
   "settings.manage": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],

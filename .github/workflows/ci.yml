@@ -100,6 +100,7 @@ jobs:
            npm run test:phase4
            npm run test:phase4:scope
            npm run test:phase5
+           npm run test:phase5:sterilization
           npm run test:patient-files
           npm run test:file-lifecycle
           npm run test:data-integrity

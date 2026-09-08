@@ -211,7 +211,7 @@ npm run build
 
 All listed gates pass. `test:phase4:scope` creates synthetic records only and verifies same-tenant access, cross-organization denial, inaccessible-clinic denial, and patient filtering; it removes those synthetic records in `finally`.
 
-## 10. Phase 5 Gate — Native Dental Operations
+## 10. Phase 5 Gate — Native Dental Operations — COMPLETE
 
 For Lab/Sterilization or other native dental capabilities:
 
@@ -234,7 +234,16 @@ node scripts/phase5-architecture-check.mjs
 npm run test:phase5
 ```
 
-These checks pass for the native LabCase workflow and tenant/clinic/status-transition smoke. Phase 5 remains open while Sterilization cycle/instrument traceability is implemented and audited.
+These checks pass for the native LabCase workflow and tenant/clinic/status-transition smoke.
+
+Sterilization re-audit adds:
+
+```powershell
+npm run test:phase5:sterilization
+npm run build
+```
+
+Phase 5 is complete on the continuation branch: both native operations slices pass tenant/clinic, permission, audit, transition, architecture, and production-build gates.
 
 ## 11. Phase 6 Gate — Optional Communication / FHIR
 

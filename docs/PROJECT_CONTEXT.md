@@ -3,7 +3,7 @@
 Last updated: 2026-09-08
 Status: ACTIVE / CANONICAL
 
-Current execution status: Phases 0–2 are merged into `main`; Phase 3 payOS/Documenso is complete on the verified integration branch; Phase 4 Orthanc/OHIF is complete in the current continuation branch; Phase 5 is in progress with the native Lab case/order slice complete and Sterilization still open.
+Current execution status: Phases 0–2 are merged into `main`; Phase 3 payOS/Documenso is complete on the verified integration branch; Phase 4 Orthanc/OHIF and Phase 5 native dental operations are complete in the current continuation branch. The next open product phase is Phase 6.
 
 > This file replaces every previous product direction, refactor queue, migration-route plan, and architecture context. Git history is an archive, not an active instruction source. Do not revive an older plan merely because it appears in a previous commit, chat, issue, or deleted document.
 
@@ -324,7 +324,7 @@ Implementation evidence:
 - `/imaging`, the imaging API routes, the migration, architecture gate, provider smoke, and tenant/clinic negative smoke are covered by the Phase 4 verification loop.
 - Phase 4 re-audit passed encoding, typecheck, canonical architecture audit, Prisma validation, production build, provider smoke, and scoped database smoke with zero unresolved Blocker/High findings.
 
-### Phase 5 — Native Dental Operations Gaps
+### Phase 5 — Native Dental Operations Gaps — COMPLETE
 
 **Objective**
 
@@ -335,10 +335,11 @@ Implement dental-specific gaps natively instead of importing another PMS archite
 - Lab case/order workflow.
 - Sterilization cycle/instrument traceability where operationally justified.
 
-Current Phase 5 progress:
+Implementation evidence:
 
 - Lab case/order workflow is implemented as the native `LabCase` bounded model with canonical Patient/Clinic/TreatmentService references, ordered status transitions (`DRAFT` → `SENT` → `IN_PROGRESS` → `READY` → `DELIVERED`), cancellation path, server-side scope/permissions, audit records, API routes, and a responsive `/lab` view.
-- Sterilization cycle/instrument traceability remains the next open slice; Phase 5 stays open until its exit criteria and re-audit are satisfied.
+- Sterilization traceability is implemented with native `SterilizationInstrument`, `SterilizationCycle`, and cycle-membership models, ordered run/pass/fail/release transitions, clinic scope, audit records, API routes, and a responsive `/sterilization` view.
+- Phase 5 re-audit passed Prisma validation, typecheck, architecture audit, Lab and Sterilization tenant/workflow smoke, and production build with zero unresolved Blocker/High findings.
 
 **Exit criteria**
 
