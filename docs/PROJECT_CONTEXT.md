@@ -1,7 +1,9 @@
 # Codexdentist Canonical Product Context
 
-Last updated: 2026-08-27
+Last updated: 2026-09-08
 Status: ACTIVE / CANONICAL
+
+Current execution status: Phases 0–2 are merged into `main`; Phase 3 payOS/Documenso is complete on the verified integration branch; Phase 4 Orthanc/OHIF is complete in the current continuation branch. The next open product phase is Phase 5.
 
 > This file replaces every previous product direction, refactor queue, migration-route plan, and architecture context. Git history is an archive, not an active instruction source. Do not revive an older plan merely because it appears in a previous commit, chat, issue, or deleted document.
 
@@ -275,7 +277,7 @@ Create safe primitives needed by all external integrations and eliminate unmanag
 - Failed DB/file sequences leave a discoverable staged object rather than unmanaged PHI.
 - Tenant/security/patient-file/data-integrity tests and new inbox/outbox/file-reconciliation tests pass.
 
-### Phase 3 — First Production Integrations: payOS And Documenso
+### Phase 3 — First Production Integrations: payOS And Documenso — COMPLETE
 
 **Objective**
 
@@ -297,7 +299,9 @@ Prove the integration substrate with high-value providers without coupling provi
 - Signed PDF enters the protected staged/committed patient-file lifecycle.
 - Consent, file, Journey/timeline and audit state reconcile after retry/failure tests.
 
-### Phase 4 — Imaging: Orthanc And OHIF
+The verified Phase 3 branch passed CI run #337 on 2026-09-02 with zero unresolved Blocker/High findings. Its merge remains a repository coordination step; Phase 3 implementation is not an open design task.
+
+### Phase 4 — Imaging: Orthanc And OHIF — COMPLETE
 
 **Objective**
 
@@ -311,6 +315,14 @@ Add production-grade DICOM/PACS viewing without turning DICOM storage into Codex
 - Patient mapping uses stable identifiers, not name/email heuristics.
 - Backup/restore and unavailable-PACS behavior are documented and tested.
 - OHIF access path works at desktop/mobile widths required by the supported workflow.
+
+Implementation evidence:
+
+- `ImagingStudy` stores organization/clinic/patient scope, Orthanc study and patient IDs, StudyInstanceUID, normalized modality/date metadata, and availability state; it has no DICOM blob or pixel-data field.
+- Orthanc transport is an isolated provider adapter. It verifies stable study IDs, minimizes DICOM metadata, rejects traversal, maps PACS outages to actionable errors, and never imports Prisma or writes canonical tables.
+- Application commands enforce tenant/clinic authorization for linking, listing, and viewer access. OHIF receives only the StudyInstanceUID through a configured base URL; missing configuration fails closed.
+- `/imaging`, the imaging API routes, the migration, architecture gate, provider smoke, and tenant/clinic negative smoke are covered by the Phase 4 verification loop.
+- Phase 4 re-audit passed encoding, typecheck, canonical architecture audit, Prisma validation, production build, provider smoke, and scoped database smoke with zero unresolved Blocker/High findings.
 
 ### Phase 5 — Native Dental Operations Gaps
 

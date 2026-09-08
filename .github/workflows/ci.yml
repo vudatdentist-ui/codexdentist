@@ -59,6 +59,7 @@ jobs:
       - run: node scripts/agent-module-audit.mjs
       - run: node scripts/phase2-architecture-check.mjs
       - run: node scripts/phase3-architecture-check.mjs
+      - run: node scripts/phase4-architecture-check.mjs
       - run: npx prisma migrate deploy
       - run: npx prisma db seed
         env:
@@ -94,7 +95,9 @@ jobs:
           npm run test:actions
           npm run test:integration-substrate
           npm run test:journey-file-command
-          npm run test:phase3
+           npm run test:phase3
+           npm run test:phase4
+           npm run test:phase4:scope
           npm run test:patient-files
           npm run test:file-lifecycle
           npm run test:data-integrity

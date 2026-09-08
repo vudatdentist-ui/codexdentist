@@ -63,6 +63,58 @@ export function resolveDocumensoConnectionSecrets(secretRef: string | null) {
   };
 }
 
+export function resolveOrthancConnectionSecrets(secretRef: string | null) {
+  const prefix = envPrefix(secretRef, "orthanc");
+  const baseUrl = orthancBaseUrl(
+    `${prefix}_BASE_URL`,
+    process.env.NODE_ENV === "production" ? "https://orthanc.invalid" : "http://127.0.0.1:8042",
+  );
+  const viewerBaseUrl = optionalViewerBaseUrl(`${prefix}_VIEWER_BASE_URL`);
+  const username = process.env[`${prefix}_USERNAME`]?.trim() || null;
+  const password = process.env[`${prefix}_PASSWORD`]?.trim() || null;
+  if ((username && !password) || (!username && password)) {
+    throw new IntegrationConfigurationError(
+      "orthanc-credentials-incomplete",
+      "Orthanc username and password must be configured together",
+    );
+  }
+
+  return { baseUrl, viewerBaseUrl, username, password };
+}
+
+function orthancBaseUrl(name: string, fallback: string) {
+  const value = process.env[name]?.trim() || fallback;
+  const url = new URL(value);
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.DEPLOYMENT_MODE !== "self-hosted" &&
+    url.protocol !== "https:"
+  ) {
+    throw new IntegrationConfigurationError(
+      "orthanc-base-url-insecure",
+      `${name} must use HTTPS outside self-hosted deployments`,
+    );
+  }
+  return url.toString().replace(/\/$/, "");
+}
+
+function optionalViewerBaseUrl(name: string) {
+  const value = process.env[name]?.trim();
+  if (!value) return null;
+  const url = new URL(value);
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.DEPLOYMENT_MODE !== "self-hosted" &&
+    url.protocol !== "https:"
+  ) {
+    throw new IntegrationConfigurationError(
+      "ohif-viewer-url-insecure",
+      `${name} must use HTTPS outside self-hosted deployments`,
+    );
+  }
+  return url.toString().replace(/\/$/, "");
+}
+
 export class IntegrationConfigurationError extends Error {
   constructor(
     public readonly code: string,

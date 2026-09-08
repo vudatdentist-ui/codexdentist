@@ -30,6 +30,8 @@
     "test:phase3:payos": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/phase3-payos-client-smoke.mjs && node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types scripts/phase3-payos-webhook-smoke.mjs",
     "test:phase3:documenso": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/phase3-documenso-smoke.mjs",
     "test:phase3": "npm run test:phase3:payos && npm run test:phase3:documenso",
+    "test:phase4": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/phase4-orthanc-smoke.mjs",
+    "test:phase4:scope": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/phase4-imaging-scope-smoke.mjs",
     "test:billing": "node scripts/billing-edge-smoke.mjs",
     "test:billing-concurrency": "node scripts/billing-concurrency-smoke.mjs",
     "test:source-commission": "node scripts/source-commission-smoke.mjs",

@@ -1,6 +1,6 @@
 # Codexdentist QA Playbook
 
-Last updated: 2026-08-27
+Last updated: 2026-09-08
 Status: ACTIVE
 
 This playbook implements the closed-loop quality process defined in `docs/PROJECT_CONTEXT.md`:
@@ -183,7 +183,7 @@ Verify:
 - consent status, file record, Journey event and audit record reconcile after failure/retry;
 - disabled/unavailable provider does not break unrelated clinical workflows.
 
-## 9. Phase 4 Gate — Orthanc / OHIF
+## 9. Phase 4 Gate — Orthanc / OHIF — COMPLETE
 
 Verify:
 
@@ -195,6 +195,21 @@ Verify:
 - unavailable PACS behavior is safe and understandable;
 - backup/restore ownership for imaging data is documented;
 - supported desktop/mobile workflow has no critical overflow/navigation break.
+
+Phase 4 evidence on the continuation branch:
+
+```powershell
+npm run encoding:check
+npm run typecheck
+npm run agent:audit
+npx prisma validate
+node scripts/phase4-architecture-check.mjs
+npm run test:phase4
+npm run test:phase4:scope
+npm run build
+```
+
+All listed gates pass. `test:phase4:scope` creates synthetic records only and verifies same-tenant access, cross-organization denial, inaccessible-clinic denial, and patient filtering; it removes those synthetic records in `finally`.
 
 ## 10. Phase 5 Gate — Native Dental Operations
 
@@ -259,6 +274,7 @@ Automated tests do not replace these targeted observations when the correspondin
 - Protected patient files cannot be fetched by another organization, inaccessible clinic, or unrelated patient portal account.
 - Staff/role administration cannot demote/disable protected equal-or-higher authority incorrectly and preserves at least one active owner.
 - Patient portal shows only the linked patient's data and future actionable appointments.
+- Imaging opens only studies already scoped to the active organization/clinic/patient; Orthanc outages show a readable unavailable state, and configured OHIF links open at desktop and 390px mobile widths without horizontal overflow.
 - Vietnamese operational copy renders without mojibake and critical layouts do not horizontally overflow at supported mobile widths.
 
 ## 14. Audit Loop Record

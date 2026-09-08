@@ -1,6 +1,6 @@
 # Operations
 
-Last updated: 2026-08-27
+Last updated: 2026-09-08
 
 ## Local PC
 
@@ -200,6 +200,10 @@ Restore drill:
 3. Point staging `.env` to the restored database.
 4. Run `npm run typecheck`, `npm run test:smoke`, `npm run test:billing`, and `npm run agent:health`.
 5. Only restore over active data after the disposable restore is verified.
+
+### Imaging / Orthanc ownership
+
+Codexdentist PostgreSQL backups contain `ImagingStudy` references, tenant/clinic/patient scope, stable Orthanc IDs, and OHIF metadata only. DICOM instances remain in Orthanc-managed storage and are not included in the application database dump. Before a clinic enables imaging, configure an Orthanc backup/export policy for the same retention window and verify that a disposable Orthanc restore preserves StudyInstanceUIDs referenced by Codexdentist. If Orthanc or OHIF is unavailable, the clinic workflow must remain readable and show an unavailable-viewer state; do not copy DICOM blobs into `PatientFile` or PostgreSQL as a fallback.
 
 ## Go-Live Gate
 

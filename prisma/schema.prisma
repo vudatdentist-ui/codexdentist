@@ -279,6 +279,7 @@ model Organization {
   formTemplates                  FormTemplate[]
   patientForms                   PatientForm[]
   patientFiles                   PatientFile[]
+  imagingStudies                 ImagingStudy[]
   patientJourneyStates           PatientJourneyState[]
   patientOdontograms             PatientOdontogram[]
   patientOdontogramRevisions     PatientOdontogramRevision[]
@@ -378,6 +379,7 @@ model Clinic {
   formTemplates                  FormTemplate[]
   patientForms                   PatientForm[]
   patientFiles                   PatientFile[]
+  imagingStudies                 ImagingStudy[]
   patientJourneyStates           PatientJourneyState[]
   patientOdontograms             PatientOdontogram[]
   patientOdontogramRevisions     PatientOdontogramRevision[]
@@ -439,6 +441,7 @@ model User {
   createdFormTemplates              FormTemplate[]                  @relation("FormTemplateCreator")
   requestedPatientForms             PatientForm[]                   @relation("PatientFormRequester")
   uploadedPatientFiles              PatientFile[]                   @relation("PatientFileUploader")
+  createdImagingStudies             ImagingStudy[]                  @relation("ImagingStudyCreator")
   createdPaymentPlans               PaymentPlan[]                   @relation("PaymentPlanCreator")
   updatedJourneyStates              PatientJourneyState[]           @relation("PatientJourneyStateUpdater")
   updatedPatientOdontograms         PatientOdontogram[]             @relation("PatientOdontogramUpdater")
@@ -582,6 +585,7 @@ model Patient {
   prescriptions            Prescription[]
   forms                    PatientForm[]
   files                    PatientFile[]
+  imagingStudies           ImagingStudy[]
   journeyState             PatientJourneyState?
   odontogram               PatientOdontogram?
   odontogramRevisions      PatientOdontogramRevision[]
@@ -1952,6 +1956,37 @@ model PatientFile {
   @@index([clinicId, createdAt])
   @@index([organizationId, category])
   @@index([organizationId, retentionUntil])
+}
+
+model ImagingStudy {
+  id                String       @id @default(cuid())
+  organizationId    String
+  organization      Organization @relation(fields: [organizationId], references: [id])
+  clinicId          String
+  clinic            Clinic       @relation(fields: [clinicId], references: [id])
+  patientId         String
+  patient           Patient      @relation(fields: [patientId], references: [id])
+  connectionId      String
+  provider          String       @default("orthanc")
+  externalStudyId   String
+  externalPatientId String?
+  studyInstanceUid  String?
+  accessionNumber   String?
+  modalities        String[]
+  studyDate         DateTime?
+  description       String?
+  availability      String       @default("AVAILABLE")
+  lastSyncedAt      DateTime?
+  lastErrorCode     String?
+  createdById       String?
+  createdBy         User?        @relation("ImagingStudyCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  @@unique([organizationId, connectionId, externalStudyId])
+  @@index([organizationId, clinicId, patientId, studyDate])
+  @@index([patientId, createdAt])
+  @@index([connectionId, externalPatientId])
 }
 
 model PatientJourneyState {

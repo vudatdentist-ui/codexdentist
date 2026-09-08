@@ -6,7 +6,7 @@ import { hasAnyRole } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { upsertIntegrationConnection } from "@/infrastructure/integrations/substrate";
 
-const providers = new Set(["payos", "documenso"]);
+const providers = new Set(["payos", "documenso", "orthanc"]);
 const secretRefPattern = /^env:[A-Z][A-Z0-9_]*$/;
 
 export async function POST(request: Request) {
@@ -42,7 +42,9 @@ export async function POST(request: Request) {
     capabilities:
       provider === "payos"
         ? { paymentLinks: true, webhooks: true }
-        : { signing: true, webhooks: true },
+        : provider === "documenso"
+          ? { signing: true, webhooks: true }
+          : { dicomStudies: true, ohifViewer: true },
     metadata: {
       configuredByUserId: session.userId,
       secretStorage: "environment",

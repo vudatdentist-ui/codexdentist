@@ -28,6 +28,8 @@ export type ActionKey =
   | "file.upload"
   | "file.delete"
   | "file.export"
+  | "imaging.study.view"
+  | "imaging.study.link"
   | "staff.manage"
   | "payroll.manage"
   | "settings.manage";
@@ -57,6 +59,8 @@ const actionRoles: Record<ActionKey, AppRole[]> = {
   "file.upload": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST", "FRONT_DESK"],
   "file.delete": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],
   "file.export": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST"],
+  "imaging.study.view": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST", "FRONT_DESK"],
+  "imaging.study.link": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST"],
   "staff.manage": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],
   "payroll.manage": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],
   "settings.manage": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],
