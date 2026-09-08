@@ -114,6 +114,10 @@ export function demoWorkspaceLimit() {
   return Number.isFinite(parsed) ? Math.min(Math.max(Math.floor(parsed), 1), 250) : 30;
 }
 
+export function fhirExportEnabled() {
+  return process.env.FHIR_EXPORT_ENABLED === "true";
+}
+
 export function appRootDomain() {
   return process.env.APP_ROOT_DOMAIN?.trim().toLowerCase() || "codexdentist.com";
 }

@@ -36,6 +36,7 @@ export type ActionKey =
   | "sterilization.view"
   | "sterilization.create"
   | "sterilization.update"
+  | "interop.patient.export"
   | "staff.manage"
   | "payroll.manage"
   | "settings.manage";
@@ -73,6 +74,7 @@ const actionRoles: Record<ActionKey, AppRole[]> = {
   "sterilization.view": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST", "FRONT_DESK"],
   "sterilization.create": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "HYGIENIST"],
   "sterilization.update": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "HYGIENIST"],
+  "interop.patient.export": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST"],
   "staff.manage": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],
   "payroll.manage": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],
   "settings.manage": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],

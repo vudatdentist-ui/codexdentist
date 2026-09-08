@@ -257,6 +257,17 @@ Verify:
 - PHI is minimized in logs/events;
 - tenant isolation remains green.
 
+Current FHIR slice evidence:
+
+```powershell
+npm run typecheck
+npm run encoding:check
+node scripts/phase6-architecture-check.mjs
+npm run test:phase6
+```
+
+The FHIR export slice passes. Phase 6 remains open for optional communication/provider adapters and any verified inbound interoperability path.
+
 ## 12. Release Hardening Gate
 
 Before real patient data or a production release after migration batches, run the full relevant regression suite, including at minimum:

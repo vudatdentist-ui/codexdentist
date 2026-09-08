@@ -3,7 +3,7 @@
 Last updated: 2026-09-08
 Status: ACTIVE / CANONICAL
 
-Current execution status: Phases 0–2 are merged into `main`; Phase 3 payOS/Documenso is complete on the verified integration branch; Phase 4 Orthanc/OHIF and Phase 5 native dental operations are complete in the current continuation branch. The next open product phase is Phase 6.
+Current execution status: Phases 0–2 are merged into `main`; Phase 3 payOS/Documenso is complete on the verified integration branch; Phase 4 Orthanc/OHIF and Phase 5 native dental operations are complete in the current continuation branch; Phase 6 is in progress with the optional, disabled-by-default FHIR export slice complete.
 
 > This file replaces every previous product direction, refactor queue, migration-route plan, and architecture context. Git history is an archive, not an active instruction source. Do not revive an older plan merely because it appears in a previous commit, chat, issue, or deleted document.
 
@@ -361,6 +361,11 @@ Add replaceable communication and standards integrations only after core boundar
 - FHIR/Medplum mappings are anti-corruption adapters and do not reshape the internal schema merely to mirror FHIR resources.
 - Optional sidecars can be disabled without breaking the core clinic workflow.
 - PHI minimization, webhook idempotency, auditability and tenant isolation are verified.
+
+Current Phase 6 progress:
+
+- The optional FHIR Patient representation is implemented as a pure adapter behind `FHIR_EXPORT_ENABLED=false` by default. The authenticated route uses canonical patient scope and exposes only demographics/contact fields required for the external representation; it does not accept inbound writes or make FHIR the source of truth.
+- Existing notification delivery already sits behind the Codexdentist notification abstraction and supports disabled delivery. Chatwoot/provider-backed communication and inbound interoperability remain open slices before Phase 6 can close.
 
 ### Phase 7 — Release Hardening
 
