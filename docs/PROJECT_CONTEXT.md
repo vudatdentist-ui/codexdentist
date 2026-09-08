@@ -382,6 +382,13 @@ Prove that the refactored/integrated system remains safe to deploy, upgrade, bac
 - Backup plus disposable restore drill passes after migration batches.
 - No unresolved blocker/high architecture, security, tenant, billing, file-integrity or integration finding remains.
 
+Current Phase 7 evidence:
+
+- Encoding, typecheck, agent audit, Prisma validation, Phase 4–6 architecture audits, hardening smoke, billing/concurrency, integration substrate, journey-file, data-integrity, compensation, source-commission, roles, actions, security runtime, tenant isolation, protected-file, file-lifecycle, and route smoke checks pass.
+- Self-host compose config and production Docker image build pass. Browser QA passes 32/32 desktop/mobile route checks with no overflow, mojibake, console, network, or critical/high findings.
+- A disposable PostgreSQL backup/restore drill passed with 51 recorded migrations and the ImagingStudy, LabCase, and SterilizationCycle tables present after restore. The disposable restore database was removed after verification.
+- The go-live gate remains open until production supplies a managed PostgreSQL URL and the four local demo accounts are rotated/deactivated; the QA database and demo credentials are intentionally not treated as production evidence.
+
 ## 11. Architecture Guardrails
 
 These are review-blocking rules:

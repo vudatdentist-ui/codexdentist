@@ -296,6 +296,8 @@ npm run go-live:check
 
 Also run the self-host packaging and restore drill in `docs/OPERATIONS.md` when migrations, storage, deployment, or infrastructure changed.
 
+Phase 7 continuation evidence: static/architecture/hardening gates, the full local runtime regression set, self-host compose validation, production Docker build, and browser QA (32/32 desktop/mobile route checks) pass. A disposable PostgreSQL backup/restore drill restored 51 migrations and the Phase 4–5 tables. The final go-live check remains intentionally open because this QA run uses localhost PostgreSQL and still contains four demo-password users; production credentials and credential rotation are required before release.
+
 ## 13. High-Risk Manual Regression Checks
 
 Automated tests do not replace these targeted observations when the corresponding workflow changes:

@@ -32,8 +32,7 @@ async function main() {
     "File is not cleared for access.",
     "getAuthorizedPatientFile",
   ]);
-  assertSource("src/app/(app)/billing/actions.ts", [
-    "nextDocumentNo",
+  assertSource("src/lib/application/revenue/commands.ts", [
     "nextInvoiceNo(session.organizationId",
     "nextReceiptNo(session.organizationId",
     "nextPaymentPlanNo(session.organizationId",
@@ -68,7 +67,7 @@ async function main() {
 }
 
 function assertSource(path, needles) {
-  const source = readFileSync(path, "utf8");
+  const source = readFileSync(path, "utf8").replaceAll("\r\n", "\n");
 
   for (const needle of needles) {
     if (!source.includes(needle)) {
@@ -78,7 +77,7 @@ function assertSource(path, needles) {
 }
 
 function assertSourceMissing(path, needles) {
-  const source = readFileSync(path, "utf8");
+  const source = readFileSync(path, "utf8").replaceAll("\r\n", "\n");
 
   for (const needle of needles) {
     if (source.includes(needle)) {
@@ -88,7 +87,7 @@ function assertSourceMissing(path, needles) {
 }
 
 function assertFunctionSourceMissing(path, functionName, needles) {
-  const source = readFileSync(path, "utf8");
+  const source = readFileSync(path, "utf8").replaceAll("\r\n", "\n");
   const functionStart = source.indexOf(`export async function ${functionName}`);
   const nextFunction = source.indexOf("\nexport async function ", functionStart + 1);
 

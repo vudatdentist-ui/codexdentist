@@ -120,8 +120,7 @@ async function login(page) {
 
   const loginForm = page.locator("form.login-form").first();
   const emailInput = loginForm.locator('input[type="email"]').first();
-  await emailInput.click();
-  await emailInput.pressSequentially(email);
+  await emailInput.fill(email);
   await loginForm.locator('input[name="password"]').fill(password);
   await loginForm.locator('button[type="submit"]').click();
   await page.waitForURL((url) => !url.pathname.endsWith("/login"), { timeout: 15000 }).catch(() => null);
