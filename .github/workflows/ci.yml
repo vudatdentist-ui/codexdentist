@@ -51,10 +51,16 @@ jobs:
           cache: npm
 
       - run: npm ci --include=dev --no-audit --no-fund
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
       - run: npm run encoding:check
       - run: npm run typecheck
       - run: node scripts/agent-module-audit.mjs
       - run: node scripts/phase2-architecture-check.mjs
+      - name: Enforce backward-compatible migrations
+        run: node scripts/check-migration-safety.mjs
+        env:
+          MIGRATION_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
       - run: npx prisma migrate deploy
       - run: npx prisma db seed
         env:
@@ -98,10 +104,37 @@ jobs:
         env:
           NODE_ENV: test
       - name: Browser QA
-        if: github.event_name == 'pull_request' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: |
           npx playwright install --with-deps chromium
           npm run browser:qa
         env:
           NODE_ENV: test
       - run: docker build -t codexdentist:ci .
+      - name: Package production release artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tar \
+            --exclude='./.git' \
+            --exclude='./node_modules' \
+            --exclude='./release.tar.gz' \
+            --exclude='./.env' \
+            --exclude='./.env.*' \
+            --exclude='./.tmp' \
+            --exclude='./coverage' \
+            --exclude='./playwright-report' \
+            --exclude='./storage' \
+            --exclude='./backups' \
+            --exclude='./test-results' \
+            -czf release.tar.gz .
+          test -s release.tar.gz
+          test -d .next
+      - name: Upload production release artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: codexdentist-production-${{ github.sha }}
+          path: release.tar.gz
+          if-no-files-found: error
+          retention-days: 7

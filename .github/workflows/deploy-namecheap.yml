@@ -1,4 +1,4 @@
-# Auto deploys require a successful push CI run and the current main SHA.
+# Production deploys only run from a successful push CI run for the current main SHA.
 name: Deploy Namecheap production
 
 on:
@@ -6,10 +6,10 @@ on:
     workflows: [CI]
     types: [completed]
     branches: [main]
-  workflow_dispatch:
 
 permissions:
   contents: read
+  actions: read
 
 concurrency:
   group: namecheap-production-deploy
@@ -18,20 +18,19 @@ concurrency:
 jobs:
   deploy:
     if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.head_branch == 'main')
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.head_branch == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
-      RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
       DEPLOY_HOST: ${{ secrets.NAMECHEAP_HOST }}
       DEPLOY_PORT: ${{ secrets.NAMECHEAP_PORT }}
       DEPLOY_USER: ${{ secrets.NAMECHEAP_USER }}
       DEPLOY_APP_ROOT: ${{ secrets.NAMECHEAP_APP_ROOT }}
       DEPLOY_DOMAIN: ${{ secrets.NAMECHEAP_DOMAIN }}
-      REMOTE_ARCHIVE: .codexdentist-release-${{ github.event.workflow_run.head_sha || github.sha }}.tar.gz
+      REMOTE_ARCHIVE: .codexdentist-release-${{ github.event.workflow_run.head_sha }}.tar.gz
 
     steps:
       - name: Resolve release eligibility
@@ -39,11 +38,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            echo "deploy=true" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
           current_main_sha="$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | awk '{print $1}')"
           if [[ -z "$current_main_sha" ]]; then
             echo "Could not resolve current main SHA." >&2
@@ -80,10 +74,19 @@ jobs:
           ref: ${{ env.RELEASE_SHA }}
           fetch-depth: 1
 
-      - name: Create source archive
+      - name: Download verified production artifact
+        if: steps.release.outputs.deploy == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: codexdentist-production-${{ env.RELEASE_SHA }}
+          path: release-artifact
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          run-id: ${{ github.event.workflow_run.id }}
+
+      - name: Verify downloaded artifact
         if: steps.release.outputs.deploy == 'true'
         shell: bash
-        run: git archive --format=tar.gz --output=release.tar.gz "$RELEASE_SHA"
+        run: test -s release-artifact/release.tar.gz
 
       - name: Configure pinned SSH host
         if: steps.release.outputs.deploy == 'true'
@@ -100,7 +103,7 @@ jobs:
           printf '%s\n' "$DEPLOY_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
 
-      - name: Upload source archive
+      - name: Upload verified release artifact
         if: steps.release.outputs.deploy == 'true'
         shell: bash
         run: |
@@ -109,10 +112,10 @@ jobs:
             -i "$HOME/.ssh/id_ed25519" \
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
-            release.tar.gz \
+            release-artifact/release.tar.gz \
             "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_ARCHIVE"
 
-      - name: Build, migrate, and restart cPanel app
+      - name: Migrate and atomically cut over cPanel app
         if: steps.release.outputs.deploy == 'true'
         shell: bash
         run: |
@@ -125,47 +128,31 @@ jobs:
             "bash -s -- '$RELEASE_SHA' '$DEPLOY_APP_ROOT' '$REMOTE_ARCHIVE' '$DEPLOY_DOMAIN'" \
             < scripts/deploy-namecheap.sh
 
-      - name: Verify production health and stability
+      - name: Verify production externally
         if: steps.release.outputs.deploy == 'true'
         shell: bash
         run: |
           set -euo pipefail
-
           check_health() {
             local response
             response="$(curl --fail --silent --show-error --location --max-time 20 \
               "https://${DEPLOY_DOMAIN}/api/health")" || return 1
             HEALTH_RESPONSE="$response" node <<'NODE'
           const health = JSON.parse(process.env.HEALTH_RESPONSE);
-          if (health.status !== "ok" || health.database !== "ok") {
+          if (health.status !== "ok" || health.database !== "ok" || health.schema !== "ok") {
             throw new Error(`Unhealthy production response: ${JSON.stringify(health)}`);
           }
           NODE
           }
 
-          ready=0
-          for attempt in {1..12}; do
-            if check_health; then
-              ready=1
-              break
-            fi
-            sleep 5
+          for route in / /login; do
+            curl --fail --silent --show-error --location --max-time 20 \
+              --output /dev/null "https://${DEPLOY_DOMAIN}${route}"
           done
 
-          if [[ "$ready" != "1" ]]; then
-            echo "Production health check failed after deployment." >&2
-            exit 1
-          fi
-
-          # A single successful request can hide an app process that dies just
-          # after restart on shared hosting. Require sustained health before the
-          # deployment is accepted.
-          for attempt in {1..6}; do
+          for attempt in {1..3}; do
+            check_health
             sleep 10
-            if ! check_health; then
-              echo "Production became unhealthy during the post-deploy stability window." >&2
-              exit 1
-            fi
           done
 
-          echo "Production application and database stayed healthy for 60 seconds."
+          echo "Production passed external health and route verification."
