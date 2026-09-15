@@ -1,3 +1,4 @@
+# Auto deploys require a successful push CI run and the current main SHA.
 name: Deploy Namecheap production
 
 on:
