@@ -1,15 +1,15 @@
 "use server";
 
 import type { Prisma } from "@prisma/client";
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { canPerformAction } from "@/lib/actions/permissions";
 import { hashPassword, requireViewSession } from "@/lib/auth";
+import { appBaseUrl } from "@/lib/env";
 import { databaseActorId, requiredString } from "@/lib/form-validation";
 import { renderNotificationTemplate } from "@/lib/notification-templates";
 import { processNotificationNow } from "@/lib/notifications";
-import { createPasswordSetupToken } from "@/lib/password-reset";
 import {
   isUploadedPatientFile,
   storeStaffProfileUpload,
@@ -64,22 +64,29 @@ export async function createOrganizationAction(formData: FormData) {
     redirect("/settings?notice=settings-organization-missing");
   }
 
+  const domain = tenantDomainForSlug(slug);
+  let result: {
+    organization: {
+      id: string;
+      name: string;
+      slug: string | null;
+      primaryDomain: string | null;
+    };
+    owner: { id: string; email: string; fullName: string };
+    setup: PasswordSetupArtifacts;
+  } | null = null;
+
   try {
     const existingOwner = await prisma.user.findUnique({
-      where: {
-        email: ownerEmail,
-      },
-      select: {
-        id: true,
-      },
+      where: { email: ownerEmail },
+      select: { id: true },
     });
 
     if (existingOwner) {
       redirect("/settings?notice=settings-email-exists");
     }
 
-    const domain = tenantDomainForSlug(slug);
-    const result = await prisma.$transaction(async (tx) => {
+    result = await prisma.$transaction(async (tx) => {
       const organization = await tx.organization.create({
         data: {
           name,
@@ -111,10 +118,19 @@ export async function createOrganizationAction(formData: FormData) {
           fullName: true,
         },
       });
+
       await tx.userRoleAssignment.create({
         data: roleAssignmentData(organization.id, owner.id, "OWNER", null),
       });
-
+      const setup = await createPasswordSetupArtifactsTx(tx, {
+        organizationId: organization.id,
+        organizationDomain: organization.primaryDomain,
+        organizationSlug: organization.slug,
+        userId: owner.id,
+        createdById: null,
+        email: owner.email,
+        fullName: owner.fullName,
+      });
       await tx.auditLog.create({
         data: {
           organizationId: session.organizationId,
@@ -130,8 +146,21 @@ export async function createOrganizationAction(formData: FormData) {
         },
       });
 
-      return { organization, owner };
+      return { organization, owner, setup };
     });
+  } catch (error) {
+    if (isNextRedirect(error)) throw error;
+    if (isUniqueConstraintError(error)) {
+      redirect("/settings?notice=settings-organization-exists");
+    }
+    redirect("/settings?notice=settings-database");
+  }
+
+  if (!result) {
+    redirect("/settings?notice=settings-database");
+  }
+
+  try {
     await bootstrapOrganizationDefaults({
       organizationId: result.organization.id,
       organizationName: result.organization.name,
@@ -141,33 +170,30 @@ export async function createOrganizationAction(formData: FormData) {
       ownerEmail: result.owner.email,
       ownerFullName: result.owner.fullName,
     });
-    const setup = await createPasswordSetupToken({
-      organizationId: result.organization.id,
-      userId: result.owner.id,
-      createdById: null,
-    });
-    const setupNotification = await createPasswordSetupNotification({
-      organizationId: result.organization.id,
-      clinicId: null,
-      userId: result.owner.id,
-      email: ownerEmail,
-      fullName: ownerFullName,
-      setupUrl: setup.url,
-      expiresAt: setup.expiresAt,
-    });
-    await processNotificationNow(setupNotification.id, setupNotification.deliveryContent);
   } catch (error) {
-    if (isNextRedirect(error)) {
-      throw error;
-    }
-    if (isUniqueConstraintError(error)) {
-      redirect("/settings?notice=settings-organization-exists");
-    }
-    redirect("/settings?notice=settings-database");
+    console.error("organization.bootstrap_failed", error);
+    await prisma.auditLog
+      .create({
+        data: {
+          organizationId: result.organization.id,
+          actorId: null,
+          action: "organization.bootstrap_failed",
+          entityType: "Organization",
+          entityId: result.organization.id,
+          metadata: {
+            retryable: true,
+          },
+        },
+      })
+      .catch(() => null);
   }
 
+  await deliverSetupNotification(result.setup);
   revalidatePath("/settings");
-  redirect(`/settings?notice=settings-organization-created&domain=${encodeURIComponent(tenantDomainForSlug(slug))}`);
+  redirect(
+    "/settings?notice=settings-organization-created&domain=" +
+      encodeURIComponent(domain),
+  );
 }
 
 export async function createStaffAction(formData: FormData) {
@@ -213,33 +239,28 @@ export async function createStaffAction(formData: FormData) {
   }
 
   const scopedClinic = await findActiveScopedClinic(session, clinicId);
-
   if (!scopedClinic) {
     redirect("/settings?notice=settings-clinic-inactive");
   }
 
   const targetOrganizationId = scopedClinic.organizationId;
-
   if (targetOrganizationId !== session.organizationId && !isSuperAdminSession(session)) {
     redirect("/settings?notice=settings-denied");
   }
 
-  let notice: string | null = null;
+  let result: { userId: string; setup: PasswordSetupArtifacts } | null = null;
 
   try {
     const existing = await prisma.user.findUnique({
-      where: {
-        email,
-      },
-      select: {
-        id: true,
-      },
+      where: { email },
+      select: { id: true },
     });
-
     if (existing) {
-      notice = "settings-email-exists";
-    } else {
-      const user = await prisma.user.create({
+      redirect("/settings?notice=settings-email-exists");
+    }
+
+    result = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.create({
         data: {
           organizationId: targetOrganizationId,
           email,
@@ -249,22 +270,18 @@ export async function createStaffAction(formData: FormData) {
           active: true,
           mustChangePassword: true,
           clinics: {
-            create: {
-              clinicId,
-            },
+            create: { clinicId },
           },
         },
-        select: {
-          id: true,
-        },
+        select: { id: true },
       });
-      await prisma.userRoleAssignment.createMany({
+      await tx.userRoleAssignment.createMany({
         data: createAssignmentRoles.map((assignmentRole) =>
           roleAssignmentData(targetOrganizationId, user.id, assignmentRole, clinicId),
         ),
         skipDuplicates: true,
       });
-      await prisma.staffProfile.create({
+      await tx.staffProfile.create({
         data: {
           organizationId: targetOrganizationId,
           userId: user.id,
@@ -275,56 +292,51 @@ export async function createStaffAction(formData: FormData) {
           active: true,
         },
       });
-      const setup = await createPasswordSetupToken({
+      const setup = await createPasswordSetupArtifactsTx(tx, {
         organizationId: targetOrganizationId,
         userId: user.id,
         createdById: databaseActorId(session.userId),
-      });
-      const setupNotification = await createPasswordSetupNotification({
-        organizationId: targetOrganizationId,
-        clinicId,
-        userId: user.id,
         email,
         fullName,
-        setupUrl: setup.url,
-        expiresAt: setup.expiresAt,
+        clinicId,
       });
-      await processNotificationNow(setupNotification.id, setupNotification.deliveryContent);
-
-      await writeSettingsAuditLog({
-        organizationId: targetOrganizationId,
-        actorId: databaseActorId(session.userId),
-        action: "staff.created",
-        entityId: user.id,
-        metadata: {
-          email,
-          derivedRole: role,
-          assignmentRoles: createAssignmentRoles,
-          clinicId,
-          createdFromOrganizationId: session.organizationId,
+      await tx.auditLog.create({
+        data: {
+          organizationId: targetOrganizationId,
+          actorId: databaseActorId(session.userId),
+          action: "staff.created",
+          entityType: "User",
+          entityId: user.id,
+          metadata: {
+            email,
+            derivedRole: role,
+            assignmentRoles: createAssignmentRoles,
+            clinicId,
+            createdFromOrganizationId: session.organizationId,
+          },
         },
       });
 
-      revalidatePath("/settings");
-      redirect(
-        `/settings?notice=settings-staff-created&setupEmail=${encodeURIComponent(
-          email,
-        )}`,
-      );
-    }
+      return { userId: user.id, setup };
+    });
   } catch (error) {
-    if (isNextRedirect(error)) {
-      throw error;
+    if (isNextRedirect(error)) throw error;
+    if (isUniqueConstraintError(error)) {
+      redirect("/settings?notice=settings-email-exists");
     }
-    notice = "settings-database";
+    redirect("/settings?notice=settings-database");
   }
 
-  if (notice) {
-    redirect(`/settings?notice=${notice}`);
+  if (!result) {
+    redirect("/settings?notice=settings-database");
   }
 
+  await deliverSetupNotification(result.setup);
   revalidatePath("/settings");
-  redirect("/settings?notice=settings-staff-created");
+  redirect(
+    "/settings?notice=settings-staff-created&setupEmail=" +
+      encodeURIComponent(email),
+  );
 }
 
 export async function createStaffPasswordSetupLinkAction(formData: FormData) {
@@ -335,74 +347,63 @@ export async function createStaffPasswordSetupLinkAction(formData: FormData) {
   }
 
   const userId = requiredString(formData.get("userId"));
-
   if (!userId) {
     redirect("/settings?notice=settings-user-not-found");
   }
-
   if (userId === session.userId) {
     redirect("/settings?notice=settings-self-password-link");
   }
 
-  let notice: string | null = null;
-  let setupEmail = "";
+  const user = await findScopedUser(session, userId);
+  if (!user) {
+    redirect("/settings?notice=settings-user-not-found");
+  }
+  assertCanManageStaffTarget(session, user);
 
+  let setup: PasswordSetupArtifacts | null = null;
   try {
-    const user = await findScopedUser(session, userId);
-
-    if (!user) {
-      notice = "settings-user-not-found";
-    } else {
-      assertCanManageStaffTarget(session, user);
-      const setup = await createPasswordSetupToken({
+    setup = await prisma.$transaction(async (tx) => {
+      const artifacts = await createPasswordSetupArtifactsTx(tx, {
         organizationId: session.organizationId,
         userId: user.id,
         createdById: databaseActorId(session.userId),
-      });
-      setupEmail = user.email;
-      const setupNotification = await createPasswordSetupNotification({
-        organizationId: session.organizationId,
-        clinicId: user.clinics[0]?.clinicId ?? session.activeClinicId ?? session.clinicIds[0] ?? null,
-        userId: user.id,
         email: user.email,
         fullName: user.fullName,
-        setupUrl: setup.url,
-        expiresAt: setup.expiresAt,
+        clinicId:
+          user.clinics[0]?.clinicId ??
+          session.activeClinicId ??
+          session.clinicIds[0] ??
+          null,
       });
-      await processNotificationNow(setupNotification.id, setupNotification.deliveryContent);
-
-      await prisma.user.update({
-        where: {
-          id: user.id,
-        },
+      await tx.user.update({
+        where: { id: user.id },
+        data: { mustChangePassword: true },
+      });
+      await tx.auditLog.create({
         data: {
-          mustChangePassword: true,
+          organizationId: session.organizationId,
+          actorId: databaseActorId(session.userId),
+          action: "staff.password_setup_link_created",
+          entityType: "User",
+          entityId: user.id,
         },
       });
-
-      await writeSettingsAuditLog({
-        organizationId: session.organizationId,
-        actorId: databaseActorId(session.userId),
-        action: "staff.password_setup_link_created",
-        entityId: user.id,
-      });
-    }
+      return artifacts;
+    });
   } catch (error) {
-    if (isNextRedirect(error)) {
-      throw error;
-    }
-    notice = "settings-database";
+    if (isNextRedirect(error)) throw error;
+    redirect("/settings?notice=settings-database");
   }
 
-  if (notice) {
-    redirect(`/settings?notice=${notice}`);
+  if (!setup) {
+    redirect("/settings?notice=settings-database");
   }
 
+  await deliverSetupNotification(setup);
   revalidatePath("/settings");
   redirect(
-    `/settings?notice=settings-password-link-created&setupEmail=${encodeURIComponent(
-      setupEmail,
-    )}`,
+    "/settings?notice=settings-password-link-created&setupEmail=" +
+      encodeURIComponent(user.email),
   );
 }
 
@@ -741,130 +742,126 @@ export async function createChainAction(formData: FormData) {
     redirect("/settings?notice=settings-chain-missing");
   }
 
-  try {
-    let ownerId: string | null = null;
-    let setupEmail: string | null = null;
-
-    if (ownerMode === "existing" && ownerUserId) {
-      const owner = await findChainOwnerCandidate(session, ownerUserId);
-
-      if (!owner) {
-        redirect("/settings?notice=settings-chain-owner-missing");
-      }
-
-      ownerId = owner.id;
+  let existingOwnerId: string | null = null;
+  if (ownerMode === "existing" && ownerUserId) {
+    const owner = await findChainOwnerCandidate(session, ownerUserId);
+    if (!owner) {
+      redirect("/settings?notice=settings-chain-owner-missing");
     }
+    existingOwnerId = owner.id;
+  }
 
-    if (ownerMode === "new") {
-      if (!canAssignStaffRoles(session, ["AREA_MANAGER"])) {
-        redirect("/settings?notice=settings-denied");
-      }
+  if (ownerMode === "new") {
+    if (!canAssignStaffRoles(session, ["AREA_MANAGER"])) {
+      redirect("/settings?notice=settings-denied");
+    }
+    if (!ownerFullName || !ownerEmail) {
+      redirect("/settings?notice=settings-chain-owner-missing");
+    }
+    const existingOwner = await prisma.user.findUnique({
+      where: { email: ownerEmail },
+      select: { id: true },
+    });
+    if (existingOwner) {
+      redirect("/settings?notice=settings-email-exists");
+    }
+  }
 
-      if (!ownerFullName || !ownerEmail) {
-        redirect("/settings?notice=settings-chain-owner-missing");
-      }
+  let setup: PasswordSetupArtifacts | null = null;
+  try {
+    setup = await prisma.$transaction(async (tx) => {
+      let ownerId = existingOwnerId;
+      let ownerSetup: PasswordSetupArtifacts | null = null;
 
-      const existingOwner = await prisma.user.findUnique({
-        where: {
-          email: ownerEmail,
-        },
-        select: {
-          id: true,
-        },
-      });
-
-      if (existingOwner) {
-        redirect("/settings?notice=settings-email-exists");
-      }
-
-      const owner = await prisma.user.create({
-        data: {
+      if (ownerMode === "new" && ownerFullName && ownerEmail) {
+        const owner = await tx.user.create({
+          data: {
+            organizationId: session.organizationId,
+            email: ownerEmail,
+            fullName: ownerFullName,
+            passwordHash: hashPassword(randomBytes(32).toString("base64url")),
+            role: "AREA_MANAGER",
+            active: true,
+            mustChangePassword: true,
+          },
+          select: { id: true },
+        });
+        await tx.userRoleAssignment.create({
+          data: roleAssignmentData(
+            session.organizationId,
+            owner.id,
+            "AREA_MANAGER",
+            null,
+          ),
+        });
+        ownerSetup = await createPasswordSetupArtifactsTx(tx, {
           organizationId: session.organizationId,
+          organizationDomain: session.organizationDomain,
+          organizationSlug: session.organizationSlug,
+          userId: owner.id,
+          createdById: databaseActorId(session.userId),
           email: ownerEmail,
           fullName: ownerFullName,
-          passwordHash: hashPassword(randomBytes(32).toString("base64url")),
-          role: "AREA_MANAGER",
-          active: true,
-          mustChangePassword: true,
+          clinicId: session.activeClinicId ?? session.clinicIds[0] ?? null,
+        });
+        ownerId = owner.id;
+      }
+
+      const chain = await tx.chain.create({
+        data: {
+          organizationId: session.organizationId,
+          ownerId,
+          name,
+          legalName,
+          brandName,
+          taxCode,
+          phone,
+          email,
+          website,
+          specialty,
         },
-        select: {
-          id: true,
+        select: { id: true },
+      });
+      await tx.auditLog.create({
+        data: {
+          organizationId: session.organizationId,
+          actorId: databaseActorId(session.userId),
+          action: "chain.created",
+          entityType: "Chain",
+          entityId: chain.id,
+          metadata: {
+            name,
+            specialty,
+            ownerId,
+          },
         },
       });
-      await prisma.userRoleAssignment.create({
-        data: roleAssignmentData(session.organizationId, owner.id, "AREA_MANAGER", null),
-      });
-      const setup = await createPasswordSetupToken({
-        organizationId: session.organizationId,
-        userId: owner.id,
-        createdById: databaseActorId(session.userId),
-      });
-      const setupNotification = await createPasswordSetupNotification({
-        organizationId: session.organizationId,
-        clinicId: session.activeClinicId ?? session.clinicIds[0] ?? null,
-        userId: owner.id,
-        email: ownerEmail,
-        fullName: ownerFullName,
-        setupUrl: setup.url,
-        expiresAt: setup.expiresAt,
-      });
-      await processNotificationNow(setupNotification.id, setupNotification.deliveryContent);
 
-      ownerId = owner.id;
-      setupEmail = ownerEmail;
-    }
-
-    const chain = await prisma.chain.create({
-      data: {
-        organizationId: session.organizationId,
-        ownerId,
-        name,
-        legalName,
-        brandName,
-        taxCode,
-        phone,
-        email,
-        website,
-        specialty,
-      },
-      select: {
-        id: true,
-      },
+      return ownerSetup;
     });
-
-    await writeSettingsAuditLog({
-      organizationId: session.organizationId,
-      actorId: databaseActorId(session.userId),
-      action: "chain.created",
-      entityType: "Chain",
-      entityId: chain.id,
-      metadata: {
-        name,
-        specialty,
-        ownerId,
-      },
-    });
-
-    if (setupEmail) {
-      revalidatePath("/settings");
-      redirect(
-        `/settings?notice=settings-chain-created&setupEmail=${encodeURIComponent(
-          setupEmail,
-        )}`,
-      );
-    }
   } catch (error) {
-    if (isNextRedirect(error)) {
-      throw error;
-    }
+    if (isNextRedirect(error)) throw error;
     if (isUniqueConstraintError(error)) {
-      redirect("/settings?notice=settings-chain-exists");
+      redirect(
+        ownerMode === "new"
+          ? "/settings?notice=settings-email-exists"
+          : "/settings?notice=settings-chain-exists",
+      );
     }
     redirect("/settings?notice=settings-database");
   }
 
+  if (setup) {
+    await deliverSetupNotification(setup);
+  }
+
   revalidatePath("/settings");
-  redirect("/settings?notice=settings-chain-created");
+  redirect(
+    ownerMode === "new" && ownerEmail
+      ? "/settings?notice=settings-chain-created&setupEmail=" +
+          encodeURIComponent(ownerEmail)
+      : "/settings?notice=settings-chain-created",
+  );
 }
 
 export async function updateChainAction(formData: FormData) {
@@ -2170,24 +2167,78 @@ async function writeSettingsAuditLog(input: {
   });
 }
 
-async function createPasswordSetupNotification(input: {
-  organizationId: string;
-  clinicId: string | null;
-  userId: string;
-  email: string;
-  fullName: string;
-  setupUrl: string;
-  expiresAt: Date;
-}) {
-  const rendered = renderNotificationTemplate("STAFF_PASSWORD_SETUP", {
-    fullName: input.fullName,
-    setupUrl: input.setupUrl,
-    expiresAt: input.expiresAt.toISOString(),
+type PasswordSetupArtifacts = {
+  notificationId: string;
+  deliveryContent: ReturnType<typeof renderNotificationTemplate>;
+};
+
+async function createPasswordSetupArtifactsTx(
+  tx: Prisma.TransactionClient,
+  input: {
+    organizationId: string;
+    organizationDomain?: string | null;
+    organizationSlug?: string | null;
+    userId: string;
+    createdById: string | null;
+    email: string;
+    fullName: string;
+    clinicId?: string | null;
+  },
+): Promise<PasswordSetupArtifacts> {
+  const token = randomBytes(32).toString("base64url");
+  const now = new Date();
+  const expiresAt = new Date(
+    now.getTime() +
+      (process.env.NODE_ENV === "production"
+        ? 60 * 60 * 1000
+        : 24 * 60 * 60 * 1000),
+  );
+
+  await tx.passwordResetToken.updateMany({
+    where: {
+      userId: input.userId,
+      usedAt: null,
+      expiresAt: { gt: now },
+    },
+    data: { usedAt: now },
   });
-  const notification = await prisma.notification.create({
+  await tx.passwordResetToken.create({
     data: {
       organizationId: input.organizationId,
-      clinicId: input.clinicId,
+      userId: input.userId,
+      createdById: input.createdById,
+      tokenHash: createHash("sha256").update(token).digest("hex"),
+      purpose: "STAFF_PASSWORD_SETUP",
+      expiresAt,
+    },
+  });
+
+  let organizationDomain = input.organizationDomain ?? null;
+  let organizationSlug = input.organizationSlug ?? null;
+  if (!organizationDomain && !organizationSlug) {
+    const organization = await tx.organization.findUnique({
+      where: { id: input.organizationId },
+      select: { primaryDomain: true, slug: true },
+    });
+    organizationDomain = organization?.primaryDomain ?? null;
+    organizationSlug = organization?.slug ?? null;
+  }
+
+  const domain =
+    organizationDomain?.trim() ||
+    (organizationSlug ? tenantDomainForSlug(organizationSlug) : "");
+  const baseUrl = passwordSetupBaseUrl(domain);
+  const setupUrl =
+    baseUrl + "/reset-password?token=" + encodeURIComponent(token);
+  const rendered = renderNotificationTemplate("STAFF_PASSWORD_SETUP", {
+    fullName: input.fullName,
+    setupUrl,
+    expiresAt: expiresAt.toISOString(),
+  });
+  const notification = await tx.notification.create({
+    data: {
+      organizationId: input.organizationId,
+      clinicId: input.clinicId ?? null,
       userId: input.userId,
       channel: "EMAIL",
       status: "SCHEDULED",
@@ -2195,17 +2246,49 @@ async function createPasswordSetupNotification(input: {
       recipient: input.email,
       subject: rendered.subject,
       body: "A one-time password setup email was requested for this account.",
-      scheduledAt: new Date(),
+      scheduledAt: now,
       metadata: {
         purpose: "STAFF_PASSWORD_SETUP",
-      } as Prisma.InputJsonValue,
+      },
     },
+    select: { id: true },
   });
 
   return {
-    id: notification.id,
+    notificationId: notification.id,
     deliveryContent: rendered,
   };
+}
+
+function passwordSetupBaseUrl(domain: string) {
+  if (!domain) {
+    return appBaseUrl();
+  }
+
+  const trimmedDomain = domain.trim().replace(/\/+$/, "");
+  if (/^https?:\/\//i.test(trimmedDomain)) {
+    return new URL(trimmedDomain).toString().replace(/\/+$/, "");
+  }
+
+  const protocol = new URL(appBaseUrl()).protocol;
+  return protocol + "//" + trimmedDomain;
+}
+
+async function deliverSetupNotification(setup: PasswordSetupArtifacts) {
+  try {
+    const result = await processNotificationNow(
+      setup.notificationId,
+      setup.deliveryContent,
+    );
+    if (result.results[0]?.status === "failed") {
+      console.error(
+        "staff.password_setup_delivery_failed",
+        result.results[0]?.reason ?? "unknown",
+      );
+    }
+  } catch (error) {
+    console.error("staff.password_setup_delivery_failed", error);
+  }
 }
 
 function isNextRedirect(error: unknown) {
