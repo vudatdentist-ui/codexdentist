@@ -1,32 +1,37 @@
-import { chromium } from "playwright";
+import { request } from "playwright";
 
 const baseUrl = process.env.API_CONTRACT_BASE_URL ?? "http://127.0.0.1:3000";
 const email = process.env.API_CONTRACT_EMAIL ?? "owner@nhavista.vn";
 const password = process.env.API_CONTRACT_PASSWORD ?? "CodexSmoke2026!";
 
-const browser = await chromium.launch({ headless: true });
-const context = await browser.newContext();
-const page = await context.newPage();
+const context = await request.newContext();
 
 try {
-  await page.goto(`${baseUrl}/login`, { waitUntil: "domcontentloaded" });
-  const form = page.locator("form.login-form").first();
-  await form.locator('input[type="email"]').fill(email);
-  await form.locator('input[name="password"]').fill(password);
-  await form.locator('button[type="submit"]').click();
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"), { timeout: 15_000 });
+  const loginPage = await context.get(`${baseUrl}/login`);
+  const loginHtml = await loginPage.text();
+  const actionName = loginHtml.match(/name="(\$ACTION_ID_[^"]+)"/)?.[1];
+  assert(actionName, "login server action field is present");
+  const loginResponse = await context.post(`${baseUrl}/login`, {
+    form: {
+      [actionName]: "",
+      email,
+      password,
+    },
+    maxRedirects: 0,
+  });
+  assert([303, 200].includes(loginResponse.status()), "login action returns a controlled response");
 
   for (const route of [
     "/api/imaging/studies",
     "/api/lab/cases",
     "/api/sterilization/cycles",
   ]) {
-    const response = await context.request.get(`${baseUrl}${route}`);
+    const response = await context.get(`${baseUrl}${route}`);
     assert(response.status() === 200, `${route} returns 200 for an authorized session`);
     assertNoStore(response, `${route} is not cached`);
   }
 
-  const viewer = await context.request.get(
+  const viewer = await context.get(
     `${baseUrl}/api/imaging/studies/api-contract-missing/viewer`,
   );
   assert([404, 503].includes(viewer.status()), "imaging viewer uses a controlled error status");
@@ -36,7 +41,7 @@ try {
     ["/api/lab/cases/api-contract-missing/status", { status: "READY" }],
     ["/api/sterilization/cycles/api-contract-missing/status", { status: "RUNNING" }],
   ]) {
-    const response = await context.request.post(`${baseUrl}${route}`, {
+    const response = await context.post(`${baseUrl}${route}`, {
       data: body,
       headers: { "content-type": "application/json", origin: baseUrl },
     });
@@ -47,13 +52,13 @@ try {
     assertNoStore(response, `${route} is not cached`);
   }
 
-  const job = await context.request.post(`${baseUrl}/api/jobs/patient-file-gc`, {
+  const job = await context.post(`${baseUrl}/api/jobs/patient-file-gc`, {
     data: {},
     headers: { "content-type": "application/json" },
   });
   assert(job.status() === 401, "patient-file GC rejects an unauthenticated request");
 
-  const fhir = await context.request.get(`${baseUrl}/api/integrations/fhir/patients/contract-smoke`);
+  const fhir = await context.get(`${baseUrl}/api/integrations/fhir/patients/contract-smoke`);
   assert(
     fhir.headers()["content-type"]?.startsWith("application/fhir+json"),
     "FHIR route uses the FHIR media type",
@@ -76,7 +81,7 @@ try {
     ["/api/integrations/payos/payment-links", { patientId: "", amount: 1 }],
     ["/api/integrations/documenso/signing-requests", { patientFormId: "", sourcePatientFileId: "" }],
   ]) {
-    const response = await context.request.post(`${baseUrl}${route}`, {
+    const response = await context.post(`${baseUrl}${route}`, {
       data: body,
       headers: { "content-type": "application/json" },
     });
@@ -87,8 +92,7 @@ try {
 
   console.log("ok API contract smoke");
 } finally {
-  await context.close();
-  await browser.close();
+  await context.dispose();
 }
 
 function assert(condition, label) {
