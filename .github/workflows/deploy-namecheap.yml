@@ -113,9 +113,14 @@ jobs:
           done
           cat /tmp/codexdentist-deploy-preflight.log
           exit 1
-      - run: npm run test:smoke
-      - run: npm run readiness:check
-      - run: npm run test:api-contract
+      - name: Capture preflight server failures
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          trap 'status=$?; if [[ "$status" -ne 0 ]]; then echo "--- deploy preflight server log ---"; tail -n 300 /tmp/codexdentist-deploy-preflight.log || true; fi; exit "$status"' EXIT
+          npm run readiness:check
+          npm run test:smoke
+          npm run test:api-contract
       - run: npx playwright install --with-deps chromium
       - run: npm run browser:qa
         env:

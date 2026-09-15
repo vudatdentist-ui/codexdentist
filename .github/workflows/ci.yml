@@ -103,6 +103,8 @@ jobs:
           exit 1
       - name: Agent health and legacy route smoke
         run: |
+          set -Eeuo pipefail
+          trap 'status=$?; if [[ "$status" -ne 0 ]]; then echo "--- production server log ---"; tail -n 300 /tmp/codexdentist.log || true; fi; exit "$status"' EXIT
           npm run readiness:check
           node scripts/agent-health-check.mjs
           npm run test:smoke
