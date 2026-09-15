@@ -83,7 +83,12 @@ try {
     transactionCode: "00",
   });
   const successResponse = await postWebhook(connection.id, successPayload);
-  assert(successResponse.ok, "verified payOS success webhook is accepted");
+  if (!successResponse.ok) {
+    throw new Error(
+      `Phase3 payOS success webhook returned HTTP ${successResponse.status}: ${await successResponse.text()}`,
+    );
+  }
+  assert(true, "verified payOS success webhook is accepted");
   const firstRef = await orderReference(owner.organizationId, connection.id, first.orderCode);
   const firstMetadata = referenceMetadata(firstRef);
   assert(firstMetadata.status === "SETTLED", "payOS success settles order");
