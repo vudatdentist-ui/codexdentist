@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { rm } from "node:fs/promises";
+import { unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -39,7 +39,11 @@ try {
   run("psql", [targetToolUrl, "-v", "ON_ERROR_STOP=1", "-c", 'SELECT 1 FROM "_prisma_migrations" LIMIT 1;']);
   console.log(`ok disposable PostgreSQL restore: ${targetDatabase}`);
 } finally {
-  await rm(dumpPath, { force: true });
+  await unlink(dumpPath).catch((error) => {
+    if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) {
+      throw error;
+    }
+  });
   run("dropdb", ["--if-exists", ...targetConnection.args, targetDatabase], false, targetConnection.env);
 }
 
