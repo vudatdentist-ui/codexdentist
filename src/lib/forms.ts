@@ -119,10 +119,6 @@ export async function getFormsWorkspace(
           OR: [
             {
               clinicId: null,
-              patient: {
-                organizationId: session.organizationId,
-                clinicId: { in: clinicIds },
-              },
             },
             {
               clinicId: {
