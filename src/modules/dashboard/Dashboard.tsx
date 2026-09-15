@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, CheckCircle2, Inbox, ShieldCheck, UsersRound } from "lucide-react";
+import { Activity, Building2, CalendarDays, CheckCircle2, Inbox, ShieldCheck, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { useMemo } from "react";
@@ -8,13 +8,10 @@ import { completeWorkItemAction, createWorkItemAction, retryFailedNotificationAc
 import { createInAppNotificationAction } from "@/app/(app)/notifications/actions";
 import { useAppLanguage, type Language } from "@/components/AppLanguage";
 import { visibleActionNoticeParam } from "@/lib/action-notices";
-import { EmptyState, MetricCard, PanelHeader } from "@/components/suite-primitives";
+import { EmptyState, MetricCard, PanelHeader, StatusPill as BaseStatusPill } from "@/components/suite-primitives";
 import { formatVnd, type Appointment, type Clinic } from "@/lib/data";
 import type { DashboardWorkspace } from "@/lib/dashboard-types";
 import type { TaskInboxWorkspace } from "@/lib/task-inbox-types";
-import type { TaskInboxItemSummary } from "@/lib/task-inbox-types";
-import { TodayBoard, TodayTasks } from "@/workspaces/today/TodayBoard";
-import { flowCounts, scopedTasks, taskAction } from "@/workspaces/today/model";
 
 const dashboardText = {
   vi: {
@@ -69,6 +66,20 @@ function displayStatus(status: string, language: Language) {
   return statusText[language][status] ?? status;
 }
 
+function StatusPill({ status }: { status: string }) {
+  const { language } = useAppLanguage();
+  return <BaseStatusPill label={displayStatus(status, language)} status={status} />;
+}
+
+function SourceBadge({ source }: { source?: "database" | "demo" }) {
+  const { t } = useAppLanguage();
+  return (
+    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
+      {source === "database" ? t.databaseLive : t.demoMode}
+    </span>
+  );
+}
+
 function noticeText(notice: string | null, language: Language) {
   const notices: Record<string, Record<Language, string>> = {
     "task-created": { vi: "Đã tạo công việc.", en: "Task created." },
@@ -119,6 +130,7 @@ export function Dashboard({
   const searchParams = useSearchParams();
   const notice = useNoticeText(visibleActionNoticeParam(searchParams.get("notice")));
   const text = dashboardText[language];
+  const inboxItems = taskInboxWorkspace?.items ?? [];
   const dashboardLabels =
     language === "vi"
       ? {
@@ -179,8 +191,6 @@ export function Dashboard({
     () => new Set(visibleClinics.map((clinic) => clinic.id)),
     [visibleClinics],
   );
-  const scopeNarrowed = Boolean(taskInboxWorkspace?.clinics.some((clinic) => !visibleClinicIdSet.has(clinic.id)));
-  const inboxItems = scopedTasks(taskInboxWorkspace?.items ?? [], visibleClinicIdSet, scopeNarrowed);
   const dashboardClinics = (
     dashboardWorkspace?.clinicSummaries ?? fallbackDashboardClinics
   ).filter((clinic) => visibleClinicIdSet.has(clinic.clinicId));
@@ -200,7 +210,7 @@ export function Dashboard({
             )}%`,
             tone: "teal" as const,
           },
-          { label: language === "vi" ? "Đang điều trị" : "In treatment", value: String(sumBy(dashboardClinics, "inChair")), tone: "teal" as const },
+          dashboardWorkspace.metrics[2] ?? dashboardMetrics[2],
           {
             label: dashboardMetrics[3].label,
             value: formatVnd(sumBy(dashboardClinics, "collectedToday")),
@@ -209,15 +219,12 @@ export function Dashboard({
         ]
       : dashboardMetrics;
   const dashboardAppointments =
-    (dashboardWorkspace?.source === "database" ? dashboardWorkspace.appointments.filter((appointment) =>
+    (dashboardWorkspace?.appointments?.filter((appointment) =>
       visibleClinicIdSet.has(appointment.clinicId),
-    ) :
-    visibleAppointments.filter((appointment) => visibleClinicIdSet.has(appointment.clinicId)).map((appointment) => ({
+    ) ??
+    visibleAppointments.slice(0, 8).map((appointment) => ({
       id: appointment.id,
       clinicId: appointment.clinicId,
-      patientId: appointment.patientId,
-      providerId: appointment.providerId,
-      startsAt: appointment.startsAt,
       time: appointment.time,
       patientName: appointment.patient,
       providerName: appointment.provider,
@@ -226,8 +233,20 @@ export function Dashboard({
         appointment.clinicId,
       procedure: appointment.procedure,
       status: appointment.status,
-    })));
-  const counts = flowCounts(dashboardAppointments);
+    }))).slice(0, 8);
+  const dashboardFlow =
+    dashboardWorkspace
+      ? dashboardWorkspace.flow.map((step) => ({
+          ...step,
+          count: dashboardAppointments.filter((appointment) => appointment.status === step.key).length,
+        }))
+      : [
+      { key: "REQUESTED", label: "Yêu cầu", count: 0 },
+      { key: "CONFIRMED", label: "Đã hẹn", count: todayVisits },
+      { key: "ARRIVED", label: "Đã đến", count: 0 },
+      { key: "IN_CHAIR", label: "Đang điều trị", count: 0 },
+      { key: "COMPLETED", label: "Hoàn tất", count: 0 },
+    ];
   const inboxLabels =
     language === "vi"
       ? {
@@ -241,7 +260,7 @@ export function Dashboard({
           due: "Hạn xử lý",
           priority: "Ưu tiên",
           detail: "Ghi chú xử lý",
-          title: "Giao việc & thông báo",
+          title: "Trung tâm thông báo và công việc",
           notificationForm: "Gửi thông báo",
           taskForm: "Giao việc nội bộ",
         }
@@ -256,7 +275,7 @@ export function Dashboard({
           due: "Due",
           priority: "Priority",
           detail: "Task note",
-          title: "Assign & communicate",
+          title: "Notifications and task inbox",
           notificationForm: "Send notification",
           taskForm: "Create internal task",
         };
@@ -309,49 +328,57 @@ export function Dashboard({
     "BILLING",
   ];
 
-  const renderTaskAction = (item: TaskInboxItemSummary) => {
-    const action = taskAction(item);
-    if (action === "retry") return (
-      <form action={retryFailedNotificationAction}>
-        <input name="notificationId" type="hidden" value={item.sourceId ?? ""} />
-        <button className="secondary-button compact-button" type="submit" disabled={!taskInboxWorkspace?.canMutate}>{retryNotificationLabel}</button>
-      </form>
-    );
-    if (action === "complete") return (
-      <form action={completeWorkItemAction}>
-        <input name="workItemId" type="hidden" value={item.sourceId ?? ""} />
-        <button className="secondary-button compact-button" type="submit" disabled={!taskInboxWorkspace?.canMutate}><CheckCircle2 size={15} />{inboxLabels.complete}</button>
-      </form>
-    );
-    return <Link className="secondary-button compact-button" href={item.href}>{language === "vi" ? "Mở chi tiết" : "Open details"}</Link>;
-  };
-
   return (
-    <section className="view-stack today-workspace">
-      <div className="today-brief">
-        <div><strong>{counts.ARRIVED}</strong><span>{language === "vi" ? "bệnh nhân đang chờ" : "patients waiting"}</span></div>
-        <div><strong>{counts.IN_CHAIR}</strong><span>{language === "vi" ? "đang điều trị" : "in treatment"}</span></div>
-        <div><strong>{inboxItems.filter((item) => item.priority === "high").length}</strong><span>{language === "vi" ? "việc ưu tiên cao" : "high-priority items"}</span></div>
-        <span className="today-updated">{dashboardLabels.updated}: {dashboardWorkspace?.generatedAt ?? taskInboxWorkspace?.generatedAt ?? "—"}</span>
-      </div>
+    <section className="view-stack">
+      <section className="dashboard-command-panel">
+        <div className="dashboard-command-copy">
+          <p className="eyebrow">{dashboardLabels.commandCenter}</p>
+          <h2>{dashboardLabels.commandCenter}</h2>
+          <span>{dashboardLabels.commandSubtitle}</span>
+        </div>
+        <div className="dashboard-command-status">
+          <SourceBadge source={dashboardWorkspace?.source} />
+          <span>
+            {dashboardLabels.updated}: {dashboardWorkspace?.generatedAt ?? taskInboxWorkspace?.generatedAt ?? "-"}
+          </span>
+        </div>
+        {scopedDashboardMetrics.map((metric) => (
+          <MetricCard
+            key={metric.label}
+            label={metric.label}
+            value={metric.value}
+            tone={metric.tone}
+          />
+        ))}
+      </section>
 
       {dashboardWorkspace?.message && (
         <div className="schedule-alert">{workspaceMessageText(dashboardWorkspace.message, language)}</div>
       )}
 
-      {taskInboxWorkspace?.message && <div className="schedule-alert">{taskInboxWorkspace.message}</div>}
-      {notice && <div className="schedule-alert action" role="status">{notice}</div>}
-      <div className="today-operation-grid">
-        <TodayBoard key={`flow-${[...visibleClinicIdSet].sort().join(",")}`} appointments={dashboardAppointments} language={language} />
-        <TodayTasks key={`tasks-${[...visibleClinicIdSet].sort().join(",")}`} items={inboxItems} language={language} renderAction={renderTaskAction} />
-      </div>
+      <section className="panel dashboard-flow-panel">
+        <PanelHeader icon={Activity} title={dashboardLabels.patientFlow} action={text.liveAppointmentFlow} />
+        <div className="dashboard-flow">
+          {dashboardFlow.map((step, index) => (
+            <div className="dashboard-flow-step" key={step.key}>
+              <span>{step.label}</span>
+              <strong>{step.count}</strong>
+              {index < dashboardFlow.length - 1 && <i />}
+            </div>
+          ))}
+        </div>
+      </section>
 
-      {taskInboxWorkspace?.canMutate && <section className="panel dashboard-inbox-panel">
+      <section className="panel dashboard-inbox-panel">
         <PanelHeader
           icon={Inbox}
           title={inboxLabels.title}
-          action=""
+          action={`${inboxItems.length}`}
         />
+        {taskInboxWorkspace?.message && (
+          <div className="schedule-alert">{workspaceMessageText(taskInboxWorkspace.message, language)}</div>
+        )}
+        {notice && <div className="schedule-alert action">{notice}</div>}
         {taskInboxWorkspace?.canMutate ? (
         <details className="dashboard-compose-details">
           <summary>{inboxLabels.notificationForm}</summary>
@@ -487,14 +514,56 @@ export function Dashboard({
         </form>
         </details>
         ) : null}
-      </section>}
-
-      <details className="panel today-management">
-        <summary>{language === "vi" ? "Số liệu & nguồn lực phòng khám" : "Clinic metrics & resources"}</summary>
-        <div className="today-metrics">
-          {scopedDashboardMetrics.map((metric) => <MetricCard key={metric.label} label={metric.label} value={metric.value} tone={metric.tone} />)}
+        <div className="invoice-list task-inbox-list">
+          {inboxItems.length > 0 ? (
+            inboxItems.slice(0, 12).map((item) => (
+              <div className="invoice-row billing-invoice-row task-inbox-row" key={item.id}>
+                <div>
+                  <strong>{item.title}</strong>
+                  <span>
+                    {displayStatus(item.kind, language)} · {item.detail}
+                  </span>
+                  <small>
+                    {item.patientName ?? item.clinicName ?? "-"}
+                    {item.dueAt ? ` · ${item.dueAt}` : ""}
+                    {item.assignedToName ? ` · ${item.assignedToName}` : ""}
+                  </small>
+                </div>
+                <StatusPill status={item.priority} />
+                {item.kind === "notification" && item.status === "FAILED" && item.sourceId ? (
+                  <form action={retryFailedNotificationAction}>
+                    <input name="notificationId" type="hidden" value={item.sourceId} />
+                    <button className="secondary-button compact-button task-action-button" type="submit" disabled={!taskInboxWorkspace?.canMutate}>
+                      {retryNotificationLabel}
+                    </button>
+                  </form>
+                ) : item.actionable && item.sourceId ? (
+                  <form action={completeWorkItemAction}>
+                    <input name="workItemId" type="hidden" value={item.sourceId} />
+                    <button className="secondary-button compact-button task-action-button" type="submit" disabled={!taskInboxWorkspace?.canMutate}>
+                      <CheckCircle2 size={15} />
+                      {inboxLabels.complete}
+                    </button>
+                  </form>
+                ) : (
+                  <Link className="secondary-button compact-button task-action-button" href={item.href}>
+                    {inboxLabels.action}
+                  </Link>
+                )}
+              </div>
+            ))
+          ) : (
+            <EmptyState label={inboxLabels.empty} />
+          )}
         </div>
-      <div className="content-grid">
+        {taskInboxWorkspace?.generatedAt && (
+          <p className="billing-panel-note">
+            {inboxLabels.generated}: {taskInboxWorkspace.generatedAt}
+          </p>
+        )}
+      </section>
+
+      <div className="content-grid two">
         <section className="panel">
           <PanelHeader
             icon={Building2}
@@ -529,11 +598,36 @@ export function Dashboard({
           </div>
         </section>
 
+        <section className="panel">
+          <PanelHeader
+            icon={CalendarDays}
+            title={dashboardLabels.appointments}
+            action={text.open}
+          />
+          <div className="timeline">
+            {dashboardAppointments.length > 0 ? (
+              dashboardAppointments.map((appointment) => (
+                <div className="timeline-item" key={appointment.id}>
+                <time>{appointment.time}</time>
+                <div>
+                  <strong>{appointment.patientName}</strong>
+                  <span>
+                    {appointment.procedure} · {appointment.providerName} · {appointment.clinicName}
+                  </span>
+                </div>
+                <StatusPill status={appointment.status} />
+                </div>
+              ))
+            ) : (
+              <EmptyState label={dashboardLabels.emptyAppointments} />
+            )}
+          </div>
+        </section>
       </div>
 
       <section className="content-grid two">
         <section className="panel">
-          <PanelHeader icon={ShieldCheck} title={dashboardLabels.risks} action={language === "vi" ? "Toàn bộ phạm vi được cấp quyền" : "All authorized clinics"} />
+          <PanelHeader icon={ShieldCheck} title={dashboardLabels.risks} action={text.open} />
           <div className="dashboard-risk-grid">
             {(dashboardWorkspace?.risks ?? []).length > 0 ? (
               dashboardWorkspace?.risks.map((risk) => (
@@ -550,7 +644,7 @@ export function Dashboard({
         </section>
 
         <section className="panel">
-          <PanelHeader icon={UsersRound} title={dashboardLabels.providers} action={language === "vi" ? "Toàn bộ phạm vi được cấp quyền" : "All authorized clinics"} />
+          <PanelHeader icon={UsersRound} title={dashboardLabels.providers} action={text.liveAppointmentFlow} />
           <div className="dashboard-provider-list">
             {(dashboardWorkspace?.providerLoads ?? []).length > 0 ? (
               dashboardWorkspace?.providerLoads.map((provider) => (
@@ -568,7 +662,7 @@ export function Dashboard({
           </div>
         </section>
       </section>
-      </details>
     </section>
   );
 }
+

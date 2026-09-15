@@ -423,8 +423,6 @@ export async function getTaskInboxWorkspace(
     const items: TaskInboxItemSummary[] = [
       ...workItems.map((task) => ({
         id: `work-${task.id}`,
-        clinicId: task.clinicId,
-        dueAtIso: task.dueAt?.toISOString() ?? null,
         sourceId: task.id,
         kind: "notification" as const,
         priority:
@@ -448,8 +446,6 @@ export async function getTaskInboxWorkspace(
       })),
       ...crmActivities.map((activity) => ({
         id: `crm-${activity.id}`,
-        clinicId: activity.clinicId,
-        dueAtIso: activity.dueAt?.toISOString() ?? null,
         sourceId: activity.id,
         kind: "crm" as const,
         priority: isPast(activity.dueAt, now) ? ("high" as const) : ("medium" as const),
@@ -468,8 +464,6 @@ export async function getTaskInboxWorkspace(
       })),
       ...overdueInvoices.map((invoice) => ({
         id: `billing-${invoice.id}`,
-        clinicId: invoice.clinicId,
-        dueAtIso: invoice.dueDate.toISOString(),
         sourceId: invoice.id,
         kind: "billing" as const,
         priority: "high" as const,
@@ -488,7 +482,6 @@ export async function getTaskInboxWorkspace(
       })),
       ...lowStock.slice(0, 20).map((item) => ({
         id: `inventory-${item.id}`,
-        clinicId: item.clinicId,
         sourceId: item.id,
         kind: "inventory" as const,
         priority: Number(item.onHandQuantity) <= 0 ? ("high" as const) : ("medium" as const),
@@ -507,8 +500,6 @@ export async function getTaskInboxWorkspace(
       })),
       ...leaveRequests.map((request) => ({
         id: `leave-${request.id}`,
-        clinicId: request.clinicId,
-        dueAtIso: request.startsAt.toISOString(),
         sourceId: request.id,
         kind: "hr" as const,
         priority: "medium" as const,
@@ -527,8 +518,6 @@ export async function getTaskInboxWorkspace(
       })),
       ...requestedAppointments.map((appointment) => ({
         id: `schedule-${appointment.id}`,
-        clinicId: appointment.clinicId,
-        dueAtIso: appointment.startsAt.toISOString(),
         sourceId: appointment.id,
         kind: "schedule" as const,
         priority: "medium" as const,
@@ -547,7 +536,6 @@ export async function getTaskInboxWorkspace(
       })),
       ...learningEnrollments.map((enrollment) => ({
         id: `learning-${enrollment.id}`,
-        clinicId: enrollment.clinicId,
         sourceId: enrollment.id,
         kind: "learning" as const,
         priority: "low" as const,
@@ -569,8 +557,6 @@ export async function getTaskInboxWorkspace(
 
         return {
           id: `notification-${notification.id}`,
-          clinicId: notification.clinicId,
-          dueAtIso: notification.scheduledAt?.toISOString() ?? null,
           sourceId: notification.id,
           kind: "notification" as const,
           priority: notification.status === "FAILED" ? ("high" as const) : metadataPriority(notification.metadata),

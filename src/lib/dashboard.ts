@@ -409,12 +409,9 @@ export async function getDashboardWorkspace(
         },
       ],
       providerLoads,
-      appointments: appointments.map((appointment) => ({
+      appointments: appointments.slice(0, 10).map((appointment) => ({
         id: appointment.id,
         clinicId: appointment.clinicId,
-        patientId: appointment.patientId,
-        providerId: appointment.providerId,
-        startsAt: appointment.startsAt.toISOString(),
         time: vietnamTime(appointment.startsAt),
         patientName: appointment.patient.fullName,
         providerName: appointment.provider.fullName,

@@ -45,9 +45,6 @@ export type DashboardProviderLoad = {
 export type DashboardAppointmentSummary = {
   id: string;
   clinicId: string;
-  patientId?: string;
-  providerId?: string;
-  startsAt?: string;
   time: string;
   patientName: string;
   providerName: string;

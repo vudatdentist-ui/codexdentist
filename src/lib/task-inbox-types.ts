@@ -18,8 +18,6 @@ export type TaskInboxItemSummary = {
   dueAt: string | null;
   patientName: string | null;
   clinicName: string | null;
-  clinicId?: string | null;
-  dueAtIso?: string | null;
   status: string;
   assignedToName: string | null;
   actionable: boolean;
