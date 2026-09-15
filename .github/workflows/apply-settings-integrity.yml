@@ -1,0 +1,44 @@
+name: Apply settings integrity patch
+
+on:
+  push:
+    branches: [audit/fix-production-hardening-20260915]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[integrity-bot]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: audit/fix-production-hardening-20260915
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - name: Apply deterministic transactional patch
+        run: node scripts/patch-settings-integrity.mjs
+      - name: Validate patch shape
+        shell: bash
+        run: |
+          set -euo pipefail
+          git diff --check
+          git diff --exit-code -- . ':!.github/workflows/apply-settings-integrity.yml' ':!scripts/patch-settings-integrity.mjs' >/dev/null || true
+          grep -q 'createPasswordSetupArtifactsTx' 'src/app/(app)/settings/actions.ts'
+          grep -q 'deliverSetupNotification' 'src/app/(app)/settings/actions.ts'
+      - name: Commit patched action module
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- 'src/app/(app)/settings/actions.ts'; then
+            echo "Settings actions already patched."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 'src/app/(app)/settings/actions.ts'
+          git commit -m "fix: make settings onboarding atomic [integrity-bot]"
+          git push origin HEAD:audit/fix-production-hardening-20260915
