@@ -101,6 +101,8 @@ jobs:
           done
           cat /tmp/codexdentist.log
           exit 1
+      - name: Install browser runtime for API and browser smoke
+        run: npx playwright install --with-deps chromium
       - name: Agent health and legacy route smoke
         run: |
           set -Eeuo pipefail
@@ -140,7 +142,6 @@ jobs:
           NODE_ENV: test
       - name: Browser QA
         run: |
-          npx playwright install --with-deps chromium
           npm run browser:qa
         env:
           NODE_ENV: test

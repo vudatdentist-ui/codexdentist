@@ -113,6 +113,8 @@ jobs:
           done
           cat /tmp/codexdentist-deploy-preflight.log
           exit 1
+      - name: Install browser runtime for API and browser smoke
+        run: npx playwright install --with-deps chromium
       - name: Capture preflight server failures
         shell: bash
         run: |
@@ -121,7 +123,6 @@ jobs:
           npm run readiness:check
           npm run test:smoke
           npm run test:api-contract
-      - run: npx playwright install --with-deps chromium
       - run: npm run browser:qa
         env:
           NODE_ENV: test
