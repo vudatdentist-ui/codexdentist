@@ -41,6 +41,9 @@ jobs:
       APP_BASE_URL: https://codexdentist.test
       PATIENT_FILE_STORAGE_DRIVER: local
       SESSION_COOKIE_SECURE: "false"
+      PAYOS_DEFAULT_CLIENT_ID: phase3-ci-client
+      PAYOS_DEFAULT_API_KEY: phase3-ci-api-key
+      PAYOS_DEFAULT_CHECKSUM_KEY: ci-phase3-payos-checksum-secret
     steps:
       - uses: actions/checkout@v7
         with:
