@@ -32,22 +32,36 @@ if (changedFiles.length === 0) {
 const forbiddenPatterns = [
   ["DROP TABLE", /\bDROP\s+TABLE\b/i],
   ["DROP COLUMN", /\bDROP\s+COLUMN\b/i],
-  ["TRUNCATE", /\bTRUNCATE\b/i],
   ["DROP TYPE", /\bDROP\s+TYPE\b/i],
+  ["DROP SCHEMA", /\bDROP\s+SCHEMA\b/i],
+  ["DROP VIEW", /\bDROP\s+(?:MATERIALIZED\s+)?VIEW\b/i],
+  ["DROP SEQUENCE", /\bDROP\s+SEQUENCE\b/i],
+  ["DROP INDEX", /\bDROP\s+INDEX\b/i],
+  ["DROP CONSTRAINT", /\bDROP\s+CONSTRAINT\b/i],
+  ["TRUNCATE", /\bTRUNCATE\b/i],
   ["RENAME TABLE", /\bALTER\s+TABLE\b[\s\S]*?\bRENAME\s+TO\b/i],
   ["RENAME COLUMN", /\bRENAME\s+COLUMN\b/i],
-  ["ALTER COLUMN TYPE", /\bALTER\s+COLUMN\b[\s\S]*?\bTYPE\b/i],
   ["ALTER TYPE RENAME", /\bALTER\s+TYPE\b[\s\S]*?\bRENAME\b/i],
+  ["ALTER COLUMN TYPE", /\bALTER\s+COLUMN\b[\s\S]*?\bTYPE\b/i],
+  ["ALTER COLUMN SET NOT NULL", /\bALTER\s+COLUMN\b[\s\S]*?\bSET\s+NOT\s+NULL\b/i],
+  ["ALTER COLUMN DROP DEFAULT", /\bALTER\s+COLUMN\b[\s\S]*?\bDROP\s+DEFAULT\b/i],
+  ["ADD REQUIRED COLUMN", /\bADD\s+(?:COLUMN\s+)?(?:"[^"]+"|[A-Za-z_][A-Za-z0-9_]*)\s+[\s\S]*?\bNOT\s+NULL\b/i],
 ];
 
 const violations = [];
 
 for (const file of changedFiles) {
   const sql = stripSqlComments(readFileSync(file, "utf8"));
+  const statements = sql
+    .split(";")
+    .map((statement) => statement.trim())
+    .filter(Boolean);
 
-  for (const [label, pattern] of forbiddenPatterns) {
-    if (pattern.test(sql)) {
-      violations.push(`${file}: ${label}`);
+  for (const statement of statements) {
+    for (const [label, pattern] of forbiddenPatterns) {
+      if (pattern.test(statement)) {
+        violations.push(`${file}: ${label}`);
+      }
     }
   }
 }
@@ -61,7 +75,7 @@ if (violations.length > 0) {
     console.error(` - ${violation}`);
   }
   console.error(
-    "Split destructive/renaming schema work into a later maintenance migration after all old application instances are retired.",
+    "Use an expand migration first (nullable/additive schema), deploy compatible code, backfill separately, then contract in a later maintenance migration after rollback compatibility is no longer required.",
   );
   process.exit(1);
 }

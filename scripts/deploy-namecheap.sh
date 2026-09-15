@@ -65,16 +65,26 @@ restore_previous_release() {
     stop_app || true
 
     if [[ -f "$PROMOTED_MANIFEST" ]]; then
-      while IFS= read -r name; do
+      while IFS=$'\t' read -r had_old name; do
         [[ -n "$name" ]] || continue
-        rm -rf -- "$APP_DIR/$name"
+
+        if [[ "$had_old" == "1" ]]; then
+          if [[ -e "$ROLLBACK_DIR/$name" || -L "$ROLLBACK_DIR/$name" ]]; then
+            rm -rf -- "$APP_DIR/$name"
+            mv -- "$ROLLBACK_DIR/$name" "$APP_DIR/$name" || true
+          fi
+        else
+          rm -rf -- "$APP_DIR/$name"
+        fi
       done < "$PROMOTED_MANIFEST"
     fi
 
+    # Defensive fallback for any item moved to rollback but not restored above.
     if [[ -d "$ROLLBACK_DIR" ]]; then
       while IFS= read -r -d '' item; do
         name="${item##*/}"
         [[ "$name" == ".promoted-items" ]] && continue
+        rm -rf -- "$APP_DIR/$name"
         mv -- "$item" "$APP_DIR/$name" || true
       done < <(find "$ROLLBACK_DIR" -mindepth 1 -maxdepth 1 -print0)
     fi
@@ -97,6 +107,14 @@ if [[ ! -d "$RELEASE_DIR/.next" ]]; then
   echo "Verified CI artifact is missing .next; refusing server-side rebuild." >&2
   exit 1
 fi
+if [[ ! -f "$RELEASE_DIR/.codexdentist-release-sha" ]]; then
+  echo "Release artifact is missing its SHA manifest." >&2
+  exit 1
+fi
+if [[ "$(tr -d '\r\n' < "$RELEASE_DIR/.codexdentist-release-sha")" != "$SHA" ]]; then
+  echo "Release artifact SHA does not match requested deployment SHA." >&2
+  exit 1
+fi
 
 export PATH="$NODE_BIN:$PATH"
 
@@ -108,9 +126,9 @@ export PATH="$NODE_BIN:$PATH"
   "$NODE_BIN/npm" ci --include=dev --ignore-scripts --no-audit --no-fund
   "$NODE_BIN/npm" run prisma:generate
 
-  # Migrations run while the old application is still live. CI rejects
-  # destructive/renaming migrations so the previous release remains compatible
-  # throughout the expand phase and can still be restored if cutover fails.
+  # Migrations run while the old application is still live. CI rejects contract
+  # migrations, so the previous release remains schema-compatible if cutover
+  # must be rolled back.
   "$NODE_BIN/npx" prisma migrate deploy
 
   "$NODE_BIN/npm" prune --omit=dev --ignore-scripts --no-audit --no-fund
@@ -119,11 +137,10 @@ export PATH="$NODE_BIN:$PATH"
 mkdir -p "$ROLLBACK_DIR"
 : > "$PROMOTED_MANIFEST"
 
-# Stop only for the final filesystem cutover. Every top-level runtime item from
-# the verified release is promoted, while its previous counterpart is retained
-# until sustained production checks have passed.
-stop_app
+# Stop only for the final filesystem cutover. Set the rollback flag before the
+# stop command so even a partially successful stop is recovered by the ERR trap.
 cutover_started=1
+stop_app
 
 while IFS= read -r -d '' item; do
   name="${item##*/}"
@@ -132,11 +149,17 @@ while IFS= read -r -d '' item; do
   esac
 
   if [[ -e "$APP_DIR/$name" || -L "$APP_DIR/$name" ]]; then
+    # Record intent before moving the old item. If the move itself fails, the
+    # rollback handler sees no backup and leaves the still-live old item alone.
+    printf '1\t%s\n' "$name" >> "$PROMOTED_MANIFEST"
     mv -- "$APP_DIR/$name" "$ROLLBACK_DIR/$name"
+  else
+    # A new-only item can always be removed safely during rollback, even if its
+    # promotion fails halfway through.
+    printf '0\t%s\n' "$name" >> "$PROMOTED_MANIFEST"
   fi
 
   mv -- "$item" "$APP_DIR/$name"
-  printf '%s\n' "$name" >> "$PROMOTED_MANIFEST"
 done < <(find "$RELEASE_DIR" -mindepth 1 -maxdepth 1 -print0)
 
 start_app

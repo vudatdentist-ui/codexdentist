@@ -7,19 +7,16 @@ type ServerActionBodySizeLimit = NonNullable<
 const serverActionBodySizeLimit = (process.env.SERVER_ACTION_BODY_SIZE_LIMIT ??
   "128mb") as ServerActionBodySizeLimit;
 const sharedHostBuild = process.env.CODEXMED_SHARED_HOST_BUILD === "true";
-const hostedDeployment = process.env.DEPLOYMENT_MODE !== "self-hosted";
 const appRootDomain =
   process.env.APP_ROOT_DOMAIN?.trim().toLowerCase() || "codexdentist.com";
-const serverActionAllowedOrigins = hostedDeployment
-  ? [
-      appRootDomain,
-      `*.${appRootDomain}`,
-      ...(process.env.TRUSTED_APP_HOSTS ?? "")
-        .split(",")
-        .map((host) => host.trim().toLowerCase())
-        .filter(Boolean),
-    ]
-  : undefined;
+const serverActionAllowedOrigins = [
+  appRootDomain,
+  `*.${appRootDomain}`,
+  ...(process.env.TRUSTED_APP_HOSTS ?? "")
+    .split(",")
+    .map((host) => host.trim().toLowerCase())
+    .filter(Boolean),
+];
 const developmentEvalSource =
   process.env.NODE_ENV === "production" ? "" : ` '${["unsafe", "eval"].join("-")}'`;
 
@@ -74,8 +71,7 @@ if (process.env.NODE_ENV === "production") {
 const nextConfig: NextConfig = {
   allowedDevOrigins: ["127.0.0.1"],
   typescript: {
-    ignoreBuildErrors:
-      process.env.CODEXMED_PHONE_BUILD === "true" || sharedHostBuild,
+    ignoreBuildErrors: process.env.CODEXMED_PHONE_BUILD === "true",
   },
   experimental: {
     cpus: sharedHostBuild ? 1 : undefined,
