@@ -12,14 +12,15 @@ try {
   const actionName = loginHtml.match(/name="(\$ACTION_ID_[^"]+)"/)?.[1];
   assert(actionName, "login server action field is present");
   const loginResponse = await context.post(`${baseUrl}/login`, {
-    form: {
+    multipart: {
       [actionName]: "",
       email,
       password,
     },
     maxRedirects: 0,
   });
-  assert([303, 200].includes(loginResponse.status()), "login action returns a controlled response");
+  assert(loginResponse.status() === 303, "login action redirects after authentication");
+  assert(Boolean(loginResponse.headers()["set-cookie"]), "login action sets a session cookie");
 
   for (const route of [
     "/api/imaging/studies",
