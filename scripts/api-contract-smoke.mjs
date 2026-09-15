@@ -4,23 +4,27 @@ const baseUrl = process.env.API_CONTRACT_BASE_URL ?? "http://127.0.0.1:3000";
 const email = process.env.API_CONTRACT_EMAIL ?? "owner@nhavista.vn";
 const password = process.env.API_CONTRACT_PASSWORD ?? "CodexSmoke2026!";
 
-const context = await request.newContext();
+let context = await request.newContext();
 
 try {
   const loginPage = await context.get(`${baseUrl}/login`);
   const loginHtml = await loginPage.text();
   const actionName = loginHtml.match(/name="(\$ACTION_ID_[^"]+)"/)?.[1];
   assert(actionName, "login server action field is present");
-  const loginResponse = await context.post(`${baseUrl}/login`, {
-    multipart: {
-      [actionName]: "",
-      email,
-      password,
-    },
-    maxRedirects: 0,
+  const form = new FormData();
+  form.set(actionName, "");
+  form.set("email", email);
+  form.set("password", password);
+  const loginResponse = await fetch(`${baseUrl}/login`, {
+    method: "POST",
+    body: form,
+    redirect: "manual",
   });
-  assert(loginResponse.status() === 303, "login action redirects after authentication");
-  assert(Boolean(loginResponse.headers()["set-cookie"]), "login action sets a session cookie");
+  assert(loginResponse.status === 303, "login action redirects after authentication");
+  const cookie = loginResponse.headers.get("set-cookie")?.split(";", 1)[0];
+  assert(Boolean(cookie), "login action sets a session cookie");
+  await context.dispose();
+  context = await request.newContext({ extraHTTPHeaders: { cookie } });
 
   for (const route of [
     "/api/imaging/studies",
