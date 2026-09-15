@@ -1,4 +1,4 @@
-import { readStoredPatientFile } from "@/lib/patient-file-storage";
+import { openStoredPatientFileStream } from "@/lib/patient-file-storage";
 import { requireViewSession } from "@/lib/auth";
 import { canUseAllClinics } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
@@ -38,23 +38,25 @@ export async function GET(
       variant === "thumbnail" ? entry.attachmentThumbnailStorageKey : null;
     const variantMimeType =
       variant === "thumbnail" ? entry.attachmentThumbnailMimeType : null;
-    const bytes = await readStoredPatientFile({
+    const stored = await openStoredPatientFileStream({
       storageProvider: entry.attachmentStorageProvider,
       storageKey: variantStorageKey ?? entry.attachmentStorageKey,
       sourceId: variantStorageKey ?? entry.attachmentStorageKey,
     });
-
-    return new Response(new Uint8Array(bytes), {
-      headers: {
-        "Cache-Control": "private, max-age=300",
-        "Content-Disposition": `inline; filename*=UTF-8''${encodeRFC5987(
-          entry.attachmentFileName ?? `${entry.description}-attachment`,
-        )}`,
-        "Content-Length": String(bytes.byteLength),
-        "Content-Type": variantMimeType ?? entry.attachmentMimeType ?? "image/jpeg",
-        "X-Content-Type-Options": "nosniff",
-      },
+    const headers = new Headers({
+      "Cache-Control": "private, max-age=300",
+      "Content-Disposition": `inline; filename*=UTF-8''${encodeRFC5987(
+        entry.attachmentFileName ?? `${entry.description}-attachment`,
+      )}`,
+      "Content-Type": variantMimeType ?? entry.attachmentMimeType ?? "image/jpeg",
+      "X-Content-Type-Options": "nosniff",
     });
+
+    if (stored.contentLength !== null) {
+      headers.set("Content-Length", String(stored.contentLength));
+    }
+
+    return new Response(stored.body, { headers });
   } catch {
     return new Response("Not found", { status: 404 });
   }

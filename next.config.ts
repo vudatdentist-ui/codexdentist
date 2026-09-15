@@ -5,7 +5,7 @@ type ServerActionBodySizeLimit = NonNullable<
 >["bodySizeLimit"];
 
 const serverActionBodySizeLimit = (process.env.SERVER_ACTION_BODY_SIZE_LIMIT ??
-  "64mb") as ServerActionBodySizeLimit;
+  "128mb") as ServerActionBodySizeLimit;
 const sharedHostBuild = process.env.CODEXMED_SHARED_HOST_BUILD === "true";
 const hostedDeployment = process.env.DEPLOYMENT_MODE !== "self-hosted";
 const appRootDomain =
