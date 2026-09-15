@@ -49,7 +49,12 @@ try {
     },
   });
   const patient = await prisma.patient.create({
-    data: { organizationId, clinicId: clinic.id, fullName: "QA purge patient" },
+    data: {
+      organizationId,
+      clinicId: clinic.id,
+      fullName: "QA purge patient",
+      phone: `090${token.slice(0, 8)}`,
+    },
   });
   const patientFileId = randomUUID();
   const storagePrefix = `patient-files/${safe(organizationId)}/${safe(patient.id)}/${safe(patientFileId)}-`;
