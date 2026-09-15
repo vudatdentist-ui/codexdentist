@@ -1,6 +1,6 @@
 # Codexdentist QA Playbook
 
-Last updated: 2026-09-08
+Last updated: 2026-09-15
 Status: ACTIVE
 
 This playbook implements the closed-loop quality process defined in `docs/PROJECT_CONTEXT.md`:
@@ -28,6 +28,7 @@ For changes that can affect bundling, routes, server/client boundaries, runtime 
 ```bash
 npm run build
 npm run test:disposable-restore
+npm run test:domain-operations
 npm run test:smoke
 ```
 
