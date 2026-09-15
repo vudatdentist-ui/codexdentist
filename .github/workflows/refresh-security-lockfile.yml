@@ -1,0 +1,39 @@
+name: Refresh security lockfile
+
+on:
+  push:
+    branches: [audit/fix-production-hardening-20260915]
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    if: ${{ !contains(github.event.head_commit.message, '[lockfile-bot]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: audit/fix-production-hardening-20260915
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - name: Resolve patched framework versions
+        run: >-
+          npm install --save-exact --package-lock-only --ignore-scripts --no-audit --no-fund
+          next@16.3.5 react@19.2.8 react-dom@19.2.8
+      - name: Commit deterministic lockfile
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- package.json package-lock.json; then
+            echo "Lockfile already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore: patch framework dependencies [lockfile-bot]"
+          git push origin HEAD:audit/fix-production-hardening-20260915
