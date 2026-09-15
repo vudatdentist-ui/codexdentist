@@ -20,6 +20,9 @@ const source = new URL(sourceUrl);
 const target = new URL(restoreUrl);
 const sourceDatabase = source.pathname.replace(/^\//, "");
 const targetDatabase = target.pathname.replace(/^\//, "");
+const sourceToolUrl = withoutPrismaSchema(sourceUrl);
+const targetToolUrl = withoutPrismaSchema(restoreUrl);
+const targetConnection = connectionOptions(targetToolUrl);
 if (!targetDatabase || targetDatabase === sourceDatabase) {
   throw new Error("RESTORE_DATABASE_URL must identify a distinct disposable database.");
 }
@@ -28,21 +31,44 @@ if (!/(^|[_-])(restore|test|qa|dev|local|sandbox)([_-]|$)/i.test(targetDatabase)
 }
 
 try {
-  run("pg_dump", ["--format=custom", "--no-owner", "--no-privileges", "--file", dumpPath, sourceUrl]);
-  run("dropdb", ["--if-exists", "--dbname", restoreUrl]);
-  run("createdb", ["--dbname", restoreUrl]);
-  run("pg_restore", ["--no-owner", "--no-privileges", "--dbname", restoreUrl, dumpPath]);
-  run("psql", [restoreUrl, "-v", "ON_ERROR_STOP=1", "-c", 'SELECT 1 FROM "_prisma_migrations" LIMIT 1;']);
+  run("pg_dump", ["--format=custom", "--no-owner", "--no-privileges", "--file", dumpPath, sourceToolUrl]);
+  run("dropdb", ["--if-exists", ...targetConnection.args, targetDatabase], true, targetConnection.env);
+  run("createdb", [...targetConnection.args, targetDatabase], true, targetConnection.env);
+  run("pg_restore", ["--no-owner", "--no-privileges", "--dbname", targetToolUrl, dumpPath]);
+  run("psql", [targetToolUrl, "-v", "ON_ERROR_STOP=1", "-c", 'SELECT 1 FROM "_prisma_migrations" LIMIT 1;']);
   console.log(`ok disposable PostgreSQL restore: ${targetDatabase}`);
 } finally {
   await rm(dumpPath, { force: true });
-  run("dropdb", ["--if-exists", "--dbname", restoreUrl], false);
+  run("dropdb", ["--if-exists", ...targetConnection.args, targetDatabase], false, targetConnection.env);
 }
 
-function run(command, args, required = true) {
-  const result = spawnSync(command, args, { encoding: "utf8", stdio: "inherit" });
+function run(command, args, required = true, connectionEnv = {}) {
+  const result = spawnSync(command, args, {
+    encoding: "utf8",
+    stdio: "inherit",
+    env: { ...process.env, ...connectionEnv },
+  });
   if (required && (result.error || result.status !== 0)) {
     throw result.error ?? new Error(`${command} failed with status ${result.status}`);
   }
   return result;
+}
+
+function withoutPrismaSchema(value) {
+  const url = new URL(value);
+  url.searchParams.delete("schema");
+  return url.toString();
+}
+
+function connectionOptions(value) {
+  const url = new URL(value);
+  const args = [];
+  if (url.hostname) args.push("--host", url.hostname);
+  if (url.port) args.push("--port", url.port);
+  if (url.username) args.push("--username", decodeURIComponent(url.username));
+  const password = url.password ? decodeURIComponent(url.password) : "";
+  return {
+    args,
+    env: password ? { PGPASSWORD: password } : {},
+  };
 }

@@ -59,6 +59,7 @@ if [[ -z "${JOB_SECRET:-}" ]]; then
   echo "JOB_SECRET is missing from the production environment." >&2
   exit 1
 fi
+DATABASE_URL_TOOL="${DATABASE_URL%%\?schema=*}"
 
 cutover_started=0
 database_backup_created=0
@@ -88,9 +89,9 @@ restore_previous_release() {
   echo "Deployment failed; starting rollback." >&2
 
   if [[ "$database_backup_created" == "1" && "$migration_attempted" == "1" ]]; then
-    psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' >/dev/null
+    psql "$DATABASE_URL_TOOL" -v ON_ERROR_STOP=1 -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' >/dev/null
     local schema_reset_status=$?
-    pg_restore --no-owner --no-privileges --dbname="$DATABASE_URL" "$ROLLBACK_DIR/database.dump" >/dev/null
+    pg_restore --no-owner --no-privileges --dbname="$DATABASE_URL_TOOL" "$ROLLBACK_DIR/database.dump" >/dev/null
     local restore_status=$?
     if [[ "$schema_reset_status" -ne 0 || "$restore_status" -ne 0 ]]; then
       database_restore_failed=1
@@ -191,7 +192,7 @@ mkdir -p "$ROLLBACK_DIR"
   cd "$RELEASE_DIR"
   "$NODE_BIN/npm" ci --include=dev --ignore-scripts --no-audit --no-fund
   "$NODE_BIN/npm" run prisma:generate
-  pg_dump --format=custom --no-owner --no-privileges --file="$ROLLBACK_DIR/database.dump" "$DATABASE_URL"
+  pg_dump --format=custom --no-owner --no-privileges --file="$ROLLBACK_DIR/database.dump" "$DATABASE_URL_TOOL"
   database_backup_created=1
   migration_attempted=1
   "$NODE_BIN/npx" prisma migrate deploy

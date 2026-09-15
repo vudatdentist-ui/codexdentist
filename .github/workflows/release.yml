@@ -92,7 +92,8 @@ jobs:
             rm -f "$dump_path"
           }
           trap cleanup_restore EXIT
-          pg_dump --format=custom --no-owner --file="$dump_path" "$DATABASE_URL"
+          source_url="${DATABASE_URL%%\?schema=*}"
+          pg_dump --format=custom --no-owner --file="$dump_path" "$source_url"
           dropdb --if-exists --host=127.0.0.1 --username=codexdentist codexdentist_restore
           createdb --host=127.0.0.1 --username=codexdentist codexdentist_restore
           pg_restore --no-owner --dbname="$restore_url" "$dump_path"
