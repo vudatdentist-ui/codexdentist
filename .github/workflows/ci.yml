@@ -81,6 +81,7 @@ jobs:
         env:
           RESTORE_DATABASE_URL: postgresql://codexdentist:codexdentist@127.0.0.1:5432/codexdentist_restore
           RESTORE_TARGET_MARKER: CODEXDENTIST_DISPOSABLE_RESTORE
+          POSTGRES_TOOL_IMAGE: postgres:17-alpine
       - run: npx prisma db seed
         env:
           NODE_ENV: test

@@ -86,18 +86,21 @@ jobs:
           dump_path=/tmp/codexdentist-release-restore.dump
           restore_url=postgresql://codexdentist:codexdentist@127.0.0.1:5432/codexdentist_restore
           restore_pid=""
+          pgtool() {
+            docker run --rm --network host --volume /tmp:/tmp -e PGPASSWORD=codexdentist postgres:17-alpine "$@"
+          }
           cleanup_restore() {
             if [[ -n "$restore_pid" ]]; then kill "$restore_pid" 2>/dev/null || true; fi
-            dropdb --if-exists --host=127.0.0.1 --username=codexdentist codexdentist_restore || true
+            pgtool dropdb --if-exists --host=127.0.0.1 --username=codexdentist codexdentist_restore || true
             rm -f "$dump_path"
           }
           trap cleanup_restore EXIT
           source_url="${DATABASE_URL%%\?schema=*}"
-          pg_dump --format=custom --no-owner --file="$dump_path" "$source_url"
-          dropdb --if-exists --host=127.0.0.1 --username=codexdentist codexdentist_restore
-          createdb --host=127.0.0.1 --username=codexdentist codexdentist_restore
-          pg_restore --no-owner --dbname="$restore_url" "$dump_path"
-          psql "$restore_url" -v ON_ERROR_STOP=1 -c 'SELECT 1 FROM "_prisma_migrations" LIMIT 1;' >/dev/null
+          pgtool pg_dump --format=custom --no-owner --file=/tmp/codexdentist-release-restore.dump "$source_url"
+          pgtool dropdb --if-exists --host=127.0.0.1 --username=codexdentist codexdentist_restore
+          pgtool createdb --host=127.0.0.1 --username=codexdentist codexdentist_restore
+          pgtool pg_restore --no-owner --dbname="$restore_url" /tmp/codexdentist-release-restore.dump
+          pgtool psql "$restore_url" -v ON_ERROR_STOP=1 -c 'SELECT 1 FROM "_prisma_migrations" LIMIT 1;' >/dev/null
           DATABASE_URL="$restore_url" PORT=3001 NODE_ENV=production npm start > /tmp/codexdentist-restore.log 2>&1 &
           restore_pid=$!
           for attempt in {1..30}; do

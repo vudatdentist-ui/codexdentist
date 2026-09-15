@@ -23,6 +23,7 @@ const targetDatabase = target.pathname.replace(/^\//, "");
 const sourceToolUrl = withoutPrismaSchema(sourceUrl);
 const targetToolUrl = withoutPrismaSchema(restoreUrl);
 const targetConnection = connectionOptions(targetToolUrl);
+const postgresToolImage = process.env.POSTGRES_TOOL_IMAGE?.trim() || "";
 if (!targetDatabase || targetDatabase === sourceDatabase) {
   throw new Error("RESTORE_DATABASE_URL must identify a distinct disposable database.");
 }
@@ -43,7 +44,27 @@ try {
 }
 
 function run(command, args, required = true, connectionEnv = {}) {
-  const result = spawnSync(command, args, {
+  const postgresCommands = new Set(["pg_dump", "dropdb", "createdb", "pg_restore", "psql"]);
+  const useContainer = postgresToolImage && postgresCommands.has(command);
+  const containerArgs = useContainer
+    ? args.map((value) => value === dumpPath ? `/codexdentist-tmp/${path.basename(dumpPath)}` : value)
+    : args;
+  const executable = useContainer ? "docker" : command;
+  const executableArgs = useContainer
+    ? [
+        "run",
+        "--rm",
+        "--network",
+        "host",
+        "--volume",
+        `${path.dirname(dumpPath)}:/codexdentist-tmp`,
+        ...Object.keys(connectionEnv).flatMap((key) => ["-e", key]),
+        postgresToolImage,
+        command,
+        ...containerArgs,
+      ]
+    : args;
+  const result = spawnSync(executable, executableArgs, {
     encoding: "utf8",
     stdio: "inherit",
     env: { ...process.env, ...connectionEnv },
