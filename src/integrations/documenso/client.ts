@@ -116,10 +116,11 @@ export async function createDocumensoSigningEnvelope(
   });
   const distributed = await safeJson(distributeResponse);
   if (!distributeResponse.ok) {
-    throw providerResponseError(
+    throw new DocumensoProviderError(
       "documenso-envelope-distribute-failed",
       distributeResponse.status,
-      distributed,
+      String(distributed.message ?? distributed.error ?? distributed.errorCode ?? "documenso-envelope-distribute-failed"),
+      envelopeId,
     );
   }
   const recipients = Array.isArray(distributed.recipients)
@@ -229,7 +230,7 @@ export async function downloadDocumensoSignedPdf(
       "Unable to download signed Documenso PDF",
     );
   }
-  const bytes = Buffer.from(await downloadResponse.arrayBuffer());
+  const bytes = await readBoundedBytes(downloadResponse, 50 * 1024 * 1024);
   if (!bytes.subarray(0, 5).equals(Buffer.from("%PDF-"))) {
     throw new DocumensoProviderError(
       "documenso-signed-pdf-invalid",
@@ -245,6 +246,36 @@ export async function downloadDocumensoSignedPdf(
       dispositionName ? decodeURIComponent(dispositionName) : `${envelopeId}-signed.pdf`,
     ),
   };
+}
+
+async function readBoundedBytes(response: Response, maxBytes: number) {
+  const contentLength = Number(response.headers.get("content-length") ?? "");
+  if (Number.isFinite(contentLength) && contentLength > maxBytes) {
+    throw new DocumensoProviderError(
+      "documenso-signed-pdf-too-large",
+      502,
+      "Documenso signed document exceeds the permitted size",
+    );
+  }
+  if (!response.body) throw new DocumensoProviderError("documenso-signed-pdf-empty", 502, "Empty signed document");
+  const reader = response.body.getReader();
+  const chunks: Buffer[] = [];
+  let total = 0;
+  try {
+    for (;;) {
+      const next = await reader.read();
+      if (next.done) break;
+      total += next.value.byteLength;
+      if (total > maxBytes) {
+        await reader.cancel();
+        throw new DocumensoProviderError("documenso-signed-pdf-too-large", 502, "Documenso signed document exceeds the permitted size");
+      }
+      chunks.push(Buffer.from(next.value));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks, total);
 }
 
 function copyToArrayBuffer(bytes: Uint8Array) {
@@ -316,6 +347,7 @@ export class DocumensoProviderError extends Error {
     public readonly code: string,
     public readonly status: number,
     message: string,
+    public readonly envelopeId?: string,
   ) {
     super(message);
     this.name = "DocumensoProviderError";

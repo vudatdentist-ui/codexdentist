@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { NextResponse } from "next/server";
 import {
   codexMedAiConfig,
@@ -17,7 +20,7 @@ type ReadinessCheck = {
 };
 
 export async function GET(request: Request) {
-  if (process.env.NODE_ENV === "production" && !verifyJobRequest(request)) {
+  if (!verifyJobRequest(request)) {
     return NextResponse.json(
       { error: "Unauthorized" },
       {
@@ -44,13 +47,32 @@ export async function GET(request: Request) {
   }
 
   try {
-    const migrations = await prisma.$queryRaw<Array<{ count: bigint }>>`
-      SELECT COUNT(*)::bigint AS count FROM "_prisma_migrations"
+    const expected = new Map(
+      readdirSync(path.join(process.cwd(), "prisma", "migrations"), { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && /^\d+_/.test(entry.name))
+        .map((entry) => [
+          entry.name,
+          createHash("sha256")
+            .update(readFileSync(path.join(process.cwd(), "prisma", "migrations", entry.name, "migration.sql")))
+            .digest("hex"),
+        ]),
+    );
+    const migrations = await prisma.$queryRaw<Array<{ migration_name: string; checksum: string }>>`
+      SELECT migration_name, checksum FROM "_prisma_migrations" WHERE finished_at IS NOT NULL
     `;
+    const applied = new Map(migrations.map((migration) => [migration.migration_name, migration.checksum]));
+    const missing = [...expected.keys()].filter((name) => !applied.has(name));
+    const unexpected = [...applied.keys()].filter((name) => !expected.has(name));
+    const drift = [...expected.entries()]
+      .filter(([name, checksum]) => applied.get(name) && applied.get(name) !== checksum)
+      .map(([name]) => name);
+    const valid = missing.length === 0 && unexpected.length === 0 && drift.length === 0;
     checks.push({
       name: "migrations",
-      status: Number(migrations[0]?.count ?? 0) > 0 ? "ok" : "warn",
-      details: `${Number(migrations[0]?.count ?? 0)} migrations recorded`,
+      status: valid ? "ok" : "fail",
+      details: valid
+        ? `${applied.size} migrations verified`
+        : `missing=${missing.length}, unexpected=${unexpected.length}, checksumDrift=${drift.length}`,
     });
   } catch (error) {
     console.error("readiness.migrations_failed", error);

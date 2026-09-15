@@ -1,6 +1,6 @@
 import "server-only";
 
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { createHash, randomUUID } from "node:crypto";
 import {
   patientFileStorageDriver,
@@ -301,24 +301,29 @@ async function storeUpload({
     storageName,
   );
   const checksumSha256 = createHash("sha256").update(bytes).digest("hex");
-  const variants = await createImageVariants({
-    bytes,
-    mimeType,
-    fileId: storageFileId,
-    storageNamespace,
-    safeOrganizationId,
-    safeOwnerId,
-    storageProvider,
-  });
-
-  if (storageProvider === "r2") {
-    await storeR2Object({
-      key: storageKey,
+  let variants: Awaited<ReturnType<typeof createImageVariants>> = {};
+  try {
+    variants = await createImageVariants({
       bytes,
       mimeType,
-      fileName: originalName,
-      checksumSha256,
+      fileId: storageFileId,
+      storageNamespace,
+      safeOrganizationId,
+      safeOwnerId,
+      storageProvider,
     });
+
+    if (storageProvider === "r2") {
+      await storeR2Object({
+        key: storageKey,
+        bytes,
+        mimeType,
+        fileName: originalName,
+        checksumSha256,
+      });
+    } else {
+      await storeLocalObject(storageKey, bytes);
+    }
 
     return {
       fileName: originalName,
@@ -332,30 +337,28 @@ async function storeUpload({
       thumbnail: variants.thumbnail,
       checksumSha256,
     };
+  } catch (error) {
+    await Promise.allSettled([
+      deleteStoredObject(storageProvider, storageKey),
+      ...(variants.preview?.storageKey
+        ? [deleteStoredObject(storageProvider, variants.preview.storageKey)]
+        : []),
+      ...(variants.thumbnail?.storageKey
+        ? [deleteStoredObject(storageProvider, variants.thumbnail.storageKey)]
+        : []),
+    ]);
+    throw error;
   }
-
-  await storeLocalObject(storageKey, bytes);
-
-  return {
-    fileName: originalName,
-    fileKind,
-    mimeType,
-    preview: variants.preview,
-    relativePath: storageKey,
-    sizeBytes: file.size,
-    storageProvider,
-    storageKey,
-    thumbnail: variants.thumbnail,
-    checksumSha256,
-  };
 }
 
 export async function readStoredPatientFile(input: {
   storageProvider?: string | null;
+  sourceType?: string | null;
   storageKey?: string | null;
   sourceId?: string | null;
 }) {
-  const provider = input.storageProvider ?? "local";
+  const provider = input.storageProvider ??
+    (input.sourceType === "R2_UPLOAD" ? "r2" : "local");
   const key = input.storageKey ?? input.sourceId;
 
   if (!key) {
@@ -575,6 +578,28 @@ async function storeLocalObject(storageKey: string, bytes: Buffer) {
   });
 }
 
+async function deleteStoredObject(storageProvider: "local" | "r2", storageKey: string) {
+  if (storageProvider === "r2") {
+    const config = requiredR2Config();
+    await getR2Client().send(
+      new DeleteObjectCommand({
+        Bucket: config.bucket,
+        Key: storageKey,
+      }),
+    );
+    return;
+  }
+
+  const { unlink } = await import("node:fs/promises");
+  try {
+    await unlink(await resolveStoredPatientFilePath(storageKey));
+  } catch (error) {
+    if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) {
+      throw error;
+    }
+  }
+}
+
 async function createImageVariants(input: {
   bytes: Buffer;
   mimeType: string;
@@ -648,28 +673,34 @@ async function createImageVariants(input: {
     `${input.fileId}-${randomUUID()}-thumbnail.webp`,
   );
 
-  if (input.storageProvider === "r2") {
-    await Promise.all([
-      storeR2Object({
+  const writtenKeys: string[] = [];
+  try {
+    if (input.storageProvider === "r2") {
+      await storeR2Object({
         key: previewKey,
         bytes: previewBytes,
         mimeType: "image/webp",
         fileName: `${input.fileId}-preview.webp`,
         checksumSha256: createHash("sha256").update(previewBytes).digest("hex"),
-      }),
-      storeR2Object({
+      });
+      writtenKeys.push(previewKey);
+      await storeR2Object({
         key: thumbnailKey,
         bytes: thumbnailBytes,
         mimeType: "image/webp",
         fileName: `${input.fileId}-thumbnail.webp`,
         checksumSha256: createHash("sha256").update(thumbnailBytes).digest("hex"),
-      }),
-    ]);
-  } else {
-    await Promise.all([
-      storeLocalObject(previewKey, previewBytes),
-      storeLocalObject(thumbnailKey, thumbnailBytes),
-    ]);
+      });
+      writtenKeys.push(thumbnailKey);
+    } else {
+      await storeLocalObject(previewKey, previewBytes);
+      writtenKeys.push(previewKey);
+      await storeLocalObject(thumbnailKey, thumbnailBytes);
+      writtenKeys.push(thumbnailKey);
+    }
+  } catch (error) {
+    await Promise.allSettled(writtenKeys.map((key) => deleteStoredObject(input.storageProvider, key)));
+    throw error;
   }
 
   return {

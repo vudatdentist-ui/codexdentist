@@ -8,25 +8,29 @@ const originalFetch = globalThis.fetch;
 const secrets = {
   baseUrl: "http://orthanc.test",
   viewerBaseUrl: "http://ohif.test/viewer",
+  viewerAccessMode: "private",
   username: "orthanc-user",
   password: "orthanc-password",
 };
 
 try {
   globalThis.fetch = async (url, init = {}) => {
-    assert(String(url) === "http://orthanc.test/studies/study-123", "Orthanc study endpoint is scoped to the study id");
+    const studyId = decodeURIComponent(String(url).split("/").pop());
+    assert(String(url) === `http://orthanc.test/studies/${studyId}`, "Orthanc study endpoint is scoped to the study id");
     assert(init.headers.get("Authorization") === `Basic ${Buffer.from("orthanc-user:orthanc-password").toString("base64")}`, "Orthanc credentials use basic auth");
+    if (studyId === "missing-study") return new Response("not found", { status: 404 });
+    const tags = {
+      StudyInstanceUID: studyId === "bad-date-study" ? "1.2.3.bad-date" : "1.2.840.113619.2.55.3.604688123.123",
+      AccessionNumber: "ACC-123",
+      ModalitiesInStudy: "CT\\MR",
+      StudyDate: studyId === "bad-date-study" ? "20260230" : "20260908",
+      StudyDescription: "Dental CBCT",
+      PatientName: "Must never leave the provider adapter",
+    };
     return new Response(JSON.stringify({
-      ID: "study-123",
-      ParentPatient: "patient-resource-123",
-      MainDicomTags: {
-        StudyInstanceUID: "1.2.840.113619.2.55.3.604688123.123",
-        AccessionNumber: "ACC-123",
-        ModalitiesInStudy: "CT\\MR",
-        StudyDate: "20260908",
-        StudyDescription: "Dental CBCT",
-        PatientName: "Must never leave the provider adapter",
-      },
+      ID: studyId,
+      ...(studyId === "missing-patient-study" ? {} : { ParentPatient: "patient-resource-123" }),
+      MainDicomTags: tags,
     }), { status: 200, headers: { "content-type": "application/json" } });
   };
 
@@ -41,6 +45,25 @@ try {
   const viewerUrl = buildOhifStudyUrl(secrets.viewerBaseUrl, study.studyInstanceUid);
   assert(viewerUrl === `http://ohif.test/viewer?StudyInstanceUIDs=${encodeURIComponent(study.studyInstanceUid)}`, "OHIF URL carries only the stable study UID");
   assert(buildOhifStudyUrl(null, study.studyInstanceUid) === null, "OHIF fails closed when no viewer is configured");
+
+  let missingStudy = false;
+  try {
+    await fetchOrthancStudy(secrets, "missing-study");
+  } catch (error) {
+    missingStudy = error instanceof OrthancProviderError && error.code === "orthanc-study-not-found";
+  }
+  assert(missingStudy, "PACS 404 is represented as study-not-found");
+
+  let missingPatient = false;
+  try {
+    await fetchOrthancStudy(secrets, "missing-patient-study");
+  } catch (error) {
+    missingPatient = error instanceof OrthancProviderError && error.code === "orthanc-patient-id-missing";
+  }
+  assert(missingPatient, "DICOM study without provider patient mapping is rejected");
+
+  const invalidDateStudy = await fetchOrthancStudy(secrets, "bad-date-study");
+  assert(invalidDateStudy.studyDate === null, "invalid calendar dates are not normalized");
 
   let invalidDenied = false;
   try {

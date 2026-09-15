@@ -66,7 +66,7 @@ const actionRoles: Record<ActionKey, AppRole[]> = {
   "file.upload": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST", "FRONT_DESK"],
   "file.delete": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],
   "file.export": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST"],
-  "imaging.study.view": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST", "FRONT_DESK"],
+  "imaging.study.view": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST"],
   "imaging.study.link": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST"],
   "lab.case.view": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST", "FRONT_DESK"],
   "lab.case.create": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST"],

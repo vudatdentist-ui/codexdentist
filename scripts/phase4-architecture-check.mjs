@@ -32,6 +32,13 @@ assert(
     source.migration.includes('"patientId"'),
   "imaging migration is tenant, clinic, and patient scoped",
 );
+assert(
+  /clinic\s+Clinic\s+@relation\(fields: \[clinicId, organizationId\]/.test(source.schema) &&
+    /patient\s+Patient\s+@relation\(fields: \[patientId, clinicId, organizationId\]/.test(source.schema) &&
+    source.schema.includes('@@unique([id, clinicId, organizationId])') &&
+    source.schema.includes('@@unique([id, organizationId])'),
+  "imaging references enforce composite tenant and clinic consistency",
+);
 assert(!/@prisma|lib\/prisma|infrastructure\//.test(source.client), "Orthanc client is provider-only");
 assert(
   source.client.includes("ParentPatient") &&
@@ -41,7 +48,7 @@ assert(
 );
 assert(
   source.commands.includes('organizationId: session.organizationId') &&
-    source.commands.includes('clinicId: { in: session.clinicIds }') &&
+    source.commands.includes("allowedClinicIds(session)") &&
     source.commands.includes('provider: "orthanc"'),
   "imaging commands enforce tenant and clinic scope",
 );
@@ -52,7 +59,8 @@ assert(
   "imaging routes dispatch through application commands",
 );
 assert(
-  source.commands.includes("imaging-viewer-not-configured") &&
+    source.commands.includes("imaging-viewer-not-configured") &&
+    source.commands.includes("orthanc-study-identity-mismatch") &&
     source.commands.includes("buildOhifStudyUrl") &&
     source.commands.includes("connection.organizationId !== session.organizationId") &&
     source.commands.includes("connection.clinicId !== study.clinicId"),

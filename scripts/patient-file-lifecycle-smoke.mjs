@@ -14,9 +14,10 @@ const {
 const { enqueueIntegrationOutbox } = await import(
   "../src/infrastructure/integrations/substrate.ts"
 );
+const { reconcileStagedPatientFiles } = await import(
+  "../src/infrastructure/patient-files/reconcile-runtime.ts"
+);
 
-const baseUrl = process.env.PATIENT_FILE_LIFECYCLE_BASE_URL ?? "http://127.0.0.1:3000";
-const jobSecret = process.env.JOB_SECRET ?? "ci-only-job-secret-with-at-least-32-characters";
 const connectionString =
   process.env.DATABASE_URL ??
   "postgresql://postgres:postgres@localhost:5432/vietnam_dental_suite?schema=public";
@@ -71,7 +72,7 @@ try {
   const beforeGc = await getPatientFileStage(prisma, orphanStageId);
   assert(beforeGc?.state === "GC_PENDING", "failed domain sequence is discoverable");
 
-  const gcResult = await runGc();
+  const gcResult = await runGc(patient.organizationId);
   assert(gcResult.deleted >= 1, "GC deletes pending staged objects");
   assert(!(await exists(orphanPath)), "orphan object removed by prefix reconciliation");
   const afterGc = await getPatientFileStage(prisma, orphanStageId);
@@ -99,7 +100,7 @@ try {
     `UPDATE "PatientFileObjectStage" SET "storageProvider" = 'unsupported', "state" = 'GC_PENDING', "gcAfter" = CURRENT_TIMESTAMP WHERE "id" = $1`,
     retryStageId,
   );
-  const failedGc = await runGc();
+  const failedGc = await runGc(patient.organizationId);
   assert(failedGc.failed >= 1, "GC failure remains retryable");
   const retryPending = await getPatientFileStage(prisma, retryStageId);
   assert(retryPending?.state === "GC_PENDING", "failed GC keeps pending state");
@@ -121,7 +122,7 @@ try {
     `UPDATE "PatientFileObjectStage" SET "storageProvider" = 'local', "gcAfter" = CURRENT_TIMESTAMP WHERE "id" = $1`,
     retryStageId,
   );
-  const retriedGc = await runGc();
+  const retriedGc = await runGc(patient.organizationId);
   assert(retriedGc.deleted >= 1, "failed GC can be retried successfully");
   assert(!(await exists(retryPath)), "retry reconciliation removes staged object");
 
@@ -204,10 +205,73 @@ try {
   );
   assert(committedOutbox.length === 1, "file commit and outbox persisted atomically");
 
-  await runGc();
+  await runGc(patient.organizationId);
   assert(await exists(committedPath), "GC never deletes committed patient file object");
   const stillCommitted = await getPatientFileStage(prisma, committedStageId);
   assert(stillCommitted?.state === "COMMITTED", "committed stage remains committed after GC");
+
+  await prisma.patientFile.update({
+    where: { id: committedFileId },
+    data: { retentionUntil: new Date(0) },
+  });
+  const committedExpiredGc = await runGc(patient.organizationId);
+  assert(committedExpiredGc.expired >= 1, "committed expired patient file is claimed");
+  assert(!(await exists(committedPath)), "committed expired object is removed");
+  const deletedCommittedStage = await getPatientFileStage(prisma, committedStageId);
+  assert(deletedCommittedStage?.state === "DELETED", "committed expired stage is deleted");
+  assert(
+    !(await prisma.patientFile.findUnique({ where: { id: committedFileId } })),
+    "committed expired patient file record is removed",
+  );
+
+  const expiredFileId = randomUUID();
+  patientFileIds.push(expiredFileId);
+  const expiredKey = patientFilePrefix(
+    patient.organizationId,
+    patient.id,
+    expiredFileId,
+  ) + "expired.pdf";
+  const expiredPath = localPath(expiredKey);
+  createdPaths.push(expiredPath);
+  await mkdir(path.dirname(expiredPath), { recursive: true });
+  await writeFile(expiredPath, Buffer.from("%PDF-expired-file\n"), { flag: "wx" });
+  await prisma.patientFile.create({
+    data: {
+      id: expiredFileId,
+      organizationId: patient.organizationId,
+      clinicId: patient.clinicId,
+      patientId: patient.id,
+      uploadedById: owner.id,
+      category: "QA_PHASE2",
+      title: "QA expired patient file",
+      fileName: "expired.pdf",
+      mimeType: "application/pdf",
+      url: `/patient-files/${expiredFileId}`,
+      sizeBytes: 18,
+      sourceType: "LOCAL_UPLOAD",
+      sourceId: expiredKey,
+      storageProvider: "local",
+      storageKey: expiredKey,
+      retentionUntil: new Date(0),
+      virusScanStatus: "CLEAN",
+    },
+  });
+  const expiredGc = await runGc(patient.organizationId);
+  assert(expiredGc.expired >= 1, "expired patient file is claimed for deletion");
+  assert(!(await exists(expiredPath)), "expired patient file object is removed");
+  assert(
+    !(await prisma.patientFile.findUnique({ where: { id: expiredFileId } })),
+    "expired patient file record is removed",
+  );
+  const expiredStage = await prisma.$queryRawUnsafe(
+    `SELECT "id" FROM "PatientFileObjectStage" WHERE "targetPatientFileId" = $1 LIMIT 1`,
+    expiredFileId,
+  );
+  if (expiredStage[0]?.id) stageIds.push(expiredStage[0].id);
+  const expiredAudit = await prisma.auditLog.findFirst({
+    where: { action: "patient_file.expired_deleted", entityId: expiredFileId },
+  });
+  assert(Boolean(expiredAudit), "expired patient file deletion is audited");
 
   console.log("ok phase2 patient file lifecycle smoke");
 } finally {
@@ -231,16 +295,8 @@ try {
   await prisma.$disconnect();
 }
 
-async function runGc() {
-  const response = await fetch(`${baseUrl}/api/jobs/patient-file-gc`, {
-    method: "POST",
-    headers: { "x-job-secret": jobSecret },
-  });
-  const body = await response.json().catch(() => ({}));
-  if (response.status !== 200) {
-    throw new Error(`patient file GC returned HTTP ${response.status}: ${JSON.stringify(body)}`);
-  }
-  return body;
+async function runGc(organizationId) {
+  return reconcileStagedPatientFiles({ organizationId });
 }
 
 function patientFilePrefix(organizationId, patientId, patientFileId) {

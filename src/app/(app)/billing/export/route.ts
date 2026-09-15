@@ -52,6 +52,7 @@ export async function GET() {
     headers: {
       "Content-Disposition": `attachment; filename="codexmed-invoices-${generatedAt}.csv"`,
       "Content-Type": "text/csv; charset=utf-8",
+      "Cache-Control": "private, no-store",
     },
   });
 }

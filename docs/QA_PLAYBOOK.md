@@ -27,6 +27,7 @@ For changes that can affect bundling, routes, server/client boundaries, runtime 
 
 ```bash
 npm run build
+npm run test:disposable-restore
 npm run test:smoke
 ```
 
@@ -112,7 +113,7 @@ npm run agent:audit
 
 If one fails, fix and rerun all three before Phase 0 closes.
 
-## 6. Phase 1 Gate — Application Boundary
+## 6. Phase 1 Gate — Application Boundary — COMPLETE
 
 For each migrated use-case:
 
@@ -142,7 +143,7 @@ npm run test:tenant
 npm run test:security
 ```
 
-## 7. Phase 2 Gate — Integration Substrate And File Lifecycle
+## 7. Phase 2 Gate — Integration Substrate And File Lifecycle — COMPLETE
 
 Add automated tests for at least:
 
@@ -155,6 +156,8 @@ Add automated tests for at least:
 - staged file created but DB commit fails;
 - staged object reconciliation/garbage collection;
 - committed protected file remains inaccessible across tenant/clinic boundary.
+
+Phase 2 continuation evidence also covers expired-retention deletion, staged-object retry, organization purge storage cleanup, and staged-only purge isolation through the patient-file lifecycle, organization-purge, and architecture gates.
 
 Run affected schema/data integrity and protected-file suites after every fix.
 
@@ -296,7 +299,7 @@ npm run go-live:check
 
 Also run the self-host packaging and restore drill in `docs/OPERATIONS.md` when migrations, storage, deployment, or infrastructure changed.
 
-Phase 7 continuation evidence: static/architecture/hardening gates, the full local runtime regression set, self-host compose validation, production Docker build, and browser QA (32/32 desktop/mobile route checks) pass. A disposable PostgreSQL backup/restore drill restored 51 migrations and the Phase 4–5 tables. The final go-live check remains intentionally open because this QA run uses localhost PostgreSQL and still contains four demo-password users; production credentials and credential rotation are required before release.
+Phase 7 continuation evidence: static/architecture/hardening gates, the full local runtime regression set, self-host compose validation, production Docker build, and browser QA (38/38 desktop/mobile route checks, including Imaging/Lab/Sterilization) pass. The CI and preflight workflows now include a disposable PostgreSQL restore smoke, and tagged releases boot the production application against the restored database before proceeding. A prior disposable PostgreSQL backup/restore drill restored 51 migrations and the Phase 4–5 tables; the current tree has 54 migrations after integrity and purge-manifest hardening. The local post-migration restore and browser rerun for this continuation remain unverified because Docker Desktop is not currently exposing its Linux daemon and the available local PostgreSQL service resets connections. The final go-live check also remains intentionally open because this QA run uses localhost PostgreSQL and still contains four demo-password users; production credentials and credential rotation are required before release.
 
 ## 13. High-Risk Manual Regression Checks
 

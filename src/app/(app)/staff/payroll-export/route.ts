@@ -12,16 +12,9 @@ export async function GET(request: Request) {
     where: {
       id: runId,
       organizationId: session.organizationId,
-      OR: [
-        {
-          clinicId: {
-            in: allowedClinicIds(session),
-          },
-        },
-        {
-          clinicId: null,
-        },
-      ],
+      ...(canUseAllClinics(session)
+        ? { OR: [{ clinicId: { in: allowedClinicIds(session) } }, { clinicId: null }] }
+        : { clinicId: { in: allowedClinicIds(session) } }),
     },
     include: {
       clinic: {
@@ -105,6 +98,7 @@ export async function GET(request: Request) {
     headers: {
       "Content-Disposition": `attachment; filename="codexmed-payroll-${payrollRun.id}.csv"`,
       "Content-Type": "text/csv; charset=utf-8",
+      "Cache-Control": "private, no-store",
     },
   });
 }

@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { getImagingViewerCommand, listImagingStudiesCommand } from "@/lib/application/imaging/commands";
+import { applicationErrorCode } from "@/lib/application/errors";
 import { canPerformAction } from "@/lib/actions/permissions";
 import { requireSession } from "@/lib/auth";
 import styles from "./imaging.module.css";
@@ -9,15 +10,13 @@ export default async function ImagingPage() {
   if (!canPerformAction(session, "imaging.study.view")) notFound();
 
   const studies = await listImagingStudiesCommand(session);
-  const cards = await Promise.all(
-    studies.map(async (study) => {
-      try {
-        return { study, viewerUrl: (await getImagingViewerCommand(session, study.id)).viewerUrl };
-      } catch {
-        return { study, viewerUrl: null };
-      }
-    }),
-  );
+  const cards = await mapWithConcurrency(studies, 8, async (study) => {
+    try {
+      return { study, viewerUrl: (await getImagingViewerCommand(session, study.id)).viewerUrl, viewerError: null };
+    } catch (error) {
+      return { study, viewerUrl: null, viewerError: applicationErrorCode(error, "imaging-viewer-failed") };
+    }
+  });
 
   return (
     <main className={styles.page}>
@@ -39,11 +38,11 @@ export default async function ImagingPage() {
         </section>
       ) : (
         <section className={styles.grid} aria-label="Danh sách study hình ảnh">
-          {cards.map(({ study, viewerUrl }) => (
+          {cards.map(({ study, viewerUrl, viewerError }) => (
             <article className={styles.card} key={study.id}>
               <div className={styles.cardTopline}>
                 <span className={styles.badge}>{study.modalities.join(" · ") || "Imaging"}</span>
-                <span>{study.availability === "AVAILABLE" ? "Sẵn sàng" : "Không khả dụng"}</span>
+                <span>{viewerError || study.availability !== "AVAILABLE" ? "Không khả dụng" : "Sẵn sàng"}</span>
               </div>
               <h2>{study.description || "Study không có mô tả"}</h2>
               <dl>
@@ -57,7 +56,7 @@ export default async function ImagingPage() {
                   Mở OHIF Viewer
                 </a>
               ) : (
-                <p className={styles.unavailable}>OHIF chưa được cấu hình cho kết nối này.</p>
+                <p className={styles.unavailable}>{viewerMessage(viewerError)}</p>
               )}
             </article>
           ))}
@@ -71,4 +70,37 @@ function formatDate(value: Date | null) {
   return value
     ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium", timeZone: "Asia/Ho_Chi_Minh" }).format(value)
     : "Chưa có ngày";
+}
+
+function viewerMessage(error: string | null) {
+  if (error === "orthanc-study-not-found") {
+    return "Study không còn tồn tại trong PACS; tham chiếu Codexdentist vẫn được giữ để đối soát.";
+  }
+  if (error === "orthanc-study-identity-mismatch") {
+    return "PACS trả về định danh không khớp; viewer đã bị khóa để bảo vệ dữ liệu bệnh nhân.";
+  }
+  if (error?.startsWith("orthanc-")) {
+    return "PACS hiện không khả dụng; tham chiếu study vẫn được giữ an toàn.";
+  }
+  if (error === "imaging-viewer-access-not-configured") {
+    return "OHIF đang bị tắt vì chưa cấu hình private viewer access.";
+  }
+  if (error === "imaging-connection-unavailable") {
+    return "Kết nối PACS hiện không hoạt động; hãy kiểm tra cấu hình tích hợp.";
+  }
+  return "OHIF chưa được cấu hình cho kết nối này.";
+}
+
+async function mapWithConcurrency<T, R>(items: T[], concurrency: number, mapper: (item: T) => Promise<R>) {
+  const results: R[] = new Array(items.length);
+  let nextIndex = 0;
+  async function worker() {
+    while (true) {
+      const index = nextIndex++;
+      if (index >= items.length) return;
+      results[index] = await mapper(items[index]);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, worker));
+  return results;
 }

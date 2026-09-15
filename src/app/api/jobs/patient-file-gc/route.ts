@@ -6,16 +6,20 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   if (!verifyJobRequest(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    return NextResponse.json(await reconcileStagedPatientFiles());
+    return json(await reconcileStagedPatientFiles());
   } catch (error) {
     console.error("patient_file_gc.failed", error);
-    return NextResponse.json(
+    return json(
       { error: "Patient file reconciliation failed" },
       { status: 500 },
     );
   }
+}
+
+function json(body: unknown, init?: ResponseInit) {
+  return NextResponse.json(body, { ...init, headers: { "cache-control": "no-store", ...(init?.headers ?? {}) } });
 }

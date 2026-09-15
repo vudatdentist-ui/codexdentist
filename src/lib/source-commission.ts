@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { allowedClinicIds } from "@/lib/patient-access";
 import type { AppSession } from "@/lib/session";
 
 export type SourceCommissionPolicySummary = {
@@ -43,7 +44,7 @@ export async function getSourceCommissionWorkspace(session: AppSession) {
       where: {
         organizationId: session.organizationId,
         clinicId: {
-          in: session.clinicIds,
+          in: allowedClinicIds(session),
         },
       },
       include: {

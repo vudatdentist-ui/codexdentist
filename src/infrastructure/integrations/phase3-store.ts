@@ -160,7 +160,12 @@ export async function updateExternalReferenceMetadata(
 ) {
   const rows = await db.$queryRawUnsafe<ExternalReferenceRecord[]>(
     `UPDATE "ExternalReference"
-     SET "metadata" = $2::jsonb,
+     SET "metadata" = CASE
+       WHEN "metadata"->>'status' IN ('SETTLED', 'SIGNED')
+        AND COALESCE(($2::jsonb)->>'status', '') NOT IN ('SETTLED', 'SIGNED')
+       THEN "metadata"
+       ELSE $2::jsonb
+     END,
          "updatedAt" = CURRENT_TIMESTAMP
      WHERE "id" = $1
      RETURNING *`,
@@ -169,6 +174,47 @@ export async function updateExternalReferenceMetadata(
   );
   if (!rows[0]) throw new Error("integration-external-reference-not-found");
   return rows[0];
+}
+
+export async function updateExternalReferenceMetadataWithRetry(
+  db: SqlExecutor,
+  referenceId: string,
+  metadata: Record<string, unknown>,
+  options: { attempts?: number; delayMs?: number } = {},
+) {
+  const attempts = Math.max(1, Math.min(options.attempts ?? 3, 5));
+  const delayMs = Math.max(25, Math.min(options.delayMs ?? 100, 2_000));
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await updateExternalReferenceMetadata(db, referenceId, metadata);
+    } catch (error) {
+      lastError = error;
+      if (attempt < attempts) {
+        await new Promise((resolve) => setTimeout(resolve, delayMs * attempt));
+      }
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("integration-external-reference-recovery-failed");
+}
+
+export async function claimExternalReferenceForRetry(
+  db: SqlExecutor,
+  referenceId: string,
+) {
+  const rows = await db.$queryRawUnsafe<ExternalReferenceRecord[]>(
+    `UPDATE "ExternalReference"
+     SET "metadata" = jsonb_set(("metadata" - 'errorCode'), '{status}', '"CREATING"'::jsonb),
+         "updatedAt" = CURRENT_TIMESTAMP
+     WHERE "id" = $1 AND "metadata"->>'status' = 'ERROR'
+     RETURNING *`,
+    referenceId,
+  );
+  return rows[0] ?? null;
 }
 
 export function referenceMetadata(

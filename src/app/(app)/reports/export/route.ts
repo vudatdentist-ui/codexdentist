@@ -96,6 +96,7 @@ export async function GET(request: Request) {
       "Content-Disposition": `attachment; filename="codexmed-reports-${generatedAt}.csv"`,
       "Content-Type": "text/csv; charset=utf-8",
       "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "private, no-store",
     },
   });
 }

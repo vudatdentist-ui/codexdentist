@@ -29,6 +29,9 @@ const legacyRoutes = [
   "/employee-app",
   "/reports",
   "/settings",
+  "/imaging",
+  "/lab",
+  "/sterilization",
 ];
 const migrationRoutes = enabledMigrationRoutes(
   process.env.BROWSER_QA_MIGRATION_ROUTES,
@@ -105,7 +108,7 @@ await writeFile(path.join(outputDir, "REPORT.md"), renderMarkdown(summary, resul
 
 console.log(JSON.stringify({ outputDir, summary }, null, 2));
 
-if (summary.critical + summary.high > 0) {
+if (summary.critical + summary.high + summary.medium > 0) {
   process.exitCode = 1;
 }
 

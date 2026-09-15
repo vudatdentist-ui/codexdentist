@@ -10,10 +10,169 @@ permissions:
   packages: write
 
 jobs:
-  container:
+  verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: codexdentist
+          POSTGRES_PASSWORD: codexdentist
+          POSTGRES_DB: codexdentist
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U codexdentist -d codexdentist"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NODE_ENV: production
+      DEPLOYMENT_MODE: self-hosted
+      DATABASE_URL: postgresql://codexdentist:codexdentist@127.0.0.1:5432/codexdentist?schema=public
+      AUTH_SECRET: ci-only-auth-secret-with-at-least-32-characters
+      JOB_SECRET: ci-only-job-secret-with-at-least-32-characters
+      APP_BASE_URL: https://codexdentist.test
+      PATIENT_FILE_STORAGE_DRIVER: local
+      SESSION_COOKIE_SECURE: "false"
     steps:
       - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --include=dev --no-audit --no-fund
+      - run: npm run encoding:check
+      - run: npm run typecheck
+      - run: npm run agent:audit
+      - run: node scripts/phase2-architecture-check.mjs
+      - run: node scripts/phase3-architecture-check.mjs
+      - run: node scripts/phase4-architecture-check.mjs
+      - run: node scripts/phase5-architecture-check.mjs
+      - run: node scripts/phase6-architecture-check.mjs
+      - run: npx prisma migrate deploy
+      - run: npx prisma db seed
+        env:
+          NODE_ENV: test
+      - run: npm run test:seed-users
+        env:
+          NODE_ENV: test
+      - run: npm run test:hardening
+      - run: npm run test:security
+      - run: npm run test:security-runtime
+      - run: npm run test:roles
+      - run: npm run test:tenant
+      - run: npm run test:billing
+      - run: npm run test:billing-concurrency
+      - run: npm run test:actions
+      - run: npm run test:settings-forms
+      - run: npm run test:integration-substrate
+      - run: npm run test:journey-file-command
+      - run: npm run test:phase3
+      - run: npm run test:phase4
+      - run: npm run test:phase4:scope
+      - run: npm run test:phase5
+      - run: npm run test:phase5:sterilization
+      - run: npm run test:phase6
+      - run: npm run test:patient-files
+      - run: npm run test:file-lifecycle
+      - run: npm run test:organization-purge
+      - run: npm run test:data-integrity
+      - run: npm run test:compensation
+      - run: npm run test:source-commission
+      - run: npm run build
+      - name: Verify database backup, disposable restore, and application boot
+        run: |
+          set -euo pipefail
+          dump_path=/tmp/codexdentist-release-restore.dump
+          restore_url=postgresql://codexdentist:codexdentist@127.0.0.1:5432/codexdentist_restore
+          restore_pid=""
+          cleanup_restore() {
+            if [[ -n "$restore_pid" ]]; then kill "$restore_pid" 2>/dev/null || true; fi
+            dropdb --if-exists --host=127.0.0.1 --username=codexdentist codexdentist_restore || true
+            rm -f "$dump_path"
+          }
+          trap cleanup_restore EXIT
+          pg_dump --format=custom --no-owner --file="$dump_path" "$DATABASE_URL"
+          dropdb --if-exists --host=127.0.0.1 --username=codexdentist codexdentist_restore
+          createdb --host=127.0.0.1 --username=codexdentist codexdentist_restore
+          pg_restore --no-owner --dbname="$restore_url" "$dump_path"
+          psql "$restore_url" -v ON_ERROR_STOP=1 -c 'SELECT 1 FROM "_prisma_migrations" LIMIT 1;' >/dev/null
+          DATABASE_URL="$restore_url" PORT=3001 NODE_ENV=production npm start > /tmp/codexdentist-restore.log 2>&1 &
+          restore_pid=$!
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3001/api/health >/dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail --silent http://127.0.0.1:3001/api/health >/dev/null
+          curl --fail --silent -H "x-job-secret: $JOB_SECRET" http://127.0.0.1:3001/api/readiness >/dev/null
+          kill "$restore_pid"
+          restore_pid=""
+      - name: Start production server for release smoke
+        run: |
+          npm start > /tmp/codexdentist-release.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3000/api/health > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/codexdentist-release.log
+          exit 1
+      - run: npm run test:smoke
+      - run: npm run readiness:check
+      - run: npm run test:api-contract
+        env:
+          NODE_ENV: test
+      - run: npx playwright install --with-deps chromium
+      - run: npm run browser:qa
+        env:
+          NODE_ENV: test
+
+  container:
+    needs: verify
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: codexdentist
+          POSTGRES_PASSWORD: codexdentist
+          POSTGRES_DB: codexdentist
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U codexdentist -d codexdentist"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://codexdentist:codexdentist@127.0.0.1:5432/codexdentist?schema=public
+      AUTH_SECRET: ci-only-auth-secret-with-at-least-32-characters
+      JOB_SECRET: ci-only-job-secret-with-at-least-32-characters
+      APP_BASE_URL: https://codexdentist.test
+      PATIENT_FILE_STORAGE_DRIVER: local
+      DEPLOYMENT_MODE: self-hosted
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Build and smoke-test published container
+        run: |
+          set -euo pipefail
+          docker build -t codexdentist:release .
+          docker run --rm --network host \
+            -e NODE_ENV=production -e DATABASE_URL -e AUTH_SECRET -e JOB_SECRET \
+            -e APP_BASE_URL -e PATIENT_FILE_STORAGE_DRIVER -e DEPLOYMENT_MODE \
+            codexdentist:release npx prisma migrate deploy
+          docker run -d --name codexdentist-release --network host \
+            -e NODE_ENV=production -e DATABASE_URL -e AUTH_SECRET -e JOB_SECRET \
+            -e APP_BASE_URL -e PATIENT_FILE_STORAGE_DRIVER -e DEPLOYMENT_MODE \
+            codexdentist:release
+          trap 'docker logs codexdentist-release || true; docker rm -f codexdentist-release || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3000/api/health >/dev/null; then break; fi
+            sleep 2
+          done
+          curl --fail --silent -H "x-job-secret: $JOB_SECRET" http://127.0.0.1:3000/api/readiness >/dev/null
+          docker rm -f codexdentist-release
+          trap - EXIT
 
       - uses: docker/login-action@v4
         with:

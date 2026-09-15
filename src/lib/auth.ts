@@ -529,8 +529,9 @@ export async function getSession(): Promise<AppSession | null> {
       clinicIds,
       activeClinicId,
     };
-  } catch {
-    return null;
+  } catch (error) {
+    console.error("auth.session_lookup_failed", error);
+    throw error;
   }
 }
 

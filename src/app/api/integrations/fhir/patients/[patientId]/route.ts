@@ -5,13 +5,42 @@ import { getSession } from "@/lib/auth";
 
 export async function GET(_request: Request, context: { params: Promise<{ patientId: string }> }) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ resourceType: "OperationOutcome", issue: [{ code: "login" }] }, { status: 401 });
+  if (!session) return fhirError("login", "Authentication is required", 401);
   try {
     const resource = await exportFhirPatientCommand(session, (await context.params).patientId);
-    return NextResponse.json(resource, { headers: { "content-type": "application/fhir+json; charset=utf-8" } });
+    return fhirJson(resource);
   } catch (cause) {
     const code = applicationErrorCode(cause, "fhir-export-failed");
-    const status = code === "fhir-export-denied" ? 403 : code === "fhir-patient-not-found" ? 404 : code === "fhir-export-disabled" ? 404 : 503;
-    return NextResponse.json({ resourceType: "OperationOutcome", issue: [{ severity: "error", code }] }, { status, headers: { "content-type": "application/fhir+json; charset=utf-8" } });
+    const mapped = code === "fhir-export-denied"
+      ? ["forbidden", 403]
+      : code === "fhir-patient-not-found"
+        ? ["not-found", 404]
+        : code === "fhir-export-disabled"
+          ? ["not-supported", 404]
+          : ["processing", 503];
+    return fhirError(mapped[0] as string, code, mapped[1] as number);
   }
+}
+
+function fhirJson(body: unknown) {
+  return NextResponse.json(body, {
+    status: 200,
+    headers: {
+      "content-type": "application/fhir+json; charset=utf-8",
+      "cache-control": "no-store",
+    },
+  });
+}
+
+function fhirError(code: string, diagnostics: string, status: number) {
+  return NextResponse.json({
+    resourceType: "OperationOutcome",
+    issue: [{ severity: "error", code, diagnostics }],
+  }, {
+    status,
+    headers: {
+      "content-type": "application/fhir+json; charset=utf-8",
+      "cache-control": "no-store",
+    },
+  });
 }

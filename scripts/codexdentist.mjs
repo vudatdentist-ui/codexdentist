@@ -51,12 +51,12 @@ switch (command) {
     break;
   case "restore":
     requireSelfHostEnv();
-    restore(args);
+    await restore(args);
     break;
   case "update":
     requireSelfHostEnv();
     backup();
-    update();
+    await update();
     break;
   default:
     printHelp();
@@ -230,7 +230,7 @@ function backup() {
   return backupDir;
 }
 
-function restore(restoreArgs) {
+async function restore(restoreArgs) {
   const backupDirArg = restoreArgs.find((value) => !value.startsWith("--"));
 
   if (!backupDirArg || !restoreArgs.includes("--confirm")) {
@@ -244,6 +244,14 @@ function restore(restoreArgs) {
   if (!existsSync(databasePath) || !existsSync(filesPath)) {
     throw new Error("Backup phải có postgres.dump và patient-files.tar.gz.");
   }
+
+  await restoreBackup(backupDir);
+  console.log(`Đã khôi phục backup: ${basename(backupDir)}`);
+}
+
+async function restoreBackup(backupDir) {
+  const databasePath = join(backupDir, "postgres.dump");
+  const filesPath = join(backupDir, "patient-files.tar.gz");
 
   compose(["stop", "app"]);
   const databaseFd = openSync(databasePath, "r");
@@ -293,20 +301,52 @@ function restore(restoreArgs) {
     "find /data/patient-files -mindepth 1 -maxdepth 1 -exec rm -rf -- {} + && tar -xzf /tmp/patient-files.tar.gz -C /data",
   ]);
   compose(["start", "app"]);
-  console.log(`Đã khôi phục backup: ${basename(backupDir)}`);
+  try {
+    await waitForHealth();
+    await waitForReadiness();
+  } catch (error) {
+    compose(["stop", "app"]);
+    throw error;
+  }
 }
 
-function update() {
-  const image = envValue("CODEXDENTIST_IMAGE");
+async function update() {
+  const backupDir = backup();
+  try {
+    const image = envValue("CODEXDENTIST_IMAGE");
 
-  if (image && image !== "codexdentist:local") {
-    compose(["pull", "app"]);
-    compose(["up", "-d", "--no-deps", "app"]);
-  } else {
-    compose(["up", "-d", "--build", "app"]);
+    if (image && image !== "codexdentist:local") {
+      compose(["pull", "app"]);
+      compose(["up", "-d", "--no-deps", "app"]);
+    } else {
+      compose(["up", "-d", "--build", "app"]);
+    }
+
+    await waitForHealth();
+    await waitForReadiness();
+    console.log("Cập nhật hoàn tất và health check đã đạt.");
+  } catch (error) {
+    compose(["stop", "app"]);
+    try {
+      await restoreBackup(backupDir);
+    } catch (rollbackError) {
+      compose(["stop", "app"]);
+      throw new Error(`Cập nhật thất bại và rollback tự động cũng thất bại; ứng dụng đã được giữ ở trạng thái dừng. Backup: ${backupDir}. ${rollbackError instanceof Error ? rollbackError.message : String(rollbackError)}`);
+    }
+    throw new Error(`Cập nhật thất bại; backup ${basename(backupDir)} đã được tự động khôi phục.`);
   }
+}
 
-  console.log("Cập nhật hoàn tất. Chạy doctor để kiểm tra.");
+async function waitForReadiness() {
+  const port = envValue("CODEXDENTIST_PORT") || "3000";
+  const response = await fetch(`http://127.0.0.1:${port}/api/readiness`, {
+    cache: "no-store",
+    headers: { "x-job-secret": envValue("JOB_SECRET") },
+  });
+  const body = await response.json().catch(() => null);
+  if (!response.ok || !body || body.status === "fail") {
+    throw new Error(`Readiness check thất bại: HTTP ${response.status} ${JSON.stringify(body)}`);
+  }
 }
 
 function printAccessUrls() {

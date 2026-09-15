@@ -64,6 +64,7 @@ export async function GET() {
     headers: {
       "Content-Disposition": 'attachment; filename="codexmed-payroll-policies.csv"',
       "Content-Type": "text/csv; charset=utf-8",
+      "Cache-Control": "private, no-store",
     },
   });
 }

@@ -1,6 +1,6 @@
 # Codexdentist Canonical Product Context
 
-Last updated: 2026-09-08
+Last updated: 2026-09-15
 Status: ACTIVE / CANONICAL
 
 Current execution status: Phases 0–2 are merged into `main`; Phase 3 payOS/Documenso is complete on the verified integration branch; Phases 4–6 are complete in the current continuation branch. Phase 7 release hardening is now the final open phase.
@@ -235,7 +235,7 @@ Remove stale product/refactor instructions and make repo tooling enforce only th
 - `encoding:check`, `typecheck`, and `agent:audit` pass on the branch.
 - Documentation and tooling agree on the same architecture direction.
 
-### Phase 1 — Extract The Application Boundary
+### Phase 1 — Extract The Application Boundary — COMPLETE
 
 **Objective**
 
@@ -256,7 +256,12 @@ Move reusable business mutation logic out of transport/UI code without changing 
 - No duplicated billing/clinical mutation implementation is introduced.
 - Existing billing concurrency, tenant, security, data-integrity, Journey/file tests for touched areas pass.
 
-### Phase 2 — Integration Substrate And File Consistency
+Implementation evidence:
+
+- Billing, Journey/file, patient, and scheduling mutations use canonical application commands with transport-level permission and tenant/clinic guards; the corresponding integration, concurrency, tenant, security, and protected-file suites remain green.
+- Phase 1 work is a dependency of the verified Phase 2–6 continuation and is not an open refactor task.
+
+### Phase 2 — Integration Substrate And File Consistency — COMPLETE
 
 **Objective**
 
@@ -276,6 +281,11 @@ Create safe primitives needed by all external integrations and eliminate unmanag
 - Provider outage/retry does not corrupt canonical business state.
 - Failed DB/file sequences leave a discoverable staged object rather than unmanaged PHI.
 - Tenant/security/patient-file/data-integrity tests and new inbox/outbox/file-reconciliation tests pass.
+
+Implementation evidence:
+
+- Integration connection/reference/inbox/outbox persistence has tenant-scoped uniqueness, idempotent processing, retry/audit state, and an application-boundary dispatcher; the integration substrate smoke verifies rollback, replay, retry, and provider-outage behavior.
+- Patient-file uploads use staged/committed/GC_PENDING lifecycle records. The reconciliation job now also claims expired retention records, removes their committed object and database metadata atomically with an auditable deletion handoff, and safely cleans storage objects during organization purge. Phase 2 architecture, Journey/file-command, lifecycle, and protected-file checks pass.
 
 ### Phase 3 — First Production Integrations: payOS And Documenso — COMPLETE
 
@@ -320,9 +330,9 @@ Implementation evidence:
 
 - `ImagingStudy` stores organization/clinic/patient scope, Orthanc study and patient IDs, StudyInstanceUID, normalized modality/date metadata, and availability state; it has no DICOM blob or pixel-data field.
 - Orthanc transport is an isolated provider adapter. It verifies stable study IDs, minimizes DICOM metadata, rejects traversal, maps PACS outages to actionable errors, and never imports Prisma or writes canonical tables.
-- Application commands enforce tenant/clinic authorization for linking, listing, and viewer access. OHIF receives only the StudyInstanceUID through a configured base URL; missing configuration fails closed.
+- Application commands enforce tenant/active-clinic authorization for linking, listing, and viewer access. External patient references are explicit and conflict-checked; ImagingStudy is protected by restrictive organization/clinic/patient/connection foreign keys. OHIF links are issued only when `ORTHANC_DEFAULT_VIEWER_ACCESS_MODE=private`; the default is disabled, so an untrusted public viewer cannot be advertised accidentally.
 - `/imaging`, the imaging API routes, the migration, architecture gate, provider smoke, and tenant/clinic negative smoke are covered by the Phase 4 verification loop.
-- Phase 4 re-audit passed encoding, typecheck, canonical architecture audit, Prisma validation, production build, provider smoke, and scoped database smoke with zero unresolved Blocker/High findings.
+- Phase 4 re-audit passed encoding, typecheck, canonical architecture audit, Prisma validation, production build, provider/malformed-DICOM smoke, and scoped database smoke with zero unresolved Blocker/High findings.
 
 ### Phase 5 — Native Dental Operations Gaps — COMPLETE
 
@@ -339,7 +349,7 @@ Implementation evidence:
 
 - Lab case/order workflow is implemented as the native `LabCase` bounded model with canonical Patient/Clinic/TreatmentService references, ordered status transitions (`DRAFT` → `SENT` → `IN_PROGRESS` → `READY` → `DELIVERED`), cancellation path, server-side scope/permissions, audit records, API routes, and a responsive `/lab` view.
 - Sterilization traceability is implemented with native `SterilizationInstrument`, `SterilizationCycle`, and cycle-membership models, ordered run/pass/fail/release transitions, clinic scope, audit records, API routes, and a responsive `/sterilization` view.
-- Phase 5 re-audit passed Prisma validation, typecheck, architecture audit, Lab and Sterilization tenant/workflow smoke, and production build with zero unresolved Blocker/High findings.
+- Phase 5 re-audit passed Prisma validation, typecheck, architecture audit, Lab and Sterilization tenant/workflow smoke, race-safe conditional transitions, and production build with zero unresolved Blocker/High findings.
 
 **Exit criteria**
 
@@ -366,7 +376,7 @@ Implementation evidence:
 
 - The optional FHIR Patient representation is implemented as a pure adapter behind `FHIR_EXPORT_ENABLED=false` by default. The authenticated route uses canonical patient scope and exposes only demographics/contact fields required for the external representation; it does not accept inbound writes or make FHIR the source of truth.
 - Existing notification delivery already sits behind the Codexdentist notification abstraction and supports disabled delivery. Optional provider adapters remain disabled unless explicitly configured, so the core clinic workflow does not depend on Chatwoot/FHIR availability.
-- Phase 6 re-audit passed encoding, typecheck, architecture audit, FHIR adapter smoke, and production build with zero unresolved Blocker/High findings. No unverified inbound provider mutation path was added.
+- Phase 6 re-audit passed encoding, typecheck, architecture audit, FHIR mapper smoke, static route-contract checks, export audit logging, and production build with zero unresolved Blocker/High findings. No unverified inbound provider mutation path was added.
 
 ### Phase 7 — Release Hardening — IN PROGRESS
 
@@ -385,9 +395,12 @@ Prove that the refactored/integrated system remains safe to deploy, upgrade, bac
 Current Phase 7 evidence:
 
 - Encoding, typecheck, agent audit, Prisma validation, Phase 4–6 architecture audits, hardening smoke, billing/concurrency, integration substrate, journey-file, data-integrity, compensation, source-commission, roles, actions, security runtime, tenant isolation, protected-file, file-lifecycle, and route smoke checks pass.
-- Self-host compose config and production Docker image build pass. Browser QA passes 32/32 desktop/mobile route checks with no overflow, mojibake, console, network, or critical/high findings.
-- A disposable PostgreSQL backup/restore drill passed with 51 recorded migrations and the ImagingStudy, LabCase, and SterilizationCycle tables present after restore. The disposable restore database was removed after verification.
-- The go-live gate remains open until production supplies a managed PostgreSQL URL and the four local demo accounts are rotated/deactivated; the QA database and demo credentials are intentionally not treated as production evidence.
+- Self-host compose config and production Docker image build pass. Browser QA passes 38/38 desktop/mobile route checks, including `/imaging`, `/lab`, and `/sterilization`, with no overflow, mojibake, console, network, or critical/high findings.
+- A disposable PostgreSQL backup/restore drill previously passed with 51 recorded migrations and the ImagingStudy, LabCase, and SterilizationCycle tables present after restore. The current tree has 54 migrations after integrity and purge-manifest hardening; a post-migration restore drill is still required before Phase 7 can close.
+- The patient-file lifecycle regression also verifies expired-retention records are removed from the database and local object storage, while organization purge removes object-backed patient-file objects before deleting tenant rows.
+- Phase 4/5 patient, clinic, and staging records now have database-level composite scope constraints in addition to application authorization. Upload stages are created before object writes, image variants clean up on partial failure, and the durable object-purge manifest is used for failed cleanup across patient files, staff avatars, learning assets, and accounting attachments.
+- CI and Namecheap preflight now run the disposable PostgreSQL restore smoke; the tagged release workflow additionally boots the production application against the restored database and checks health/readiness. The self-host `update` command restores its backup automatically when the new release fails validation.
+- The go-live gate remains open until production supplies a managed PostgreSQL URL and the four local demo accounts are rotated/deactivated; the QA database and demo credentials are intentionally not treated as production evidence. The go-live script and readiness endpoint verify the complete migration ledger, including checksums and unexpected/missing migration detection.
 
 ## 11. Architecture Guardrails
 

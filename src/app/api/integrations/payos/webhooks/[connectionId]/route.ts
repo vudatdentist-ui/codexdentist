@@ -173,7 +173,10 @@ export async function POST(
       },
       { maxAttempts: 5, retryDelayMs: 5_000 },
     );
-    return NextResponse.json({
+    if (processed.status === "failed") {
+      return error("payos-inbox-failed", 503);
+    }
+    return json({
       ok: true,
       duplicate: accepted.duplicate,
       inboxStatus: processed.status,
@@ -201,5 +204,9 @@ function statusCode(cause: unknown, fallback: number) {
 }
 
 function error(code: string, status: number) {
-  return NextResponse.json({ error: code }, { status });
+  return json({ error: code }, { status });
+}
+
+function json(body: unknown, init?: ResponseInit) {
+  return NextResponse.json(body, { ...init, headers: { "cache-control": "no-store", ...(init?.headers ?? {}) } });
 }

@@ -56,6 +56,7 @@ export async function GET(
       storageProvider: file.storageProvider,
       storageKey: variantStorageKey ?? file.storageKey,
       sourceId: variantStorageKey ?? file.sourceId,
+      sourceType: file.sourceType,
     });
     await writeAuditLog({
       session,
@@ -73,7 +74,7 @@ export async function GET(
 
     return new Response(new Uint8Array(bytes), {
       headers: {
-        "Cache-Control": "private, max-age=300",
+        "Cache-Control": "private, no-store",
         "Content-Disposition": `${contentDispositionFor(
           variantMimeType ?? file.mimeType,
         )}; filename*=UTF-8''${encodeRFC5987(file.fileName ?? file.title)}`,

@@ -3,6 +3,7 @@ import "server-only";
 export type OrthancConnectionSecrets = {
   baseUrl: string;
   viewerBaseUrl: string | null;
+  viewerAccessMode: "private" | "disabled";
   username: string | null;
   password: string | null;
 };
@@ -68,10 +69,12 @@ function normalizeOrthancStudy(value: unknown, externalStudyId: string): Orthanc
   const tags = asRecord(record.MainDicomTags);
   const studyInstanceUid = stringValue(tags.StudyInstanceUID);
   if (!studyInstanceUid) throw new OrthancProviderError("orthanc-study-uid-missing", 502);
+  const externalPatientId = stringValue(record.ParentPatient);
+  if (!externalPatientId) throw new OrthancProviderError("orthanc-patient-id-missing", 502);
 
   return {
     externalStudyId,
-    externalPatientId: stringValue(record.ParentPatient),
+    externalPatientId,
     studyInstanceUid,
     accessionNumber: stringValue(tags.AccessionNumber),
     modalities: stringList(tags.ModalitiesInStudy),
@@ -82,6 +85,15 @@ function normalizeOrthancStudy(value: unknown, externalStudyId: string): Orthanc
 
 function normalizeStudyDate(value: string | null) {
   if (!value || !/^\d{8}$/.test(value)) return null;
+  const year = Number(value.slice(0, 4));
+  const month = Number(value.slice(4, 6));
+  const day = Number(value.slice(6, 8));
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (
+    date.getUTCFullYear() !== year ||
+    date.getUTCMonth() !== month - 1 ||
+    date.getUTCDate() !== day
+  ) return null;
   return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`;
 }
 

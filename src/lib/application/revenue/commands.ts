@@ -7,6 +7,7 @@ import { renderNotificationTemplate } from "@/lib/notification-templates";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 import { runSerializableTransaction } from "@/lib/transaction";
+import { allowedClinicIds } from "@/lib/patient-access";
 
 export type ReceiptMethod = "cash" | "card" | "bank_transfer" | "credit_balance";
 
@@ -22,7 +23,7 @@ export async function createInvoiceCommand(session: AppSession, input: {
     where: {
       id: input.patientId,
       organizationId: session.organizationId,
-      clinicId: { in: session.clinicIds },
+      clinicId: { in: allowedClinicIds(session) },
     },
     select: { id: true, clinicId: true },
   });
@@ -85,7 +86,7 @@ export async function recordInvoicePaymentCommand(session: AppSession, input: {
     const invoice = await tx.invoice.findFirst({
       where: {
         invoiceNo: input.invoiceNo,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: allowedClinicIds(session) },
         patient: { organizationId: session.organizationId },
       },
       select: {
@@ -197,7 +198,7 @@ export async function recordPatientReceiptCommand(session: AppSession, input: {
       where: {
         id: input.patientId,
         organizationId: session.organizationId,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: allowedClinicIds(session) },
       },
       select: { id: true, clinicId: true },
     });
@@ -329,12 +330,20 @@ export async function voidInvoiceCommand(session: AppSession, invoiceNo: string)
       where: {
         invoiceNo,
         organizationId: session.organizationId,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: allowedClinicIds(session) },
         patient: { organizationId: session.organizationId },
       },
-      select: { id: true, clinicId: true, patientId: true },
+      select: {
+        id: true,
+        clinicId: true,
+        patientId: true,
+        status: true,
+        payments: { select: { amount: true } },
+      },
     });
-    if (!invoice) throw new ApplicationCommandError("billing-invoice-not-found");
+    if (!invoice || invoice.status === "VOID") {
+      throw new ApplicationCommandError("billing-invoice-not-found");
+    }
 
     const allocations = await tx.receiptAllocation.findMany({
       where: { invoiceId: invoice.id },
@@ -344,7 +353,21 @@ export async function voidInvoiceCommand(session: AppSession, invoiceNo: string)
     const directAllocations = allocations.filter((a) => !a.treatmentServiceId);
     const directReleasedAmount = sumMoney(directAllocations);
 
-    await tx.invoice.update({ where: { id: invoice.id }, data: { status: "VOID" } });
+    const paymentNet = invoice.payments.reduce((sum, payment) => sum + Number(payment.amount), 0);
+    if (paymentNet > 0) {
+      await tx.payment.create({
+        data: {
+          invoiceId: invoice.id,
+          amount: -paymentNet,
+          method: "void_reversal",
+          reference: invoiceNo,
+        },
+      });
+    }
+    await tx.invoice.update({
+      where: { id: invoice.id },
+      data: { status: "VOID", paidAmount: 0 },
+    });
     if (serviceAllocationIds.length > 0) {
       await tx.receiptAllocation.updateMany({
         where: { id: { in: serviceAllocationIds } },
@@ -387,6 +410,7 @@ export async function voidInvoiceCommand(session: AppSession, invoiceNo: string)
           invoiceNo,
           serviceAllocationsReleased: serviceAllocationIds.length,
           directReceiptAmountReleased: directReleasedAmount,
+          paymentReversed: paymentNet > 0 ? paymentNet : 0,
         } as Prisma.InputJsonValue,
       },
     });
@@ -404,12 +428,23 @@ export async function adjustInvoiceAmountCommand(session: AppSession, input: {
     const invoice = await tx.invoice.findFirst({
       where: {
         invoiceNo: input.invoiceNo,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: allowedClinicIds(session) },
         patient: { organizationId: session.organizationId },
       },
-      include: { items: { orderBy: { createdAt: "asc" }, take: 1 } },
+      include: {
+        items: { orderBy: { createdAt: "asc" } },
+        payments: { select: { id: true } },
+        receiptAllocations: { select: { id: true } },
+      },
     });
     if (!invoice || invoice.status === "VOID") throw new ApplicationCommandError("billing-invoice-not-found");
+    if (
+      invoice.items.length !== 1 ||
+      invoice.payments.length > 0 ||
+      invoice.receiptAllocations.length > 0
+    ) {
+      throw new ApplicationCommandError("billing-invoice-adjustment-locked");
+    }
     const paidAmount = Math.min(Number(invoice.paidAmount), input.amount);
     const nextStatus = paidAmount >= input.amount ? "PAID" : paidAmount > 0 ? "PARTIAL" : "OPEN";
     await tx.invoice.update({
@@ -452,16 +487,37 @@ export async function recordInvoiceRefundCommand(session: AppSession, input: {
     const invoice = await tx.invoice.findFirst({
       where: {
         invoiceNo: input.invoiceNo,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: allowedClinicIds(session) },
         patient: { organizationId: session.organizationId },
       },
-      select: { id: true, amount: true, paidAmount: true, status: true, patientId: true },
+      select: {
+        id: true,
+        amount: true,
+        paidAmount: true,
+        status: true,
+        patientId: true,
+        clinicId: true,
+        payments: {
+          where: { amount: { lt: 0 }, method: { startsWith: "refund:" } },
+          select: { amount: true },
+        },
+        receiptAllocations: {
+          where: { amount: { gt: 0 } },
+          select: {
+            receiptId: true,
+            amount: true,
+            invoiceItemId: true,
+            treatmentServiceId: true,
+          },
+        },
+      },
     });
     if (!invoice || invoice.status === "VOID") throw new ApplicationCommandError("billing-invoice-not-found");
     const refundAmount = Math.min(input.amount, Number(invoice.paidAmount));
     if (refundAmount <= 0) throw new ApplicationCommandError("billing-bad-payment");
     const paidAmount = Math.max(Number(invoice.paidAmount) - refundAmount, 0);
     const nextStatus = paidAmount >= Number(invoice.amount) ? "PAID" : paidAmount > 0 ? "PARTIAL" : "OPEN";
+    const refundedBefore = invoice.payments.reduce((total, payment) => total + Math.abs(Number(payment.amount)), 0);
     await tx.payment.create({
       data: {
         invoiceId: invoice.id,
@@ -470,6 +526,45 @@ export async function recordInvoiceRefundCommand(session: AppSession, input: {
         reference: input.reference,
       },
     });
+    const totalCollected = invoice.receiptAllocations.reduce((sum, allocation) => sum + Number(allocation.amount), 0);
+    if (totalCollected > 0) {
+      const accruals = await tx.sourceCommissionAccrual.findMany({
+        where: { receiptId: { in: [...new Set(invoice.receiptAllocations.map((allocation) => allocation.receiptId))] } },
+        select: { id: true, receiptId: true, baseAmount: true, commissionAmount: true },
+      });
+      for (const accrual of accruals) {
+        const receiptBase = invoice.receiptAllocations
+          .filter((allocation) => allocation.receiptId === accrual.receiptId)
+          .reduce((sum, allocation) => sum + Number(allocation.amount), 0);
+        const refundedBeforeOnReceipt = Math.min(receiptBase, (refundedBefore * receiptBase) / totalCollected);
+        const refundedAfterOnReceipt = Math.min(receiptBase, ((refundedBefore + refundAmount) * receiptBase) / totalCollected);
+        const incrementalRefund = Math.max(refundedAfterOnReceipt - refundedBeforeOnReceipt, 0);
+        const remainingReceiptBase = Math.max(receiptBase - refundedBeforeOnReceipt, 0);
+        const ratio = remainingReceiptBase > 0 ? Math.min(incrementalRefund / remainingReceiptBase, 1) : 1;
+        const reversalBase = Math.min(Number(accrual.baseAmount), Number(accrual.baseAmount) * ratio);
+        const reversalCommission = Math.min(Number(accrual.commissionAmount), Number(accrual.commissionAmount) * ratio);
+        await tx.sourceCommissionAccrual.update({
+          where: { id: accrual.id },
+          data: {
+            baseAmount: { decrement: reversalBase },
+            commissionAmount: { decrement: reversalCommission },
+          notes: "Adjusted after invoice refund",
+          },
+        });
+      }
+    }
+    if (input.method === "credit_balance") {
+      await tx.patientCreditBalance.upsert({
+        where: { patientId: invoice.patientId },
+        update: { clinicId: invoice.clinicId, amount: { increment: refundAmount } },
+        create: {
+          organizationId: session.organizationId,
+          clinicId: invoice.clinicId,
+          patientId: invoice.patientId,
+          amount: refundAmount,
+        },
+      });
+    }
     await tx.invoice.update({ where: { id: invoice.id }, data: { paidAmount, status: nextStatus } });
     await tx.auditLog.create({
       data: {
@@ -501,7 +596,7 @@ export async function createPaymentPlanReminderCommand(session: AppSession, inpu
     where: {
       id: input.patientId,
       organizationId: session.organizationId,
-      clinicId: { in: session.clinicIds },
+      clinicId: { in: allowedClinicIds(session) },
     },
     select: { id: true, clinicId: true, fullName: true, phone: true, email: true },
   });
@@ -561,7 +656,7 @@ export async function createPaymentPlanCommand(session: AppSession, input: {
       where: {
         id: input.patientId,
         organizationId: session.organizationId,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: allowedClinicIds(session) },
       },
       select: { id: true, clinicId: true, fullName: true, phone: true, email: true },
     });
@@ -800,7 +895,7 @@ async function findScopedTreatmentService(client: BillingDbClient, session: AppS
     where: {
       id: treatmentServiceId,
       organizationId: session.organizationId,
-      clinicId: { in: session.clinicIds },
+        clinicId: { in: allowedClinicIds(session) },
     },
     include: {
       patient: { select: { id: true, fullName: true } },

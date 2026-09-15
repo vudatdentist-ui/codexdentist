@@ -73,7 +73,7 @@ export async function GET(
 
     return new Response(new Uint8Array(bytes), {
       headers: {
-        "Cache-Control": "private, max-age=300",
+        "Cache-Control": "private, no-store",
         "Content-Disposition": `inline; filename*=UTF-8''${encodeRFC5987(
           staffProfile.avatarFileName ?? `${staffProfile.user.fullName}-avatar`,
         )}`,

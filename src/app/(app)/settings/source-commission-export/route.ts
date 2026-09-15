@@ -1,6 +1,7 @@
 import { requireViewSession } from "@/lib/auth";
 import { csvCell } from "@/lib/csv";
 import { prisma } from "@/lib/prisma";
+import { allowedClinicIds } from "@/lib/patient-access";
 
 export async function GET() {
   const session = await requireViewSession("settings");
@@ -10,7 +11,7 @@ export async function GET() {
       where: {
         organizationId: session.organizationId,
         clinicId: {
-          in: session.clinicIds,
+          in: allowedClinicIds(session),
         },
       },
       include: {
@@ -83,6 +84,7 @@ export async function GET() {
         "Content-Disposition": "attachment; filename=source-commission.csv",
         "Content-Type": "text/csv; charset=utf-8",
         "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "private, no-store",
       },
     });
   } catch (error) {

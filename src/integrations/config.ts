@@ -38,6 +38,9 @@ function optionalBaseUrl(name: string, fallback: string, provider: string) {
 
 export function resolvePayOSConnectionSecrets(secretRef: string | null) {
   const prefix = envPrefix(secretRef, "payos");
+  if (prefix !== "PAYOS_DEFAULT") {
+    throw new IntegrationConfigurationError("payos-secret-ref-invalid", "payOS connections must use env:PAYOS_DEFAULT");
+  }
   return {
     clientId: requiredEnv(`${prefix}_CLIENT_ID`, "payos"),
     apiKey: requiredEnv(`${prefix}_API_KEY`, "payos"),
@@ -52,6 +55,9 @@ export function resolvePayOSConnectionSecrets(secretRef: string | null) {
 
 export function resolveDocumensoConnectionSecrets(secretRef: string | null) {
   const prefix = envPrefix(secretRef, "documenso");
+  if (prefix !== "DOCUMENSO_DEFAULT") {
+    throw new IntegrationConfigurationError("documenso-secret-ref-invalid", "Documenso connections must use env:DOCUMENSO_DEFAULT");
+  }
   return {
     apiToken: requiredEnv(`${prefix}_API_TOKEN`, "documenso"),
     webhookSecret: requiredEnv(`${prefix}_WEBHOOK_SECRET`, "documenso"),
@@ -65,11 +71,24 @@ export function resolveDocumensoConnectionSecrets(secretRef: string | null) {
 
 export function resolveOrthancConnectionSecrets(secretRef: string | null) {
   const prefix = envPrefix(secretRef, "orthanc");
+  if (prefix !== "ORTHANC_DEFAULT") {
+    throw new IntegrationConfigurationError(
+      "orthanc-secret-ref-invalid",
+      "Orthanc connections must use env:ORTHANC_DEFAULT",
+    );
+  }
   const baseUrl = orthancBaseUrl(
     `${prefix}_BASE_URL`,
     process.env.NODE_ENV === "production" ? "https://orthanc.invalid" : "http://127.0.0.1:8042",
   );
   const viewerBaseUrl = optionalViewerBaseUrl(`${prefix}_VIEWER_BASE_URL`);
+  const viewerAccessMode = (process.env[`${prefix}_VIEWER_ACCESS_MODE`]?.trim() || "disabled") as "private" | "disabled";
+  if (viewerAccessMode !== "private" && viewerAccessMode !== "disabled") {
+    throw new IntegrationConfigurationError(
+      "ohif-viewer-access-mode-invalid",
+      `${prefix}_VIEWER_ACCESS_MODE must be private or disabled`,
+    );
+  }
   const username = process.env[`${prefix}_USERNAME`]?.trim() || null;
   const password = process.env[`${prefix}_PASSWORD`]?.trim() || null;
   if ((username && !password) || (!username && password)) {
@@ -79,7 +98,7 @@ export function resolveOrthancConnectionSecrets(secretRef: string | null) {
     );
   }
 
-  return { baseUrl, viewerBaseUrl, username, password };
+  return { baseUrl, viewerBaseUrl, viewerAccessMode, username, password };
 }
 
 function orthancBaseUrl(name: string, fallback: string) {
@@ -102,15 +121,14 @@ function optionalViewerBaseUrl(name: string) {
   const value = process.env[name]?.trim();
   if (!value) return null;
   const url = new URL(value);
-  if (
-    process.env.NODE_ENV === "production" &&
-    process.env.DEPLOYMENT_MODE !== "self-hosted" &&
-    url.protocol !== "https:"
-  ) {
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
     throw new IntegrationConfigurationError(
       "ohif-viewer-url-insecure",
-      `${name} must use HTTPS outside self-hosted deployments`,
+      `${name} must use HTTP or HTTPS`,
     );
+  }
+  if (process.env.NODE_ENV === "production" && process.env.DEPLOYMENT_MODE !== "self-hosted" && url.protocol !== "https:") {
+    throw new IntegrationConfigurationError("ohif-viewer-url-insecure", `${name} must use HTTPS outside self-hosted deployments`);
   }
   return url.toString().replace(/\/$/, "");
 }

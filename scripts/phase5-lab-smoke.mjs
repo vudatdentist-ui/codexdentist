@@ -12,6 +12,7 @@ const organizationAId = `phase5-org-a-${suffix}`;
 const organizationBId = `phase5-org-b-${suffix}`;
 const clinicAId = `phase5-clinic-a-${suffix}`;
 const clinicBId = `phase5-clinic-b-${suffix}`;
+const clinicA2Id = `phase5-clinic-a2-${suffix}`;
 const patientAId = `phase5-patient-a-${suffix}`;
 const patientBId = `phase5-patient-b-${suffix}`;
 const userAId = `phase5-user-a-${suffix}`;
@@ -41,7 +42,9 @@ function session(organizationId, organizationName, clinicId, userId) {
 
 const sessionA = session(organizationAId, "Phase 5 QA A", clinicAId, userAId);
 const sessionB = session(organizationBId, "Phase 5 QA B", clinicBId, userBId);
+const sessionA2 = session(organizationAId, "Phase 5 QA A", clinicA2Id, userAId);
 let createdCaseId = null;
+const cleanupErrors = [];
 
 try {
   await prisma.organization.createMany({
@@ -53,6 +56,7 @@ try {
   await prisma.clinic.createMany({
     data: [
       { id: clinicAId, organizationId: organizationAId, name: `QA Clinic A ${suffix}`, city: "HCMC", address: "QA" },
+      { id: clinicA2Id, organizationId: organizationAId, name: `QA Clinic A2 ${suffix}`, city: "HCMC", address: "QA" },
       { id: clinicBId, organizationId: organizationBId, name: `QA Clinic B ${suffix}`, city: "HCMC", address: "QA" },
     ],
   });
@@ -90,15 +94,22 @@ try {
   assert(pureInvalid, "terminal lab case cannot reopen");
   const hidden = await listLabCasesCommand(sessionB);
   assert(hidden.length === 0, "other organization cannot list lab cases");
+  const sameTenantHidden = await listLabCasesCommand(sessionA2);
+  assert(sameTenantHidden.length === 0, "same-tenant inaccessible clinic cannot list lab cases");
   console.log("ok phase5 lab scope and workflow smoke");
 } finally {
-  if (createdCaseId) await prisma.labCase.deleteMany({ where: { id: createdCaseId } }).catch(() => {});
-  await prisma.auditLog.deleteMany({ where: { organizationId: { in: [organizationAId, organizationBId] } } }).catch(() => {});
-  await prisma.patient.deleteMany({ where: { id: { in: [patientAId, patientBId] } } }).catch(() => {});
-  await prisma.user.deleteMany({ where: { id: { in: [userAId, userBId] } } }).catch(() => {});
-  await prisma.clinic.deleteMany({ where: { id: { in: [clinicAId, clinicBId] } } }).catch(() => {});
-  await prisma.organization.deleteMany({ where: { id: { in: [organizationAId, organizationBId] } } }).catch(() => {});
+  if (createdCaseId) await cleanup(() => prisma.labCase.deleteMany({ where: { id: createdCaseId } }), "lab case");
+  await cleanup(() => prisma.auditLog.deleteMany({ where: { organizationId: { in: [organizationAId, organizationBId] } } }), "audit logs");
+  await cleanup(() => prisma.patient.deleteMany({ where: { id: { in: [patientAId, patientBId] } } }), "patients");
+  await cleanup(() => prisma.user.deleteMany({ where: { id: { in: [userAId, userBId] } } }), "users");
+  await cleanup(() => prisma.clinic.deleteMany({ where: { id: { in: [clinicAId, clinicA2Id, clinicBId] } } }), "clinics");
+  await cleanup(() => prisma.organization.deleteMany({ where: { id: { in: [organizationAId, organizationBId] } } }), "organizations");
   await prisma.$disconnect();
+  if (cleanupErrors.length > 0) throw new Error(`Phase5 lab cleanup failed: ${cleanupErrors.join("; ")}`);
+}
+
+async function cleanup(action, label) {
+  try { await action(); } catch (error) { cleanupErrors.push(`${label}: ${error instanceof Error ? error.message : String(error)}`); }
 }
 
 function assert(condition, label) {

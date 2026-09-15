@@ -406,6 +406,7 @@ model Clinic {
   updatedAt                      DateTime                        @updatedAt
 
   @@unique([organizationId, name])
+  @@unique([id, organizationId])
   @@index([chainId])
 }
 
@@ -609,6 +610,7 @@ model Patient {
   updatedAt                DateTime                    @updatedAt
 
   @@unique([organizationId, phone])
+  @@unique([id, clinicId, organizationId])
 }
 
 model PatientConsent {
@@ -774,11 +776,11 @@ model Receipt {
 model ReceiptAllocation {
   id                 String            @id @default(cuid())
   organizationId     String
-  organization       Organization      @relation(fields: [organizationId], references: [id])
+  organization       Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   clinicId           String
-  clinic             Clinic            @relation(fields: [clinicId], references: [id])
+  clinic             Clinic            @relation(fields: [clinicId], references: [id], onDelete: Restrict)
   patientId          String
-  patient            Patient           @relation(fields: [patientId], references: [id])
+  patient            Patient           @relation(fields: [patientId], references: [id], onDelete: Restrict)
   receiptId          String
   receipt            Receipt           @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   invoiceId          String?
@@ -1933,9 +1935,9 @@ model PatientFile {
   organizationId      String
   organization        Organization @relation(fields: [organizationId], references: [id])
   clinicId            String
-  clinic              Clinic       @relation(fields: [clinicId], references: [id])
+  clinic              Clinic       @relation(fields: [clinicId, organizationId], references: [id, organizationId])
   patientId           String
-  patient             Patient      @relation(fields: [patientId], references: [id])
+  patient             Patient      @relation(fields: [patientId, clinicId, organizationId], references: [id, clinicId, organizationId])
   uploadedById        String?
   uploadedBy          User?        @relation("PatientFileUploader", fields: [uploadedById], references: [id])
   category            String       @default("CLINICAL_IMAGE")
@@ -1971,15 +1973,16 @@ model PatientFile {
 }
 
 model ImagingStudy {
-  id                String       @id @default(cuid())
+  id                String                @id @default(cuid())
   organizationId    String
-  organization      Organization @relation(fields: [organizationId], references: [id])
+  organization      Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   clinicId          String
-  clinic            Clinic       @relation(fields: [clinicId], references: [id])
+  clinic            Clinic                @relation(fields: [clinicId, organizationId], references: [id, organizationId], onDelete: Restrict)
   patientId         String
-  patient           Patient      @relation(fields: [patientId], references: [id])
+  patient           Patient               @relation(fields: [patientId, clinicId, organizationId], references: [id, clinicId, organizationId], onDelete: Restrict)
   connectionId      String
-  provider          String       @default("orthanc")
+  connection        IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  provider          String                @default("orthanc")
   externalStudyId   String
   externalPatientId String?
   studyInstanceUid  String?
@@ -1987,13 +1990,13 @@ model ImagingStudy {
   modalities        String[]
   studyDate         DateTime?
   description       String?
-  availability      String       @default("AVAILABLE")
+  availability      String                @default("AVAILABLE")
   lastSyncedAt      DateTime?
   lastErrorCode     String?
   createdById       String?
-  createdBy         User?        @relation("ImagingStudyCreator", fields: [createdById], references: [id], onDelete: SetNull)
-  createdAt         DateTime     @default(now())
-  updatedAt         DateTime     @updatedAt
+  createdBy         User?                 @relation("ImagingStudyCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
 
   @@unique([organizationId, connectionId, externalStudyId])
   @@index([organizationId, clinicId, patientId, studyDate])
@@ -2006,9 +2009,9 @@ model LabCase {
   organizationId     String
   organization       Organization      @relation(fields: [organizationId], references: [id])
   clinicId           String
-  clinic             Clinic            @relation(fields: [clinicId], references: [id])
+  clinic             Clinic            @relation(fields: [clinicId, organizationId], references: [id, organizationId])
   patientId          String
-  patient            Patient           @relation(fields: [patientId], references: [id])
+  patient            Patient           @relation(fields: [patientId, clinicId, organizationId], references: [id, clinicId, organizationId])
   treatmentServiceId String?
   treatmentService   TreatmentService? @relation(fields: [treatmentServiceId], references: [id], onDelete: SetNull)
   caseNo             String
@@ -2034,9 +2037,9 @@ model LabCase {
 model SterilizationInstrument {
   id             String                         @id @default(cuid())
   organizationId String
-  organization   Organization                   @relation(fields: [organizationId], references: [id])
+  organization   Organization                   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   clinicId       String
-  clinic         Clinic                         @relation(fields: [clinicId], references: [id])
+  clinic         Clinic                         @relation(fields: [clinicId, organizationId], references: [id, organizationId], onDelete: Restrict)
   code           String
   name           String
   category       String
@@ -2046,15 +2049,16 @@ model SterilizationInstrument {
   updatedAt      DateTime                       @updatedAt
 
   @@unique([organizationId, clinicId, code])
+  @@unique([id, organizationId, clinicId])
   @@index([organizationId, clinicId, status])
 }
 
 model SterilizationCycle {
   id             String                         @id @default(cuid())
   organizationId String
-  organization   Organization                   @relation(fields: [organizationId], references: [id])
+  organization   Organization                   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   clinicId       String
-  clinic         Clinic                         @relation(fields: [clinicId], references: [id])
+  clinic         Clinic                         @relation(fields: [clinicId, organizationId], references: [id, organizationId], onDelete: Restrict)
   cycleNo        String
   status         String                         @default("PREPARING")
   method         String
@@ -2070,18 +2074,19 @@ model SterilizationCycle {
   updatedAt      DateTime                       @updatedAt
 
   @@unique([organizationId, cycleNo])
+  @@unique([id, organizationId, clinicId])
   @@index([organizationId, clinicId, status, createdAt])
 }
 
 model SterilizationCycleInstrument {
   cycleId        String
-  cycle          SterilizationCycle      @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  cycle          SterilizationCycle      @relation(fields: [cycleId, organizationId, clinicId], references: [id, organizationId, clinicId], onDelete: Restrict)
   instrumentId   String
-  instrument     SterilizationInstrument @relation(fields: [instrumentId], references: [id], onDelete: Restrict)
+  instrument     SterilizationInstrument @relation(fields: [instrumentId, organizationId, clinicId], references: [id, organizationId, clinicId], onDelete: Restrict)
   organizationId String
-  organization   Organization            @relation(fields: [organizationId], references: [id])
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   clinicId       String
-  clinic         Clinic                  @relation(fields: [clinicId], references: [id])
+  clinic         Clinic                  @relation(fields: [clinicId, organizationId], references: [id, organizationId], onDelete: Restrict)
   includedAt     DateTime                @default(now())
 
   @@id([cycleId, instrumentId])

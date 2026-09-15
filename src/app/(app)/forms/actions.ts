@@ -323,6 +323,10 @@ async function scopedPatientForm(session: AppSession, patientFormId: string) {
         },
         {
           clinicId: null,
+          patient: {
+            organizationId: session.organizationId,
+            clinicId: { in: allowedClinicIds(session) },
+          },
         },
       ],
     },

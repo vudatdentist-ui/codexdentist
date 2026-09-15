@@ -8,18 +8,29 @@ export async function GET(
   context: { params: Promise<{ studyId: string }> },
 ) {
   const session = await getSession();
-  if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!session) return json({ error: "unauthorized" }, { status: 401 });
   const { studyId } = await context.params;
   try {
     const result = await getImagingViewerCommand(session, studyId);
-    return NextResponse.json(result);
+    return json(result);
   } catch (cause) {
     const code = applicationErrorCode(cause, "imaging-viewer-failed");
     const status = code === "imaging-view-denied"
       ? 403
       : code === "imaging-study-not-found"
         ? 404
+        : code === "orthanc-study-not-found"
+          ? 404
+        : code === "imaging-viewer-access-not-configured"
+          ? 503
         : 503;
-    return NextResponse.json({ error: code }, { status });
+    return json({ error: code }, { status });
   }
+}
+
+function json(body: unknown, init?: ResponseInit) {
+  return NextResponse.json(body, {
+    ...init,
+    headers: { "cache-control": "no-store", ...(init?.headers ?? {}) },
+  });
 }

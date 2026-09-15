@@ -16,5 +16,15 @@ export async function exportFhirPatientCommand(session: AppSession, patientId: s
     select: { id: true, fullName: true, dateOfBirth: true, gender: true, phone: true, email: true, address: true },
   });
   if (!patient) throw new ApplicationCommandError("fhir-patient-not-found");
+  await prisma.auditLog.create({
+    data: {
+      organizationId: session.organizationId,
+      actorId: session.userId,
+      action: "interop.patient_exported",
+      entityType: "Patient",
+      entityId: patient.id,
+      metadata: { format: "FHIR", resourceType: "Patient" },
+    },
+  });
   return toFhirPatient(patient);
 }

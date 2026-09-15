@@ -60,14 +60,20 @@ export async function getAuthorizedPatientFile(
       thumbnailMimeType: true,
       thumbnailStorageKey: true,
       sourceId: true,
+      sourceType: true,
       storageProvider: true,
       storageKey: true,
       title: true,
       virusScanStatus: true,
+      retentionUntil: true,
     },
   });
 
   if (!file) {
+    return null;
+  }
+
+  if (file.retentionUntil && file.retentionUntil <= new Date()) {
     return null;
   }
 

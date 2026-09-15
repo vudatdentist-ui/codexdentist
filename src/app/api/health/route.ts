@@ -9,14 +9,14 @@ export async function GET() {
   try {
     await prisma.$queryRaw`SELECT 1`;
 
-    return NextResponse.json({
+    return json({
       status: "ok",
       database: "ok",
       latencyMs: Date.now() - startedAt,
       timestamp: new Date().toISOString(),
     });
   } catch {
-    return NextResponse.json(
+    return json(
       {
         status: "degraded",
         database: "unavailable",
@@ -26,4 +26,11 @@ export async function GET() {
       { status: 503 },
     );
   }
+}
+
+function json(body: unknown, init?: ResponseInit) {
+  return NextResponse.json(body, {
+    ...init,
+    headers: { "cache-control": "no-store", ...(init?.headers ?? {}) },
+  });
 }

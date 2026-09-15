@@ -107,6 +107,8 @@ export async function getPatientPortalWorkspace(
       prisma.patientFile.findMany({
         where: {
           patientId: patient.id,
+          virusScanStatus: { in: ["CLEAN", "EXTERNAL_URL"] },
+          OR: [{ retentionUntil: null }, { retentionUntil: { gt: now } }],
         },
         orderBy: {
           createdAt: "desc",
@@ -204,7 +206,15 @@ export async function getPatientPortalWorkspace(
         title: file.title,
         fileName: file.fileName,
         mimeType: file.mimeType,
-        url: file.sourceType === "LOCAL_UPLOAD" ? `/patient-files/${file.id}` : file.url,
+        url:
+          file.storageProvider === "local" ||
+          file.storageProvider === "r2" ||
+          file.sourceType === "LOCAL_UPLOAD" ||
+          file.sourceType === "R2_UPLOAD"
+            ? `/patient-files/${file.id}`
+            : file.sourceType === "EXTERNAL_URL"
+              ? file.url
+              : `/patient-files/${file.id}`,
         createdAt: vietnamDateTime(file.createdAt),
       })),
       treatmentServices: treatmentServices.map((service) => {

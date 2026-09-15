@@ -30,7 +30,10 @@ export type ViewKey =
   | "reports"
   | "community"
   | "patient-app"
-  | "settings";
+  | "settings"
+  | "imaging"
+  | "lab"
+  | "sterilization";
 
 export const viewRoutes: Record<ViewKey, string> = {
   dashboard: "/dashboard",
@@ -53,6 +56,9 @@ export const viewRoutes: Record<ViewKey, string> = {
   community: "/community",
   "patient-app": "/patient-app",
   settings: "/settings",
+  imaging: "/imaging",
+  lab: "/lab",
+  sterilization: "/sterilization",
 };
 
 export const roleLabels: Record<AppRole, string> = {
@@ -98,6 +104,9 @@ const viewAccess: Record<ViewKey, AppRole[]> = {
   community: ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST", "FRONT_DESK", "BILLING"],
   "patient-app": ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "FRONT_DESK", "PATIENT"],
   settings: ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],
+  imaging: ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST"],
+  lab: ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "DENTIST", "HYGIENIST", "FRONT_DESK"],
+  sterilization: ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER", "HYGIENIST", "FRONT_DESK"],
 };
 
 export type RoleSource = AppRole | Pick<AppSession, "role" | "roles" | "roleAssignments">;

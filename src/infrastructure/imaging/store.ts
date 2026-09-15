@@ -1,7 +1,10 @@
 import "server-only";
 
 import { randomUUID } from "node:crypto";
+import type { Prisma, PrismaClient } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+
+type ImagingDb = PrismaClient | Prisma.TransactionClient;
 
 export type ImagingStudyInput = {
   organizationId: string;
@@ -19,8 +22,8 @@ export type ImagingStudyInput = {
   createdById: string | null;
 };
 
-export async function upsertImagingStudy(input: ImagingStudyInput) {
-  return prisma.imagingStudy.upsert({
+export async function upsertImagingStudy(db: ImagingDb, input: ImagingStudyInput) {
+  return db.imagingStudy.upsert({
     where: {
       organizationId_connectionId_externalStudyId: {
         organizationId: input.organizationId,
@@ -29,8 +32,6 @@ export async function upsertImagingStudy(input: ImagingStudyInput) {
       },
     },
     update: {
-      clinicId: input.clinicId,
-      patientId: input.patientId,
       provider: input.provider,
       externalPatientId: input.externalPatientId,
       studyInstanceUid: input.studyInstanceUid,
@@ -65,6 +66,30 @@ export async function upsertImagingStudy(input: ImagingStudyInput) {
   });
 }
 
+export async function createImagingStudy(db: ImagingDb, input: ImagingStudyInput) {
+  return db.imagingStudy.create({
+    data: {
+      id: randomUUID(),
+      organizationId: input.organizationId,
+      clinicId: input.clinicId,
+      patientId: input.patientId,
+      connectionId: input.connectionId,
+      provider: input.provider,
+      externalStudyId: input.externalStudyId,
+      externalPatientId: input.externalPatientId,
+      studyInstanceUid: input.studyInstanceUid,
+      accessionNumber: input.accessionNumber,
+      modalities: input.modalities,
+      studyDate: input.studyDate,
+      description: input.description,
+      availability: "AVAILABLE",
+      lastSyncedAt: new Date(),
+      createdById: input.createdById,
+    },
+    select: imagingStudySelect,
+  });
+}
+
 export async function listImagingStudies(input: {
   organizationId: string;
   clinicIds: string[];
@@ -77,6 +102,22 @@ export async function listImagingStudies(input: {
       ...(input.patientId ? { patientId: input.patientId } : {}),
     },
     orderBy: [{ studyDate: "desc" }, { createdAt: "desc" }],
+    take: 200,
+    select: imagingStudySelect,
+  });
+}
+
+export async function updateImagingStudyAvailability(
+  db: ImagingDb,
+  input: { id: string; availability: string; lastErrorCode?: string | null },
+) {
+  return db.imagingStudy.update({
+    where: { id: input.id },
+    data: {
+      availability: input.availability,
+      lastSyncedAt: new Date(),
+      lastErrorCode: input.lastErrorCode ?? null,
+    },
     select: imagingStudySelect,
   });
 }

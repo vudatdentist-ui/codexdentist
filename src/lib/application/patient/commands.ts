@@ -5,6 +5,7 @@ import { hasAnyRole, type AppRole } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 import { ApplicationCommandError } from "@/lib/application/errors";
+import { allowedClinicIds } from "@/lib/patient-access";
 
 const patientLeadSourceRoles: AppRole[] = ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"];
 
@@ -119,7 +120,7 @@ export async function updatePatientCommand(
       where: {
         id: patientId,
         organizationId: session.organizationId,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: allowedClinicIds(session) },
       },
       select: { id: true },
     }),
@@ -227,7 +228,7 @@ function requireAction(session: AppSession, action: Parameters<typeof canPerform
 }
 
 function requireClinicAccess(session: AppSession, clinicId: string) {
-  if (!session.clinicIds.includes(clinicId)) throw new ApplicationCommandError("clinic-denied");
+  if (!allowedClinicIds(session).includes(clinicId)) throw new ApplicationCommandError("clinic-denied");
 }
 
 async function requireScopedPatient(session: AppSession, patientId: string) {
@@ -235,7 +236,7 @@ async function requireScopedPatient(session: AppSession, patientId: string) {
     where: {
       id: patientId,
       organizationId: session.organizationId,
-      clinicId: { in: session.clinicIds },
+      clinicId: { in: allowedClinicIds(session) },
     },
     select: { id: true },
   });
@@ -248,7 +249,7 @@ async function requireScopedPatientWithLeadSource(session: AppSession, patientId
     where: {
       id: patientId,
       organizationId: session.organizationId,
-      clinicId: { in: session.clinicIds },
+      clinicId: { in: allowedClinicIds(session) },
     },
     select: { id: true, leadSource: true },
   });

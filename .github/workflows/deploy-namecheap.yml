@@ -1,7 +1,9 @@
 name: Deploy Namecheap production
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -13,7 +15,106 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  preflight:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: codexdentist
+          POSTGRES_PASSWORD: codexdentist
+          POSTGRES_DB: codexdentist
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U codexdentist -d codexdentist"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      NODE_ENV: production
+      DEPLOYMENT_MODE: self-hosted
+      DATABASE_URL: postgresql://codexdentist:codexdentist@127.0.0.1:5432/codexdentist?schema=public
+      AUTH_SECRET: ci-only-auth-secret-with-at-least-32-characters
+      JOB_SECRET: ci-only-job-secret-with-at-least-32-characters
+      APP_BASE_URL: https://codexdentist.test
+      PATIENT_FILE_STORAGE_DRIVER: local
+      SESSION_COOKIE_SECURE: "false"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --include=dev --no-audit --no-fund
+      - run: npm run encoding:check
+      - run: npm run typecheck
+      - run: npm run agent:audit
+      - run: node scripts/phase2-architecture-check.mjs
+      - run: node scripts/phase3-architecture-check.mjs
+      - run: node scripts/phase4-architecture-check.mjs
+      - run: node scripts/phase5-architecture-check.mjs
+      - run: node scripts/phase6-architecture-check.mjs
+      - run: docker compose --env-file .env.selfhost.example -f compose.selfhost.yml config --quiet
+      - run: npx prisma migrate deploy
+      - run: npm run test:disposable-restore
+        env:
+          RESTORE_DATABASE_URL: postgresql://codexdentist:codexdentist@127.0.0.1:5432/codexdentist_restore
+          RESTORE_TARGET_MARKER: CODEXDENTIST_DISPOSABLE_RESTORE
+      - run: npx prisma db seed
+        env:
+          NODE_ENV: test
+      - run: npm run test:seed-users
+        env:
+          NODE_ENV: test
+      - run: npm run test:hardening
+      - run: npm run test:security
+      - run: npm run test:security-runtime
+      - run: npm run test:roles
+      - run: npm run test:tenant
+      - run: npm run test:billing
+      - run: npm run test:billing-concurrency
+      - run: npm run test:actions
+      - run: npm run test:settings-forms
+      - run: npm run test:integration-substrate
+      - run: npm run test:journey-file-command
+      - run: npm run test:phase3
+      - run: npm run test:phase4
+      - run: npm run test:phase4:scope
+      - run: npm run test:phase5
+      - run: npm run test:phase5:sterilization
+      - run: npm run test:phase6
+      - run: npm run test:patient-files
+      - run: npm run test:file-lifecycle
+      - run: npm run test:organization-purge
+      - run: npm run test:data-integrity
+      - run: npm run test:compensation
+      - run: npm run test:source-commission
+      - run: npm run build
+      - name: Start production server for API smoke
+        run: |
+          npm start > /tmp/codexdentist-deploy-preflight.log 2>&1 &
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3000/api/health > /dev/null; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/codexdentist-deploy-preflight.log
+          exit 1
+      - run: npm run test:smoke
+      - run: npm run readiness:check
+      - run: npm run test:api-contract
+      - run: npx playwright install --with-deps chromium
+      - run: npm run browser:qa
+        env:
+          NODE_ENV: test
+
   deploy:
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main')
+    needs: preflight
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
@@ -22,7 +123,8 @@ jobs:
       DEPLOY_USER: ${{ secrets.NAMECHEAP_USER }}
       DEPLOY_APP_ROOT: ${{ secrets.NAMECHEAP_APP_ROOT }}
       DEPLOY_DOMAIN: ${{ secrets.NAMECHEAP_DOMAIN }}
-      REMOTE_ARCHIVE: .codexdentist-release-${{ github.sha }}.tar.gz
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+      REMOTE_ARCHIVE: .codexdentist-release-${{ github.event.workflow_run.head_sha || github.sha }}.tar.gz
 
     steps:
       - name: Check deployment configuration
@@ -43,10 +145,11 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 1
+          ref: ${{ env.RELEASE_SHA }}
 
       - name: Create source archive
         shell: bash
-        run: git archive --format=tar.gz --output=release.tar.gz "$GITHUB_SHA"
+        run: git archive --format=tar.gz --output=release.tar.gz "$RELEASE_SHA"
 
       - name: Configure pinned SSH host
         shell: bash
@@ -82,7 +185,7 @@ jobs:
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" \
-            "bash -s -- '$GITHUB_SHA' '$DEPLOY_APP_ROOT' '$REMOTE_ARCHIVE' '$DEPLOY_DOMAIN'" \
+            "bash -s -- '$RELEASE_SHA' '$DEPLOY_APP_ROOT' '$REMOTE_ARCHIVE' '$DEPLOY_DOMAIN'" \
             < scripts/deploy-namecheap.sh
 
       - name: Verify production health
