@@ -39,12 +39,35 @@ try {
   run("psql", [targetToolUrl, "-v", "ON_ERROR_STOP=1", "-c", 'SELECT 1 FROM "_prisma_migrations" LIMIT 1;']);
   console.log(`ok disposable PostgreSQL restore: ${targetDatabase}`);
 } finally {
-  await unlink(dumpPath).catch((error) => {
+  let dumpCleanupError = null;
+  try {
+    await unlink(dumpPath);
+  } catch (error) {
     if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) {
-      throw error;
+      if (postgresToolImage) {
+        const cleanup = spawnSync(
+          "docker",
+          [
+            "run",
+            "--rm",
+            "--volume",
+            `${path.dirname(dumpPath)}:/codexdentist-tmp`,
+            "--entrypoint",
+            "rm",
+            postgresToolImage,
+            "-f",
+            `/codexdentist-tmp/${path.basename(dumpPath)}`,
+          ],
+          { encoding: "utf8", stdio: "inherit" },
+        );
+        if (cleanup.error || cleanup.status !== 0) dumpCleanupError = error;
+      } else {
+        dumpCleanupError = error;
+      }
     }
-  });
+  }
   run("dropdb", ["--if-exists", ...targetConnection.args, targetDatabase], false, targetConnection.env);
+  if (dumpCleanupError) throw dumpCleanupError;
 }
 
 function run(command, args, required = true, connectionEnv = {}) {
