@@ -33,7 +33,32 @@ jobs:
       REMOTE_ARCHIVE: .codexdentist-release-${{ github.event.workflow_run.head_sha || github.sha }}.tar.gz
 
     steps:
+      - name: Resolve release eligibility
+        id: release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            echo "deploy=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          current_main_sha="$(git ls-remote "https://github.com/${GITHUB_REPOSITORY}.git" refs/heads/main | awk '{print $1}')"
+          if [[ -z "$current_main_sha" ]]; then
+            echo "Could not resolve current main SHA." >&2
+            exit 1
+          fi
+
+          if [[ "$RELEASE_SHA" != "$current_main_sha" ]]; then
+            echo "Skipping stale release $RELEASE_SHA; current main is $current_main_sha."
+            echo "deploy=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "deploy=true" >> "$GITHUB_OUTPUT"
+
       - name: Check deployment configuration
+        if: steps.release.outputs.deploy == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -49,15 +74,18 @@ jobs:
           esac
 
       - uses: actions/checkout@v7
+        if: steps.release.outputs.deploy == 'true'
         with:
           ref: ${{ env.RELEASE_SHA }}
           fetch-depth: 1
 
       - name: Create source archive
+        if: steps.release.outputs.deploy == 'true'
         shell: bash
         run: git archive --format=tar.gz --output=release.tar.gz "$RELEASE_SHA"
 
       - name: Configure pinned SSH host
+        if: steps.release.outputs.deploy == 'true'
         shell: bash
         env:
           DEPLOY_SSH_KEY: ${{ secrets.NAMECHEAP_SSH_KEY }}
@@ -72,6 +100,7 @@ jobs:
           chmod 600 "$HOME/.ssh/id_ed25519" "$HOME/.ssh/known_hosts"
 
       - name: Upload source archive
+        if: steps.release.outputs.deploy == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -83,6 +112,7 @@ jobs:
             "$DEPLOY_USER@$DEPLOY_HOST:$REMOTE_ARCHIVE"
 
       - name: Build, migrate, and restart cPanel app
+        if: steps.release.outputs.deploy == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -95,6 +125,7 @@ jobs:
             < scripts/deploy-namecheap.sh
 
       - name: Verify production health and stability
+        if: steps.release.outputs.deploy == 'true'
         shell: bash
         run: |
           set -euo pipefail
