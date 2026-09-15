@@ -165,7 +165,8 @@ jobs:
 
           ready=0
           for attempt in {1..30}; do
-            if curl --fail --silent http://127.0.0.1:3001/api/health > /tmp/hosted-health.json; then
+            if curl --fail --silent --header "Host: ${APP_ROOT_DOMAIN}" \
+              http://127.0.0.1:3001/api/health > /tmp/hosted-health.json; then
               ready=1
               break
             fi
@@ -182,7 +183,8 @@ jobs:
           fi
 
           node -e 'const fs=require("fs");const h=JSON.parse(fs.readFileSync("/tmp/hosted-health.json","utf8"));if(h.status!=="ok"||h.database!=="ok"||h.schema!=="ok")process.exit(1)'
-          curl --fail --silent --location --output /dev/null http://127.0.0.1:3001/login
+          curl --fail --silent --location --header "Host: ${APP_ROOT_DOMAIN}" \
+            --output /dev/null http://127.0.0.1:3001/login
       - name: Package production release artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         shell: bash
