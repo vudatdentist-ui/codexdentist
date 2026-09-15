@@ -2,6 +2,8 @@ import "server-only";
 
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { createHash, randomUUID } from "node:crypto";
+import { Readable } from "node:stream";
+import { pipeline } from "node:stream/promises";
 import {
   patientFileStorageDriver,
   patientFileStorageRoot,
@@ -87,6 +89,11 @@ export type StoredPatientUpload = {
   storageKey: string;
   thumbnail?: StoredPatientUploadVariant;
   checksumSha256: string;
+};
+
+export type StoredPatientFileStream = {
+  body: ReadableStream<Uint8Array>;
+  contentLength: number | null;
 };
 
 export function isUploadedPatientFile(value: FormDataEntryValue | null): value is File {
@@ -282,9 +289,12 @@ async function storeUpload({
     throw new Error("File exceeds the allowed size");
   }
 
-  const bytes = Buffer.from(await file.arrayBuffer());
+  const shouldBuffer = fileKind === "image";
+  const validationBytes = Buffer.from(
+    await (shouldBuffer ? file : file.slice(0, Math.min(file.size, 512))).arrayBuffer(),
+  );
   validateUploadContent({
-    bytes,
+    bytes: validationBytes,
     fileKind,
     fileName: originalName,
     mimeType,
@@ -300,29 +310,45 @@ async function storeUpload({
     safeOwnerId,
     storageName,
   );
-  const checksumSha256 = createHash("sha256").update(bytes).digest("hex");
+  const checksumSha256 = shouldBuffer
+    ? createHash("sha256").update(validationBytes).digest("hex")
+    : await checksumFile(file);
   let variants: Awaited<ReturnType<typeof createImageVariants>> = {};
   try {
-    variants = await createImageVariants({
-      bytes,
-      mimeType,
-      fileId: storageFileId,
-      storageNamespace,
-      safeOrganizationId,
-      safeOwnerId,
-      storageProvider,
-    });
+    variants = shouldBuffer
+      ? await createImageVariants({
+          bytes: validationBytes,
+          mimeType,
+          fileId: storageFileId,
+          storageNamespace,
+          safeOrganizationId,
+          safeOwnerId,
+          storageProvider,
+        })
+      : {};
 
     if (storageProvider === "r2") {
-      await storeR2Object({
-        key: storageKey,
-        bytes,
-        mimeType,
-        fileName: originalName,
-        checksumSha256,
-      });
+      if (shouldBuffer) {
+        await storeR2Object({
+          key: storageKey,
+          bytes: validationBytes,
+          mimeType,
+          fileName: originalName,
+          checksumSha256,
+        });
+      } else {
+        await storeR2File({
+          key: storageKey,
+          file,
+          mimeType,
+          fileName: originalName,
+          checksumSha256,
+        });
+      }
+    } else if (shouldBuffer) {
+      await storeLocalObject(storageKey, validationBytes);
     } else {
-      await storeLocalObject(storageKey, bytes);
+      await storeLocalFile(storageKey, file);
     }
 
     return {
@@ -374,6 +400,31 @@ export async function readStoredPatientFile(input: {
   }
 
   return readLocalObject(key);
+}
+
+export async function openStoredPatientFileStream(input: {
+  storageProvider?: string | null;
+  sourceType?: string | null;
+  storageKey?: string | null;
+  sourceId?: string | null;
+}): Promise<StoredPatientFileStream> {
+  const provider = input.storageProvider ??
+    (input.sourceType === "R2_UPLOAD" ? "r2" : "local");
+  const key = input.storageKey ?? input.sourceId;
+
+  if (!key) {
+    throw new Error("Missing patient file storage key");
+  }
+
+  if (provider === "r2") {
+    return openR2ObjectStream(key);
+  }
+
+  if (provider !== "local") {
+    throw new Error(`Unsupported patient file storage provider: ${provider}`);
+  }
+
+  return openLocalObjectStream(key);
 }
 
 async function resolveStoredPatientFilePath(relativePath: string) {
@@ -561,6 +612,23 @@ function objectKey(...segments: string[]) {
     .join("/");
 }
 
+async function checksumFile(file: File) {
+  const hash = createHash("sha256");
+  const reader = file.stream().getReader();
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      hash.update(Buffer.from(value));
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  return hash.digest("hex");
+}
+
 async function storeLocalObject(storageKey: string, bytes: Buffer) {
   const path = await import("node:path");
   const { mkdir, writeFile } = await import("node:fs/promises");
@@ -598,6 +666,25 @@ async function deleteStoredObject(storageProvider: "local" | "r2", storageKey: s
       throw error;
     }
   }
+}
+
+async function storeLocalFile(storageKey: string, file: File) {
+  const path = await import("node:path");
+  const { createWriteStream } = await import("node:fs");
+  const { mkdir } = await import("node:fs/promises");
+  const root = await localStorageRoot();
+  const storageRelativePath = storageKey.replace(/^patient-files\//, "");
+  const absolutePath = path.resolve(root, storageRelativePath);
+
+  if (!absolutePath.startsWith(`${root}${path.sep}`)) {
+    throw new Error("Invalid patient file path");
+  }
+
+  await mkdir(path.dirname(absolutePath), { recursive: true });
+  await pipeline(
+    Readable.fromWeb(file.stream() as any),
+    createWriteStream(absolutePath, { flags: "wx" }),
+  );
 }
 
 async function createImageVariants(input: {
@@ -725,6 +812,19 @@ async function readLocalObject(storageKey: string) {
   return readFile(await resolveStoredPatientFilePath(storageKey));
 }
 
+async function openLocalObjectStream(storageKey: string): Promise<StoredPatientFileStream> {
+  const { createReadStream } = await import("node:fs");
+  const { stat } = await import("node:fs/promises");
+  const absolutePath = await resolveStoredPatientFilePath(storageKey);
+  const fileStat = await stat(absolutePath);
+  const nodeStream = createReadStream(absolutePath);
+
+  return {
+    body: Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>,
+    contentLength: fileStat.size,
+  };
+}
+
 async function localStorageRoot() {
   const path = await import("node:path");
   const configuredStorageRoot = patientFileStorageRoot();
@@ -749,6 +849,31 @@ async function storeR2Object(input: {
       Key: input.key,
       Body: input.bytes,
       ContentType: input.mimeType,
+      ContentLength: input.bytes.byteLength,
+      Metadata: {
+        originalName: input.fileName,
+        checksumSha256: input.checksumSha256,
+      },
+    }),
+  );
+}
+
+async function storeR2File(input: {
+  key: string;
+  file: File;
+  mimeType: string;
+  fileName: string;
+  checksumSha256: string;
+}) {
+  const config = requiredR2Config();
+
+  await getR2Client().send(
+    new PutObjectCommand({
+      Bucket: config.bucket,
+      Key: input.key,
+      Body: Readable.fromWeb(input.file.stream() as any),
+      ContentType: input.mimeType,
+      ContentLength: input.file.size,
       Metadata: {
         originalName: input.fileName,
         checksumSha256: input.checksumSha256,
@@ -771,6 +896,26 @@ async function readR2Object(key: string) {
   }
 
   return Buffer.from(await response.Body.transformToByteArray());
+}
+
+async function openR2ObjectStream(key: string): Promise<StoredPatientFileStream> {
+  const config = requiredR2Config();
+  const response = await getR2Client().send(
+    new GetObjectCommand({
+      Bucket: config.bucket,
+      Key: key,
+    }),
+  );
+
+  if (!response.Body) {
+    throw new Error("Empty R2 object body");
+  }
+
+  return {
+    body: response.Body.transformToWebStream() as ReadableStream<Uint8Array>,
+    contentLength:
+      typeof response.ContentLength === "number" ? response.ContentLength : null,
+  };
 }
 
 function getR2Client() {

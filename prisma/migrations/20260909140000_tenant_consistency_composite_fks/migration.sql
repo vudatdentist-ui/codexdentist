@@ -78,43 +78,32 @@ ALTER TABLE "Patient" ADD CONSTRAINT "Patient_id_clinicId_organizationId_key" UN
 ALTER TABLE "SterilizationInstrument" ADD CONSTRAINT "SterilizationInstrument_id_organizationId_clinicId_key" UNIQUE ("id", "organizationId", "clinicId");
 ALTER TABLE "SterilizationCycle" ADD CONSTRAINT "SterilizationCycle_id_organizationId_clinicId_key" UNIQUE ("id", "organizationId", "clinicId");
 
-ALTER TABLE "PatientFile" DROP CONSTRAINT "PatientFile_clinicId_fkey";
-ALTER TABLE "PatientFile" DROP CONSTRAINT "PatientFile_patientId_fkey";
 ALTER TABLE "PatientFile"
   ADD CONSTRAINT "PatientFile_clinicId_organizationId_fkey"
     FOREIGN KEY ("clinicId", "organizationId") REFERENCES "Clinic" ("id", "organizationId") ON DELETE NO ACTION ON UPDATE CASCADE,
   ADD CONSTRAINT "PatientFile_patientId_clinicId_organizationId_fkey"
     FOREIGN KEY ("patientId", "clinicId", "organizationId") REFERENCES "Patient" ("id", "clinicId", "organizationId") ON DELETE NO ACTION ON UPDATE CASCADE;
 
-ALTER TABLE "ImagingStudy" DROP CONSTRAINT "ImagingStudy_clinicId_fkey";
-ALTER TABLE "ImagingStudy" DROP CONSTRAINT "ImagingStudy_patientId_fkey";
 ALTER TABLE "ImagingStudy"
   ADD CONSTRAINT "ImagingStudy_clinicId_organizationId_fkey"
     FOREIGN KEY ("clinicId", "organizationId") REFERENCES "Clinic" ("id", "organizationId") ON DELETE RESTRICT ON UPDATE CASCADE,
   ADD CONSTRAINT "ImagingStudy_patientId_clinicId_organizationId_fkey"
     FOREIGN KEY ("patientId", "clinicId", "organizationId") REFERENCES "Patient" ("id", "clinicId", "organizationId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE "LabCase" DROP CONSTRAINT "LabCase_clinicId_fkey";
-ALTER TABLE "LabCase" DROP CONSTRAINT "LabCase_patientId_fkey";
 ALTER TABLE "LabCase"
   ADD CONSTRAINT "LabCase_clinicId_organizationId_fkey"
     FOREIGN KEY ("clinicId", "organizationId") REFERENCES "Clinic" ("id", "organizationId") ON DELETE NO ACTION ON UPDATE CASCADE,
   ADD CONSTRAINT "LabCase_patientId_clinicId_organizationId_fkey"
     FOREIGN KEY ("patientId", "clinicId", "organizationId") REFERENCES "Patient" ("id", "clinicId", "organizationId") ON DELETE NO ACTION ON UPDATE CASCADE;
 
-ALTER TABLE "SterilizationInstrument" DROP CONSTRAINT "SterilizationInstrument_clinicId_fkey";
 ALTER TABLE "SterilizationInstrument"
   ADD CONSTRAINT "SterilizationInstrument_clinicId_organizationId_fkey"
     FOREIGN KEY ("clinicId", "organizationId") REFERENCES "Clinic" ("id", "organizationId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE "SterilizationCycle" DROP CONSTRAINT "SterilizationCycle_clinicId_fkey";
 ALTER TABLE "SterilizationCycle"
   ADD CONSTRAINT "SterilizationCycle_clinicId_organizationId_fkey"
     FOREIGN KEY ("clinicId", "organizationId") REFERENCES "Clinic" ("id", "organizationId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE "SterilizationCycleInstrument" DROP CONSTRAINT "SterilizationCycleInstrument_cycleId_fkey";
-ALTER TABLE "SterilizationCycleInstrument" DROP CONSTRAINT "SterilizationCycleInstrument_instrumentId_fkey";
-ALTER TABLE "SterilizationCycleInstrument" DROP CONSTRAINT "SterilizationCycleInstrument_clinicId_fkey";
 ALTER TABLE "SterilizationCycleInstrument"
   ADD CONSTRAINT "SterilizationCycleInstrument_cycle_scope_fkey"
     FOREIGN KEY ("cycleId", "organizationId", "clinicId") REFERENCES "SterilizationCycle" ("id", "organizationId", "clinicId") ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -123,9 +112,6 @@ ALTER TABLE "SterilizationCycleInstrument"
   ADD CONSTRAINT "SterilizationCycleInstrument_clinic_organization_fkey"
     FOREIGN KEY ("clinicId", "organizationId") REFERENCES "Clinic" ("id", "organizationId") ON DELETE RESTRICT ON UPDATE CASCADE;
 
-ALTER TABLE "PatientFileObjectStage"
-  DROP CONSTRAINT "PatientFileObjectStage_clinicId_fkey",
-  DROP CONSTRAINT "PatientFileObjectStage_patientId_fkey";
 ALTER TABLE "PatientFileObjectStage"
   ADD CONSTRAINT "PatientFileObjectStage_clinicId_organizationId_fkey"
     FOREIGN KEY ("clinicId", "organizationId") REFERENCES "Clinic" ("id", "organizationId") ON DELETE RESTRICT ON UPDATE CASCADE,

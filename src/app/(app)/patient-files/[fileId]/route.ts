@@ -1,6 +1,6 @@
 import { requireSession } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
-import { readStoredPatientFile } from "@/lib/patient-file-storage";
+import { openStoredPatientFileStream } from "@/lib/patient-file-storage";
 import { getAuthorizedPatientFile } from "@/lib/resource-policy";
 
 export async function GET(
@@ -52,7 +52,7 @@ export async function GET(
         : variant === "thumbnail"
           ? file.thumbnailMimeType
           : null;
-    const bytes = await readStoredPatientFile({
+    const stored = await openStoredPatientFileStream({
       storageProvider: file.storageProvider,
       storageKey: variantStorageKey ?? file.storageKey,
       sourceId: variantStorageKey ?? file.sourceId,
@@ -72,17 +72,20 @@ export async function GET(
       },
     });
 
-    return new Response(new Uint8Array(bytes), {
-      headers: {
-        "Cache-Control": "private, no-store",
-        "Content-Disposition": `${contentDispositionFor(
-          variantMimeType ?? file.mimeType,
-        )}; filename*=UTF-8''${encodeRFC5987(file.fileName ?? file.title)}`,
-        "Content-Length": String(bytes.byteLength),
-        "Content-Type": variantMimeType ?? file.mimeType ?? "application/octet-stream",
-        "X-Content-Type-Options": "nosniff",
-      },
+    const headers = new Headers({
+      "Cache-Control": "private, no-store",
+      "Content-Disposition": `${contentDispositionFor(
+        variantMimeType ?? file.mimeType,
+      )}; filename*=UTF-8''${encodeRFC5987(file.fileName ?? file.title)}`,
+      "Content-Type": variantMimeType ?? file.mimeType ?? "application/octet-stream",
+      "X-Content-Type-Options": "nosniff",
     });
+
+    if (stored.contentLength !== null) {
+      headers.set("Content-Length", String(stored.contentLength));
+    }
+
+    return new Response(stored.body, { headers });
   } catch {
     return new Response("Not found", { status: 404 });
   }

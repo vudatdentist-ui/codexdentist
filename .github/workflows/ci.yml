@@ -14,7 +14,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 55
     services:
       postgres:
         image: postgres:17-alpine
@@ -54,10 +54,22 @@ jobs:
           cache: npm
 
       - run: npm ci --include=dev --no-audit --no-fund
+      - name: Production dependency audit
+        run: npm audit --omit=dev --audit-level=high
       - run: npm run encoding:check
       - run: npm run typecheck
       - run: node scripts/agent-module-audit.mjs
       - run: node scripts/phase2-architecture-check.mjs
+      - name: Validate deployment guards
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n scripts/deploy-namecheap.sh
+          node --check scripts/check-migration-safety.mjs
+      - name: Enforce backward-compatible migrations
+        run: node scripts/check-migration-safety.mjs
+        env:
+          MIGRATION_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
       - run: node scripts/phase3-architecture-check.mjs
       - run: node scripts/phase4-architecture-check.mjs
       - run: node scripts/phase5-architecture-check.mjs
@@ -129,3 +141,102 @@ jobs:
         env:
           NODE_ENV: test
       - run: docker build -t codexdentist:ci .
+      - name: Stop verification server
+        shell: bash
+        run: pkill -f 'next start' || true
+      - name: Build hosted production release
+        shell: bash
+        env:
+          CODEXDENTIST_BUILD: "1"
+          DEPLOYMENT_MODE: hosted
+          APP_BASE_URL: https://codexdentist.com
+          APP_ROOT_DOMAIN: codexdentist.com
+          PATIENT_FILE_STORAGE_DRIVER: r2
+          R2_ENDPOINT: https://r2-build.invalid
+          R2_BUCKET_NAME: build-placeholder
+          R2_ACCESS_KEY_ID: build-placeholder
+          R2_SECRET_ACCESS_KEY: build-placeholder
+          SESSION_COOKIE_SECURE: "true"
+          TRUSTED_PROXY_PROVIDER: cloudflare
+        run: |
+          set -euo pipefail
+          rm -rf .next
+          npm run build
+          test -d .next
+      - name: Verify hosted release boots
+        shell: bash
+        env:
+          CODEXDENTIST_BUILD: "1"
+          DEPLOYMENT_MODE: hosted
+          APP_BASE_URL: https://codexdentist.com
+          APP_ROOT_DOMAIN: codexdentist.com
+          PATIENT_FILE_STORAGE_DRIVER: r2
+          R2_ENDPOINT: https://r2-build.invalid
+          R2_BUCKET_NAME: build-placeholder
+          R2_ACCESS_KEY_ID: build-placeholder
+          R2_SECRET_ACCESS_KEY: build-placeholder
+          SESSION_COOKIE_SECURE: "true"
+          TRUSTED_PROXY_PROVIDER: cloudflare
+          PORT: "3001"
+        run: |
+          set -euo pipefail
+          npm start > /tmp/codexdentist-hosted.log 2>&1 &
+          server_pid=$!
+          cleanup() {
+            kill "$server_pid" >/dev/null 2>&1 || true
+            pkill -f 'next start' >/dev/null 2>&1 || true
+          }
+          trap cleanup EXIT
+
+          ready=0
+          for attempt in {1..30}; do
+            if curl --fail --silent --header "Host: ${APP_ROOT_DOMAIN}" \
+              http://127.0.0.1:3001/api/health > /tmp/hosted-health.json; then
+              ready=1
+              break
+            fi
+            if ! kill -0 "$server_pid" >/dev/null 2>&1; then
+              cat /tmp/codexdentist-hosted.log
+              exit 1
+            fi
+            sleep 2
+          done
+
+          if [[ "$ready" != "1" ]]; then
+            cat /tmp/codexdentist-hosted.log
+            exit 1
+          fi
+
+          node -e 'const fs=require("fs");const h=JSON.parse(fs.readFileSync("/tmp/hosted-health.json","utf8"));if(h.status!=="ok"||h.database!=="ok"||h.schema!=="ok")process.exit(1)'
+          curl --fail --silent --location --header "Host: ${APP_ROOT_DOMAIN}" \
+            --output /dev/null http://127.0.0.1:3001/login
+      - name: Package production release artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$GITHUB_SHA" > .codexdentist-release-sha
+          tar \
+            --exclude='./.git' \
+            --exclude='./node_modules' \
+            --exclude='./release.tar.gz' \
+            --exclude='./.env' \
+            --exclude='./.env.*' \
+            --exclude='./.tmp' \
+            --exclude='./coverage' \
+            --exclude='./playwright-report' \
+            --exclude='./storage' \
+            --exclude='./backups' \
+            --exclude='./test-results' \
+            -czf release.tar.gz .
+          test -s release.tar.gz
+          test -d .next
+          test "$(cat .codexdentist-release-sha)" = "$GITHUB_SHA"
+      - name: Upload production release artifact
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: codexdentist-production-${{ github.sha }}
+          path: release.tar.gz
+          if-no-files-found: error
+          retention-days: 7
