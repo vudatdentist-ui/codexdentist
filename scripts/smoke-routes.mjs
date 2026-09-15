@@ -38,7 +38,7 @@ const migrationRoutes = enabledMigrationRoutes(
 ).map((route) => route.replace(/^\/+/, ""));
 const routes = [...new Set([...configuredRoutes, ...migrationRoutes])];
 const routeMarkers = {
-  dashboard: ["Group dashboard", "Tổng quan hệ thống"],
+  dashboard: ["Group dashboard", "Tổng quan hệ thống", "Today command center", "Trung tâm điều hành hôm nay"],
   schedule: ["Multi-clinic schedule", "Lịch hẹn đa phòng khám"],
   patients: ["Patient 360", "Hồ sơ bệnh nhân 360"],
   "patients/[patientId]": ["Patient 360", "Hồ sơ bệnh nhân 360"],
