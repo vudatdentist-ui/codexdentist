@@ -22,7 +22,7 @@ export async function GET() {
       throw new Error("Database has unfinished migrations.");
     }
 
-    return json(
+    return NextResponse.json(
       {
         status: "ok",
         database: "ok",
@@ -30,9 +30,14 @@ export async function GET() {
         latencyMs: Date.now() - startedAt,
         timestamp: new Date().toISOString(),
       },
+      {
+        headers: {
+          "Cache-Control": "no-store",
+        },
+      },
     );
   } catch {
-    return json(
+    return NextResponse.json(
       {
         status: "degraded",
         database: "unavailable",
@@ -48,11 +53,4 @@ export async function GET() {
       },
     );
   }
-}
-
-function json(body: unknown, init?: ResponseInit) {
-  return NextResponse.json(body, {
-    ...init,
-    headers: { "cache-control": "no-store", ...(init?.headers ?? {}) },
-  });
 }

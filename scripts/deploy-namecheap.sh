@@ -239,7 +239,6 @@ check_readiness() {
   READINESS_URL="https://${DOMAIN}/api/readiness" JOB_SECRET="$JOB_SECRET" STRICT_READINESS=true \
     "$NODE_BIN/node" "$APP_DIR/scripts/readiness-check.mjs" >/dev/null
 }
-
 check_routes() {
   local route
   for route in / /login; do
