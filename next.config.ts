@@ -12,6 +12,9 @@ const appRootDomain =
 const serverActionAllowedOrigins = [
   appRootDomain,
   `*.${appRootDomain}`,
+  ...(process.env.DEPLOYMENT_MODE === "self-hosted"
+    ? ["127.0.0.1", "localhost"]
+    : []),
   ...(process.env.TRUSTED_APP_HOSTS ?? "")
     .split(",")
     .map((host) => host.trim().toLowerCase())
