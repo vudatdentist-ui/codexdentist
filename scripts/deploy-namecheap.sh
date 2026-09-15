@@ -8,8 +8,10 @@ DOMAIN="${4:?application domain is required}"
 
 NODE_BIN="/opt/alt/alt-nodejs22/root/usr/bin"
 ARCHIVE_PATH="$HOME/$ARCHIVE_NAME"
-RELEASE_DIR="$HOME/.codexdentist-release-$SHA"
+RELEASES_DIR="$APP_DIR/.codexdentist-releases"
+RELEASE_DIR="$RELEASES_DIR/$SHA"
 ROLLBACK_DIR="$APP_DIR/.codexdentist-rollback-$SHA"
+PROMOTED_MANIFEST="$ROLLBACK_DIR/.promoted-items"
 LOCK_PATH="$HOME/.codexdentist-deploy.lock"
 
 if [[ ! -d "$APP_DIR" ]]; then
@@ -39,90 +41,175 @@ if ! flock -n 9; then
   exit 1
 fi
 
-started=0
-cleanup() {
-  rm -rf -- "$RELEASE_DIR" "$ARCHIVE_PATH" "$ROLLBACK_DIR"
+cutover_started=0
+
+cleanup_staging() {
+  rm -rf -- "$RELEASE_DIR" "$ARCHIVE_PATH"
 }
-restart_after_failure() {
+
+start_app() {
+  cloudlinux-selector start --json --interpreter nodejs --domain "$DOMAIN" --app-root "$APP_DIR" >/dev/null 2>&1 </dev/null
+}
+
+stop_app() {
+  cloudlinux-selector stop --json --interpreter nodejs --domain "$DOMAIN" --app-root "$APP_DIR" >/dev/null 2>&1 </dev/null
+}
+
+restore_previous_release() {
   local status=$?
-  if [[ -d "$ROLLBACK_DIR" ]]; then
-    rm -rf -- "$APP_DIR/.next" "$APP_DIR/package.json" "$APP_DIR/package-lock.json"
-    for item in .next package.json package-lock.json; do
-      if [[ -e "$ROLLBACK_DIR/$item" || -L "$ROLLBACK_DIR/$item" ]]; then
-        mv -- "$ROLLBACK_DIR/$item" "$APP_DIR/$item"
-      fi
-    done
+  trap - ERR
+  set +e
+
+  if [[ "$cutover_started" == "1" ]]; then
+    echo "Deployment failed after cutover started; restoring previous release." >&2
+    stop_app || true
+
+    if [[ -f "$PROMOTED_MANIFEST" ]]; then
+      while IFS=$'\t' read -r had_old name; do
+        [[ -n "$name" ]] || continue
+
+        if [[ "$had_old" == "1" ]]; then
+          if [[ -e "$ROLLBACK_DIR/$name" || -L "$ROLLBACK_DIR/$name" ]]; then
+            rm -rf -- "$APP_DIR/$name"
+            mv -- "$ROLLBACK_DIR/$name" "$APP_DIR/$name" || true
+          fi
+        else
+          rm -rf -- "$APP_DIR/$name"
+        fi
+      done < "$PROMOTED_MANIFEST"
+    fi
+
+    # Defensive fallback for any item moved to rollback but not restored above.
+    if [[ -d "$ROLLBACK_DIR" ]]; then
+      while IFS= read -r -d '' item; do
+        name="${item##*/}"
+        [[ "$name" == ".promoted-items" ]] && continue
+        rm -rf -- "$APP_DIR/$name"
+        mv -- "$item" "$APP_DIR/$name" || true
+      done < <(find "$ROLLBACK_DIR" -mindepth 1 -maxdepth 1 -print0)
+    fi
+
+    start_app || true
   fi
-  if [[ "$started" == "1" ]]; then
-    cloudlinux-selector start --json --interpreter nodejs --domain "$DOMAIN" --app-root "$APP_DIR" >/dev/null 2>&1 </dev/null || true
-  fi
-  cleanup
+
+  cleanup_staging
+  rm -rf -- "$ROLLBACK_DIR"
   exit "$status"
 }
-trap restart_after_failure ERR
+trap restore_previous_release ERR
 
-rm -rf -- "$RELEASE_DIR"
-rm -rf -- "$ROLLBACK_DIR"
-mkdir -p "$RELEASE_DIR"
+rm -rf -- "$RELEASE_DIR" "$ROLLBACK_DIR"
+mkdir -p "$RELEASE_DIR" "$RELEASES_DIR"
 tar -xzf "$ARCHIVE_PATH" -C "$RELEASE_DIR"
 cp -- "$APP_DIR/.env" "$RELEASE_DIR/.env"
 
-# Stop only this cPanel Node app before dependency installation/build. The old
-# application root stays intact until the new source has built successfully.
-cloudlinux-selector stop --json --interpreter nodejs --domain "$DOMAIN" --app-root "$APP_DIR" >/dev/null
-started=1
+if [[ ! -d "$RELEASE_DIR/.next" ]]; then
+  echo "Verified CI artifact is missing .next; refusing server-side rebuild." >&2
+  exit 1
+fi
+if [[ ! -f "$RELEASE_DIR/.codexdentist-release-sha" ]]; then
+  echo "Release artifact is missing its SHA manifest." >&2
+  exit 1
+fi
+if [[ "$(tr -d '\r\n' < "$RELEASE_DIR/.codexdentist-release-sha")" != "$SHA" ]]; then
+  echo "Release artifact SHA does not match requested deployment SHA." >&2
+  exit 1
+fi
 
 export PATH="$NODE_BIN:$PATH"
 
-# Keep the previous compiled app and package manifests available if the new
-# build fails. The source tree can be updated before building because Next.js
-# serves the compiled `.next` output, not the source files directly.
-mkdir -p "$ROLLBACK_DIR"
-for item in .next package.json package-lock.json; do
-  if [[ -e "$APP_DIR/$item" || -L "$APP_DIR/$item" ]]; then
-    mv -- "$APP_DIR/$item" "$ROLLBACK_DIR/$item"
-  fi
-done
-
-# Keep the physical node_modules directory required by this cPanel setup, but
-# install from the exact package lock that is about to be released.
-cp -- "$RELEASE_DIR/package.json" "$APP_DIR/package.json"
-cp -- "$RELEASE_DIR/package-lock.json" "$APP_DIR/package-lock.json"
+# Prepare the complete runtime tree while the currently deployed application
+# continues serving traffic. The release artifact was already built and tested
+# in CI, so shared hosting no longer performs a production Next.js build.
 (
-  cd "$APP_DIR"
+  cd "$RELEASE_DIR"
   "$NODE_BIN/npm" ci --include=dev --ignore-scripts --no-audit --no-fund
   "$NODE_BIN/npm" run prisma:generate
-)
 
-# Copy source files into the real cPanel app root. This keeps `node_modules`
-# physical and inside the Next.js project root; Turbopack rejects a symlink that
-# points from a temporary project outside its filesystem root.
-while IFS= read -r -d '' item; do
-  name="${item##*/}"
-  case "$name" in
-    .env|node_modules|storage|backups|.next|package.json|package-lock.json) continue ;;
-  esac
-  rm -rf -- "$APP_DIR/$name"
-  cp -a -- "$item" "$APP_DIR/$name"
-done < <(find "$RELEASE_DIR" -mindepth 1 -maxdepth 1 -print0)
-
-set -a
-# shellcheck disable=SC1091
-. "$APP_DIR/.env"
-set +a
-(
-  cd "$APP_DIR"
-  CODEXMED_SHARED_HOST_BUILD=true "$NODE_BIN/npm" run build
+  # Migrations run while the old application is still live. CI rejects contract
+  # migrations, so the previous release remains schema-compatible if cutover
+  # must be rolled back.
   "$NODE_BIN/npx" prisma migrate deploy
-)
 
-(
-  cd "$APP_DIR"
   "$NODE_BIN/npm" prune --omit=dev --ignore-scripts --no-audit --no-fund
 )
 
+mkdir -p "$ROLLBACK_DIR"
+: > "$PROMOTED_MANIFEST"
+
+# Stop only for the final filesystem cutover. Set the rollback flag before the
+# stop command so even a partially successful stop is recovered by the ERR trap.
+cutover_started=1
+stop_app
+
+while IFS= read -r -d '' item; do
+  name="${item##*/}"
+  case "$name" in
+    .env) continue ;;
+  esac
+
+  if [[ -e "$APP_DIR/$name" || -L "$APP_DIR/$name" ]]; then
+    # Record intent before moving the old item. If the move itself fails, the
+    # rollback handler sees no backup and leaves the still-live old item alone.
+    printf '1\t%s\n' "$name" >> "$PROMOTED_MANIFEST"
+    mv -- "$APP_DIR/$name" "$ROLLBACK_DIR/$name"
+  else
+    # A new-only item can always be removed safely during rollback, even if its
+    # promotion fails halfway through.
+    printf '0\t%s\n' "$name" >> "$PROMOTED_MANIFEST"
+  fi
+
+  mv -- "$item" "$APP_DIR/$name"
+done < <(find "$RELEASE_DIR" -mindepth 1 -maxdepth 1 -print0)
+
+start_app
+
+check_health() {
+  local response
+  response="$(curl --fail --silent --show-error --location --max-time 20 \
+    "https://${DOMAIN}/api/health")" || return 1
+  HEALTH_RESPONSE="$response" "$NODE_BIN/node" <<'NODE'
+const health = JSON.parse(process.env.HEALTH_RESPONSE);
+if (health.status !== "ok" || health.database !== "ok" || health.schema !== "ok") {
+  throw new Error(`Unhealthy production response: ${JSON.stringify(health)}`);
+}
+NODE
+}
+
+check_routes() {
+  local route
+  for route in / /login; do
+    curl --fail --silent --show-error --location --max-time 20 \
+      --output /dev/null "https://${DOMAIN}${route}" || return 1
+  done
+}
+
+ready=0
+for attempt in {1..12}; do
+  if check_health && check_routes; then
+    ready=1
+    break
+  fi
+  sleep 5
+done
+
+if [[ "$ready" != "1" ]]; then
+  echo "Production failed readiness checks after cutover." >&2
+  false
+fi
+
+for attempt in {1..6}; do
+  sleep 10
+  if ! check_health || ! check_routes; then
+    echo "Production became unhealthy during the post-deploy stability window." >&2
+    false
+  fi
+done
+
+# Only now is the release accepted and rollback state discarded.
+cutover_started=0
 rm -rf -- "$ROLLBACK_DIR"
-cloudlinux-selector start --json --interpreter nodejs --domain "$DOMAIN" --app-root "$APP_DIR" >/dev/null 2>&1 </dev/null
-started=0
-cleanup
-echo "Codexdentist release $SHA deployed to $DOMAIN."
+cleanup_staging
+trap - ERR
+
+echo "Codexdentist release $SHA deployed to $DOMAIN and stayed healthy for 60 seconds."
