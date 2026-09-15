@@ -60,6 +60,7 @@
     "browser:qa": "node scripts/browser-qa-audit.mjs",
     "test:api-contract": "node scripts/api-contract-smoke.mjs",
     "test:disposable-restore": "node scripts/disposable-postgres-restore-smoke.mjs",
+    "test:domain-operations": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/domain-operations-smoke.mjs",
     "encoding:check": "node scripts/check-encoding.mjs",
     "agent:health": "node scripts/check-encoding.mjs && node scripts/agent-health-check.mjs",
     "agent:audit": "node scripts/agent-module-audit.mjs",

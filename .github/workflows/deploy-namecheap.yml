@@ -64,6 +64,7 @@ jobs:
       - run: node scripts/phase4-architecture-check.mjs
       - run: node scripts/phase5-architecture-check.mjs
       - run: node scripts/phase6-architecture-check.mjs
+      - run: npm run test:domain-operations
       - run: docker compose --env-file .env.selfhost.example -f compose.selfhost.yml config --quiet
       - run: npx prisma migrate deploy
       - run: npm run test:disposable-restore
