@@ -1,7 +1,9 @@
 name: Deploy Namecheap production
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -14,24 +16,29 @@ concurrency:
 
 jobs:
   deploy:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
+      RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
       DEPLOY_HOST: ${{ secrets.NAMECHEAP_HOST }}
       DEPLOY_PORT: ${{ secrets.NAMECHEAP_PORT }}
       DEPLOY_USER: ${{ secrets.NAMECHEAP_USER }}
       DEPLOY_APP_ROOT: ${{ secrets.NAMECHEAP_APP_ROOT }}
       DEPLOY_DOMAIN: ${{ secrets.NAMECHEAP_DOMAIN }}
-      REMOTE_ARCHIVE: .codexdentist-release-${{ github.sha }}.tar.gz
+      REMOTE_ARCHIVE: .codexdentist-release-${{ github.event.workflow_run.head_sha || github.sha }}.tar.gz
 
     steps:
       - name: Check deployment configuration
         shell: bash
         run: |
           set -euo pipefail
-          for variable in DEPLOY_HOST DEPLOY_PORT DEPLOY_USER DEPLOY_APP_ROOT DEPLOY_DOMAIN; do
+          for variable in RELEASE_SHA DEPLOY_HOST DEPLOY_PORT DEPLOY_USER DEPLOY_APP_ROOT DEPLOY_DOMAIN; do
             if [[ -z "${!variable}" ]]; then
-              echo "Missing GitHub secret for ${variable}." >&2
+              echo "Missing deployment value for ${variable}." >&2
               exit 1
             fi
           done
@@ -42,11 +49,12 @@ jobs:
 
       - uses: actions/checkout@v7
         with:
+          ref: ${{ env.RELEASE_SHA }}
           fetch-depth: 1
 
       - name: Create source archive
         shell: bash
-        run: git archive --format=tar.gz --output=release.tar.gz "$GITHUB_SHA"
+        run: git archive --format=tar.gz --output=release.tar.gz "$RELEASE_SHA"
 
       - name: Configure pinned SSH host
         shell: bash
@@ -82,26 +90,49 @@ jobs:
             -o BatchMode=yes \
             -o IdentitiesOnly=yes \
             "$DEPLOY_USER@$DEPLOY_HOST" \
-            "bash -s -- '$GITHUB_SHA' '$DEPLOY_APP_ROOT' '$REMOTE_ARCHIVE' '$DEPLOY_DOMAIN'" \
+            "bash -s -- '$RELEASE_SHA' '$DEPLOY_APP_ROOT' '$REMOTE_ARCHIVE' '$DEPLOY_DOMAIN'" \
             < scripts/deploy-namecheap.sh
 
-      - name: Verify production health
+      - name: Verify production health and stability
         shell: bash
         run: |
           set -euo pipefail
-          for attempt in {1..12}; do
-            if response="$(curl --fail --silent --show-error --location --max-time 20 \
-              "https://${DEPLOY_DOMAIN}/api/health")"; then
-              HEALTH_RESPONSE="$response" node <<'NODE'
+
+          check_health() {
+            local response
+            response="$(curl --fail --silent --show-error --location --max-time 20 \
+              "https://${DEPLOY_DOMAIN}/api/health")" || return 1
+            HEALTH_RESPONSE="$response" node <<'NODE'
           const health = JSON.parse(process.env.HEALTH_RESPONSE);
           if (health.status !== "ok" || health.database !== "ok") {
             throw new Error(`Unhealthy production response: ${JSON.stringify(health)}`);
           }
-          console.log("Production application and database are healthy.");
           NODE
-              exit 0
+          }
+
+          ready=0
+          for attempt in {1..12}; do
+            if check_health; then
+              ready=1
+              break
             fi
             sleep 5
           done
-          echo "Production health check failed after deployment." >&2
-          exit 1
+
+          if [[ "$ready" != "1" ]]; then
+            echo "Production health check failed after deployment." >&2
+            exit 1
+          fi
+
+          # A single successful request can hide an app process that dies just
+          # after restart on shared hosting. Require sustained health before the
+          # deployment is accepted.
+          for attempt in {1..6}; do
+            sleep 10
+            if ! check_health; then
+              echo "Production became unhealthy during the post-deploy stability window." >&2
+              exit 1
+            fi
+          done
+
+          echo "Production application and database stayed healthy for 60 seconds."
