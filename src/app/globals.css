@@ -8085,6 +8085,32 @@ textarea {
   background: var(--green);
 }
 
+.today-brief {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 18px 28px;
+  border-block: 1px solid var(--line);
+  padding: 16px 0;
+}
+.today-brief > div { display: flex; align-items: baseline; gap: 8px; }
+.today-brief strong { font-size: 1.5rem; color: var(--teal-strong); }
+.today-brief span { font-size: .875rem; color: var(--muted); }
+.today-brief .today-updated { margin-left: auto; font-size: .8125rem; }
+.today-operation-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+.today-management > summary { cursor: pointer; padding: 4px 0; font-size: 1rem; font-weight: 650; }
+.today-management[open] > summary { margin-bottom: 20px; }
+.today-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 20px; }
+.today-management > .content-grid { margin-top: 16px; }
+.today-workspace .dashboard-compose-details > summary { font-size: .875rem; }
+@media (max-width: 1200px) {
+  .today-operation-grid { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .today-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .today-brief .today-updated { margin-left: 0; width: 100%; }
+}
+
 .dashboard-command-panel {
   align-items: stretch;
   background: var(--surface);

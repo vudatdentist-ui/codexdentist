@@ -151,48 +151,42 @@ const SettingsPanel = dynamic(() =>
 
 const navGroups: AppShellNavGroup[] = [
   {
-    title: { vi: "Tổng quan", en: "Overview" },
+    title: { vi: "Điều hành", en: "Operations" },
     items: [
       { key: "dashboard", icon: LayoutDashboard },
+      { key: "schedule", icon: CalendarDays },
+      { key: "crm", icon: Inbox },
       { key: "reports", icon: BarChart3 },
-      { key: "accounting", icon: WalletCards },
     ],
   },
   {
-    title: { vi: "Bệnh nhân", en: "Patients" },
+    title: { vi: "Chăm sóc bệnh nhân", en: "Patient care" },
     items: [
-      { key: "schedule", icon: CalendarDays },
       { key: "patients", icon: UsersRound },
       { key: "journey", icon: Stethoscope },
-      { key: "billing", icon: CreditCard },
-      { key: "crm", icon: Inbox },
+      { key: "services", icon: ClipboardList },
+      { key: "forms", icon: ShieldCheck },
       { key: "patient-app", icon: Smartphone },
     ],
   },
   {
-    title: { vi: "Lâm sàng", en: "Clinical" },
+    title: { vi: "Tài chính & nguồn lực", en: "Money & resources" },
     items: [
-      { key: "services", icon: ClipboardList },
+      { key: "billing", icon: CreditCard },
+      { key: "accounting", icon: WalletCards },
       { key: "pharmacy", icon: FileText },
-      { key: "forms", icon: ShieldCheck },
+      { key: "inventory", icon: ClipboardList },
     ],
   },
   {
-    title: { vi: "Nội bộ", en: "Internal" },
+    title: { vi: "Đội ngũ & hệ thống", en: "Team & system" },
     items: [
       { key: "staff", icon: Building2 },
       { key: "employee-app", icon: Smartphone },
       { key: "learning", icon: Bell },
       { key: "community", icon: MessageSquareText },
+      { key: "settings", icon: Settings },
     ],
-  },
-  {
-    title: { vi: "Kho", en: "Stock" },
-    items: [{ key: "inventory", icon: ClipboardList }],
-  },
-  {
-    title: { vi: "Hệ thống", en: "System" },
-    items: [{ key: "settings", icon: Settings }],
   },
 ];
 
@@ -235,7 +229,7 @@ const uiText: Record<Language, UiText> = {
     clearSearch: "Xóa tìm kiếm",
     patientSearchPlaceholder: "Tìm bệnh nhân, số điện thoại, mã bệnh nhân",
     nav: {
-      dashboard: "Tổng quan",
+      dashboard: "Hôm nay",
       schedule: "Lịch hẹn",
       patients: "Bệnh nhân",
       journey: "Hành trình điều trị",
@@ -245,7 +239,7 @@ const uiText: Record<Language, UiText> = {
       accounting: "Kế toán",
       services: "Quản lý dịch vụ",
       staff: "Nhân sự",
-      crm: "CSKH",
+      crm: "Chăm sóc & tái hẹn",
       inventory: "Kho vật tư",
       pharmacy: "Đơn thuốc",
       forms: "Biểu mẫu",
@@ -270,7 +264,7 @@ const uiText: Record<Language, UiText> = {
     selectPatient: "Chọn bệnh nhân",
     signOut: "Đăng xuất",
     titles: {
-      dashboard: "Tổng quan hệ thống",
+      dashboard: "Trung tâm điều hành hôm nay",
       schedule: "Lịch hẹn đa phòng khám",
       patients: "Hồ sơ bệnh nhân 360",
       journey: "Hành trình bệnh nhân",
@@ -306,7 +300,7 @@ const uiText: Record<Language, UiText> = {
     clearSearch: "Clear search",
     patientSearchPlaceholder: "Search patient, phone, patient code",
     nav: {
-      dashboard: "Dashboard",
+      dashboard: "Today",
       schedule: "Schedule",
       patients: "Patients",
       journey: "Patient Journey",
@@ -316,7 +310,7 @@ const uiText: Record<Language, UiText> = {
       accounting: "Accounting",
       services: "Services",
       staff: "Staff",
-      crm: "CRM",
+      crm: "Follow-up & recall",
       inventory: "Inventory",
       pharmacy: "Pharmacy",
       forms: "Forms",
@@ -332,7 +326,7 @@ const uiText: Record<Language, UiText> = {
     selectPatient: "Select patient",
     signOut: "Sign out",
     titles: {
-      dashboard: "Group dashboard",
+      dashboard: "Today command center",
       schedule: "Multi-clinic schedule",
       patients: "Patient 360",
       journey: "Patient journey",

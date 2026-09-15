@@ -33,6 +33,10 @@ Primary product goals:
 
 PostgreSQL remains the canonical transactional store for Codexdentist core business state.
 
+### Today workspace presentation
+
+The dashboard at `/dashboard` presents today's complete appointment flow and an actionable task queue before expandable management metrics. Status filters and pagination operate on the full authorized daily appointment projection. Task clinic filtering uses stable clinic IDs, and notification links remain distinct from WorkItem completion. New presentation code lives in `src/workspaces/today`; existing Dashboard composition wires server actions into it. This UI change preserves existing routes, role access, clinical semantics and deployment architecture; it does not reinstate a cancelled route migration plan.
+
 ## 3. Non-Negotiable Invariants
 
 These rules survive every refactor and integration.
