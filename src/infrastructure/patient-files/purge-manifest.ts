@@ -125,21 +125,27 @@ export async function reconcilePatientFilePurgeManifests(
           leaseToken,
         );
         if (finalized === 1) {
-          await tx.$executeRawUnsafe(
-            `INSERT INTO "AuditLog"
-              ("id", "organizationId", "actorId", "action", "entityType", "entityId", "metadata", "createdAt")
-             VALUES ($1, $2, NULL, 'patient_file.purge_object_deleted',
-                     'PatientFilePurgeManifest', $3, $4::jsonb, CURRENT_TIMESTAMP)`,
-            randomUUID(),
+          const organization = await tx.$queryRawUnsafe<Array<{ id: string }>>(
+            `SELECT "id" FROM "Organization" WHERE "id" = $1 LIMIT 1`,
             manifest.organizationId,
-            manifest.id,
-            JSON.stringify({
-              storageProvider: manifest.storageProvider,
-              storageKey: manifest.storageKey,
-              previewStorageKey: manifest.previewStorageKey,
-              thumbnailStorageKey: manifest.thumbnailStorageKey,
-            }),
           );
+          if (organization[0]) {
+            await tx.$executeRawUnsafe(
+              `INSERT INTO "AuditLog"
+                ("id", "organizationId", "actorId", "action", "entityType", "entityId", "metadata", "createdAt")
+               VALUES ($1, $2, NULL, 'patient_file.purge_object_deleted',
+                       'PatientFilePurgeManifest', $3, $4::jsonb, CURRENT_TIMESTAMP)`,
+              randomUUID(),
+              manifest.organizationId,
+              manifest.id,
+              JSON.stringify({
+                storageProvider: manifest.storageProvider,
+                storageKey: manifest.storageKey,
+                previewStorageKey: manifest.previewStorageKey,
+                thumbnailStorageKey: manifest.thumbnailStorageKey,
+              }),
+            );
+          }
         }
         return finalized;
       });
