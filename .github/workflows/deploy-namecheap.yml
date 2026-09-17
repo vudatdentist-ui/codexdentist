@@ -76,7 +76,7 @@ jobs:
 
       - name: Download verified production artifact
         if: steps.release.outputs.deploy == 'true'
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: codexdentist-production-${{ env.RELEASE_SHA }}
           path: release-artifact
