@@ -142,6 +142,8 @@ jobs:
           NODE_ENV: test
       - name: Browser QA
         run: |
+          set -Eeuo pipefail
+          trap 'status=$?; if [[ "$status" -ne 0 ]]; then echo "--- production server log ---"; tail -n 300 /tmp/codexdentist.log || true; fi; exit "$status"' EXIT
           npm run browser:qa
         env:
           NODE_ENV: test

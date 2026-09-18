@@ -9,11 +9,17 @@ const serverActionBodySizeLimit = (process.env.SERVER_ACTION_BODY_SIZE_LIMIT ??
 const sharedHostBuild = process.env.CODEXMED_SHARED_HOST_BUILD === "true";
 const appRootDomain =
   process.env.APP_ROOT_DOMAIN?.trim().toLowerCase() || "codexdentist.com";
+const selfHostedPort = process.env.PORT?.trim() || "3000";
 const serverActionAllowedOrigins = [
   appRootDomain,
   `*.${appRootDomain}`,
   ...(process.env.DEPLOYMENT_MODE === "self-hosted"
-    ? ["127.0.0.1", "localhost"]
+    ? [
+        "127.0.0.1",
+        `127.0.0.1:${selfHostedPort}`,
+        "localhost",
+        `localhost:${selfHostedPort}`,
+      ]
     : []),
   ...(process.env.TRUSTED_APP_HOSTS ?? "")
     .split(",")

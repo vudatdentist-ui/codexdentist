@@ -113,6 +113,21 @@ if (summary.critical + summary.high + summary.medium > 0) {
 }
 
 async function login(page) {
+  const actionResponses = [];
+  const actionRequests = [];
+  const onResponse = (response) => {
+    if (response.request().method() === "POST" && response.url().includes("/login")) {
+      actionResponses.push(`${response.status()} ${response.url()}`);
+    }
+  };
+  const onRequestFailed = (request) => {
+    if (request.method() === "POST" && request.url().includes("/login")) {
+      actionRequests.push(`${request.url()}: ${request.failure()?.errorText ?? "request failed"}`);
+    }
+  };
+  page.on("response", onResponse);
+  page.on("requestfailed", onRequestFailed);
+
   const response = await page.goto(`${baseUrl}/login`, {
     waitUntil: "domcontentloaded",
   });
@@ -133,10 +148,20 @@ async function login(page) {
   const currentPath = new URL(page.url()).pathname;
   if (currentPath.endsWith("/login")) {
     const bodyText = await page.locator("body").innerText().catch(() => "");
+    const visibleError = await page.locator(".login-error").allTextContents().catch(() => []);
+    page.off("response", onResponse);
+    page.off("requestfailed", onRequestFailed);
     throw new Error(
-      `Login failed for ${email}; still on ${page.url()}. ${bodyText.slice(0, 300)}`,
+      `Login failed for ${email}; still on ${page.url()}. ` +
+        `error=${visibleError.join(" | ") || "none"}; ` +
+        `responses=${actionResponses.join(" | ") || "none"}; ` +
+        `failedRequests=${actionRequests.join(" | ") || "none"}; ` +
+        bodyText.slice(0, 300),
     );
   }
+
+  page.off("response", onResponse);
+  page.off("requestfailed", onRequestFailed);
 }
 
 async function auditRoute(page, viewport, route, consoleErrors, networkErrors) {
