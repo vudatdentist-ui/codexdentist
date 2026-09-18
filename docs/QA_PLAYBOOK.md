@@ -1,6 +1,6 @@
 # Codexdentist QA Playbook
 
-Last updated: 2026-09-15
+Last updated: 2026-09-18
 Status: ACTIVE
 
 This playbook implements the closed-loop quality process defined in `docs/PROJECT_CONTEXT.md`:
@@ -300,7 +300,7 @@ npm run go-live:check
 
 Also run the self-host packaging and restore drill in `docs/OPERATIONS.md` when migrations, storage, deployment, or infrastructure changed.
 
-Phase 7 continuation evidence: static/architecture/hardening gates, the full local runtime regression set, self-host compose validation, production Docker build, and browser QA (38/38 desktop/mobile route checks, including Imaging/Lab/Sterilization) pass. The CI and preflight workflows now include a disposable PostgreSQL restore smoke, and tagged releases boot the production application against the restored database before proceeding. A prior disposable PostgreSQL backup/restore drill restored 51 migrations and the Phase 4–5 tables; the current tree has 54 migrations after integrity and purge-manifest hardening. The local post-migration restore and browser rerun for this continuation remain unverified because Docker Desktop is not currently exposing its Linux daemon and the available local PostgreSQL service resets connections. The final go-live check also remains intentionally open because this QA run uses localhost PostgreSQL and still contains four demo-password users; production credentials and credential rotation are required before release.
+Phase 7 continuation evidence: GitHub CI run `35309708634` passed the static/architecture/hardening gates, current 54-migration disposable PostgreSQL restore, reseed, full PostgreSQL runtime regression set, self-host compose validation, production Docker build, hosted release boot, and Browser QA (38/38 desktop/mobile route checks, including Imaging/Lab/Sterilization). The restored database was exercised by the production application before release verification. The local rerun remains unavailable because Docker Desktop is not exposing its Linux daemon and the available local PostgreSQL service resets connections. The final go-live check remains intentionally open because CI uses an isolated QA database and still contains four demo-password users; production managed PostgreSQL/R2/notification credentials, demo-account rotation, and a real-environment restore drill are required before release.
 
 ## 13. High-Risk Manual Regression Checks
 

@@ -1,6 +1,6 @@
 # Codexdentist Canonical Product Context
 
-Last updated: 2026-09-15
+Last updated: 2026-09-18
 Status: ACTIVE / CANONICAL
 
 Current execution status: Phases 0–2 are merged into `main`; Phase 3 payOS/Documenso is complete on the verified integration branch; Phases 4–6 are complete in the current continuation branch. Phase 7 release hardening is now the final open phase.
@@ -396,12 +396,12 @@ Current Phase 7 evidence:
 
 - Encoding, typecheck, agent audit, Prisma validation, Phase 4–6 architecture audits, hardening smoke, billing/concurrency, integration substrate, journey-file, data-integrity, compensation, source-commission, roles, actions, security runtime, tenant isolation, protected-file, file-lifecycle, and route smoke checks pass.
 - Self-host compose config and production Docker image build pass. Browser QA passes 38/38 desktop/mobile route checks, including `/imaging`, `/lab`, and `/sterilization`, with no overflow, mojibake, console, network, or critical/high findings.
-- A disposable PostgreSQL backup/restore drill previously passed with 51 recorded migrations and the ImagingStudy, LabCase, and SterilizationCycle tables present after restore. The current tree has 54 migrations after integrity and purge-manifest hardening; a post-migration restore drill is still required before Phase 7 can close.
+- GitHub CI run `35309708634` passed the current 54-migration disposable PostgreSQL restore, reseed, full runtime regression, production Docker build, hosted release boot, and Browser QA gates. The restored database was exercised by the production application before the release checks; a restore against the real managed production/staging dataset is still required before Phase 7 can close.
 - The patient-file lifecycle regression also verifies expired-retention records are removed from the database and local object storage, while organization purge removes object-backed patient-file objects before deleting tenant rows.
 - Phase 4/5 patient, clinic, and staging records now have database-level composite scope constraints in addition to application authorization. Upload stages are created before object writes, image variants clean up on partial failure, and the durable object-purge manifest is used for failed cleanup across patient files, staff avatars, learning assets, and accounting attachments.
 - Lab and Sterilization transition rules now live in framework-independent `src/domains/operations` modules; application commands retain the transport-compatible exports and map domain rule errors to the existing API error contract.
-- CI and Namecheap preflight now run the disposable PostgreSQL restore smoke; the tagged release workflow additionally boots the production application against the restored database and checks health/readiness. The self-host `update` command restores its backup automatically when the new release fails validation.
-- The go-live gate remains open until production supplies a managed PostgreSQL URL and the four local demo accounts are rotated/deactivated; the QA database and demo credentials are intentionally not treated as production evidence. The go-live script and readiness endpoint verify the complete migration ledger, including checksums and unexpected/missing migration detection.
+- CI and Namecheap preflight now run the disposable PostgreSQL restore smoke; the tagged release workflow additionally boots the production application against the restored database and checks health/readiness. CI run `35309708634` passed this current release path, including 54 migrations and desktop/mobile Browser QA. The self-host `update` command restores its backup automatically when the new release fails validation.
+- The go-live gate remains open until production supplies a managed PostgreSQL URL, R2/notification credentials, a verified real-environment restore drill, and the four local demo accounts are rotated/deactivated; CI's QA database and demo credentials are intentionally not treated as production evidence. The go-live script and readiness endpoint verify the complete migration ledger, including checksums and unexpected/missing migration detection.
 
 ## 11. Architecture Guardrails
 
