@@ -136,6 +136,10 @@ async function login(page) {
     throw new Error(`/login returned HTTP ${response?.status() ?? "unknown"}`);
   }
 
+  // Server Action forms are inert until the App Router client has hydrated.
+  // Waiting for the initial network to settle prevents a fast CI click from
+  // being lost before React attaches the action handler.
+  await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => null);
   const loginForm = page.locator("form.login-form").first();
   const emailInput = loginForm.locator('input[type="email"]').first();
   await emailInput.fill(email);
