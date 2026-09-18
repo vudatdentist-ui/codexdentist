@@ -62,7 +62,13 @@ export async function createSterilizationCycleCommand(session: AppSession, input
       data: {
         id: randomUUID(), organizationId: session.organizationId, clinicId, cycleNo, method,
         machineName: clean(input.machineName, 160), notes: clean(input.notes, 4000), createdById: databaseActorId(session.userId),
-        instruments: { create: instruments.map((instrument) => ({ instrumentId: instrument.id, organizationId: session.organizationId, clinicId })) },
+        instruments: {
+          create: instruments.map((instrument) => ({
+            instrument: { connect: { id_organizationId_clinicId: { id: instrument.id, organizationId: session.organizationId, clinicId } } },
+            organization: { connect: { id: session.organizationId } },
+            clinic: { connect: { id_organizationId: { id: clinicId, organizationId: session.organizationId } } },
+          })),
+        },
       },
       select: cycleSelect,
     });
