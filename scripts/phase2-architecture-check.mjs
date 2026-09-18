@@ -42,8 +42,21 @@ assertMarkers("src/infrastructure/patient-files/staging.ts", staging, [
   '"state" = \'GC_PENDING\'',
   '"state" = \'DELETED\'',
   "reconcilePatientFileStages",
+  "stageExpiredPatientFiles",
+  "patient-file-retention-expired",
+  "patient-file-organization:",
   "FOR UPDATE SKIP LOCKED",
 ]);
+
+const purge = source("src/lib/organization-purge.ts");
+const purgeManifest = source("src/infrastructure/patient-files/purge-manifest.ts");
+assertMarkers("src/lib/organization-purge.ts", purge, [
+  "deletePatientFileStageObjects",
+  "organization-purge-file-storage-key-missing",
+  "createPatientFilePurgeManifests",
+  "reconcilePatientFilePurgeManifests",
+]);
+assertMarkers("purge manifest", purgeManifest, ["createStorageObjectPurgeManifests"]);
 
 const objectGc = source("src/infrastructure/patient-files/object-gc.ts");
 assertMarkers("src/infrastructure/patient-files/object-gc.ts", objectGc, [
@@ -80,6 +93,7 @@ assertMarkers("prisma.config.ts", prismaConfig, [
   "externalTables: true",
   '"public.IntegrationConnection"',
   '"public.PatientFileObjectStage"',
+  '"public.PatientFilePurgeManifest"',
 ]);
 
 walkIntegrations("src/integrations");

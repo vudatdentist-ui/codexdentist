@@ -72,6 +72,7 @@ assertSource("src/lib/patient-access.ts", [
   'session.role === "PATIENT"',
   "portalUserId: session.userId",
 ]);
+assertFormsTemplateQueryHasNoPatientRelation();
 assertSource("src/lib/application/revenue/commands.ts", [
   "runSerializableTransaction",
   "recordInvoicePaymentCommand",
@@ -95,6 +96,16 @@ assertSource("src/app/(app)/patient-app/actions.ts", [
 ]);
 
 console.log("ok security hardening check");
+
+function assertFormsTemplateQueryHasNoPatientRelation() {
+  const source = readFileSync("src/lib/forms.ts", "utf8");
+  const templateStart = source.indexOf("prisma.formTemplate.findMany");
+  const patientFormStart = source.indexOf("prisma.patientForm.findMany", templateStart);
+  const templateQuery = source.slice(templateStart, patientFormStart);
+  if (templateStart < 0 || patientFormStart < 0 || templateQuery.includes("patient:")) {
+    throw new Error("src/lib/forms.ts FormTemplate query must not reference a Patient relation.");
+  }
+}
 
 function assertEqual(actual, expected, label) {
   if (actual !== expected) {

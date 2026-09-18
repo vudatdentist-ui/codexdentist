@@ -1,3 +1,5 @@
+import { DomainRuleError } from "@/domains/errors";
+
 export class ApplicationCommandError extends Error {
   constructor(
     public readonly code: string,
@@ -9,5 +11,7 @@ export class ApplicationCommandError extends Error {
 }
 
 export function applicationErrorCode(error: unknown, fallback: string) {
-  return error instanceof ApplicationCommandError ? error.code : fallback;
+  return error instanceof ApplicationCommandError || error instanceof DomainRuleError
+    ? error.code
+    : fallback;
 }

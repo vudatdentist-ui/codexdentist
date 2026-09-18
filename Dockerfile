@@ -5,7 +5,7 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends openssl \
   && rm -rf /var/lib/apt/lists/*
 COPY package.json package-lock.json prisma.config.ts ./
-COPY prisma/schema.prisma prisma/schema.prisma
+COPY prisma ./prisma
 RUN npm ci --include=dev --no-audit --no-fund
 
 FROM dependencies AS builder

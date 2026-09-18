@@ -1,6 +1,6 @@
 # Operations
 
-Last updated: 2026-08-27
+Last updated: 2026-09-18
 
 ## Local PC
 
@@ -53,7 +53,7 @@ Self-host storage:
 
 The repository deploys to the Namecheap cPanel app after a successful commit to `main` through `.github/workflows/deploy-namecheap.yml`. The workflow uploads a source archive over SSH, stages it outside the live app, builds with the physical dependency tree in the cPanel app root, runs Prisma migrations, updates only application files, and restarts the existing CloudLinux Node.js app.
 
-It never reads, replaces, or commits the production `.env`, PostgreSQL data, protected files, backups, or the physical `node_modules` directory.
+It preserves the production `.env`, protected files, and persistent storage, but it deliberately snapshots the previous application tree, creates a PostgreSQL rollback dump, runs migrations, and restores the database/application snapshot if migration or readiness fails. The physical `node_modules` directory is replaced by the release lockfile install and pruned after a successful health/readiness check.
 
 Configure these GitHub repository secrets once:
 
@@ -69,7 +69,9 @@ Configure these GitHub repository secrets once:
 
 In cPanel, import the matching public key under **SSH Access → Manage SSH Keys**, authorize it, and confirm that the key can run a non-interactive command. Do not put `.env`, database credentials, R2 credentials, or a cPanel password in GitHub. A failed deploy must not start or mutate any unrelated application.
 
-The deploy workflow performs a public `/api/health` check after restart. The hourly production-health workflow remains separate and continues to monitor the public site and database.
+The deploy workflow performs public `/api/health` and authenticated `/api/readiness` checks after restart. The hourly production-health workflow remains separate and continues to monitor the public site and database.
+
+The manual command sequence below is a legacy recovery reference only; normal deployments must use the hardened workflow/script because the raw `prisma migrate deploy` command has no rollback trap. Before using it for an emergency, take a `pg_dump`, preserve the current release tree, and run the readiness check before declaring success.
 
 Current cPanel deployment:
 
@@ -182,6 +184,7 @@ npm run backup:postgres
 Restore:
 
 ```powershell
+$env:RESTORE_TARGET_MARKER = "CODEXDENTIST_DISPOSABLE_RESTORE"
 powershell -File scripts/pg-restore.ps1 -BackupPath <dump> -ConfirmRestore
 ```
 
@@ -198,8 +201,15 @@ Restore drill:
 1. Create a fresh backup first.
 2. Restore into a disposable database.
 3. Point staging `.env` to the restored database.
-4. Run `npm run typecheck`, `npm run test:smoke`, `npm run test:billing`, and `npm run agent:health`.
-5. Only restore over active data after the disposable restore is verified.
+4. Set `RESTORE_TARGET_MARKER=CODEXDENTIST_DISPOSABLE_RESTORE` and run `npm run test:disposable-restore` when the source database is available to the test runner.
+5. Run `npm run typecheck`, `npm run test:smoke`, `npm run test:billing`, and `npm run agent:health` against the restored application.
+6. Only restore over active data after the disposable restore is verified.
+
+### Imaging / Orthanc ownership
+
+Codexdentist PostgreSQL backups contain `ImagingStudy` references, tenant/clinic/patient scope, stable Orthanc IDs, and OHIF metadata only. DICOM instances remain in Orthanc-managed storage and are not included in the application database dump. Before a clinic enables imaging, configure an Orthanc backup/export policy for the same retention window and verify that a disposable Orthanc restore preserves StudyInstanceUIDs referenced by Codexdentist. If Orthanc or OHIF is unavailable, the clinic workflow must remain readable and show an unavailable-viewer state; do not copy DICOM blobs into `PatientFile` or PostgreSQL as a fallback.
+
+The application does not issue OHIF links by default. Set `ORTHANC_DEFAULT_VIEWER_ACCESS_MODE=private` only when the configured OHIF/Orthanc viewer is private, authenticated, and reachable only through the clinic's trusted network or an equivalent access-control layer. The value `disabled` is the safe default and causes viewer access to fail closed.
 
 ## Go-Live Gate
 

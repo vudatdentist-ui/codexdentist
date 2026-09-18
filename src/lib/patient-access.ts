@@ -47,6 +47,7 @@ export function patientAccessWhere(
       {
         appointments: {
           some: {
+            clinicId: { in: clinicIds },
             providerId: session.userId,
             startsAt: {
               gte: from,
@@ -61,6 +62,7 @@ export function patientAccessWhere(
       {
         treatmentServices: {
           some: {
+            clinicId: { in: clinicIds },
             createdById: session.userId,
           },
         },
@@ -68,6 +70,7 @@ export function patientAccessWhere(
       {
         treatmentServices: {
           some: {
+            clinicId: { in: clinicIds },
             progressEvents: {
               some: {
                 OR: [

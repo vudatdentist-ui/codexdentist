@@ -64,6 +64,10 @@ export async function createPatientFileStage(
   },
 ) {
   if (input.sizeBytes < 0) throw new Error("patient-file-stage-invalid-size");
+  await db.$executeRawUnsafe(
+    `SELECT pg_advisory_xact_lock(hashtext($1))`,
+    `patient-file-organization:${input.organizationId}`,
+  );
   await assertPatientScope(db, input);
   await assertUploaderScope(db, input.organizationId, input.uploadedById ?? null);
 
@@ -176,26 +180,35 @@ export async function markPatientFileStageGcPending(
 export async function reconcilePatientFileStages(
   db: PrismaClient,
   deleteObjects: DeletePatientFileStageObjects,
-  options: { limit?: number; retryDelayMs?: number } = {},
+  options: { limit?: number; retryDelayMs?: number; organizationId?: string } = {},
 ) {
   const limit = Math.max(1, Math.min(options.limit ?? 25, 100));
   const retryDelayMs = options.retryDelayMs ?? 60_000;
+  const leaseMs = Math.max(retryDelayMs, 60_000);
+  const leaseToken = `gc-lease:${randomUUID()}`;
   const claimed = await db.$queryRawUnsafe<PatientFileStageRow[]>(
     `WITH picked AS (
        SELECT "id"
        FROM "PatientFileObjectStage"
        WHERE "state" IN ('STAGED', 'GC_PENDING')
          AND "gcAfter" <= CURRENT_TIMESTAMP
+         AND ($4::text IS NULL OR "organizationId" = $4)
        ORDER BY "createdAt"
        FOR UPDATE SKIP LOCKED
        LIMIT $1
      )
      UPDATE "PatientFileObjectStage" AS stage
-     SET "state" = 'GC_PENDING', "updatedAt" = CURRENT_TIMESTAMP
+     SET "state" = 'GC_PENDING',
+         "gcAfter" = CURRENT_TIMESTAMP + ($2 * INTERVAL '1 millisecond'),
+         "lastErrorCode" = $3,
+         "updatedAt" = CURRENT_TIMESTAMP
      FROM picked
      WHERE stage."id" = picked."id" AND stage."state" <> 'COMMITTED'
      RETURNING stage.*`,
     limit,
+    leaseMs,
+    leaseToken,
+    options.organizationId ?? null,
   );
 
   let deleted = 0;
@@ -203,35 +216,154 @@ export async function reconcilePatientFileStages(
   for (const stage of claimed) {
     try {
       await deleteObjects(stage);
-      await db.$executeRawUnsafe(
-        `UPDATE "PatientFileObjectStage"
-         SET "state" = 'DELETED',
-             "deletedAt" = CURRENT_TIMESTAMP,
-             "lastErrorCode" = NULL,
-             "updatedAt" = CURRENT_TIMESTAMP
-         WHERE "id" = $1 AND "state" = 'GC_PENDING'`,
-        stage.id,
-      );
-      await writeStageAudit(db, stage, "patient_file.stage_deleted", null);
-      deleted += 1;
+      const finalized = await db.$transaction(async (tx) => {
+        const updated = await tx.$executeRawUnsafe(
+          `UPDATE "PatientFileObjectStage"
+           SET "state" = 'DELETED',
+               "deletedAt" = CURRENT_TIMESTAMP,
+               "lastErrorCode" = NULL,
+               "updatedAt" = CURRENT_TIMESTAMP
+           WHERE "id" = $1 AND "state" = 'GC_PENDING' AND "lastErrorCode" = $2`,
+          stage.id,
+          leaseToken,
+        );
+        if (updated === 1) {
+          await writeStageAudit(tx, stage, "patient_file.stage_deleted", null);
+        }
+        return updated;
+      });
+      if (finalized === 1) {
+        deleted += 1;
+      }
     } catch (error) {
       const errorCode = safeUnknownErrorCode(error, "patient-file-gc-failed");
-      await db.$executeRawUnsafe(
+      const retried = await db.$executeRawUnsafe(
         `UPDATE "PatientFileObjectStage"
          SET "gcAfter" = $2,
              "lastErrorCode" = $3,
              "updatedAt" = CURRENT_TIMESTAMP
-         WHERE "id" = $1 AND "state" = 'GC_PENDING'`,
+         WHERE "id" = $1 AND "state" = 'GC_PENDING' AND "lastErrorCode" = $4`,
         stage.id,
         new Date(Date.now() + retryDelayMs),
         errorCode,
+        leaseToken,
       );
-      await writeStageAudit(db, stage, "patient_file.stage_gc_retry", errorCode);
-      failed += 1;
+      if (retried === 1) {
+        await writeStageAudit(db, stage, "patient_file.stage_gc_retry", errorCode);
+        failed += 1;
+      }
     }
   }
 
   return { claimed: claimed.length, deleted, failed };
+}
+
+export async function stageExpiredPatientFiles(
+  db: PrismaClient,
+  options: { limit?: number; organizationId?: string } = {},
+) {
+  const limit = Math.max(1, Math.min(options.limit ?? 25, 100));
+  return db.$transaction(async (tx) => {
+    await tx.$executeRawUnsafe(
+      `SELECT pg_advisory_xact_lock(hashtext($1))`,
+      "patient-file-retention-global",
+    );
+    const expiredFiles = await tx.$queryRawUnsafe<ExpiredPatientFileRow[]>(
+      `SELECT file.*,
+              stage."id" AS "stageId",
+              stage."state" AS "stageState",
+              stage."storageProvider" AS "stageStorageProvider",
+              stage."storageKey" AS "stageStorageKey"
+       FROM "PatientFile" AS file
+       LEFT JOIN "PatientFileObjectStage" AS stage
+         ON stage."targetPatientFileId" = file."id"
+       WHERE file."retentionUntil" IS NOT NULL
+         AND file."retentionUntil" <= CURRENT_TIMESTAMP
+         AND ($2::text IS NULL OR file."organizationId" = $2)
+       ORDER BY file."retentionUntil", file."createdAt"
+       FOR UPDATE OF file SKIP LOCKED
+       LIMIT $1`,
+      limit,
+      options.organizationId ?? null,
+    );
+
+    const stagedIds: string[] = [];
+    for (const file of expiredFiles) {
+      let stagedForObjectGc = false;
+      if (!file.stageId && isObjectBackedPatientFile(file)) {
+        const storageProvider = file.storageProvider ?? legacyStorageProvider(file.sourceType);
+        const storageKey = file.storageKey ?? file.sourceId;
+        if (!storageProvider || !storageKey) {
+          throw new Error(`patient-file-retention-storage-key-missing:${file.id}`);
+        }
+        const stageId = randomUUID();
+        await tx.$executeRawUnsafe(
+          `INSERT INTO "PatientFileObjectStage"
+            ("id", "organizationId", "clinicId", "patientId", "uploadedById",
+             "targetPatientFileId", "fileName", "mimeType", "sizeBytes",
+             "storageProvider", "storageKey", "previewStorageKey",
+             "thumbnailStorageKey", "checksumSha256", "state", "storedAt",
+             "gcAfter", "lastErrorCode")
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
+                   $14, 'GC_PENDING', $15, CURRENT_TIMESTAMP, $16)`,
+          stageId,
+          file.organizationId,
+          file.clinicId,
+          file.patientId,
+          file.uploadedById,
+          file.id,
+          file.fileName ?? file.title,
+          file.mimeType ?? "application/octet-stream",
+          file.sizeBytes ?? 0,
+          storageProvider,
+          storageKey,
+          file.previewStorageKey,
+          file.thumbnailStorageKey,
+          file.checksumSha256,
+          file.createdAt,
+          "patient-file-retention-expired",
+        );
+        stagedIds.push(stageId);
+        stagedForObjectGc = true;
+      } else if (file.stageId && file.stageState !== "DELETED") {
+        if (!isObjectStorageProvider(file.stageStorageProvider) || !file.stageStorageKey) {
+          throw new Error(`patient-file-retention-stage-storage-invalid:${file.id}`);
+        }
+        await tx.$executeRawUnsafe(
+          `UPDATE "PatientFileObjectStage"
+           SET "state" = 'GC_PENDING',
+               "gcAfter" = CURRENT_TIMESTAMP,
+               "lastErrorCode" = $2,
+               "updatedAt" = CURRENT_TIMESTAMP
+           WHERE "id" = $1 AND "state" <> 'DELETED'`,
+          file.stageId,
+          "patient-file-retention-expired",
+        );
+        stagedIds.push(file.stageId);
+        stagedForObjectGc = true;
+      }
+
+      await tx.patientFile.delete({ where: { id: file.id } });
+      await tx.auditLog.create({
+        data: {
+          organizationId: file.organizationId,
+          actorId: null,
+          action: "patient_file.expired_deleted",
+          entityType: "PatientFile",
+          entityId: file.id,
+          metadata: {
+            clinicId: file.clinicId,
+            patientId: file.patientId,
+            storageProvider: file.storageProvider,
+            stagedForObjectGc,
+            retentionUntil: file.retentionUntil.toISOString(),
+          },
+        },
+      });
+    }
+
+    return { claimed: expiredFiles.length, staged: stagedIds.length };
+  }, { timeout: 60_000 });
 }
 
 export async function getPatientFileStage(
@@ -258,6 +390,48 @@ async function assertPatientScope(
     input.clinicId,
   );
   if (!rows[0]) throw new Error("patient-file-stage-tenant-mismatch");
+}
+
+type ExpiredPatientFileRow = {
+  id: string;
+  organizationId: string;
+  clinicId: string;
+  patientId: string;
+  uploadedById: string | null;
+  title: string;
+  fileName: string | null;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  storageProvider: string | null;
+  storageKey: string | null;
+  sourceType: string | null;
+  sourceId: string | null;
+  previewStorageKey: string | null;
+  thumbnailStorageKey: string | null;
+  checksumSha256: string | null;
+  retentionUntil: Date;
+  createdAt: Date;
+  stageId: string | null;
+  stageState: string | null;
+  stageStorageProvider: string | null;
+  stageStorageKey: string | null;
+};
+
+function isObjectBackedPatientFile(file: ExpiredPatientFileRow) {
+  if (file.sourceType === "EXTERNAL_URL") return false;
+  return isObjectStorageProvider(file.storageProvider) || Boolean(file.storageKey || file.sourceId);
+}
+
+function legacyStorageProvider(sourceType: string | null) {
+  return sourceType === "LOCAL_UPLOAD"
+    ? "local"
+    : sourceType === "R2_UPLOAD"
+      ? "r2"
+      : null;
+}
+
+function isObjectStorageProvider(provider: string | null): provider is "local" | "r2" {
+  return provider === "local" || provider === "r2";
 }
 
 async function assertUploaderScope(

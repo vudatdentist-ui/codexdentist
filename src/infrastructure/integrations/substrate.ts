@@ -171,7 +171,7 @@ export async function createExternalReference(
     if (existingExternal[0].internalId !== internalId) {
       throw new IntegrationScopeError("integration-external-reference-conflict");
     }
-    return existingExternal[0];
+    return { ...existingExternal[0], created: false };
   }
 
   const existingInternal = await db.$queryRawUnsafe<ExternalReferenceRow[]>(
@@ -189,13 +189,14 @@ export async function createExternalReference(
     if (existingInternal[0].externalId !== externalId) {
       throw new IntegrationScopeError("integration-internal-reference-conflict");
     }
-    return existingInternal[0];
+    return { ...existingInternal[0], created: false };
   }
 
   const rows = await db.$queryRawUnsafe<ExternalReferenceRow[]>(
     `INSERT INTO "ExternalReference"
       ("id", "organizationId", "clinicId", "connectionId", "provider", "entityType", "internalId", "externalId", "metadata")
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+     ON CONFLICT DO NOTHING
      RETURNING *`,
     randomUUID(),
     input.organizationId,
@@ -207,7 +208,33 @@ export async function createExternalReference(
     externalId,
     json(input.metadata ?? {}),
   );
-  return rows[0]!;
+  if (rows[0]) return { ...rows[0], created: true };
+
+  const conflicted = await db.$queryRawUnsafe<ExternalReferenceRow[]>(
+    `SELECT * FROM "ExternalReference"
+     WHERE "organizationId" = $1 AND "provider" = $2 AND "entityType" = $3
+       AND "connectionId" IS NOT DISTINCT FROM $4
+       AND ("externalId" = $5 OR "internalId" = $6)
+     LIMIT 2`,
+    input.organizationId,
+    provider,
+    entityType,
+    connectionId,
+    externalId,
+    internalId,
+  );
+  const externalConflict = conflicted.find((row) => row.externalId === externalId);
+  if (externalConflict && externalConflict.internalId !== internalId) {
+    throw new IntegrationScopeError("integration-external-reference-conflict");
+  }
+  const internalConflict = conflicted.find((row) => row.internalId === internalId);
+  if (internalConflict && internalConflict.externalId !== externalId) {
+    throw new IntegrationScopeError("integration-internal-reference-conflict");
+  }
+  if (externalConflict || internalConflict) {
+    return { ...(externalConflict ?? internalConflict!), created: false };
+  }
+  throw new Error("integration-external-reference-create-conflict");
 }
 
 export async function acceptIntegrationInbox(
@@ -271,6 +298,20 @@ export async function acceptIntegrationInbox(
   if (!existing[0]) throw new Error("Integration inbox dedupe lookup failed");
   if (existing[0].payloadHash !== payloadHash) {
     throw new IntegrationScopeError("integration-inbox-payload-conflict");
+  }
+  if (existing[0].status === "FAILED") {
+    const requeued = await db.$queryRawUnsafe<InboxRow[]>(
+      `UPDATE "IntegrationInbox"
+       SET "status" = 'RETRY',
+           "attempts" = 0,
+           "availableAt" = CURRENT_TIMESTAMP,
+           "lastErrorCode" = NULL,
+           "updatedAt" = CURRENT_TIMESTAMP
+       WHERE "id" = $1 AND "status" = 'FAILED'
+       RETURNING *`,
+      existing[0].id,
+    );
+    if (requeued[0]) return { event: requeued[0], duplicate: true } as const;
   }
   return { event: existing[0], duplicate: true } as const;
 }
@@ -466,12 +507,22 @@ export async function dispatchIntegrationOutbox(
     sent: 0,
     retried: 0,
     failed: 0,
+    lostLease: 0,
   };
 
   for (const event of claimed) {
+    const heartbeat = setInterval(() => {
+      void db.$executeRawUnsafe(
+        `UPDATE "IntegrationOutbox"
+         SET "lockedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
+         WHERE "id" = $1 AND "lockToken" = $2 AND "status" = 'PROCESSING'`,
+        event.id,
+        lockToken,
+      );
+    }, Math.max(1_000, Math.floor(staleLockMs / 3)));
     try {
       await transport(event);
-      await db.$executeRawUnsafe(
+      const finalized = await db.$executeRawUnsafe(
         `UPDATE "IntegrationOutbox"
          SET "status" = 'SENT',
              "dispatchedAt" = CURRENT_TIMESTAMP,
@@ -483,11 +534,12 @@ export async function dispatchIntegrationOutbox(
         event.id,
         lockToken,
       );
-      result.sent += 1;
+      if (finalized === 1) result.sent += 1;
+      else result.lostLease += 1;
     } catch (error) {
       const terminal = event.attempts >= maxAttempts;
       const errorCode = safeErrorCode(error, "integration-dispatch-failed");
-      await db.$executeRawUnsafe(
+      const finalized = await db.$executeRawUnsafe(
         `UPDATE "IntegrationOutbox"
          SET "status" = $3,
              "availableAt" = $4,
@@ -502,6 +554,10 @@ export async function dispatchIntegrationOutbox(
         terminal ? event.availableAt : new Date(Date.now() + retryDelayMs),
         errorCode,
       );
+      if (finalized === 0) {
+        result.lostLease += 1;
+        continue;
+      }
       await writeSystemAudit(db, {
         organizationId: event.organizationId,
         action: terminal
@@ -519,6 +575,8 @@ export async function dispatchIntegrationOutbox(
       });
       if (terminal) result.failed += 1;
       else result.retried += 1;
+    } finally {
+      clearInterval(heartbeat);
     }
   }
 

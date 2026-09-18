@@ -6,14 +6,21 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   if (!verifyJobRequest(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return json({ error: "Unauthorized" }, { status: 401 });
   }
 
   try {
-    return NextResponse.json(await cleanupExpiredDemoWorkspaces());
+    return json(await cleanupExpiredDemoWorkspaces());
   } catch (error) {
     console.error("demo_cleanup.failed", error);
 
-    return NextResponse.json({ error: "Demo cleanup failed" }, { status: 500 });
+    return json({ error: "Demo cleanup failed" }, { status: 500 });
   }
+}
+
+function json(body: unknown, init?: ResponseInit) {
+  return NextResponse.json(body, {
+    ...init,
+    headers: { "cache-control": "no-store", ...(init?.headers ?? {}) },
+  });
 }

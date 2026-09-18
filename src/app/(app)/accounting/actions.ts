@@ -23,6 +23,8 @@ import type { AppRole } from "@/lib/permissions";
 import { canUseAllClinics } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
+import { deletePatientFileStageObjects } from "@/infrastructure/patient-files/object-gc";
+import { createStorageObjectPurgeManifests } from "@/infrastructure/patient-files/purge-manifest";
 
 const mutableAccountingRoles: AppRole[] = ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"];
 const accountingKinds = ["INCOME", "EXPENSE", "TRANSFER"] as const;
@@ -65,6 +67,7 @@ export async function createAccountingEntryAction(formData: FormData) {
     redirect("/accounting?notice=accounting-denied");
   }
 
+  let storedAttachment: Awaited<ReturnType<typeof storeAccountingUpload>> | null = null;
   try {
     const category = await prisma.accountingCategory.findFirst({
       where: {
@@ -87,7 +90,7 @@ export async function createAccountingEntryAction(formData: FormData) {
     }
 
     const entryId = randomUUID();
-    const storedAttachment = hasAttachment
+    storedAttachment = hasAttachment
       ? await storeAccountingUpload({
           file: attachment,
           organizationId: session.organizationId,
@@ -145,6 +148,23 @@ export async function createAccountingEntryAction(formData: FormData) {
       throw error;
     }
 
+    if (storedAttachment) {
+      await createStorageObjectPurgeManifests(prisma, [{
+        organizationId: session.organizationId,
+        storageProvider: storedAttachment.storageProvider,
+        storageKey: storedAttachment.storageKey,
+        previewStorageKey: storedAttachment.preview?.storageKey ?? null,
+        thumbnailStorageKey: storedAttachment.thumbnail?.storageKey ?? null,
+      }]).catch((manifestError) => {
+        console.error("accounting.attachment_cleanup_manifest_failed", manifestError);
+      });
+      await deletePatientFileStageObjects({
+        storageProvider: storedAttachment.storageProvider,
+        storageKey: storedAttachment.storageKey,
+        previewStorageKey: storedAttachment.preview?.storageKey ?? null,
+        thumbnailStorageKey: storedAttachment.thumbnail?.storageKey ?? null,
+      }).catch(() => {});
+    }
     redirect("/accounting?notice=accounting-database");
   }
 

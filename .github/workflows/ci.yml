@@ -39,6 +39,9 @@ jobs:
       PATIENT_FILE_STORAGE_DRIVER: local
       SESSION_COOKIE_SECURE: "false"
       TRUSTED_PROXY_PROVIDER: reverse-proxy
+      PAYOS_DEFAULT_CLIENT_ID: phase3-ci-client
+      PAYOS_DEFAULT_API_KEY: phase3-ci-api-key
+      PAYOS_DEFAULT_CHECKSUM_KEY: ci-phase3-payos-checksum-secret
 
     steps:
       - uses: actions/checkout@v7
@@ -67,13 +70,25 @@ jobs:
         run: node scripts/check-migration-safety.mjs
         env:
           MIGRATION_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      - run: node scripts/phase3-architecture-check.mjs
+      - run: node scripts/phase4-architecture-check.mjs
+      - run: node scripts/phase5-architecture-check.mjs
+      - run: node scripts/phase6-architecture-check.mjs
+      - run: npm run test:domain-operations
+      - run: docker compose --env-file .env.selfhost.example -f compose.selfhost.yml config --quiet
       - run: npx prisma migrate deploy
+      - run: npm run test:disposable-restore
+        env:
+          RESTORE_DATABASE_URL: postgresql://codexdentist:codexdentist@127.0.0.1:5432/codexdentist_restore
+          RESTORE_TARGET_MARKER: CODEXDENTIST_DISPOSABLE_RESTORE
+          POSTGRES_TOOL_IMAGE: postgres:17-alpine
       - run: npx prisma db seed
         env:
           NODE_ENV: test
       - run: npm run test:seed-users
         env:
           NODE_ENV: test
+      - run: npm run test:hardening
       - run: npm run build
       - name: Start production server
         run: |
@@ -86,32 +101,49 @@ jobs:
           done
           cat /tmp/codexdentist.log
           exit 1
+      - name: Install browser runtime for API and browser smoke
+        run: npx playwright install --with-deps chromium
       - name: Agent health and legacy route smoke
         run: |
+          set -Eeuo pipefail
+          trap 'status=$?; if [[ "$status" -ne 0 ]]; then echo "--- production server log ---"; tail -n 300 /tmp/codexdentist.log || true; fi; exit "$status"' EXIT
+          npm run readiness:check
           node scripts/agent-health-check.mjs
           npm run test:smoke
+          npm run test:api-contract
         env:
           NODE_ENV: test
       - name: Runtime security, tenant, billing, journey, integration, and file tests
         run: |
           npm run test:security
           npm run test:security-runtime
+          npm run test:roles
           npm run test:tenant
           npm run test:billing
           npm run test:billing-concurrency
           npm run test:actions
+          npm run test:settings-forms
           npm run test:integration-substrate
           npm run test:journey-file-command
+          npm run test:organization-purge
+          npm run test:phase3
+          npm run test:phase4
+          npm run test:phase4:scope
+          npm run test:phase5
+          npm run test:phase5:sterilization
+          npm run test:phase6
           npm run test:patient-files
           npm run test:file-lifecycle
           npm run test:data-integrity
           npm run test:compensation
+          npm run test:source-commission
           npm run test:pilot-workflows
         env:
           NODE_ENV: test
       - name: Browser QA
         run: |
-          npx playwright install --with-deps chromium
+          set -Eeuo pipefail
+          trap 'status=$?; if [[ "$status" -ne 0 ]]; then echo "--- production server log ---"; tail -n 300 /tmp/codexdentist.log || true; fi; exit "$status"' EXIT
           npm run browser:qa
         env:
           NODE_ENV: test

@@ -279,6 +279,11 @@ model Organization {
   formTemplates                  FormTemplate[]
   patientForms                   PatientForm[]
   patientFiles                   PatientFile[]
+  imagingStudies                 ImagingStudy[]
+  labCases                       LabCase[]
+  sterilizationInstruments       SterilizationInstrument[]
+  sterilizationCycles            SterilizationCycle[]
+  sterilizationCycleItems        SterilizationCycleInstrument[]
   patientJourneyStates           PatientJourneyState[]
   patientOdontograms             PatientOdontogram[]
   patientOdontogramRevisions     PatientOdontogramRevision[]
@@ -378,6 +383,11 @@ model Clinic {
   formTemplates                  FormTemplate[]
   patientForms                   PatientForm[]
   patientFiles                   PatientFile[]
+  imagingStudies                 ImagingStudy[]
+  labCases                       LabCase[]
+  sterilizationInstruments       SterilizationInstrument[]
+  sterilizationCycles            SterilizationCycle[]
+  sterilizationCycleItems        SterilizationCycleInstrument[]
   patientJourneyStates           PatientJourneyState[]
   patientOdontograms             PatientOdontogram[]
   patientOdontogramRevisions     PatientOdontogramRevision[]
@@ -396,6 +406,7 @@ model Clinic {
   updatedAt                      DateTime                        @updatedAt
 
   @@unique([organizationId, name])
+  @@unique([id, organizationId])
   @@index([chainId])
 }
 
@@ -439,6 +450,9 @@ model User {
   createdFormTemplates              FormTemplate[]                  @relation("FormTemplateCreator")
   requestedPatientForms             PatientForm[]                   @relation("PatientFormRequester")
   uploadedPatientFiles              PatientFile[]                   @relation("PatientFileUploader")
+  createdImagingStudies             ImagingStudy[]                  @relation("ImagingStudyCreator")
+  createdLabCases                   LabCase[]                       @relation("LabCaseCreator")
+  createdSterilizationCycles        SterilizationCycle[]            @relation("SterilizationCycleCreator")
   createdPaymentPlans               PaymentPlan[]                   @relation("PaymentPlanCreator")
   updatedJourneyStates              PatientJourneyState[]           @relation("PatientJourneyStateUpdater")
   updatedPatientOdontograms         PatientOdontogram[]             @relation("PatientOdontogramUpdater")
@@ -582,6 +596,8 @@ model Patient {
   prescriptions            Prescription[]
   forms                    PatientForm[]
   files                    PatientFile[]
+  imagingStudies           ImagingStudy[]
+  labCases                 LabCase[]
   journeyState             PatientJourneyState?
   odontogram               PatientOdontogram?
   odontogramRevisions      PatientOdontogramRevision[]
@@ -594,6 +610,7 @@ model Patient {
   updatedAt                DateTime                    @updatedAt
 
   @@unique([organizationId, phone])
+  @@unique([id, clinicId, organizationId])
 }
 
 model PatientConsent {
@@ -759,11 +776,11 @@ model Receipt {
 model ReceiptAllocation {
   id                 String            @id @default(cuid())
   organizationId     String
-  organization       Organization      @relation(fields: [organizationId], references: [id])
+  organization       Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
   clinicId           String
-  clinic             Clinic            @relation(fields: [clinicId], references: [id])
+  clinic             Clinic            @relation(fields: [clinicId], references: [id], onDelete: Restrict)
   patientId          String
-  patient            Patient           @relation(fields: [patientId], references: [id])
+  patient            Patient           @relation(fields: [patientId], references: [id], onDelete: Restrict)
   receiptId          String
   receipt            Receipt           @relation(fields: [receiptId], references: [id], onDelete: Cascade)
   invoiceId          String?
@@ -1652,6 +1669,7 @@ model TreatmentService {
   invoiceItems            InvoiceItem[]
   receiptAllocations      ReceiptAllocation[]
   compensationAccruals    CompensationAccrual[]
+  labCases                LabCase[]
   createdAt               DateTime                        @default(now())
   updatedAt               DateTime                        @updatedAt
 
@@ -1917,9 +1935,9 @@ model PatientFile {
   organizationId      String
   organization        Organization @relation(fields: [organizationId], references: [id])
   clinicId            String
-  clinic              Clinic       @relation(fields: [clinicId], references: [id])
+  clinic              Clinic       @relation(fields: [clinicId, organizationId], references: [id, organizationId])
   patientId           String
-  patient             Patient      @relation(fields: [patientId], references: [id])
+  patient             Patient      @relation(fields: [patientId, clinicId, organizationId], references: [id, clinicId, organizationId])
   uploadedById        String?
   uploadedBy          User?        @relation("PatientFileUploader", fields: [uploadedById], references: [id])
   category            String       @default("CLINICAL_IMAGE")
@@ -1952,6 +1970,127 @@ model PatientFile {
   @@index([clinicId, createdAt])
   @@index([organizationId, category])
   @@index([organizationId, retentionUntil])
+}
+
+model ImagingStudy {
+  id                String                @id @default(cuid())
+  organizationId    String
+  organization      Organization          @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicId          String
+  clinic            Clinic                @relation(fields: [clinicId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  patientId         String
+  patient           Patient               @relation(fields: [patientId, clinicId, organizationId], references: [id, clinicId, organizationId], onDelete: Restrict)
+  connectionId      String
+  connection        IntegrationConnection @relation(fields: [connectionId], references: [id], onDelete: Restrict)
+  provider          String                @default("orthanc")
+  externalStudyId   String
+  externalPatientId String?
+  studyInstanceUid  String?
+  accessionNumber   String?
+  modalities        String[]
+  studyDate         DateTime?
+  description       String?
+  availability      String                @default("AVAILABLE")
+  lastSyncedAt      DateTime?
+  lastErrorCode     String?
+  createdById       String?
+  createdBy         User?                 @relation("ImagingStudyCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@unique([organizationId, connectionId, externalStudyId])
+  @@index([organizationId, clinicId, patientId, studyDate])
+  @@index([patientId, createdAt])
+  @@index([connectionId, externalPatientId])
+}
+
+model LabCase {
+  id                 String            @id @default(cuid())
+  organizationId     String
+  organization       Organization      @relation(fields: [organizationId], references: [id])
+  clinicId           String
+  clinic             Clinic            @relation(fields: [clinicId, organizationId], references: [id, organizationId])
+  patientId          String
+  patient            Patient           @relation(fields: [patientId, clinicId, organizationId], references: [id, clinicId, organizationId])
+  treatmentServiceId String?
+  treatmentService   TreatmentService? @relation(fields: [treatmentServiceId], references: [id], onDelete: SetNull)
+  caseNo             String
+  title              String
+  laboratoryName     String?
+  workType           String
+  status             String            @default("DRAFT")
+  dueAt              DateTime?
+  sentAt             DateTime?
+  receivedAt         DateTime?
+  notes              String?
+  createdById        String?
+  createdBy          User?             @relation("LabCaseCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+
+  @@unique([organizationId, caseNo])
+  @@index([organizationId, clinicId, status, dueAt])
+  @@index([patientId, createdAt])
+  @@index([treatmentServiceId])
+}
+
+model SterilizationInstrument {
+  id             String                         @id @default(cuid())
+  organizationId String
+  organization   Organization                   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicId       String
+  clinic         Clinic                         @relation(fields: [clinicId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  code           String
+  name           String
+  category       String
+  status         String                         @default("ACTIVE")
+  cycles         SterilizationCycleInstrument[]
+  createdAt      DateTime                       @default(now())
+  updatedAt      DateTime                       @updatedAt
+
+  @@unique([organizationId, clinicId, code])
+  @@unique([id, organizationId, clinicId])
+  @@index([organizationId, clinicId, status])
+}
+
+model SterilizationCycle {
+  id             String                         @id @default(cuid())
+  organizationId String
+  organization   Organization                   @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicId       String
+  clinic         Clinic                         @relation(fields: [clinicId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  cycleNo        String
+  status         String                         @default("PREPARING")
+  method         String
+  machineName    String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  releasedAt     DateTime?
+  notes          String?
+  createdById    String?
+  createdBy      User?                          @relation("SterilizationCycleCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  instruments    SterilizationCycleInstrument[]
+  createdAt      DateTime                       @default(now())
+  updatedAt      DateTime                       @updatedAt
+
+  @@unique([organizationId, cycleNo])
+  @@unique([id, organizationId, clinicId])
+  @@index([organizationId, clinicId, status, createdAt])
+}
+
+model SterilizationCycleInstrument {
+  cycleId        String
+  cycle          SterilizationCycle      @relation(fields: [cycleId, organizationId, clinicId], references: [id, organizationId, clinicId], onDelete: Restrict)
+  instrumentId   String
+  instrument     SterilizationInstrument @relation(fields: [instrumentId, organizationId, clinicId], references: [id, organizationId, clinicId], onDelete: Restrict)
+  organizationId String
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  clinicId       String
+  clinic         Clinic                  @relation(fields: [clinicId, organizationId], references: [id, organizationId], onDelete: Restrict)
+  includedAt     DateTime                @default(now())
+
+  @@id([cycleId, instrumentId])
+  @@index([organizationId, clinicId, instrumentId])
 }
 
 model PatientJourneyState {

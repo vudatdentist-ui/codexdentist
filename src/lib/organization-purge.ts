@@ -1,5 +1,10 @@
 import "server-only";
 
+import { deletePatientFileStageObjects } from "@/infrastructure/patient-files/object-gc";
+import {
+  createPatientFilePurgeManifests,
+  reconcilePatientFilePurgeManifests,
+} from "@/infrastructure/patient-files/purge-manifest";
 import { prisma } from "@/lib/prisma";
 
 const purgeSql = String.raw`
@@ -8,6 +13,7 @@ DECLARE
   target_org_id text;
   relation_record record;
   fk_record record;
+  organization_guard text;
   deleted_count integer;
   pending_count integer;
   made_progress boolean;
@@ -23,6 +29,7 @@ BEGIN
       JOIN pg_attribute attr ON attr.attrelid = cls.oid
       WHERE ns.nspname = 'public'
         AND cls.relkind = 'r'
+        AND cls.relname <> 'PatientFilePurgeManifest'
         AND attr.attname = 'organizationId'
         AND NOT attr.attisdropped
     LOOP
@@ -80,11 +87,21 @@ BEGIN
           parent_ns.nspname,
           parent_cls.relname
       LOOP
+        SELECT CASE
+          WHEN EXISTS (
+            SELECT 1 FROM pg_attribute
+            WHERE attrelid = fk_record.child_oid
+              AND attname = 'organizationId'
+              AND NOT attisdropped
+          ) THEN format(' AND child."organizationId" = %L', target_org_id)
+          ELSE ''
+        END INTO organization_guard;
         EXECUTE format(
           'INSERT INTO "_organization_purge_rows" (table_oid, table_name, row_tid, depth)
            SELECT %s, %L, child.ctid, parent_marker.depth + 1
            FROM %I.%I child
            JOIN %I.%I parent ON %s
+           %s
            JOIN "_organization_purge_rows" parent_marker
              ON parent_marker.table_oid = %s
             AND parent_marker.row_tid = parent.ctid
@@ -96,6 +113,7 @@ BEGIN
           fk_record.parent_schema,
           fk_record.parent_table,
           fk_record.join_condition,
+          organization_guard,
           fk_record.parent_oid
         );
         GET DIAGNOSTICS pending_count = ROW_COUNT;
@@ -157,8 +175,131 @@ $purge$;
 `;
 
 export async function purgeOrganization(organizationId: string) {
+  let manifestIds: string[] = [];
   await prisma.$transaction(
     async (tx) => {
+      await tx.$executeRawUnsafe(
+        `SELECT pg_advisory_xact_lock(hashtext($1))`,
+        "patient-file-retention-global",
+      );
+      await tx.$executeRawUnsafe(
+        `SELECT pg_advisory_xact_lock(hashtext($1))`,
+        `patient-file-organization:${organizationId}`,
+      );
+
+      const patientFiles = await tx.patientFile.findMany({
+        where: { organizationId },
+        select: {
+          id: true,
+          storageProvider: true,
+          storageKey: true,
+          sourceType: true,
+          sourceId: true,
+          previewStorageKey: true,
+          thumbnailStorageKey: true,
+        },
+      });
+      const stagedFiles = await tx.$queryRawUnsafe<OrganizationPurgeStageRow[]>(
+        `SELECT "id", "storageProvider", "storageKey", "previewStorageKey", "thumbnailStorageKey"
+         FROM "PatientFileObjectStage"
+         WHERE "organizationId" = $1
+           AND "state" <> 'DELETED'`,
+        organizationId,
+      );
+      const staffAvatars = await tx.staffProfile.findMany({
+        where: { organizationId },
+        select: {
+          id: true,
+          avatarStorageProvider: true,
+          avatarStorageKey: true,
+          avatarThumbnailStorageKey: true,
+        },
+      });
+      const learningAssets = await tx.learningAsset.findMany({
+        where: { organizationId },
+        select: {
+          id: true,
+          storageProvider: true,
+          storageKey: true,
+          previewStorageKey: true,
+          thumbnailStorageKey: true,
+        },
+      });
+      const accountingAttachments = await tx.accountingEntry.findMany({
+        where: { organizationId },
+        select: {
+          id: true,
+          attachmentStorageProvider: true,
+          attachmentStorageKey: true,
+          attachmentThumbnailStorageKey: true,
+        },
+      });
+
+      const purgeObjects = [];
+      for (const file of patientFiles) {
+        if (file.sourceType === "EXTERNAL_URL") continue;
+        const object = ownedStorageObject({
+          id: file.id,
+          organizationId,
+          storageProvider: file.storageProvider ??
+            (file.sourceType === "R2_UPLOAD"
+              ? "r2"
+              : file.sourceType === "LOCAL_UPLOAD"
+                ? "local"
+                : null),
+          storageKey: file.storageKey ?? file.sourceId,
+          previewStorageKey: file.previewStorageKey,
+          thumbnailStorageKey: file.thumbnailStorageKey,
+        });
+        if (object) purgeObjects.push(object);
+      }
+      for (const stage of stagedFiles) {
+        const object = ownedStorageObject({
+          id: stage.id,
+          organizationId,
+          storageProvider: stage.storageProvider,
+          storageKey: stage.storageKey,
+          previewStorageKey: stage.previewStorageKey,
+          thumbnailStorageKey: stage.thumbnailStorageKey,
+        });
+        if (object) purgeObjects.push(object);
+      }
+      for (const avatar of staffAvatars) {
+        const object = ownedStorageObject({
+          id: `staff-profile:${avatar.id}`,
+          organizationId,
+          storageProvider: avatar.avatarStorageProvider,
+          storageKey: avatar.avatarStorageKey,
+          previewStorageKey: null,
+          thumbnailStorageKey: avatar.avatarThumbnailStorageKey,
+        });
+        if (object) purgeObjects.push(object);
+      }
+      for (const asset of learningAssets) {
+        const object = ownedStorageObject({
+          id: `learning-asset:${asset.id}`,
+          organizationId,
+          storageProvider: asset.storageProvider,
+          storageKey: asset.storageKey,
+          previewStorageKey: asset.previewStorageKey,
+          thumbnailStorageKey: asset.thumbnailStorageKey,
+        });
+        if (object) purgeObjects.push(object);
+      }
+      for (const entry of accountingAttachments) {
+        const object = ownedStorageObject({
+          id: `accounting-entry:${entry.id}`,
+          organizationId,
+          storageProvider: entry.attachmentStorageProvider,
+          storageKey: entry.attachmentStorageKey,
+          previewStorageKey: null,
+          thumbnailStorageKey: entry.attachmentThumbnailStorageKey,
+        });
+        if (object) purgeObjects.push(object);
+      }
+
+      manifestIds = await createPatientFilePurgeManifests(tx, purgeObjects);
+
       await tx.$executeRawUnsafe(`
         CREATE TEMP TABLE "_organization_purge_target" (
           "organizationId" text NOT NULL
@@ -187,4 +328,53 @@ export async function purgeOrganization(organizationId: string) {
       timeout: 60_000,
     },
   );
+
+  const manifestResult = await reconcilePatientFilePurgeManifests(
+    prisma,
+    deletePatientFileStageObjects,
+    { ids: manifestIds },
+  );
+  if (manifestResult.failed > 0) {
+    throw new Error(`organization-purge-object-cleanup-failed:${manifestResult.failed}`);
+  }
+  return { manifestIds, ...manifestResult };
+}
+
+type OrganizationPurgeStageRow = {
+  id: string;
+  storageProvider: string;
+  storageKey: string;
+  previewStorageKey: string | null;
+  thumbnailStorageKey: string | null;
+};
+
+function ownedStorageObject(input: {
+  id: string;
+  organizationId: string;
+  storageProvider: string | null;
+  storageKey: string | null;
+  previewStorageKey: string | null;
+  thumbnailStorageKey: string | null;
+}) {
+  if (!input.storageProvider || input.storageProvider === "external") {
+    if (input.storageKey) {
+      throw new Error(`organization-purge-storage-provider-missing:${input.id}`);
+    }
+    return null;
+  }
+  if (input.storageProvider !== "local" && input.storageProvider !== "r2") {
+    throw new Error(`organization-purge-file-storage-provider-invalid:${input.id}`);
+  }
+  if (!input.storageKey) {
+    throw new Error(`organization-purge-file-storage-key-missing:${input.id}`);
+  }
+
+  return {
+    id: input.id,
+    organizationId: input.organizationId,
+    storageProvider: input.storageProvider,
+    storageKey: input.storageKey,
+    previewStorageKey: input.previewStorageKey,
+    thumbnailStorageKey: input.thumbnailStorageKey,
+  };
 }

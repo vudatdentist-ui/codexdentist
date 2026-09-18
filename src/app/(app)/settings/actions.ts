@@ -10,6 +10,8 @@ import { appBaseUrl } from "@/lib/env";
 import { databaseActorId, requiredString } from "@/lib/form-validation";
 import { renderNotificationTemplate } from "@/lib/notification-templates";
 import { processNotificationNow } from "@/lib/notifications";
+import { allowedClinicIds } from "@/lib/patient-access";
+import { createPasswordSetupToken } from "@/lib/password-reset";
 import {
   isUploadedPatientFile,
   storeStaffProfileUpload,
@@ -19,6 +21,8 @@ import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 import { generateSourceCommissionAccruals } from "@/lib/source-commission";
 import { isSuperAdminSession } from "@/lib/super-admin";
+import { deletePatientFileStageObjects } from "@/infrastructure/patient-files/object-gc";
+import { createStorageObjectPurgeManifests } from "@/infrastructure/patient-files/purge-manifest";
 import { bootstrapOrganizationDefaults } from "@/lib/tenant-bootstrap";
 import {
   isValidTenantSlug,
@@ -1262,7 +1266,7 @@ export async function updateStaffProfileAction(formData: FormData) {
     redirect("/settings?notice=settings-profile-missing-fields");
   }
 
-  if (clinicId && !canUseAllClinics(session) && !session.clinicIds.includes(clinicId)) {
+  if (clinicId && !canUseAllClinics(session) && !allowedClinicIds(session).includes(clinicId)) {
     redirect("/settings?notice=settings-user-not-found");
   }
 
@@ -1293,6 +1297,7 @@ export async function updateStaffProfileAction(formData: FormData) {
   }
 
   let notice: string | null = null;
+  let storedAvatar: Awaited<ReturnType<typeof storeStaffProfileUpload>> | null = null;
 
   try {
     const user = await prisma.user.findFirst({
@@ -1302,7 +1307,7 @@ export async function updateStaffProfileAction(formData: FormData) {
         clinics: {
           some: {
             clinicId: {
-              in: session.clinicIds,
+              in: allowedClinicIds(session),
             },
           },
         },
@@ -1312,6 +1317,9 @@ export async function updateStaffProfileAction(formData: FormData) {
         staffProfile: {
           select: {
             employeeCode: true,
+            avatarStorageProvider: true,
+            avatarStorageKey: true,
+            avatarThumbnailStorageKey: true,
           },
         },
       },
@@ -1322,7 +1330,7 @@ export async function updateStaffProfileAction(formData: FormData) {
     } else {
       const employeeCode =
         employeeCodeInput || user.staffProfile?.employeeCode || defaultEmployeeCode(user.id);
-      const storedAvatar = isUploadedPatientFile(avatarFile)
+      storedAvatar = isUploadedPatientFile(avatarFile)
         ? await storeStaffProfileUpload({
             file: avatarFile,
             organizationId: session.organizationId,
@@ -1387,12 +1395,46 @@ export async function updateStaffProfileAction(formData: FormData) {
           },
         }),
       ]);
+      if (storedAvatar && user.staffProfile?.avatarStorageProvider && user.staffProfile.avatarStorageKey) {
+        await createStorageObjectPurgeManifests(prisma, [{
+          organizationId: session.organizationId,
+          storageProvider: user.staffProfile.avatarStorageProvider,
+          storageKey: user.staffProfile.avatarStorageKey,
+          previewStorageKey: null,
+          thumbnailStorageKey: user.staffProfile.avatarThumbnailStorageKey,
+        }]).catch((manifestError) => {
+          console.error("staff.avatar_old_cleanup_manifest_failed", manifestError);
+        });
+        await deletePatientFileStageObjects({
+          storageProvider: user.staffProfile.avatarStorageProvider,
+          storageKey: user.staffProfile.avatarStorageKey,
+          previewStorageKey: null,
+          thumbnailStorageKey: user.staffProfile.avatarThumbnailStorageKey,
+        }).catch((error) => console.error("staff.avatar_old_object_cleanup_failed", error));
+      }
     }
   } catch (error) {
     if (isUniqueConstraintError(error)) {
       notice = "settings-profile-code-exists";
     } else {
       notice = "settings-database";
+    }
+    if (storedAvatar) {
+      await createStorageObjectPurgeManifests(prisma, [{
+        organizationId: session.organizationId,
+        storageProvider: storedAvatar.storageProvider,
+        storageKey: storedAvatar.storageKey,
+        previewStorageKey: storedAvatar.preview?.storageKey ?? null,
+        thumbnailStorageKey: storedAvatar.thumbnail?.storageKey ?? null,
+      }]).catch((manifestError) => {
+        console.error("staff.avatar_cleanup_manifest_failed", manifestError);
+      });
+      await deletePatientFileStageObjects({
+        storageProvider: storedAvatar.storageProvider,
+        storageKey: storedAvatar.storageKey,
+        previewStorageKey: storedAvatar.preview?.storageKey ?? null,
+        thumbnailStorageKey: storedAvatar.thumbnail?.storageKey ?? null,
+      }).catch(() => {});
     }
   }
 

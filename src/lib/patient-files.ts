@@ -24,6 +24,10 @@ export async function getPatientFilesWorkspace(
     const files = await prisma.patientFile.findMany({
       where: {
         organizationId: session.organizationId,
+        OR: [
+          { retentionUntil: null },
+          { retentionUntil: { gt: new Date() } },
+        ],
         ...(options.patientId ? { patientId: options.patientId } : {}),
         patient: patientAccessWhere(session),
       },

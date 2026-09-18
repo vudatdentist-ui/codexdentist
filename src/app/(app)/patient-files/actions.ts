@@ -17,6 +17,8 @@ import {
   patientFileValidationError,
   storePatientUpload,
 } from "@/lib/patient-file-storage";
+import { currentPatientFileStorageProvider, deletePatientFileStageObjects, patientFileStageStoragePrefix } from "@/infrastructure/patient-files/object-gc";
+import { createPatientFileStage, markPatientFileStageCommitted, markPatientFileStageGcPending, markPatientFileStageStored } from "@/infrastructure/patient-files/staging";
 import { patientAccessWhere } from "@/lib/patient-access";
 import { prisma } from "@/lib/prisma";
 
@@ -50,6 +52,7 @@ export async function createPatientFileAction(formData: FormData) {
     redirect("/journey?notice=files-too-large");
   }
 
+  let createdStageId: string | null = null;
   try {
     const patient = await prisma.patient.findFirst({
       where: {
@@ -67,21 +70,53 @@ export async function createPatientFileAction(formData: FormData) {
     }
 
     const patientFileId = randomUUID();
-    const storedUpload = hasUpload
-      ? await storePatientUpload({
-          file: uploadedFile,
+    const stageId = hasUpload ? randomUUID() : null;
+    createdStageId = stageId;
+    let storedUpload: Awaited<ReturnType<typeof storePatientUpload>> | null = null;
+    try {
+      if (hasUpload && stageId) {
+        await createPatientFileStage(prisma, {
+          id: stageId,
           organizationId: session.organizationId,
+          clinicId: patient.clinicId,
           patientId: patient.id,
-          patientFileId,
-        })
-      : null;
+          uploadedById: databaseActorId(session.userId),
+          targetPatientFileId: patientFileId,
+          fileName: uploadedFile.name || "patient-file",
+          mimeType: uploadedFile.type || "application/octet-stream",
+          sizeBytes: uploadedFile.size,
+          storageProvider: currentPatientFileStorageProvider(),
+          storageKey: patientFileStageStoragePrefix({ organizationId: session.organizationId, patientId: patient.id, patientFileId }),
+        });
+        storedUpload = await storePatientUpload({ file: uploadedFile, organizationId: session.organizationId, patientId: patient.id, patientFileId });
+        await prisma.$transaction((tx) => markPatientFileStageStored(tx, {
+          stageId,
+          checksumSha256: storedUpload!.checksumSha256,
+          storageKey: storedUpload!.storageKey,
+          previewStorageKey: storedUpload!.preview?.storageKey ?? null,
+          thumbnailStorageKey: storedUpload!.thumbnail?.storageKey ?? null,
+        }));
+      }
+    } catch (error) {
+      if (stageId) {
+        await markPatientFileStageGcPending(prisma, stageId, "patient-file-object-write-failed").catch(() => {});
+        await deletePatientFileStageObjects({
+          storageProvider: currentPatientFileStorageProvider(),
+          storageKey: patientFileStageStoragePrefix({ organizationId: session.organizationId, patientId: patient.id, patientFileId }),
+          previewStorageKey: null,
+          thumbnailStorageKey: null,
+        }).catch(() => {});
+      }
+      throw error;
+    }
     const fileUrl = storedUpload ? `/patient-files/${patientFileId}` : safeExternalUrl;
 
     if (!fileUrl) {
       redirect("/journey?notice=files-missing");
     }
 
-    const file = await prisma.patientFile.create({
+    const file = await prisma.$transaction(async (tx) => {
+      const created = await tx.patientFile.create({
       data: {
         id: patientFileId,
         organizationId: session.organizationId,
@@ -121,15 +156,15 @@ export async function createPatientFileAction(formData: FormData) {
       select: {
         id: true,
       },
-    });
-
-    await prisma.auditLog.create({
-      data: {
+      });
+      if (stageId) await markPatientFileStageCommitted(tx, stageId, created.id);
+      await tx.auditLog.create({
+        data: {
         organizationId: session.organizationId,
         actorId: databaseActorId(session.userId),
         action: "patient_file.created",
         entityType: "PatientFile",
-        entityId: file.id,
+        entityId: created.id,
         metadata: {
           patientId: patient.id,
           category,
@@ -141,13 +176,16 @@ export async function createPatientFileAction(formData: FormData) {
           sizeBytes: storedUpload?.sizeBytes ?? null,
           checksumSha256: storedUpload?.checksumSha256 ?? null,
         } as Prisma.InputJsonValue,
-      },
+        },
+      });
+      return created;
     });
   } catch (error) {
     if (isNextRedirect(error)) {
       throw error;
     }
 
+    if (createdStageId) await markPatientFileStageGcPending(prisma, createdStageId, "patient-file-domain-commit-failed");
     console.error("patient_file.create_failed", error);
     redirect("/journey?notice=files-database");
   }
@@ -173,7 +211,6 @@ export async function updatePatientFileGovernanceAction(formData: FormData) {
   const allowedScanStatuses = new Set([
     "NOT_SCANNED",
     "PENDING",
-    "CLEAN",
     "QUARANTINED",
     "INFECTED",
     "EXTERNAL_URL",
@@ -197,6 +234,7 @@ export async function updatePatientFileGovernanceAction(formData: FormData) {
       select: {
         id: true,
         patientId: true,
+        sourceType: true,
         virusScanStatus: true,
         retentionUntil: true,
       },
@@ -204,6 +242,9 @@ export async function updatePatientFileGovernanceAction(formData: FormData) {
 
     if (!file) {
       redirect("/journey?notice=files-patient-not-found");
+    }
+    if (virusScanStatus === "EXTERNAL_URL" && file.sourceType !== "EXTERNAL_URL") {
+      redirect("/journey?notice=files-governance-invalid");
     }
 
     await prisma.$transaction(async (tx) => {

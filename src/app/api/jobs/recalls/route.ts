@@ -7,10 +7,13 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: Request) {
   if (!verifyJobRequest(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const body = await request.json().catch(() => ({}));
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const organizationId =
     typeof body.organizationId === "string" ? body.organizationId : null;
   const requestedClinicIds = Array.isArray(body.clinicIds)
@@ -51,9 +54,16 @@ export async function POST(request: Request) {
     });
   }
 
-  return NextResponse.json({
+  return json({
     processedOrganizations: results.length,
     createdCount: results.reduce((sum, result) => sum + result.createdCount, 0),
     results,
+  });
+}
+
+function json(body: unknown, init?: ResponseInit) {
+  return NextResponse.json(body, {
+    ...init,
+    headers: { "cache-control": "no-store", ...(init?.headers ?? {}) },
   });
 }

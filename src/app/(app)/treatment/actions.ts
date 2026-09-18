@@ -12,6 +12,7 @@ import {
   splitList,
 } from "@/lib/form-validation";
 import { prisma } from "@/lib/prisma";
+import { allowedClinicIds } from "@/lib/patient-access";
 
 const treatmentStatuses = [
   "DRAFT",
@@ -52,7 +53,7 @@ export async function createTreatmentPlanAction(formData: FormData) {
         id: patientId,
         organizationId: session.organizationId,
         clinicId: {
-          in: session.clinicIds,
+          in: allowedClinicIds(session),
         },
       },
       select: {
@@ -132,7 +133,7 @@ export async function updateTreatmentStatusAction(formData: FormData) {
         patient: {
           organizationId: session.organizationId,
           clinicId: {
-            in: session.clinicIds,
+            in: allowedClinicIds(session),
           },
         },
       },
@@ -204,7 +205,7 @@ export async function addTreatmentPhaseAction(formData: FormData) {
         patient: {
           organizationId: session.organizationId,
           clinicId: {
-            in: session.clinicIds,
+            in: allowedClinicIds(session),
           },
         },
       },

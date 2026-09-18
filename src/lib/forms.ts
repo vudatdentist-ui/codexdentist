@@ -148,6 +148,10 @@ export async function getFormsWorkspace(
             },
             {
               clinicId: null,
+              patient: {
+                organizationId: session.organizationId,
+                clinicId: { in: clinicIds },
+              },
             },
           ],
         },

@@ -1,6 +1,6 @@
 # Codexdentist QA Playbook
 
-Last updated: 2026-08-27
+Last updated: 2026-09-18
 Status: ACTIVE
 
 This playbook implements the closed-loop quality process defined in `docs/PROJECT_CONTEXT.md`:
@@ -27,6 +27,8 @@ For changes that can affect bundling, routes, server/client boundaries, runtime 
 
 ```bash
 npm run build
+npm run test:disposable-restore
+npm run test:domain-operations
 npm run test:smoke
 ```
 
@@ -112,7 +114,7 @@ npm run agent:audit
 
 If one fails, fix and rerun all three before Phase 0 closes.
 
-## 6. Phase 1 Gate — Application Boundary
+## 6. Phase 1 Gate — Application Boundary — COMPLETE
 
 For each migrated use-case:
 
@@ -142,7 +144,7 @@ npm run test:tenant
 npm run test:security
 ```
 
-## 7. Phase 2 Gate — Integration Substrate And File Lifecycle
+## 7. Phase 2 Gate — Integration Substrate And File Lifecycle — COMPLETE
 
 Add automated tests for at least:
 
@@ -155,6 +157,8 @@ Add automated tests for at least:
 - staged file created but DB commit fails;
 - staged object reconciliation/garbage collection;
 - committed protected file remains inaccessible across tenant/clinic boundary.
+
+Phase 2 continuation evidence also covers expired-retention deletion, staged-object retry, organization purge storage cleanup, and staged-only purge isolation through the patient-file lifecycle, organization-purge, and architecture gates.
 
 Run affected schema/data integrity and protected-file suites after every fix.
 
@@ -183,7 +187,7 @@ Verify:
 - consent status, file record, Journey event and audit record reconcile after failure/retry;
 - disabled/unavailable provider does not break unrelated clinical workflows.
 
-## 9. Phase 4 Gate — Orthanc / OHIF
+## 9. Phase 4 Gate — Orthanc / OHIF — COMPLETE
 
 Verify:
 
@@ -196,7 +200,22 @@ Verify:
 - backup/restore ownership for imaging data is documented;
 - supported desktop/mobile workflow has no critical overflow/navigation break.
 
-## 10. Phase 5 Gate — Native Dental Operations
+Phase 4 evidence on the continuation branch:
+
+```powershell
+npm run encoding:check
+npm run typecheck
+npm run agent:audit
+npx prisma validate
+node scripts/phase4-architecture-check.mjs
+npm run test:phase4
+npm run test:phase4:scope
+npm run build
+```
+
+All listed gates pass. `test:phase4:scope` creates synthetic records only and verifies same-tenant access, cross-organization denial, inaccessible-clinic denial, and patient filtering; it removes those synthetic records in `finally`.
+
+## 10. Phase 5 Gate — Native Dental Operations — COMPLETE
 
 For Lab/Sterilization or other native dental capabilities:
 
@@ -209,7 +228,28 @@ For Lab/Sterilization or other native dental capabilities:
 
 Run tenant, action permission, data-integrity, smoke, and browser gates plus feature-specific tests.
 
-## 11. Phase 6 Gate — Optional Communication / FHIR
+Current Lab case/order slice evidence:
+
+```powershell
+npx prisma validate
+npm run typecheck
+npm run agent:audit
+node scripts/phase5-architecture-check.mjs
+npm run test:phase5
+```
+
+These checks pass for the native LabCase workflow and tenant/clinic/status-transition smoke.
+
+Sterilization re-audit adds:
+
+```powershell
+npm run test:phase5:sterilization
+npm run build
+```
+
+Phase 5 is complete on the continuation branch: both native operations slices pass tenant/clinic, permission, audit, transition, architecture, and production-build gates.
+
+## 11. Phase 6 Gate — Optional Communication / FHIR — COMPLETE
 
 Verify:
 
@@ -220,6 +260,17 @@ Verify:
 - inbound updates are idempotent and authorized;
 - PHI is minimized in logs/events;
 - tenant isolation remains green.
+
+Current FHIR slice evidence:
+
+```powershell
+npm run typecheck
+npm run encoding:check
+node scripts/phase6-architecture-check.mjs
+npm run test:phase6
+```
+
+The FHIR export and disabled-by-default provider gates pass. Phase 6 is complete on the continuation branch; no unverified inbound provider mutation path was introduced.
 
 ## 12. Release Hardening Gate
 
@@ -249,6 +300,8 @@ npm run go-live:check
 
 Also run the self-host packaging and restore drill in `docs/OPERATIONS.md` when migrations, storage, deployment, or infrastructure changed.
 
+Phase 7 continuation evidence: GitHub CI run `35309708634` passed the static/architecture/hardening gates, current 54-migration disposable PostgreSQL restore, reseed, full PostgreSQL runtime regression set, self-host compose validation, production Docker build, hosted release boot, and Browser QA (38/38 desktop/mobile route checks, including Imaging/Lab/Sterilization). The restored database was exercised by the production application before release verification. The local rerun remains unavailable because Docker Desktop is not exposing its Linux daemon and the available local PostgreSQL service resets connections. The final go-live check remains intentionally open because CI uses an isolated QA database and still contains four demo-password users; production managed PostgreSQL/R2/notification credentials, demo-account rotation, and a real-environment restore drill are required before release.
+
 ## 13. High-Risk Manual Regression Checks
 
 Automated tests do not replace these targeted observations when the corresponding workflow changes:
@@ -259,6 +312,8 @@ Automated tests do not replace these targeted observations when the correspondin
 - Protected patient files cannot be fetched by another organization, inaccessible clinic, or unrelated patient portal account.
 - Staff/role administration cannot demote/disable protected equal-or-higher authority incorrectly and preserves at least one active owner.
 - Patient portal shows only the linked patient's data and future actionable appointments.
+- Imaging opens only studies already scoped to the active organization/clinic/patient; Orthanc outages show a readable unavailable state, and configured OHIF links open at desktop and 390px mobile widths without horizontal overflow.
+- Lab cases stay attached to the canonical patient/clinic/treatment service, reject skipped terminal transitions, and record each status transition in the audit log.
 - Vietnamese operational copy renders without mojibake and critical layouts do not horizontally overflow at supported mobile widths.
 
 ## 14. Audit Loop Record

@@ -5,6 +5,7 @@ import { ApplicationCommandError } from "@/lib/application/errors";
 import { databaseActorId } from "@/lib/form-validation";
 import {
   currentPatientFileStorageProvider,
+  deletePatientFileStageObjects,
   patientFileStageStoragePrefix,
 } from "@/infrastructure/patient-files/object-gc";
 import {
@@ -125,27 +126,6 @@ export async function createJourneyCommentCommand(
     };
   });
 
-  if (plannedAttachments.length > 0) {
-    await prisma.$transaction(async (tx) => {
-      for (const attachment of plannedAttachments) {
-        await createPatientFileStage(tx, {
-          id: attachment.stageId,
-          organizationId: session.organizationId,
-          clinicId: patient.clinicId,
-          patientId: patient.id,
-          uploadedById: actorId,
-          targetPatientFileId: attachment.patientFileId,
-          fileName: attachment.uploadedFile.name || "patient-file",
-          mimeType:
-            attachment.uploadedFile.type || "application/octet-stream",
-          sizeBytes: attachment.uploadedFile.size,
-          storageProvider,
-          storageKey: attachment.storagePrefix,
-        });
-      }
-    });
-  }
-
   const storedAttachments: Array<{
     index: number;
     stageId: string;
@@ -156,29 +136,56 @@ export async function createJourneyCommentCommand(
 
   try {
     for (const attachment of plannedAttachments) {
-      const storedUpload = await storePatientUpload({
-        file: attachment.uploadedFile,
-        organizationId: session.organizationId,
-        patientId: patient.id,
-        patientFileId: attachment.patientFileId,
+      await createPatientFileStage(prisma, {
+          id: attachment.stageId,
+          organizationId: session.organizationId,
+          clinicId: patient.clinicId,
+          patientId: patient.id,
+          uploadedById: actorId,
+          targetPatientFileId: attachment.patientFileId,
+          fileName: attachment.uploadedFile.name || "patient-file",
+          mimeType: attachment.uploadedFile.type || "application/octet-stream",
+          sizeBytes: attachment.uploadedFile.size,
+          storageProvider,
+          storageKey: attachment.storagePrefix,
       });
-      await markPatientFileStageStored(prisma, {
-        stageId: attachment.stageId,
-        checksumSha256: storedUpload.checksumSha256,
-        storageKey: storedUpload.storageKey,
-        previewStorageKey: storedUpload.preview?.storageKey ?? null,
-        thumbnailStorageKey: storedUpload.thumbnail?.storageKey ?? null,
+      const storedUpload = await storePatientUpload({
+          file: attachment.uploadedFile,
+          organizationId: session.organizationId,
+          patientId: patient.id,
+          patientFileId: attachment.patientFileId,
       });
       storedAttachments.push({
-        index: attachment.index,
-        stageId: attachment.stageId,
-        patientFileId: attachment.patientFileId,
-        storedUpload,
-        attachmentUrl: attachment.attachmentUrl,
+          index: attachment.index,
+          stageId: attachment.stageId,
+          patientFileId: attachment.patientFileId,
+          storedUpload,
+          attachmentUrl: attachment.attachmentUrl,
       });
     }
+    await prisma.$transaction(async (tx) => {
+      for (const attachment of storedAttachments) {
+        await markPatientFileStageStored(tx, {
+          stageId: attachment.stageId,
+          checksumSha256: attachment.storedUpload.checksumSha256,
+          storageKey: attachment.storedUpload.storageKey,
+          previewStorageKey: attachment.storedUpload.preview?.storageKey ?? null,
+          thumbnailStorageKey: attachment.storedUpload.thumbnail?.storageKey ?? null,
+        });
+      }
+    }, { maxWait: 30_000, timeout: 120_000 });
   } catch (error) {
     await markStagesForGc(plannedAttachments, "patient-file-object-write-failed");
+    await Promise.all(
+      plannedAttachments.map((attachment) =>
+        deletePatientFileStageObjects({
+          storageProvider,
+          storageKey: attachment.storagePrefix,
+          previewStorageKey: null,
+          thumbnailStorageKey: null,
+        }).catch(() => {}),
+      ),
+    );
     throw error;
   }
 

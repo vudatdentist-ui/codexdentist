@@ -25,6 +25,8 @@ import {
 import { canUseAllClinics } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
+import { deletePatientFileStageObjects } from "@/infrastructure/patient-files/object-gc";
+import { createStorageObjectPurgeManifests } from "@/infrastructure/patient-files/purge-manifest";
 
 const learningTypes = ["BOOK", "ARTICLE", "VIDEO", "COURSE", "CHECKLIST", "POLICY"] as const;
 const enrollmentStatuses = ["ASSIGNED", "IN_PROGRESS", "COMPLETED", "EXPIRED"] as const;
@@ -63,6 +65,13 @@ export async function createLearningContentAction(formData: FormData) {
     redirect(`/learning?notice=${uploadValidationError}`);
   }
 
+  const storedAssetObjects: Array<{
+    organizationId: string;
+    storageProvider: string;
+    storageKey: string;
+    previewStorageKey: string | null;
+    thumbnailStorageKey: string | null;
+  }> = [];
   try {
     const content = await prisma.learningContent.upsert({
       where: {
@@ -110,6 +119,13 @@ export async function createLearningContentAction(formData: FormData) {
             organizationId: session.organizationId,
             contentId: content.id,
             assetId,
+          });
+          storedAssetObjects.push({
+            organizationId: session.organizationId,
+            storageProvider: storedUpload.storageProvider,
+            storageKey: storedUpload.storageKey,
+            previewStorageKey: storedUpload.preview?.storageKey ?? null,
+            thumbnailStorageKey: storedUpload.thumbnail?.storageKey ?? null,
           });
           const assetUrl = `/learning-assets/${assetId}`;
 
@@ -163,6 +179,12 @@ export async function createLearningContentAction(formData: FormData) {
       },
     });
   } catch {
+    await createStorageObjectPurgeManifests(prisma, storedAssetObjects).catch((manifestError) => {
+      console.error("learning.asset_cleanup_manifest_failed", manifestError);
+    });
+    await Promise.all(
+      storedAssetObjects.map((object) => deletePatientFileStageObjects(object)).map((promise) => promise.catch(() => {})),
+    );
     redirect("/learning?notice=learning-database");
   }
 

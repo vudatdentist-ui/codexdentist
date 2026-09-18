@@ -21,6 +21,7 @@ export default defineConfig({
       "public.IntegrationInbox",
       "public.IntegrationOutbox",
       "public.PatientFileObjectStage",
+      "public.PatientFilePurgeManifest",
     ],
   },
 });

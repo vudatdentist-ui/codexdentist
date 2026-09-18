@@ -11,7 +11,7 @@ import {
   type ServiceCompensationRuleInput,
 } from "@/lib/compensation";
 import { databaseActorId, optionalString, parseMoney, requiredString } from "@/lib/form-validation";
-import { patientAccessWhere } from "@/lib/patient-access";
+import { allowedClinicIds, patientAccessWhere } from "@/lib/patient-access";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 import { runSerializableTransaction } from "@/lib/transaction";
@@ -136,7 +136,7 @@ export async function updateJourneyTreatmentServiceDiscountAction(formData: Form
       where: {
         id: treatmentServiceId,
         organizationId: session.organizationId,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: allowedClinicIds(session) },
       },
       include: {
         serviceCatalogItem: { select: { defaultPrice: true } },
@@ -198,7 +198,7 @@ export async function deleteJourneyTreatmentServiceAction(formData: FormData) {
       where: {
         id: treatmentServiceId,
         organizationId: session.organizationId,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: allowedClinicIds(session) },
       },
       select: {
         id: true,
@@ -279,7 +279,7 @@ export async function recordJourneyServiceProgressAction(formData: FormData) {
         where: {
           id: treatmentServiceId,
           organizationId: session.organizationId,
-          clinicId: { in: session.clinicIds },
+          clinicId: { in: allowedClinicIds(session) },
         },
         include: {
           serviceCatalogItem: {

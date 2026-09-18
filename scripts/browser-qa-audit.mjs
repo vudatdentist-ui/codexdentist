@@ -29,6 +29,9 @@ const legacyRoutes = [
   "/employee-app",
   "/reports",
   "/settings",
+  "/imaging",
+  "/lab",
+  "/sterilization",
 ];
 const migrationRoutes = enabledMigrationRoutes(
   process.env.BROWSER_QA_MIGRATION_ROUTES,
@@ -105,11 +108,26 @@ await writeFile(path.join(outputDir, "REPORT.md"), renderMarkdown(summary, resul
 
 console.log(JSON.stringify({ outputDir, summary }, null, 2));
 
-if (summary.critical + summary.high > 0) {
+if (summary.critical + summary.high + summary.medium > 0) {
   process.exitCode = 1;
 }
 
 async function login(page) {
+  const actionResponses = [];
+  const actionRequests = [];
+  const onResponse = (response) => {
+    if (response.request().method() === "POST" && response.url().includes("/login")) {
+      actionResponses.push(`${response.status()} ${response.url()}`);
+    }
+  };
+  const onRequestFailed = (request) => {
+    if (request.method() === "POST" && request.url().includes("/login")) {
+      actionRequests.push(`${request.url()}: ${request.failure()?.errorText ?? "request failed"}`);
+    }
+  };
+  page.on("response", onResponse);
+  page.on("requestfailed", onRequestFailed);
+
   const response = await page.goto(`${baseUrl}/login`, {
     waitUntil: "domcontentloaded",
   });
@@ -118,10 +136,13 @@ async function login(page) {
     throw new Error(`/login returned HTTP ${response?.status() ?? "unknown"}`);
   }
 
+  // Server Action forms are inert until the App Router client has hydrated.
+  // Waiting for the initial network to settle prevents a fast CI click from
+  // being lost before React attaches the action handler.
+  await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => null);
   const loginForm = page.locator("form.login-form").first();
   const emailInput = loginForm.locator('input[type="email"]').first();
-  await emailInput.click();
-  await emailInput.pressSequentially(email);
+  await emailInput.fill(email);
   await loginForm.locator('input[name="password"]').fill(password);
   await loginForm.locator('button[type="submit"]').click();
   await page.waitForURL((url) => !url.pathname.endsWith("/login"), { timeout: 15000 }).catch(() => null);
@@ -131,10 +152,20 @@ async function login(page) {
   const currentPath = new URL(page.url()).pathname;
   if (currentPath.endsWith("/login")) {
     const bodyText = await page.locator("body").innerText().catch(() => "");
+    const visibleError = await page.locator(".login-error").allTextContents().catch(() => []);
+    page.off("response", onResponse);
+    page.off("requestfailed", onRequestFailed);
     throw new Error(
-      `Login failed for ${email}; still on ${page.url()}. ${bodyText.slice(0, 300)}`,
+      `Login failed for ${email}; still on ${page.url()}. ` +
+        `error=${visibleError.join(" | ") || "none"}; ` +
+        `responses=${actionResponses.join(" | ") || "none"}; ` +
+        `failedRequests=${actionRequests.join(" | ") || "none"}; ` +
+        bodyText.slice(0, 300),
     );
   }
+
+  page.off("response", onResponse);
+  page.off("requestfailed", onRequestFailed);
 }
 
 async function auditRoute(page, viewport, route, consoleErrors, networkErrors) {
