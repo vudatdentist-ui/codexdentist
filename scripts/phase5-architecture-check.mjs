@@ -33,7 +33,14 @@ assert(
   "sterilization records enforce composite tenant and clinic consistency",
 );
 assert(source.sterilization.includes("organizationId: session.organizationId") && source.sterilization.includes("clinicId"), "sterilization commands enforce tenant and clinic scope");
-assert(source.sterilization.includes("assertSterilizationTransition") && source.sterilizationDomain.includes('"RUNNING"') && source.sterilization.includes("instruments: { create:"), "sterilization cycle transition and load membership are explicit");
+assert(
+  source.sterilization.includes("assertSterilizationTransition") &&
+    source.sterilizationDomain.includes('"RUNNING"') &&
+    /instruments:\s*\{\s*create:/.test(source.sterilization) &&
+    source.sterilization.includes("id_organizationId_clinicId") &&
+    source.sterilization.includes("id_organizationId: { id: clinicId"),
+  "sterilization cycle transition and scoped load membership are explicit",
+);
 assert(!/@prisma|next\/|lib\/prisma|infrastructure\//.test(source.labDomain) && !/@prisma|next\/|lib\/prisma|infrastructure\//.test(source.sterilizationDomain), "operations domain rules remain framework and persistence independent");
 assert(source.sterilization.includes("sterilization.cycle_status_changed") && source.sterilizationApi.includes("createSterilizationCycleCommand"), "sterilization actions are audited and routed through commands");
 console.log("phase5-architecture-check: ok");
