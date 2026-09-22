@@ -10,6 +10,7 @@ if (!["127.0.0.1", "localhost", "[::1]"].includes(base.hostname)) {
 const output = path.resolve("output/landing-qa");
 await mkdir(output, { recursive: true });
 const results = [];
+const publicTargets = new Set(["/demo", "/docs", "/features", "/login"]);
 const browser = await chromium.launch({
   headless: true,
   ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH
@@ -45,22 +46,35 @@ try {
       await page.evaluate(() => document.fonts.ready);
       assert.equal(await page.locator("h1").count(), 1);
       assert.match(await page.title(), /Codexdentist/);
+      for (const href of await page.locator('[data-landing-page] a[href^="/"]').evaluateAll(links => links.map(a => a.getAttribute("href")))) publicTargets.add(href);
       layoutFindings.push(...await inspectLayout(page));
       await screenshot(page, `${name}-full`, true);
       await screenshot(page, `${name}-hero`);
+      if (name === "laptop") {
+        await page.setViewportSize({ width: 951, height });
+        layoutFindings.push(...await inspectLayout(page));
+        assert.equal(await page.locator("header").getByRole("link", { name: "Đăng nhập", exact: true }).isVisible(), true);
+        await screenshot(page, "navigation-breakpoint");
+        await page.setViewportSize({ width, height });
+      }
 
       const tabs = page.getByRole("tab");
       assert.equal(await tabs.count(), 3);
       const headings = ["S\u1eb5n s\u00e0ng cho ng\u00e0y m\u1edbi.", "M\u1ed9t h\u1ed3 s\u01a1. C\u1ea3 h\u00e0nh tr\u00ecnh.", "Kh\u00e9p l\u1ea1i m\u1ed9t bu\u1ed5i kh\u00e1m."];
       for (let index = 0; index < 3; index++) {
-        await tabs.nth(index).click();
+        if (width < 951) await tabs.nth(index).tap();
+        else await tabs.nth(index).click();
         await page.getByRole("tabpanel").getByRole("heading", { name: headings[index], exact: true }).waitFor();
         assert.equal(await tabs.nth(index).getAttribute("aria-selected"), "true");
         assert.equal(await page.getByRole("tabpanel").getAttribute("aria-labelledby"), `day-tab-${index}`);
         assert.equal(await page.locator('[role="tab"][tabindex="0"]').count(), 1);
         layoutFindings.push(...await inspectLayout(page));
         if (["mobile", "desktop"].includes(name)) {
-          await page.getByRole("tablist").locator("..").screenshot({ path: path.join(output, `${name}-chapter-${index + 1}.png`) });
+          const preview = page.getByRole("tablist").locator("..");
+          await preview.evaluate(el => el.scrollIntoView({ block: "center", behavior: "instant" }));
+          const top = await preview.evaluate(el => el.getBoundingClientRect().top);
+          assert.ok(top >= await page.locator("header").evaluate(el => el.getBoundingClientRect().bottom), "Preview evidence must not be obscured by the sticky header");
+          await preview.screenshot({ path: path.join(output, `${name}-chapter-${index + 1}.png`) });
         }
       }
       // Native keyboard navigation, including wrapping and focus, must work without a mouse.
@@ -75,7 +89,11 @@ try {
         const menu = page.locator("header details");
         await menu.locator("summary").click();
         assert.equal(await menu.getAttribute("open"), "");
-        if (name === "mobile") await screenshot(page, "mobile-menu");
+        layoutFindings.push(...await inspectLayout(page));
+        const login = menu.locator('a[href="/login"]');
+        await login.scrollIntoViewIfNeeded();
+        assert.ok((await login.boundingBox()).y + (await login.boundingBox()).height <= height + 1, "Menu must let landscape users reach login");
+        if (["mobile", "landscape"].includes(name)) await screenshot(page, `${name}-menu`);
         await page.keyboard.press("Escape");
         assert.equal(await menu.getAttribute("open"), null);
         assert.equal(await menu.locator("summary").evaluate(el => el === document.activeElement), true);
@@ -84,7 +102,8 @@ try {
         await page.waitForFunction(() => location.hash === "#mot-ngay");
         assert.equal(await menu.getAttribute("open"), null);
       } else {
-        await page.locator('header a[href="#mot-ngay"]').click();
+        assert.equal(await page.locator("header").getByRole("link", { name: "Đăng nhập", exact: true }).isVisible(), true);
+        await page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Một ngày tại phòng khám", exact: true }).click();
       }
       const anchorTop = await page.locator("#mot-ngay").evaluate(el => el.getBoundingClientRect().top);
       const headerBottom = await page.locator("header").evaluate(el => el.getBoundingClientRect().bottom);
@@ -124,6 +143,7 @@ try {
     assert.equal(await page.locator("h1").isVisible(), true);
     await page.locator("header details summary").click();
     assert.equal(await page.locator('header details a[href="/demo"]').isVisible(), true);
+    await page.locator("header details summary").click();
     await page.locator('details[name="landing-faq"]').first().locator("summary").click();
     assert.equal(await page.locator('details[name="landing-faq"]').first().locator("p").isVisible(), true);
     await screenshot(page, "no-javascript", true);
@@ -132,11 +152,15 @@ try {
   finally { await plain.close(); }
 
   // Read-only public endpoints; do not create a demo or touch operational records.
-  for (const endpoint of ["/demo", "/docs", "/features", "/login"]) {
+  for (const endpoint of publicTargets) {
     const response = await browser.newPage();
     try {
-      const result = await response.request.get(new URL(endpoint, base).href);
+      const target = new URL(endpoint, base);
+      assert.equal(target.origin, base.origin);
+      const result = await response.request.get(target.href);
       assert.equal(result.status(), 200, endpoint);
+      // A successful docs response alone cannot prove that a linked section exists.
+      if (target.hash) assert.ok((await result.text()).includes(`id="${decodeURIComponent(target.hash.slice(1))}"`), `Missing section: ${endpoint}`);
       results.push({ name: `GET ${endpoint}`, status: "pass" });
     } catch (error) { failures.push(error.message); }
     finally { await response.close(); }

@@ -174,7 +174,7 @@
   .headerInner { width: calc(100% - 48px); gap: 20px; }
   .desktopNav { gap: 20px; }
   .desktopNav a { font-size: 12px; }
-  .loginLink { display: none; }
+  .headerActions { gap: 16px; }
   .hero { gap: 36px; padding-block: 66px; }
   .hero h1 { font-size: 60px; }
   .appPanel { padding-inline: 15px; }

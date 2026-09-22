@@ -76,7 +76,7 @@ export function LandingPage({ demoUrl, sourceUrl }: Props) {
               <p className={styles.eyebrow}>02 / Chủ động từ nền tảng</p>
               <h2 id="ownership-title">Phòng khám của bạn.<br /><em>Dữ liệu do bạn chủ động.</em></h2>
               <p>Chọn hạ tầng phù hợp, phân quyền cho đội ngũ và chủ động sao lưu. Mã nguồn mở để bạn có thể kiểm tra và tự triển khai.</p>
-              <Link className={styles.lightCta} href="/docs#quick-start">Tìm hiểu cách cài đặt <ArrowUpRight size={18} aria-hidden="true" /></Link>
+              <Link className={styles.lightCta} href="/docs#before-start">Tìm hiểu cách cài đặt <ArrowUpRight size={18} aria-hidden="true" /></Link>
             </div>
             <div className={styles.ownershipDetails}>
               {[
