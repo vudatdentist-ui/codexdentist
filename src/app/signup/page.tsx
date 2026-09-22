@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
@@ -8,6 +9,7 @@ import {
   ShieldCheck,
   UsersRound,
 } from "lucide-react";
+import { trialSignupEnabled } from "@/lib/env";
 import { createTrialAccountAction } from "./actions";
 import styles from "./signup.module.css";
 
@@ -24,6 +26,10 @@ type SignupPageProps = {
 };
 
 export default async function SignupPage({ searchParams }: SignupPageProps) {
+  if (!trialSignupEnabled()) {
+    notFound();
+  }
+
   const params = await searchParams;
 
   return (
