@@ -5,16 +5,15 @@ import { PublicOdontogram } from "@/components/PublicOdontogram";
 import { appRootDomain, demoWorkspaceEnabled } from "@/lib/env";
 import {
   currentHostname,
-  isLocalHostname,
   systemSubdomainFromHostname,
   tenantSlugFromHostname,
 } from "@/lib/tenant";
 import { LandingPage } from "./_landing/LandingPage";
 
 const marketingMetadata: Metadata = {
-  title: "Codexdentist - Phần mềm quản lý phòng khám nha khoa mã nguồn mở",
+  title: "Codexdentist - Nền tảng vận hành phòng khám nha khoa",
   description:
-    "Quản lý lịch hẹn, hồ sơ bệnh nhân, điều trị, thu chi, kho và nhân sự trong một hệ thống có thể tự host.",
+    "Quản lý lịch hẹn, hồ sơ bệnh nhân, điều trị, thu chi, kho và nhân sự trong một workspace cho cả phòng khám. Dùng thử miễn phí 30 ngày.",
 };
 
 const odontogramMetadata: Metadata = {
@@ -68,11 +67,5 @@ export default async function Home({ searchParams }: HomePageProps) {
     redirect("/dashboard");
   }
 
-  const demoUrl = isLocalHostname(hostname)
-    ? "/demo"
-    : `https://demo.${appRootDomain()}`;
-  const sourceUrl =
-    process.env.NEXT_PUBLIC_SOURCE_REPOSITORY_URL?.trim() || "/docs#source";
-
-  return <LandingPage demoUrl={demoUrl} sourceUrl={sourceUrl} />;
+  return <LandingPage />;
 }
