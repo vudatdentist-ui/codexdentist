@@ -111,10 +111,20 @@ jobs:
           npm run test:pilot-workflows
         env:
           NODE_ENV: test
+      - name: Install browser
+        run: npx playwright install --with-deps chromium
+      - name: Landing responsive and interaction QA
+        run: npm run browser:landing
+      - name: Upload landing evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: landing-qa-${{ github.sha }}
+          path: output/landing-qa
+          if-no-files-found: warn
+          retention-days: 7
       - name: Browser QA
-        run: |
-          npx playwright install --with-deps chromium
-          npm run browser:qa
+        run: npm run browser:qa
         env:
           NODE_ENV: test
       - run: docker build -t codexdentist:ci .
