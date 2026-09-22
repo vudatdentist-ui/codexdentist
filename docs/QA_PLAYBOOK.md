@@ -38,6 +38,16 @@ npm run browser:qa
 
 Do not suppress a failing safety test to complete a phase. Classify the failure, fix it, and repeat the relevant gate.
 
+### Public landing page
+
+Run `npm run browser:landing` against a disposable local production build after landing changes.
+The gate captures eight viewport profiles (320-1920px, including landscape), all three
+story states, mobile navigation and FAQ states. It checks keyboard navigation,
+contrast, overflow, resource errors, links and no-JavaScript progressive enhancement.
+Screenshots and a commit-bound report are uploaded by CI as `landing-qa-<sha>`.
+Review the actual screenshots before merging; automated checks are not a visual sign-off.
+The shared demo/docs/features styling and root hostname routing must stay intact.
+
 ## 2. Finding Severity
 
 - **Blocker**: cross-tenant access, authorization bypass, PHI exposure, data loss/corruption, billing reconciliation/concurrency failure, destructive migration without safe restore, provider bypass of canonical application boundary, or broken production boot for the changed path.
