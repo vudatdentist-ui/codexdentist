@@ -13,7 +13,7 @@ import {
   type AppRole,
   type ViewKey,
 } from "@/lib/permissions";
-import { authSecret, demoAuthEnabled, sessionCookieSecure } from "@/lib/env";
+import { appRootDomain, authSecret, demoAuthEnabled, sessionCookieSecure } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 import { superAdminEmails } from "@/lib/super-admin";
@@ -117,6 +117,7 @@ export async function signIn(
   password: string,
   options?: {
     allowNeutralDemo?: boolean;
+    allowNeutralUser?: boolean;
   },
 ) {
   const normalizedEmail = email.trim().toLowerCase();
@@ -196,6 +197,13 @@ export async function signIn(
       return { ok: false as const, reason: "expired" as const };
     }
 
+    if (
+      user.organization.trialEndsAt &&
+      user.organization.trialEndsAt.getTime() <= Date.now()
+    ) {
+      return { ok: false as const, reason: "trial-expired" as const };
+    }
+
     if (tenant && user.organizationId !== tenant.id) {
       await writeAuditLog({
         organizationId: user.organizationId,
@@ -218,7 +226,8 @@ export async function signIn(
       !tenant &&
       isNeutralAppHostname(hostname) &&
       !isSuperAdminEmail(normalizedEmail) &&
-      !isAllowedNeutralDemo
+      !isAllowedNeutralDemo &&
+      options?.allowNeutralUser !== true
     ) {
       await writeAuditLog({
         organizationId: user.organizationId,
@@ -261,6 +270,10 @@ export async function signIn(
           .map((membership) => membership.clinic)
           .filter((clinic) => clinic.active);
 
+    const workspaceExpiresAt = user.organization.isDemo
+      ? user.organization.demoExpiresAt
+      : user.organization.trialEndsAt;
+
     const session = createSession({
       userId: user.id,
       email: user.email,
@@ -273,17 +286,25 @@ export async function signIn(
       organizationSlug: user.organization.slug,
       organizationDomain: user.organization.primaryDomain,
       isDemo: user.organization.isDemo,
-      workspaceExpiresAt: user.organization.demoExpiresAt?.getTime() ?? null,
+      workspaceExpiresAt: workspaceExpiresAt?.getTime() ?? null,
       clinics: scopedClinics,
       ttlSeconds: user.organization.isDemo
         ? Math.max(
             60,
             Math.floor(
-              ((user.organization.demoExpiresAt?.getTime() ?? Date.now()) - Date.now()) /
+              ((workspaceExpiresAt?.getTime() ?? Date.now()) - Date.now()) /
                 1000,
             ),
           )
-        : undefined,
+        : workspaceExpiresAt
+          ? Math.max(
+              60,
+              Math.min(
+                SESSION_TTL_SECONDS,
+                Math.floor((workspaceExpiresAt.getTime() - Date.now()) / 1000),
+              ),
+            )
+          : undefined,
     });
 
     await Promise.all([
@@ -314,7 +335,10 @@ export async function signIn(
       },
     });
 
-    return { ok: true as const };
+    return {
+      ok: true as const,
+      organizationSlug: user.organization.slug,
+    };
   } catch {
     if (process.env.NODE_ENV === "production" || !demoAuthEnabled()) {
       return { ok: false as const, reason: "database" as const };
@@ -441,6 +465,7 @@ export async function getSession(): Promise<AppSession | null> {
                 primaryDomain: true,
                 isDemo: true,
                 demoExpiresAt: true,
+                trialEndsAt: true,
                 clinics: {
                   where: {
                     active: true,
@@ -492,6 +517,13 @@ export async function getSession(): Promise<AppSession | null> {
       return null;
     }
 
+    if (
+      storedSession.user.organization.trialEndsAt &&
+      storedSession.user.organization.trialEndsAt.getTime() <= Date.now()
+    ) {
+      return null;
+    }
+
     const roleAssignments = normalizeRoleAssignments(
       storedSession.user.role as AppRole,
       storedSession.user.organizationId,
@@ -524,7 +556,11 @@ export async function getSession(): Promise<AppSession | null> {
       organizationDomain: storedSession.user.organization.primaryDomain,
       isDemo: storedSession.user.organization.isDemo,
       workspaceExpiresAt:
-        storedSession.user.organization.demoExpiresAt?.getTime() ?? null,
+        (
+          storedSession.user.organization.isDemo
+            ? storedSession.user.organization.demoExpiresAt
+            : storedSession.user.organization.trialEndsAt
+        )?.getTime() ?? null,
       clinics,
       clinicIds,
       activeClinicId,
@@ -650,8 +686,15 @@ function rolesFromAssignments(
 async function setSessionCookie(session: AppSession) {
   const cookieStore = await cookies();
   const maxAge = Math.max(60, Math.floor((session.expiresAt - Date.now()) / 1000));
+  const hostname = await currentHostname();
+  const rootDomain = appRootDomain();
+  const sharedDomain =
+    hostname === rootDomain || hostname.endsWith(`.${rootDomain}`)
+      ? `.${rootDomain}`
+      : undefined;
 
   cookieStore.set(SESSION_COOKIE, signPayload(session), {
+    ...(sharedDomain ? { domain: sharedDomain } : {}),
     httpOnly: true,
     maxAge,
     path: "/",
