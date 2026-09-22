@@ -45,6 +45,7 @@ try {
       await page.locator('[data-landing-page="true"]').waitFor();
       await page.evaluate(() => document.fonts.ready);
       assert.equal(await page.locator("h1").count(), 1);
+      assert.equal(await page.locator("h1 em").evaluate(el => getComputedStyle(el).fontStyle), "normal", "Vietnamese display emphasis must not use the broken serif italic face");
       assert.match(await page.title(), /Codexdentist/);
       for (const href of await page.locator('[data-landing-page] a[href^="/"]').evaluateAll(links => links.map(a => a.getAttribute("href")))) publicTargets.add(href);
       layoutFindings.push(...await inspectLayout(page));
