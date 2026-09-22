@@ -7,6 +7,7 @@ type LoginPageProps = {
     error?: string;
     forgot?: string;
     reset?: string;
+    signup?: string;
   }>;
 };
 
@@ -47,6 +48,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         {params?.reset === "success" && (
           <p className="login-success">
             Đã lưu mật khẩu. Hãy đăng nhập bằng mật khẩu mới.
+          </p>
+        )}
+        {params?.signup === "created" && (
+          <p className="login-success">
+            Tài khoản dùng thử 30 ngày đã được tạo. Hãy đăng nhập để bắt đầu.
           </p>
         )}
         {params?.forgot === "sent" && (
@@ -133,7 +139,11 @@ function loginErrorText(error: string) {
   }
 
   if (error === "expired") {
-    return "Không gian dùng thử đã hết hạn. Hãy tạo một phiên dùng thử 24 giờ mới.";
+    return "Không gian demo đã hết hạn.";
+  }
+
+  if (error === "trial-expired") {
+    return "Thời gian dùng thử 30 ngày đã kết thúc. Vui lòng liên hệ để tiếp tục sử dụng workspace.";
   }
 
   return "Email hoặc mật khẩu không đúng.";
