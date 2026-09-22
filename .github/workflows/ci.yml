@@ -39,6 +39,7 @@ jobs:
       PATIENT_FILE_STORAGE_DRIVER: local
       SESSION_COOKIE_SECURE: "false"
       TRUSTED_PROXY_PROVIDER: reverse-proxy
+      TRIAL_SIGNUP_ENABLED: "true"
 
     steps:
       - uses: actions/checkout@v7
@@ -78,8 +79,6 @@ jobs:
           NODE_ENV: test
       - run: npm run build
       - name: Start production server
-        env:
-          TRIAL_SIGNUP_ENABLED: "true"
         run: |
           npm start > /tmp/codexdentist.log 2>&1 &
           for attempt in {1..30}; do
