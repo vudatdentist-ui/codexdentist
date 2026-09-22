@@ -21,6 +21,7 @@ import {
   currentHostname,
   findTenantOrganization,
   isNeutralAppHostname,
+  systemSubdomainFromHostname,
   tenantSlugFromHostname,
 } from "@/lib/tenant";
 
@@ -441,6 +442,7 @@ export async function getSession(): Promise<AppSession | null> {
 
   const hostname = await currentHostname();
   const tenantSlug = tenantSlugFromHostname(hostname);
+  const systemSubdomain = systemSubdomainFromHostname(hostname);
 
   if (tenantSlug && session.organizationSlug !== tenantSlug) {
     return null;
@@ -448,10 +450,14 @@ export async function getSession(): Promise<AppSession | null> {
 
   if (
     !tenantSlug &&
-    isNeutralAppHostname(hostname) &&
+    (isNeutralAppHostname(hostname) || systemSubdomain !== null) &&
     !isSuperAdminEmail(session.email) &&
     !session.isDemo
   ) {
+    return null;
+  }
+
+  if (session.isDemo && systemSubdomain && systemSubdomain !== "demo") {
     return null;
   }
 
