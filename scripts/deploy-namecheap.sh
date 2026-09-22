@@ -41,6 +41,15 @@ if ! flock -n 9; then
   exit 1
 fi
 
+# A failed recovery is evidence, not disposable staging. Retrying any SHA must
+# not erase the only remaining good files or layer a new release over them.
+for pending_rollback in "$APP_DIR"/.codexdentist-rollback-*; do
+  if [[ -e "$pending_rollback" || -L "$pending_rollback" ]]; then
+    echo "Unresolved rollback at $pending_rollback; manual recovery is required before another deployment." >&2
+    exit 1
+  fi
+done
+
 cutover_started=0
 
 cleanup_staging() {
@@ -57,39 +66,53 @@ stop_app() {
 
 restore_previous_release() {
   local status=$?
+  local rollback_failed=0
+  local name item had_old
   trap - ERR
   set +e
 
   if [[ "$cutover_started" == "1" ]]; then
     echo "Deployment failed after cutover started; restoring previous release." >&2
-    stop_app || true
+    if ! stop_app; then
+      echo "Could not stop the application for rollback; preserving $ROLLBACK_DIR and staging for manual recovery." >&2
+      exit "$status"
+    fi
 
     if [[ -f "$PROMOTED_MANIFEST" ]]; then
+      # Old entries still in APP_DIR were never moved. Restore only actual
+      # backups below, and remove newly introduced entries from the manifest.
       while IFS=$'\t' read -r had_old name; do
         [[ -n "$name" ]] || continue
-
-        if [[ "$had_old" == "1" ]]; then
-          if [[ -e "$ROLLBACK_DIR/$name" || -L "$ROLLBACK_DIR/$name" ]]; then
-            rm -rf -- "$APP_DIR/$name"
-            mv -- "$ROLLBACK_DIR/$name" "$APP_DIR/$name" || true
+        if [[ "$had_old" == "0" ]]; then
+          if ! rm -rf -- "$APP_DIR/$name"; then
+            rollback_failed=1
           fi
-        else
-          rm -rf -- "$APP_DIR/$name"
         fi
       done < "$PROMOTED_MANIFEST"
     fi
 
-    # Defensive fallback for any item moved to rollback but not restored above.
-    if [[ -d "$ROLLBACK_DIR" ]]; then
-      while IFS= read -r -d '' item; do
-        name="${item##*/}"
-        [[ "$name" == ".promoted-items" ]] && continue
-        rm -rf -- "$APP_DIR/$name"
-        mv -- "$item" "$APP_DIR/$name" || true
-      done < <(find "$ROLLBACK_DIR" -mindepth 1 -maxdepth 1 -print0)
-    fi
+    # Nullglob/dotglob includes hidden runtime entries without a subprocess
+    # whose enumeration errors could be lost behind process substitution.
+    shopt -s nullglob dotglob
+    for item in "$ROLLBACK_DIR"/*; do
+      name="${item##*/}"
+      [[ "$name" == ".promoted-items" ]] && continue
+      if ! { rm -rf -- "$APP_DIR/$name" && mv -- "$item" "$APP_DIR/$name"; }; then
+        echo "Could not restore $name from $ROLLBACK_DIR." >&2
+        rollback_failed=1
+      fi
+    done
+    shopt -u nullglob dotglob
 
-    start_app || true
+    if [[ "$rollback_failed" == "0" ]]; then
+      if ! start_app; then
+        rollback_failed=1
+      fi
+    fi
+    if [[ "$rollback_failed" != "0" ]]; then
+      echo "Rollback incomplete; preserving $ROLLBACK_DIR and staging for manual recovery. No further automatic restart will be attempted." >&2
+      exit "$status"
+    fi
   fi
 
   cleanup_staging

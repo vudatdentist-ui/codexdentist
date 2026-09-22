@@ -1,6 +1,6 @@
 # Operations
 
-Last updated: 2026-08-27
+Last updated: 2026-09-22
 
 ## Local PC
 
@@ -51,9 +51,20 @@ Self-host storage:
 
 ### Automatic deploy from GitHub `main`
 
-The repository deploys to the Namecheap cPanel app after a successful commit to `main` through `.github/workflows/deploy-namecheap.yml`. The workflow uploads a source archive over SSH, stages it outside the live app, builds with the physical dependency tree in the cPanel app root, runs Prisma migrations, updates only application files, and restarts the existing CloudLinux Node.js app.
+The repository deploys to the Namecheap cPanel app after a successful push CI run for the current `main` SHA through `.github/workflows/deploy-namecheap.yml`. The workflow downloads that run's verified hosted release archive and uploads it over SSH. It stages the archive separately, installs dependencies, generates Prisma, runs backward-compatible migrations while the old application remains live, and prunes development dependencies. It stops only the existing CloudLinux Node.js app for the final file cutover; it does not build Next.js on the hosting server.
 
-It never reads, replaces, or commits the production `.env`, PostgreSQL data, protected files, backups, or the physical `node_modules` directory.
+The deploy script never replaces the production `.env`, protected patient files, or backups. It copies `.env` into the isolated staging directory for preparation; a fresh physical `node_modules` tree is prepared there and promoted with the application. PostgreSQL migrations are explicit database changes, not a reset or data replacement.
+
+CI must package and boot the extracted archive on pull requests as well as `main`. It checks `server.cjs` with production-only dependencies, health/database/schema, and login. Only a successful push to `main` uploads the production artifact. From a clean, built CI checkout with synthetic test data:
+
+```sh
+node --test scripts/package-release.test.mjs scripts/deploy-namecheap.test.mjs
+node scripts/package-release.mjs "$GITHUB_SHA" "$RUNNER_TEMP/codexdentist-artifact/release.tar.gz"
+```
+
+The packager uses explicit runtime inputs, excludes environment files, patient storage/backups, QA output and build caches, and verifies SHA/build identity from the archive before publishing. Never package a live application directory: generated pages can contain application data. The deployment regression tests simulate host commands and filesystem failures; they do not replace a real hosting or database restore drill.
+
+If rollback cannot stop the app, restore a file, or restart the restored app, the script retains rollback/staging state and exits unsuccessfully. Any remaining `.codexdentist-rollback-*` directory blocks another deployment, including retries with a different SHA. Do not delete it to bypass the guard. Stop only the affected app, preserve a separate copy of the remaining recovery files and `.promoted-items`, reconcile restored and pending entries, then verify health and routes. Remove the resolved rollback marker only after recovery is verified; otherwise retain it and investigate the filesystem or hosting failure.
 
 Configure these GitHub repository secrets once:
 
@@ -85,7 +96,7 @@ Cloudflare SSL mode is `Full (strict)`. cPanel has a Cloudflare Origin CA certif
 
 The cache rule `Cache public odontogram shell` applies only to `odontogram.codexdentist.com/` with a one-hour edge TTL and `Browser TTL: Bypass cache`. The app also declares `Cache-Control: no-store, max-age=0, must-revalidate` for that host/root; Cloudflare's browser-TTL override is authoritative because LiteSpeed may replace the origin `max-age`. The resulting public response must remain `no-store` while Cloudflare may retain its forced edge copy. After each shared-host deployment, purge that exact URL in Cloudflare, request it once to warm the new HTML, then verify a non-empty `MISS` followed by non-empty `HIT` responses. Do not broaden this rule to authenticated app routes or patient data.
 
-Stellar Plus limits memory and process creation during builds. Stop only this Node.js app before installing dependencies, use one Next.js worker, and prune development dependencies before starting it again:
+For an emergency manual rebuild only, Stellar Plus limits memory and process creation during builds. Normal CI-artifact deployment does not run this build sequence. Stop only this Node.js app before installing dependencies, use one Next.js worker, and prune development dependencies before starting it again:
 
 ```sh
 cloudlinux-selector stop --json --interpreter nodejs --domain codexdentist.com --app-root codexdentist-app

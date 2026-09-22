@@ -63,8 +63,8 @@ jobs:
           set -euo pipefail
           bash -n scripts/deploy-namecheap.sh
           node --check scripts/check-migration-safety.mjs
-      - name: Release packaging regression tests
-        run: node --test scripts/package-release.test.mjs
+      - name: Release and rollback regression tests
+        run: node --test scripts/package-release.test.mjs scripts/deploy-namecheap.test.mjs
       - name: Enforce backward-compatible migrations
         run: node scripts/check-migration-safety.mjs
         env:
