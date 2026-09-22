@@ -89,7 +89,7 @@ try {
   await context.clearCookies();
 
   await page.goto(new URL("/login", base).href, { waitUntil: "networkidle" });
-  await page.getByLabel("Email").fill(email);
+  await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Mật khẩu").fill(password);
 
   await Promise.all([
