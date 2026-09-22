@@ -127,6 +127,8 @@ jobs:
         run: npm run browser:qa
         env:
           NODE_ENV: test
+      - name: Hosted trial signup and expiry QA
+        run: npm run browser:trial-signup
       - run: docker build -t codexdentist:ci .
       - name: Stop verification server
         shell: bash
