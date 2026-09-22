@@ -403,7 +403,22 @@ export async function signOut() {
   }
 
   const cookieStore = await cookies();
+  const hostname = await currentHostname();
+  const sharedDomain = sessionCookieDomain(hostname);
+
+  // Clear both the legacy host-only cookie and the hosted parent-domain cookie.
   cookieStore.delete(SESSION_COOKIE);
+
+  if (sharedDomain) {
+    cookieStore.set(SESSION_COOKIE, "", {
+      domain: sharedDomain,
+      httpOnly: true,
+      maxAge: 0,
+      path: "/",
+      sameSite: "lax",
+      secure: sessionCookieSecure(),
+    });
+  }
 }
 
 export async function getSession(): Promise<AppSession | null> {
@@ -690,11 +705,7 @@ async function setSessionCookie(session: AppSession) {
   const cookieStore = await cookies();
   const maxAge = Math.max(60, Math.floor((session.expiresAt - Date.now()) / 1000));
   const hostname = await currentHostname();
-  const rootDomain = appRootDomain();
-  const sharedDomain =
-    hostname === rootDomain || hostname.endsWith(`.${rootDomain}`)
-      ? `.${rootDomain}`
-      : undefined;
+  const sharedDomain = sessionCookieDomain(hostname);
 
   cookieStore.set(SESSION_COOKIE, signPayload(session), {
     ...(sharedDomain ? { domain: sharedDomain } : {}),
@@ -704,6 +715,14 @@ async function setSessionCookie(session: AppSession) {
     sameSite: "lax",
     secure: sessionCookieSecure(),
   });
+}
+
+function sessionCookieDomain(hostname: string) {
+  const rootDomain = appRootDomain();
+
+  return hostname === rootDomain || hostname.endsWith(`.${rootDomain}`)
+    ? `.${rootDomain}`
+    : undefined;
 }
 
 function signPayload(session: AppSession) {
