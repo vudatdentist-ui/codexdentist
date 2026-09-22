@@ -102,6 +102,16 @@ export function demoWorkspaceEnabled() {
   return process.env.DEMO_WORKSPACE_ENABLED === "true";
 }
 
+export function trialSignupEnabled() {
+  const explicit = process.env.TRIAL_SIGNUP_ENABLED?.trim().toLowerCase();
+
+  if (explicit) {
+    return ["1", "true", "yes"].includes(explicit);
+  }
+
+  return deploymentMode() === "hosted";
+}
+
 export function demoWorkspaceTtlHours() {
   const parsed = Number(process.env.DEMO_WORKSPACE_TTL_HOURS ?? "24");
 
