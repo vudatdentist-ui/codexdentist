@@ -104,7 +104,7 @@ try {
         assert.equal(await menu.getAttribute("open"), null);
       } else {
         assert.equal(await page.locator("header").getByRole("link", { name: "Đăng nhập", exact: true }).isVisible(), true);
-        await page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Một ngày tại phòng khám", exact: true }).click();
+        await page.getByRole("navigation", { name: "Điều hướng chính", exact: true }).getByRole("link", { name: "Cách vận hành", exact: true }).click();
       }
       const anchorTop = await page.locator("#mot-ngay").evaluate(el => el.getBoundingClientRect().top);
       const headerBottom = await page.locator("header").evaluate(el => el.getBoundingClientRect().bottom);
