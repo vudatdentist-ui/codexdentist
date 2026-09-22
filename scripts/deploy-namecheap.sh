@@ -141,6 +141,29 @@ fi
 
 export PATH="$NODE_BIN:$PATH"
 
+# Prisma 7 evaluates prisma.config.ts before reading project environment files.
+# Parse only DATABASE_URL from the protected production .env with Node 22 rather
+# than sourcing arbitrary shell content. Missing database configuration must
+# fail before migrations and before the live application is stopped.
+DATABASE_URL="$(
+  "$NODE_BIN/node" - "$RELEASE_DIR/.env" <<'NODE'
+const { readFileSync } = require("node:fs");
+const { parseEnv } = require("node:util");
+
+const envPath = process.argv[2];
+const parsed = parseEnv(readFileSync(envPath, "utf8"));
+const databaseUrl = parsed.DATABASE_URL;
+
+if (!databaseUrl?.trim()) {
+  console.error("Production .env is missing DATABASE_URL; refusing to run migrations.");
+  process.exit(78);
+}
+
+process.stdout.write(databaseUrl);
+NODE
+)"
+export DATABASE_URL
+
 # Prepare the complete runtime tree while the currently deployed application
 # continues serving traffic. The release artifact was already built and tested
 # in CI, so shared hosting no longer performs a production Next.js build.

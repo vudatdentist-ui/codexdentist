@@ -9,6 +9,8 @@ const sha = "a".repeat(40);
 const source = readFileSync(new URL("./deploy-namecheap.sh", import.meta.url), "utf8");
 const runtimeDeclaration = 'NODE_BIN="/opt/alt/alt-nodejs22/root/usr/bin"';
 const realMv = execFileSync("which", ["mv"], { encoding: "utf8" }).trim();
+const fixtureDatabaseUrl = "postgresql://fixture_user:fixture_pass@db.invalid:5432/codexdentist?schema=public";
+const fixtureEnv = `DATABASE_URL="${fixtureDatabaseUrl}"\nAPP_BASE_URL="https://fixture.invalid"\n`;
 
 function put(root, path, text, mode = 0o600) {
   mkdirSync(dirname(join(root, path)), { recursive: true });
@@ -25,7 +27,7 @@ function fixture(t, options = {}) {
   const bin = join(root, "bin");
   mkdirSync(bin);
   for (const [path, text] of Object.entries({
-    "server.cjs": "old", ".next/BUILD_ID": "old-build", ".env": "protected-environment",
+    "server.cjs": "old", ".next/BUILD_ID": "old-build", ".env": fixtureEnv,
     "storage/patient.bin": "protected-patient-fixture", "backups/database.sql": "protected-backup-fixture",
   })) put(app, path, text);
   const payload = join(root, "payload");
@@ -39,7 +41,16 @@ function fixture(t, options = {}) {
   symlinkSync(process.execPath, join(bin, "node"));
   const command = (name, body) => put(bin, name, `#!/usr/bin/env bash\nset -euo pipefail\n${body}\n`, 0o700);
   command("npm", 'echo "npm $*" >> "$MOCK_EVENTS"; exit "${MOCK_NPM_FAILURE:-0}"');
-  command("npx", 'echo "npx $*" >> "$MOCK_EVENTS"');
+  command("npx", `
+    echo "npx $*" >> "$MOCK_EVENTS"
+    if [[ "$*" == "prisma migrate deploy" ]]; then
+      if [[ "\${DATABASE_URL:-}" != "$MOCK_DATABASE_URL" ]]; then
+        echo "Migration did not receive DATABASE_URL from the protected production .env." >&2
+        exit 65
+      fi
+      echo "migration-env-ok" >> "$MOCK_EVENTS"
+    fi
+  `);
   command("sleep", ":");
   command("curl", `printf '%s\\n' '{"status":"ok","database":"ok","schema":"ok"}'`);
   command("cloudlinux-selector", `
@@ -71,13 +82,14 @@ function fixture(t, options = {}) {
       cwd: root, encoding: "utf8", timeout: 10_000,
       env: { ...process.env, HOME: root, PATH: `${bin}:${process.env.PATH}`, MOCK_APP: app,
         MOCK_EVENTS: events, MOCK_REAL_MV: realMv, MOCK_START_FAILURE: "1",
-        MOCK_STOP_FAILURE: "0", MOCK_RESTORE_FAILURE: "0", MOCK_NPM_FAILURE: "0", ...options },
+        MOCK_STOP_FAILURE: "0", MOCK_RESTORE_FAILURE: "0", MOCK_NPM_FAILURE: "0",
+        MOCK_DATABASE_URL: fixtureDatabaseUrl, ...options },
     }),
   };
 }
 
 function protectedFilesUnchanged(f) {
-  assert.equal(f.read(".env"), "protected-environment");
+  assert.equal(f.read(".env"), fixtureEnv);
   assert.equal(f.read("storage/patient.bin"), "protected-patient-fixture");
   assert.equal(f.read("backups/database.sql"), "protected-backup-fixture");
 }
@@ -140,6 +152,17 @@ test("dependency preparation failure never stops or mutates the live application
   protectedFilesUnchanged(f);
 });
 
+test("missing DATABASE_URL fails before migration and before touching the live application", (t) => {
+  const f = fixture(t, { MOCK_START_FAILURE: "0" });
+  writeFileSync(join(f.app, ".env"), 'APP_BASE_URL="https://fixture.invalid"\n');
+  const result = f.run();
+  assert.equal(result.status, 78, result.stderr);
+  assert.equal(f.read("server.cjs"), "old");
+  assert.equal(f.events().some((e) => e === "start" || e === "stop"), false);
+  assert.equal(f.events().includes("migration-env-ok"), false);
+  assert.match(result.stderr, /missing DATABASE_URL/i);
+});
+
 test("healthy release cleans rollback state only after the readiness and stability checks", (t) => {
   const f = fixture(t, { MOCK_START_FAILURE: "0" });
   const result = f.run();
@@ -148,5 +171,6 @@ test("healthy release cleans rollback state only after the readiness and stabili
   assert.equal(f.read(".next/BUILD_ID"), "new-build");
   assert.equal(existsSync(f.rollback), false);
   assert.deepEqual(f.events().filter((e) => e === "start" || e === "stop"), ["stop", "start"]);
+  assert.equal(f.events().includes("migration-env-ok"), true, "migration must receive the protected production DATABASE_URL");
   protectedFilesUnchanged(f);
 });
