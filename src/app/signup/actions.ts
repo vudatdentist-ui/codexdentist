@@ -3,6 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { signIn } from "@/lib/auth";
+import { trialSignupEnabled } from "@/lib/env";
 import { consumeTrialSignupAttempt } from "@/lib/rate-limit";
 import { clientIpFromHeaders } from "@/lib/request-ip";
 import {
@@ -16,6 +17,10 @@ import {
 } from "@/lib/trial-workspaces";
 
 export async function createTrialAccountAction(formData: FormData) {
+  if (!trialSignupEnabled()) {
+    redirect("/");
+  }
+
   const clinicName = requiredString(formData.get("clinicName"));
   const city = requiredString(formData.get("city"));
   const ownerFullName = requiredString(formData.get("ownerFullName"));
