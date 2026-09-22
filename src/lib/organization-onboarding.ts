@@ -16,6 +16,7 @@ type OrganizationWorkspaceInput = {
   address: string;
   isDemo?: boolean;
   demoExpiresAt?: Date | null;
+  trialEndsAt?: Date | null;
   seedDemoData?: boolean;
   requireEmptyDatabase?: boolean;
 };
@@ -49,6 +50,7 @@ export async function createOrganizationWorkspace(input: OrganizationWorkspaceIn
         primaryDomain: null,
         isDemo: input.isDemo ?? false,
         demoExpiresAt: input.demoExpiresAt ?? null,
+        trialEndsAt: input.trialEndsAt ?? null,
       },
     });
     const chain = await tx.chain.create({
@@ -120,12 +122,23 @@ export async function createOrganizationWorkspace(input: OrganizationWorkspaceIn
       data: {
         organizationId: organization.id,
         actorId: owner.id,
-        action: input.isDemo ? "demo.workspace_created" : "organization.setup_completed",
+        action: input.isDemo
+          ? "demo.workspace_created"
+          : input.trialEndsAt
+            ? "trial.workspace_created"
+            : "organization.setup_completed",
         entityType: "Organization",
         entityId: organization.id,
         metadata: {
-          expiresAt: input.demoExpiresAt?.toISOString() ?? null,
-          source: input.isDemo ? "public-demo" : "first-run",
+          expiresAt:
+            input.demoExpiresAt?.toISOString() ??
+            input.trialEndsAt?.toISOString() ??
+            null,
+          source: input.isDemo
+            ? "public-demo"
+            : input.trialEndsAt
+              ? "public-trial"
+              : "first-run",
         },
       },
     });
