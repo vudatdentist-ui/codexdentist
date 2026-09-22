@@ -10,7 +10,7 @@ if (!["127.0.0.1", "localhost", "[::1]"].includes(base.hostname)) {
 const output = path.resolve("output/landing-qa");
 await mkdir(output, { recursive: true });
 const results = [];
-const publicTargets = new Set(["/demo", "/docs", "/features", "/login"]);
+const publicTargets = new Set(["/signup", "/docs", "/features", "/login"]);
 const browser = await chromium.launch({
   headless: true,
   ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH
@@ -123,7 +123,9 @@ try {
       if (name === "mobile") await page.locator("#cau-hoi").screenshot({ path: path.join(output, "mobile-faq.png") });
       await page.keyboard.press("Enter");
       await page.evaluate(() => window.scrollTo(0, 0));
-      assert.ok(await page.locator('a[href="/demo"]').count() >= 3, "Local demo CTAs must remain available");
+      assert.ok(await page.locator('a[href="/signup"]').count() >= 3, "Hosted trial CTAs must remain available");
+      const marketingText = await page.locator('[data-landing-page="true"]').innerText();
+      assert.doesNotMatch(marketingText, /mã nguồn mở|tự triển khai|dùng thử 24 giờ/i, "Hosted landing must not retain open-source or 24-hour demo positioning");
       const brokenAnchors = await page.locator('[data-landing-page] a[href^="#"]').evaluateAll(links => links.map(a => a.getAttribute("href")).filter(href => !document.getElementById(href.slice(1))));
       assert.deepEqual(brokenAnchors, []);
       assert.deepEqual(errors, [], "No browser exceptions or failed same-origin resources");
@@ -143,7 +145,7 @@ try {
     await page.goto(base.href, { waitUntil: "load" });
     assert.equal(await page.locator("h1").isVisible(), true);
     await page.locator("header details summary").click();
-    assert.equal(await page.locator('header details a[href="/demo"]').isVisible(), true);
+    assert.equal(await page.locator('header details a[href="/signup"]').isVisible(), true);
     await page.locator("header details summary").click();
     await page.locator('details[name="landing-faq"]').first().locator("summary").click();
     assert.equal(await page.locator('details[name="landing-faq"]').first().locator("p").isVisible(), true);
@@ -152,7 +154,7 @@ try {
   } catch (error) { failures.push(`no-javascript: ${error.message}`); }
   finally { await plain.close(); }
 
-  // Read-only public endpoints; do not create a demo or touch operational records.
+  // Public marketing endpoints are read-only here. Trial creation has a separate browser smoke.
   for (const endpoint of publicTargets) {
     const response = await browser.newPage();
     try {
