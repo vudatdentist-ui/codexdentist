@@ -224,7 +224,7 @@ NODE
 
 check_routes() {
   local route
-  for route in / /login; do
+  for route in / /signup /login; do
     curl --fail --silent --show-error --location --max-time 20 \
       --output /dev/null "https://${DOMAIN}${route}" || return 1
   done
