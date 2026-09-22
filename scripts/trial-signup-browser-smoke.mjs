@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { chromium } from "playwright";
 
@@ -9,7 +10,12 @@ if (!["127.0.0.1", "localhost", "[::1]"].includes(base.hostname)) {
   throw new Error("Trial signup smoke must target a disposable loopback server.");
 }
 
-const prisma = new PrismaClient();
+const connectionString =
+  process.env.DATABASE_URL ??
+  "postgresql://postgres:postgres@localhost:5432/vietnam_dental_suite?schema=public";
+const prisma = new PrismaClient({
+  adapter: new PrismaPg({ connectionString }),
+});
 const browser = await chromium.launch({
   headless: true,
   ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH
