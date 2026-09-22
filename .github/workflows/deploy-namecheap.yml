@@ -145,7 +145,7 @@ jobs:
           NODE
           }
 
-          for route in / /login; do
+          for route in / /signup /login; do
             curl --fail --silent --show-error --location --max-time 20 \
               --output /dev/null "https://${DEPLOY_DOMAIN}${route}"
           done
