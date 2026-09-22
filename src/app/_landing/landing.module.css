@@ -39,6 +39,7 @@
 .eyebrow { font-size: 11px; font-weight: 650; letter-spacing: 1.4px; line-height: 1.8; text-transform: uppercase; display: flex; align-items: center; gap: 9px; }
 .eyebrow > span { height: 6px; width: 6px; flex: 0 0 6px; background: var(--leaf); border-radius: 50%; }
 .hero h1, .sectionIntro h2, .ownership h2, .faq h2, .invitation h2 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; letter-spacing: -2.8px; line-height: 1.1; text-wrap: balance; }
+.landing :where(h1, h2) em { font-style: normal; }
 .hero h1 { font-size: clamp(52px, 4.9vw, 76px); margin-top: 26px; }
 .hero h1 em, .sectionIntro h2 em, .faq h2 em, .invitation h2 em { font-weight: 400; color: var(--leaf); }
 .heroLead { max-width: 460px; margin-top: 26px !important; font-size: 16px; line-height: 1.85; color: var(--quiet); }
