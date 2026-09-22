@@ -1,0 +1,75 @@
+name: Landing baseline
+on:
+  push:
+    branches: [qa/landing-baseline-20260922]
+permissions:
+  contents: read
+jobs:
+  capture:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NODE_ENV: production
+      DEPLOYMENT_MODE: self-hosted
+      CODEXDENTIST_BUILD: "1"
+      DATABASE_URL: postgresql://test:test@127.0.0.1:5432/test
+      APP_BASE_URL: http://127.0.0.1:3000
+      AUTH_SECRET: isolated-landing-test-secret-at-least-32-characters
+      JOB_SECRET: isolated-landing-job-secret-at-least-32-characters
+      PATIENT_FILE_STORAGE_DRIVER: local
+      SESSION_COOKIE_SECURE: "false"
+      NEXT_TELEMETRY_DISABLED: "1"
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: e7ce96b17abf1cfb99b8903c03530b80f882896d
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --include=dev --no-audit --no-fund
+      - run: npm run encoding:check && npm run typecheck && node scripts/agent-module-audit.mjs
+      - run: npm run build
+      - name: Package disposable offline checkout
+        run: |
+          tar --exclude='./.git' --exclude='./.next/cache' --exclude='./output' --exclude='./storage' --exclude='./.env*' -czf "$RUNNER_TEMP/landing-offline.tar.gz" .
+      - uses: actions/upload-artifact@v4
+        with:
+          name: landing-offline-e7ce96b
+          path: ${{ runner.temp }}/landing-offline.tar.gz
+          retention-days: 1
+      - run: npx playwright install --with-deps chromium
+      - name: Capture original landing
+        shell: bash
+        run: |
+          node node_modules/next/dist/bin/next start --hostname 127.0.0.1 > /tmp/landing-baseline.log 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid" || true' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent http://127.0.0.1:3000/ > /dev/null; then break; fi
+            sleep 2
+          done
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          import { mkdir, writeFile } from 'node:fs/promises';
+          const out='output/landing-baseline';
+          await mkdir(out,{recursive:true});
+          const browser=await chromium.launch({headless:true});
+          for(const [name,width,height] of [['desktop',1440,1000],['mobile',390,844]]) {
+            const page=await browser.newPage({viewport:{width,height}});
+            const response=await page.goto('http://127.0.0.1:3000/',{waitUntil:'networkidle'});
+            if(response.status()!==200) throw new Error('Landing unavailable');
+            await page.screenshot({path:`${out}/${name}.png`,fullPage:true});
+            await writeFile(`${out}/${name}.html`,await page.content());
+            await page.close();
+          }
+          await browser.close();
+          NODE
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: landing-baseline-e7ce96b
+          path: output/landing-baseline
+          retention-days: 7
+          if-no-files-found: error
