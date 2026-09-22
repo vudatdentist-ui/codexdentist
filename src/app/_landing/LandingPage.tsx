@@ -3,7 +3,6 @@ import {
   ArrowDown,
   ArrowRight,
   ArrowUpRight,
-  BookOpen,
   CalendarDays,
   CheckCircle2,
   HeartPulse,
@@ -274,9 +273,9 @@ export function LandingPage() {
               <br />
               <em>tự mình đánh giá.</em>
             </h2>
-            <Link className={styles.textLink} href="/docs">
-              <BookOpen size={18} aria-hidden="true" />
-              Đọc thêm trong tài liệu
+            <Link className={styles.textLink} href="/features">
+              Xem toàn bộ tính năng
+              <ArrowUpRight size={17} aria-hidden="true" />
             </Link>
           </div>
 
@@ -356,7 +355,6 @@ export function LandingPage() {
 
         <nav aria-label="Liên kết cuối trang">
           <Link href="/features">Tính năng</Link>
-          <Link href="/docs">Tài liệu</Link>
           <Link href="/signup">Dùng thử 30 ngày</Link>
           <Link href="/login">Đăng nhập</Link>
         </nav>
