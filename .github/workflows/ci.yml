@@ -63,6 +63,8 @@ jobs:
           set -euo pipefail
           bash -n scripts/deploy-namecheap.sh
           node --check scripts/check-migration-safety.mjs
+      - name: Release and rollback regression tests
+        run: node --test scripts/package-release.test.mjs scripts/deploy-namecheap.test.mjs
       - name: Enforce backward-compatible migrations
         run: node scripts/check-migration-safety.mjs
         env:
@@ -138,7 +140,12 @@ jobs:
           rm -rf .next
           npm run build
           test -d .next
-      - name: Verify hosted release boots
+      - name: Package production release artifact
+        shell: bash
+        run: node scripts/package-release.mjs "$GITHUB_SHA" "$RUNNER_TEMP/codexdentist-artifact/release.tar.gz"
+      - name: Install production-only runtime dependencies
+        run: npm prune --omit=dev --ignore-scripts --no-audit --no-fund
+      - name: Verify extracted hosted release boots
         shell: bash
         env:
           CODEXDENTIST_BUILD: "1"
@@ -153,15 +160,25 @@ jobs:
           SESSION_COOKIE_SECURE: "true"
           TRUSTED_PROXY_PROVIDER: cloudflare
           PORT: "3001"
+          HOSTNAME: "127.0.0.1"
         run: |
           set -euo pipefail
-          npm start > /tmp/codexdentist-hosted.log 2>&1 &
-          server_pid=$!
+          release_dir="$(mktemp -d "$RUNNER_TEMP/codexdentist-runtime-XXXXXX")"
+          server_pid=""
           cleanup() {
-            kill "$server_pid" >/dev/null 2>&1 || true
-            pkill -f 'next start' >/dev/null 2>&1 || true
+            if [[ -n "$server_pid" ]]; then
+              kill "$server_pid" >/dev/null 2>&1 || true
+              wait "$server_pid" 2>/dev/null || true
+            fi
+            rm -rf -- "$release_dir"
           }
           trap cleanup EXIT
+          tar -xzf "$RUNNER_TEMP/codexdentist-artifact/release.tar.gz" -C "$release_dir"
+          test "$(cat "$release_dir/.codexdentist-release-sha")" = "$GITHUB_SHA"
+          ln -s "$GITHUB_WORKSPACE/node_modules" "$release_dir/node_modules"
+          cd "$release_dir"
+          node server.cjs > /tmp/codexdentist-hosted.log 2>&1 &
+          server_pid=$!
 
           ready=0
           for attempt in {1..30}; do
@@ -185,33 +202,11 @@ jobs:
           node -e 'const fs=require("fs");const h=JSON.parse(fs.readFileSync("/tmp/hosted-health.json","utf8"));if(h.status!=="ok"||h.database!=="ok"||h.schema!=="ok")process.exit(1)'
           curl --fail --silent --location --header "Host: ${APP_ROOT_DOMAIN}" \
             --output /dev/null http://127.0.0.1:3001/login
-      - name: Package production release artifact
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        shell: bash
-        run: |
-          set -euo pipefail
-          printf '%s\n' "$GITHUB_SHA" > .codexdentist-release-sha
-          tar \
-            --exclude='./.git' \
-            --exclude='./node_modules' \
-            --exclude='./release.tar.gz' \
-            --exclude='./.env' \
-            --exclude='./.env.*' \
-            --exclude='./.tmp' \
-            --exclude='./coverage' \
-            --exclude='./playwright-report' \
-            --exclude='./storage' \
-            --exclude='./backups' \
-            --exclude='./test-results' \
-            -czf release.tar.gz .
-          test -s release.tar.gz
-          test -d .next
-          test "$(cat .codexdentist-release-sha)" = "$GITHUB_SHA"
       - name: Upload production release artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: actions/upload-artifact@v4
         with:
           name: codexdentist-production-${{ github.sha }}
-          path: release.tar.gz
+          path: ${{ runner.temp }}/codexdentist-artifact/release.tar.gz
           if-no-files-found: error
           retention-days: 7
