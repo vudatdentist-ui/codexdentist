@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 import { packageRelease } from "./package-release.mjs";
@@ -145,4 +146,65 @@ test("CI verifies packaging and extracted boot on PRs while publishing only from
   assert.match(upload, /if: github\.event_name == 'push' && github\.ref == 'refs\/heads\/main'/);
   assert.ok(steps.indexOf(packaging) < steps.indexOf(boot));
   assert.ok(steps.indexOf(boot) < steps.indexOf(upload));
+});
+
+
+function dependency(root, name, value) {
+  put(root, `node_modules/${name}/package.json`, JSON.stringify({ name, main: "index.cjs" }));
+  put(root, `node_modules/${name}/index.cjs`, `module.exports = ${JSON.stringify(value)};`);
+}
+
+function alias(root, name, target) {
+  const path = join(root, ".next/node_modules", name);
+  mkdirSync(dirname(path), { recursive: true });
+  symlinkSync(target, path);
+  return path;
+}
+
+test("preserves portable Turbopack aliases without bundling installed dependencies", (t) => {
+  const root = fixture(t);
+  const names = ["pg", "@prisma/client"];
+  for (const name of names) {
+    dependency(root, name, `source-${name}`);
+    const link = join(root, ".next/node_modules", `${name}-0123456789abcdef`);
+    const target = join(root, "node_modules", name);
+    // Both absolute build-host links and already-relative links become portable.
+    alias(root, `${name}-0123456789abcdef`, name === "pg" ? target : relative(dirname(link), target));
+  }
+  const output = join(root, "release.tar.gz");
+  packageRelease({ sourceDir: root, outputPath: output, sha });
+  const extracted = unpack(root, output);
+  assert.equal(existsSync(join(extracted, "node_modules")), false, "dependencies must be installed separately");
+  for (const name of names) {
+    const link = join(extracted, ".next/node_modules", `${name}-0123456789abcdef`);
+    assert.equal(lstatSync(link).isSymbolicLink(), true, name);
+    assert.equal(readlinkSync(link), relative(dirname(link), join(extracted, "node_modules", name)));
+    dependency(extracted, name, `installed-${name}`);
+  }
+  rmSync(join(root, "node_modules"), { recursive: true });
+  const require = createRequire(join(extracted, ".next/server/probe.cjs"));
+  for (const name of names) assert.equal(require(`${name}-0123456789abcdef`), `installed-${name}`);
+});
+
+test("rejects unsafe or broken runtime aliases without replacing the previous archive", (t) => {
+  for (const kind of ["outside", "transitive-escape", "broken", "file", "alias-root"]) {
+    const root = fixture(t);
+    dependency(root, "pg", "fixture");
+    put(root, "storage/private.txt", "protected fixture");
+    let target;
+    if (kind === "outside") target = join(root, "storage");
+    if (kind === "transitive-escape") {
+      symlinkSync(join(root, "storage"), join(root, "node_modules/escape"));
+      target = join(root, "node_modules/escape");
+    }
+    if (kind === "broken") target = join(root, "node_modules/absent");
+    if (kind === "file") target = join(root, "node_modules/pg/index.cjs");
+    if (kind === "alias-root") symlinkSync(join(root, "storage"), join(root, ".next/node_modules"));
+    else alias(root, "pg-0123456789abcdef", target);
+    const output = join(root, "release.tar.gz");
+    writeFileSync(output, "previous release");
+    assert.throws(() => packageRelease({ sourceDir: root, outputPath: output, sha }), /Unsafe runtime alias/, kind);
+    assert.equal(readFileSync(output, "utf8"), "previous release");
+    assert.equal(readFileSync(join(root, "storage/private.txt"), "utf8"), "protected fixture");
+  }
 });
