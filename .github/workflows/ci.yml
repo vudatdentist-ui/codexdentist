@@ -39,6 +39,7 @@ jobs:
       PATIENT_FILE_STORAGE_DRIVER: local
       SESSION_COOKIE_SECURE: "false"
       TRUSTED_PROXY_PROVIDER: reverse-proxy
+      TRIAL_SIGNUP_ENABLED: "true"
 
     steps:
       - uses: actions/checkout@v7
@@ -127,6 +128,8 @@ jobs:
         run: npm run browser:qa
         env:
           NODE_ENV: test
+      - name: Hosted trial signup and expiry QA
+        run: npm run browser:trial-signup
       - run: docker build -t codexdentist:ci .
       - name: Stop verification server
         shell: bash

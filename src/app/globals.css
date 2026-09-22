@@ -108,8 +108,34 @@ button {
   text-decoration: none;
 }
 
+.trial-workspace-banner {
+  align-items: center;
+  background: #edf5e8;
+  border-bottom: 1px solid #c6d8bd;
+  color: #294d39;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 7px max(16px, calc((100vw - 1240px) / 2));
+  position: relative;
+  z-index: 90;
+}
+
+.trial-workspace-banner div {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.trial-workspace-banner span {
+  font-size: 12px;
+  font-weight: 800;
+}
+
 @media (max-width: 620px) {
-  .demo-workspace-banner {
+  .demo-workspace-banner,
+  .trial-workspace-banner {
     align-items: flex-start;
     flex-direction: column;
     gap: 4px;

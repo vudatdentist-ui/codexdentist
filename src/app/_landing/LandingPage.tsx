@@ -1,108 +1,368 @@
 import Link from "next/link";
-import { ArrowDown, ArrowRight, ArrowUpRight, BookOpen, CalendarDays, DatabaseBackup, GitFork, HeartPulse, Monitor, Plus, ReceiptText, ShieldCheck, Smartphone, UsersRound } from "lucide-react";
+import {
+  ArrowDown,
+  ArrowRight,
+  ArrowUpRight,
+  CalendarDays,
+  CheckCircle2,
+  HeartPulse,
+  Monitor,
+  ReceiptText,
+  ShieldCheck,
+  Smartphone,
+  Sparkles,
+  UsersRound,
+} from "lucide-react";
 import { LandingNav } from "./LandingNav";
 import { DayPreview } from "./DayPreview";
 import styles from "./landing.module.css";
 
-type Props = { demoUrl: string; sourceUrl: string };
 const questions = [
-  ["Tôi có cần nhập dữ liệu bệnh nhân để dùng thử?", "Không. Môi trường trải nghiệm có sẵn dữ liệu giả lập và không gian riêng trong 24 giờ. Chỉ sử dụng dữ liệu giả; tải tệp và gửi thông báo ra ngoài được tắt trong bản demo."],
-  ["Phòng khám có bắt buộc dùng cloud?", "Không. Bạn có thể tự triển khai trên máy tại phòng khám hoặc máy chủ riêng. Với cài đặt nội bộ, các thiết bị truy cập qua mạng LAN; các dịch vụ bên ngoài vẫn cần kết nối Internet."],
-  ["Tôi có thể sử dụng trên điện thoại?", "Có. Giao diện web có thể truy cập từ máy tính, máy tính bảng và điện thoại. Thiết bị cần kết nối được với máy chủ của phòng khám."],
-  ["Nên bắt đầu triển khai như thế nào?", "Thử luồng làm việc trước, sau đó đọc hướng dẫn cài đặt và kiểm tra yêu cầu hạ tầng. Trước khi sử dụng hồ sơ bệnh nhân, cần thiết lập phân quyền, sao lưu và thử khôi phục."],
+  [
+    "Thời gian dùng thử kéo dài bao lâu?",
+    "Tài khoản dùng thử có hiệu lực trong 30 ngày kể từ lúc tạo. Đây là workspace riêng của phòng khám, không phải phiên demo 24 giờ.",
+  ],
+  [
+    "Tôi có cần thẻ thanh toán để bắt đầu không?",
+    "Không. Bạn có thể tạo tài khoản và dùng thử trước mà không cần nhập thông tin thẻ thanh toán.",
+  ],
+  [
+    "Tôi có thể mời nhân sự cùng dùng thử không?",
+    "Có. Chủ phòng khám có thể tạo tài khoản cho đội ngũ và phân quyền theo vai trò để thử quy trình làm việc thực tế.",
+  ],
+  [
+    "Điều gì xảy ra sau 30 ngày?",
+    "Workspace sẽ dừng truy cập khi thời gian dùng thử kết thúc cho đến khi được chuyển sang gói sử dụng phù hợp. Dữ liệu trial không bị xoá theo cơ chế demo 24 giờ.",
+  ],
 ] as const;
 
-export function LandingPage({ demoUrl, sourceUrl }: Props) {
+export function LandingPage() {
   return (
     <div className={styles.landing} data-landing-page="true">
-      <a className={styles.skipLink} href="#noi-dung">Đến nội dung chính</a>
-      <LandingNav demoUrl={demoUrl} />
+      <a className={styles.skipLink} href="#noi-dung">
+        Đến nội dung chính
+      </a>
+      <LandingNav />
+
       <main id="noi-dung" tabIndex={-1}>
-        <section className={`${styles.container} ${styles.hero}`} aria-labelledby="landing-title">
+        <section
+          className={`${styles.container} ${styles.hero}`}
+          aria-labelledby="landing-title"
+        >
           <div className={styles.heroCopy}>
-            <p className={styles.eyebrow}><span /> Phần mềm nha khoa mã nguồn mở</p>
-            <h1 id="landing-title">Từ một lịch hẹn,<br /><em>đến cả hành trình</em> chăm sóc.</h1>
-            <p className={styles.heroLead}>Lịch hẹn, hồ sơ điều trị và thu chi ở cùng một nơi. Để lễ tân, bác sĩ và quản lý tiếp nối công việc, không phải tìm lại thông tin.</p>
+            <p className={styles.eyebrow}>
+              <span /> Nền tảng vận hành phòng khám nha khoa
+            </p>
+            <h1 id="landing-title">
+              Từ một lịch hẹn,
+              <br />
+              <em>đến cả hành trình</em> chăm sóc.
+            </h1>
+            <p className={styles.heroLead}>
+              Lịch hẹn, hồ sơ điều trị, thu chi và vận hành ở cùng một nơi.
+              Để lễ tân, bác sĩ và quản lý tiếp nối công việc mà không phải tìm
+              lại thông tin ở nhiều hệ thống.
+            </p>
             <div className={styles.heroActions}>
-              <Link className={styles.primaryCta} href={demoUrl}>Trải nghiệm 24 giờ <ArrowUpRight size={19} aria-hidden="true" /></Link>
-              <a className={styles.textLink} href="#mot-ngay">Khám phá một ngày <ArrowDown size={17} aria-hidden="true" /></a>
+              <Link className={styles.primaryCta} href="/signup">
+                Dùng thử miễn phí 30 ngày
+                <ArrowUpRight size={19} aria-hidden="true" />
+              </Link>
+              <a className={styles.textLink} href="#mot-ngay">
+                Xem cách vận hành
+                <ArrowDown size={17} aria-hidden="true" />
+              </a>
             </div>
-            <p className={styles.heroFootnote}>Không gian thử riêng. Chỉ dùng dữ liệu giả.</p>
+            <p className={styles.heroFootnote}>
+              Không cần thẻ thanh toán · Workspace riêng cho phòng khám.
+            </p>
           </div>
+
           <DayPreview />
         </section>
 
-        <div className={`${styles.container} ${styles.principles}`} aria-label="Định hướng sản phẩm">
-          <p>Dành cho nha khoa Việt Nam.<br /><strong>Vừa vặn với phòng khám của bạn.</strong></p>
-          <span><GitFork size={21} aria-hidden="true" />Mã nguồn mở</span>
-          <span><Monitor size={21} aria-hidden="true" />Có thể tự triển khai</span>
-          <span><Smartphone size={21} aria-hidden="true" />Máy tính & điện thoại</span>
+        <div
+          className={`${styles.container} ${styles.principles}`}
+          aria-label="Giá trị sản phẩm"
+        >
+          <p>
+            Được thiết kế quanh nhịp vận hành nha khoa.
+            <br />
+            <strong>Một hệ thống để cả đội cùng làm việc.</strong>
+          </p>
+          <span>
+            <UsersRound size={21} aria-hidden="true" />
+            Cả đội trên một workspace
+          </span>
+          <span>
+            <ShieldCheck size={21} aria-hidden="true" />
+            Phân quyền theo vai trò
+          </span>
+          <span>
+            <Smartphone size={21} aria-hidden="true" />
+            Máy tính & điện thoại
+          </span>
         </div>
 
-        <section className={`${styles.container} ${styles.story}`} id="mot-ngay" aria-labelledby="story-title">
+        <section
+          className={`${styles.container} ${styles.story}`}
+          id="mot-ngay"
+          aria-labelledby="story-title"
+        >
           <div className={styles.sectionIntro}>
-            <div><p className={styles.eyebrow}>01 / Một ngày tại phòng khám</p><h2 id="story-title">Nhiều việc cần làm.<br /><em>Không cần nhiều mảnh rời.</em></h2></div>
-            <p>Bệnh nhân đi qua nhiều điểm chạm. Thông tin về họ nên đi cùng, không bắt đầu lại ở mỗi bước.</p>
+            <div>
+              <p className={styles.eyebrow}>01 / Một ngày tại phòng khám</p>
+              <h2 id="story-title">
+                Nhiều việc cần làm.
+                <br />
+                <em>Không cần nhiều mảnh rời.</em>
+              </h2>
+            </div>
+            <p>
+              Bệnh nhân đi qua nhiều điểm chạm. Thông tin về họ nên đi cùng,
+              không bắt đầu lại ở mỗi bước.
+            </p>
           </div>
+
           <div className={styles.chapters}>
             <article className={styles.chapter}>
-              <div className={styles.chapterTop}><time>08:00</time><CalendarDays size={24} aria-hidden="true" /></div>
+              <div className={styles.chapterTop}>
+                <time>08:00</time>
+                <CalendarDays size={24} aria-hidden="true" />
+              </div>
               <p className={styles.chapterLabel}>Trước buổi khám</p>
-              <h3>Đón đúng người.<br />Nắm đúng lịch.</h3>
-              <p>Lễ tân nắm lịch bác sĩ, ghế điều trị và trạng thái cuộc hẹn. Cả đội bắt đầu ngày làm việc từ cùng một lịch.</p>
-              <div className={styles.chapterFlow}><span>Lịch hẹn</span><ArrowRight size={15} aria-hidden="true" /><span>Đón tiếp</span></div>
+              <h3>
+                Đón đúng người.
+                <br />
+                Nắm đúng lịch.
+              </h3>
+              <p>
+                Lễ tân nắm lịch bác sĩ, ghế điều trị và trạng thái cuộc hẹn.
+                Cả đội bắt đầu ngày làm việc từ cùng một lịch.
+              </p>
+              <div className={styles.chapterFlow}>
+                <span>Lịch hẹn</span>
+                <ArrowRight size={15} aria-hidden="true" />
+                <span>Đón tiếp</span>
+              </div>
             </article>
+
             <article className={styles.chapter}>
-              <div className={styles.chapterTop}><time>10:30</time><HeartPulse size={24} aria-hidden="true" /></div>
+              <div className={styles.chapterTop}>
+                <time>10:30</time>
+                <HeartPulse size={24} aria-hidden="true" />
+              </div>
               <p className={styles.chapterLabel}>Trong buổi điều trị</p>
-              <h3>Mở hồ sơ.<br />Tiếp nối chăm sóc.</h3>
-              <p>Journey kết nối ghi chú, odontogram và tiến trình điều trị. Bác sĩ xem lại lịch sử trước khi ghi nhận bước tiếp theo.</p>
-              <div className={styles.chapterFlow}><span>Hồ sơ</span><ArrowRight size={15} aria-hidden="true" /><span>Điều trị</span></div>
+              <h3>
+                Mở hồ sơ.
+                <br />
+                Tiếp nối chăm sóc.
+              </h3>
+              <p>
+                Journey kết nối ghi chú, odontogram và tiến trình điều trị.
+                Bác sĩ xem lại lịch sử trước khi ghi nhận bước tiếp theo.
+              </p>
+              <div className={styles.chapterFlow}>
+                <span>Hồ sơ</span>
+                <ArrowRight size={15} aria-hidden="true" />
+                <span>Điều trị</span>
+              </div>
             </article>
+
             <article className={styles.chapter}>
-              <div className={styles.chapterTop}><time>17:00</time><ReceiptText size={24} aria-hidden="true" /></div>
+              <div className={styles.chapterTop}>
+                <time>17:00</time>
+                <ReceiptText size={24} aria-hidden="true" />
+              </div>
               <p className={styles.chapterLabel}>Sau buổi khám</p>
-              <h3>Rõ khoản thu.<br />Nhớ lần hẹn tới.</h3>
-              <p>Kiểm tra dịch vụ, ghi nhận thu tiền, theo dõi hoá đơn và đặt lịch tái khám. Một buổi khám khép lại, hành trình vẫn tiếp tục.</p>
-              <div className={styles.chapterFlow}><span>Thu chi</span><ArrowRight size={15} aria-hidden="true" /><span>Tái khám</span></div>
+              <h3>
+                Rõ khoản thu.
+                <br />
+                Nhớ lần hẹn tới.
+              </h3>
+              <p>
+                Kiểm tra dịch vụ, ghi nhận thu tiền, theo dõi hoá đơn và đặt
+                lịch tái khám. Một buổi khám khép lại, hành trình vẫn tiếp tục.
+              </p>
+              <div className={styles.chapterFlow}>
+                <span>Thu chi</span>
+                <ArrowRight size={15} aria-hidden="true" />
+                <span>Tái khám</span>
+              </div>
             </article>
           </div>
-          <div className={styles.storyFooter}><p>Và phía sau mỗi buổi khám: kho, thuốc, nhân sự và báo cáo.</p><Link className={styles.textLink} href="/features">Xem tính năng & hướng dẫn <ArrowUpRight size={17} aria-hidden="true" /></Link></div>
+
+          <div className={styles.storyFooter}>
+            <p>
+              Và phía sau mỗi buổi khám: kho, thuốc, nhân sự và báo cáo.
+            </p>
+            <Link className={styles.textLink} href="/features">
+              Xem toàn bộ tính năng
+              <ArrowUpRight size={17} aria-hidden="true" />
+            </Link>
+          </div>
         </section>
 
-        <section className={styles.ownership} id="du-lieu" aria-labelledby="ownership-title">
+        <section
+          className={styles.ownership}
+          id="dung-thu"
+          aria-labelledby="trial-title"
+        >
           <div className={`${styles.container} ${styles.ownershipInner}`}>
             <div className={styles.ownershipCopy}>
-              <p className={styles.eyebrow}>02 / Chủ động từ nền tảng</p>
-              <h2 id="ownership-title">Phòng khám của bạn.<br /><em>Dữ liệu do bạn chủ động.</em></h2>
-              <p>Chọn hạ tầng phù hợp, phân quyền cho đội ngũ và chủ động sao lưu. Mã nguồn mở để bạn có thể kiểm tra và tự triển khai.</p>
-              <Link className={styles.lightCta} href="/docs#before-start">Tìm hiểu cách cài đặt <ArrowUpRight size={18} aria-hidden="true" /></Link>
+              <p className={styles.eyebrow}>02 / Bắt đầu bằng trải nghiệm thật</p>
+              <h2 id="trial-title">
+                30 ngày để thử thật.
+                <br />
+                <em>Không chỉ xem demo.</em>
+              </h2>
+              <p>
+                Tạo workspace cho chính phòng khám, mời đội ngũ vào dùng và
+                đánh giá sản phẩm trên quy trình thực tế trước khi quyết định.
+              </p>
+              <Link className={styles.lightCta} href="/signup">
+                Tạo tài khoản miễn phí
+                <ArrowUpRight size={18} aria-hidden="true" />
+              </Link>
             </div>
+
             <div className={styles.ownershipDetails}>
-              {[
-                { icon: Monitor, title: "Chạy trên hạ tầng bạn chọn", copy: "Máy tại phòng khám hoặc máy chủ riêng. Không bắt buộc cloud." },
-                { icon: UsersRound, title: "Đúng người, đúng phạm vi", copy: "Phân quyền theo vai trò và phòng khám; hồ sơ bệnh nhân có kiểm soát truy cập." },
-                { icon: DatabaseBackup, title: "Chủ động sao lưu, thử khôi phục", copy: "Thiết lập quy trình sao lưu trước khi bắt đầu vận hành." },
-              ].map(({ icon: Icon, title, copy }) => <article key={title}><Icon size={25} aria-hidden="true" /><div><h3>{title}</h3><p>{copy}</p></div></article>)}
-              <a className={styles.sourceLink} href={sourceUrl}><GitFork size={18} aria-hidden="true" /> Khám phá mã nguồn <ArrowUpRight size={17} aria-hidden="true" /></a>
+              <article>
+                <Monitor size={25} aria-hidden="true" />
+                <div>
+                  <h3>Workspace riêng cho phòng khám</h3>
+                  <p>
+                    Bắt đầu bằng dữ liệu và cấu hình của chính đội ngũ, không
+                    dùng chung một môi trường demo công cộng.
+                  </p>
+                </div>
+              </article>
+              <article>
+                <UsersRound size={25} aria-hidden="true" />
+                <div>
+                  <h3>Đủ thời gian để cả đội cùng thử</h3>
+                  <p>
+                    Lễ tân, bác sĩ và quản lý có 30 ngày để kiểm tra cách hệ
+                    thống đi cùng quy trình thực tế.
+                  </p>
+                </div>
+              </article>
+              <article>
+                <CheckCircle2 size={25} aria-hidden="true" />
+                <div>
+                  <h3>Không cần thẻ khi bắt đầu</h3>
+                  <p>
+                    Tạo tài khoản trước, trải nghiệm sản phẩm trước, rồi mới
+                    quyết định bước tiếp theo.
+                  </p>
+                </div>
+              </article>
             </div>
           </div>
         </section>
 
-        <section className={`${styles.container} ${styles.faq}`} id="cau-hoi" aria-labelledby="faq-title">
-          <div><p className={styles.eyebrow}>03 / Trước khi bắt đầu</p><h2 id="faq-title">Bạn có thể<br /><em>đang tự hỏi.</em></h2><Link className={styles.textLink} href="/docs"><BookOpen size={18} aria-hidden="true" /> Đọc thêm trong tài liệu</Link></div>
-          <div className={styles.questions}>{questions.map(([question, answer]) => <details key={question} name="landing-faq"><summary>{question}<Plus size={20} aria-hidden="true" /></summary><p>{answer}</p></details>)}</div>
+        <section
+          className={`${styles.container} ${styles.faq}`}
+          id="cau-hoi"
+          aria-labelledby="faq-title"
+        >
+          <div>
+            <p className={styles.eyebrow}>03 / Trước khi bắt đầu</p>
+            <h2 id="faq-title">
+              Một tháng để
+              <br />
+              <em>tự mình đánh giá.</em>
+            </h2>
+            <Link className={styles.textLink} href="/features">
+              Xem toàn bộ tính năng
+              <ArrowUpRight size={17} aria-hidden="true" />
+            </Link>
+          </div>
+
+          <div className={styles.questions}>
+            {questions.map(([question, answer]) => (
+              <details key={question} name="landing-faq">
+                <summary>
+                  {question}
+                  <Sparkles size={20} aria-hidden="true" />
+                </summary>
+                <p>{answer}</p>
+              </details>
+            ))}
+          </div>
         </section>
 
-        <section className={`${styles.container} ${styles.invitation}`} aria-labelledby="invitation-title">
-          <div><p className={styles.eyebrow}>Câu chuyện tiếp theo là của bạn</p><h2 id="invitation-title">Thử một ngày.<br /><em>Tự mình cảm nhận.</em></h2><p>Đi từ lịch hẹn đến hồ sơ và thu chi trong một không gian trải nghiệm riêng.</p><Link className={styles.primaryCta} href={demoUrl}>Bắt đầu trải nghiệm <ArrowUpRight size={19} aria-hidden="true" /></Link><p className={styles.invitationNote}>Dữ liệu giả lập. Tự xoá sau 24 giờ.</p></div>
-          <div className={styles.continuity} aria-hidden="true"><span className={styles.continuityRing} /><span className={styles.continuityIcon}><img src="/icons/codexmed-icon.svg" width="66" height="66" alt="" /></span><span className={styles.orbitTop}><CalendarDays size={24} /></span><span className={styles.orbitRight}><HeartPulse size={24} /></span><span className={styles.orbitBottom}><ReceiptText size={24} /></span><span className={styles.orbitLeft}><ShieldCheck size={24} /></span></div>
+        <section
+          className={`${styles.container} ${styles.invitation}`}
+          aria-labelledby="invitation-title"
+        >
+          <div>
+            <p className={styles.eyebrow}>Bắt đầu khi phòng khám còn đang vận hành</p>
+            <h2 id="invitation-title">
+              Dùng thử 30 ngày.
+              <br />
+              <em>Không cần thẻ.</em>
+            </h2>
+            <p>
+              Tạo workspace riêng và đi từ lịch hẹn đến hồ sơ, điều trị và thu
+              chi cùng đội ngũ của bạn.
+            </p>
+            <Link className={styles.primaryCta} href="/signup">
+              Tạo tài khoản dùng thử
+              <ArrowUpRight size={19} aria-hidden="true" />
+            </Link>
+            <p className={styles.invitationNote}>
+              Miễn phí 30 ngày kể từ lúc tạo tài khoản.
+            </p>
+          </div>
+
+          <div className={styles.continuity} aria-hidden="true">
+            <span className={styles.continuityRing} />
+            <span className={styles.continuityIcon}>
+              <img
+                src="/icons/codexmed-icon.svg"
+                width="66"
+                height="66"
+                alt=""
+              />
+            </span>
+            <span className={styles.orbitTop}>
+              <CalendarDays size={24} />
+            </span>
+            <span className={styles.orbitRight}>
+              <HeartPulse size={24} />
+            </span>
+            <span className={styles.orbitBottom}>
+              <ReceiptText size={24} />
+            </span>
+            <span className={styles.orbitLeft}>
+              <ShieldCheck size={24} />
+            </span>
+          </div>
         </section>
       </main>
+
       <footer className={`${styles.container} ${styles.footer}`}>
-        <div><Link href="/" className={styles.brand}><img src="/icons/codexmed-icon.svg" width="32" height="32" alt="" /><span>codexdentist<span className={styles.brandDot}>.</span></span></Link><p>Mã nguồn mở cho nha khoa Việt Nam.</p></div>
-        <nav aria-label="Liên kết cuối trang"><Link href="/features">Tính năng</Link><Link href="/docs">Tài liệu</Link><a href={sourceUrl}>Mã nguồn <ArrowUpRight size={14} aria-hidden="true" /></a><Link href="/login">Đăng nhập</Link></nav>
-        <p className={styles.footerBottom}><span>Codexdentist</span><span>Thiết kế quanh hành trình chăm sóc.</span></p>
+        <div>
+          <Link href="/" className={styles.brand}>
+            <img src="/icons/codexmed-icon.svg" width="32" height="32" alt="" />
+            <span>
+              codexdentist<span className={styles.brandDot}>.</span>
+            </span>
+          </Link>
+          <p>Nền tảng vận hành cho phòng khám nha khoa.</p>
+        </div>
+
+        <nav aria-label="Liên kết cuối trang">
+          <Link href="/features">Tính năng</Link>
+          <Link href="/signup">Dùng thử 30 ngày</Link>
+          <Link href="/login">Đăng nhập</Link>
+        </nav>
+
+        <p className={styles.footerBottom}>
+          <span>Codexdentist</span>
+          <span>Thiết kế quanh hành trình chăm sóc.</span>
+        </p>
       </footer>
     </div>
   );

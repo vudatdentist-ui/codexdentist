@@ -23,6 +23,7 @@ jobs:
           set -euo pipefail
           for url in \
             "https://codexdentist.com/" \
+            "https://codexdentist.com/signup" \
             "https://codexdentist.com/features" \
             "https://demo.codexdentist.com/"; do
             curl --fail --silent --show-error \

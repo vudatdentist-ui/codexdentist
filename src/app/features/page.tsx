@@ -19,7 +19,6 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { appRootDomain } from "@/lib/env";
 import styles from "../marketing.module.css";
 
 export const metadata: Metadata = {
@@ -41,8 +40,6 @@ const featureNavigation = [
 ];
 
 export default function FeaturesPage() {
-  const demoUrl = `https://demo.${appRootDomain()}`;
-
   return (
     <main className={styles.publicShell}>
       <header className={styles.publicHeader}>
@@ -53,7 +50,7 @@ export default function FeaturesPage() {
         <nav aria-label="Điều hướng hướng dẫn">
           <a href="#tong-quan">Tính năng</a>
           <a href="#bat-dau">Bắt đầu</a>
-          <Link href="/docs">Cài đặt</Link>
+          <Link href="/signup">Dùng thử 30 ngày</Link>
         </nav>
         <Link className={styles.textLink} href="/">
           <ArrowLeft size={15} />
@@ -70,10 +67,10 @@ export default function FeaturesPage() {
             luồng dữ liệu thống nhất.
           </p>
           <div className={styles.heroActions}>
-            <a className={styles.primaryCta} href={demoUrl}>
-              Mở bản demo
+            <Link className={styles.primaryCta} href="/signup">
+              Dùng thử miễn phí 30 ngày
               <ArrowRight size={18} />
-            </a>
+            </Link>
             <a className={styles.secondaryCta} href="#bat-dau">
               Xem quy trình bắt đầu
             </a>
@@ -289,19 +286,19 @@ export default function FeaturesPage() {
               copy="Thiết lập theo thứ tự dưới đây để các module dùng chung đúng dữ liệu ngay từ đầu."
             />
             <ol className={styles.startSteps}>
-              <li><span>01</span><div><strong>Cài đặt hệ thống</strong><p>Làm theo tài liệu cài đặt, tạo tài khoản Chủ hệ thống và phòng khám đầu tiên.</p></div></li>
+              <li><span>01</span><div><strong>Tạo workspace phòng khám</strong><p>Đăng ký tài khoản dùng thử và tạo không gian riêng cho phòng khám của bạn.</p></div></li>
               <li><span>02</span><div><strong>Thiết lập danh mục</strong><p>Tạo chi nhánh, ghế, dịch vụ, biểu mẫu, nhóm kho và phương thức thanh toán.</p></div></li>
               <li><span>03</span><div><strong>Mời nhân sự</strong><p>Tạo tài khoản, gán nhiều vai trò và giới hạn phạm vi theo phòng khám.</p></div></li>
               <li><span>04</span><div><strong>Chạy một ca mẫu</strong><p>Tạo bệnh nhân, đặt lịch, ghi điều trị, thu tiền và phát hành hóa đơn.</p></div></li>
               <li><span>05</span><div><strong>Kiểm tra và sao lưu</strong><p>Đối soát Dashboard, chạy kiểm tra hệ thống và tạo bản backup đầu tiên.</p></div></li>
             </ol>
             <div className={styles.guideFinalActions}>
-              <a className={styles.primaryCta} href={demoUrl}>
-                Thử quy trình trên demo
+              <Link className={styles.primaryCta} href="/signup">
+                Tạo tài khoản dùng thử
                 <ArrowRight size={18} />
-              </a>
-              <Link className={styles.secondaryCta} href="/docs">
-                Đọc hướng dẫn cài đặt
+              </Link>
+              <Link className={styles.secondaryCta} href="/login">
+                Đăng nhập
               </Link>
             </div>
           </section>

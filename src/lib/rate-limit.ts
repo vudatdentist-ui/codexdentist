@@ -52,6 +52,15 @@ export function consumeDemoWorkspaceAttempt(key: string) {
   });
 }
 
+export function consumeTrialSignupAttempt(key: string) {
+  return consumePersistentBucket({
+    key,
+    maxAttempts: 3,
+    namespace: "trial-signup",
+    windowMs: 24 * 60 * 60 * 1000,
+  });
+}
+
 export function consumeAiUserAttempt(userId: string) {
   return consumePersistentBucket({
     key: userId,

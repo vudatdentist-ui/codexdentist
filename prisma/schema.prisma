@@ -229,6 +229,7 @@ model Organization {
   locale                         String                          @default("vi-VN")
   isDemo                         Boolean                         @default(false)
   demoExpiresAt                  DateTime?
+  trialEndsAt                    DateTime?
   chains                         Chain[]
   clinics                        Clinic[]
   users                          User[]
@@ -301,6 +302,7 @@ model Organization {
   updatedAt                      DateTime                        @updatedAt
 
   @@index([isDemo, demoExpiresAt])
+  @@index([trialEndsAt])
 }
 
 model Chain {

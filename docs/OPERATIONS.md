@@ -141,14 +141,14 @@ Production `/api/readiness` requires `x-job-secret: <JOB_SECRET>` or a Bearer to
 
 Public host routing:
 
-- root/`www`: product site, feature guide at `/features`, and compatibility demo entry at `/demo`;
+- root/`www`: product site, hosted trial signup at `/signup`, feature guide at `/features`, and compatibility demo entry at `/demo`;
 - `demo`: 24-hour demo entry directly at `/`;
 - `docs`: redirects to `/docs`;
 - `odontogram`: rewrites `/` internally to the standalone odontogram entry;
 - `app`/`admin`: neutral application entry;
 - other supported subdomains: tenant application.
 
-Production availability is checked hourly by `.github/workflows/production-health.yml`. It verifies the product page, feature guide, demo entry, application health, and database health. A failed run is an operational alert and must be investigated before release or onboarding.
+Production availability is checked hourly by `.github/workflows/production-health.yml`. It verifies the product page, hosted signup page, feature guide, demo entry, application health, and database health. A failed run is an operational alert and must be investigated before release or onboarding.
 
 GitHub health checks do not expose cPanel resource exhaustion. Review CPU, memory, process, disk, PostgreSQL size, and error logs in cPanel at least weekly during the public beta.
 
@@ -156,6 +156,7 @@ GitHub health checks do not expose cPanel resource exhaustion. Review CPU, memor
 
 Required:
 
+- `DEPLOYMENT_MODE=hosted`: enables the hosted product surface, including public trial signup. Set `TRIAL_SIGNUP_ENABLED=false` only as an explicit emergency kill switch for new registrations.
 - `DATABASE_URL`: managed PostgreSQL, not localhost.
 - `APP_BASE_URL`: final HTTPS URL.
 - `AUTH_SECRET`: unique random value, at least 32 characters.
@@ -181,6 +182,8 @@ Call with `POST` plus `x-job-secret: <JOB_SECRET>` or `Authorization: Bearer <JO
 Failed notification webhooks become `FAILED` rows and should be retried/triaged from Dashboard.
 
 Demo cleanup requires `DEMO_WORKSPACE_ENABLED=true`, a strong `JOB_SECRET`, and a scheduled `POST` request. Send an empty JSON body with `Content-Type: application/json` on Namecheap/LiteSpeed so the request is not rejected before it reaches Next.js. Demo organizations are marked by `Organization.isDemo`; never purge organizations by slug/name pattern.
+
+Hosted trial organizations are normal tenant workspaces with `Organization.trialEndsAt` set 30 days after registration; they are not marked `isDemo` and must never be removed by the demo cleanup job. Authentication rejects an expired trial until an operator or future billing flow converts it by clearing/updating `trialEndsAt`.
 
 ## Backup And Restore
 

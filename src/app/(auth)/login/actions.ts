@@ -12,6 +12,7 @@ import {
   currentHostname,
   findTenantOrganization,
   isNeutralAppHostname,
+  tenantDomainForSlug,
   tenantSlugFromHostname,
 } from "@/lib/tenant";
 import {
@@ -31,13 +32,20 @@ export async function loginAction(formData: FormData) {
     redirect("/login?error=rate-limited");
   }
 
-  const result = await signIn(email, password);
+  const result = await signIn(email, password, { allowNeutralUser: true });
 
   if (!result.ok) {
     redirect(`/login?error=${result.reason}`);
   }
 
   await Promise.all(keys.map((key) => clearLoginAttempts(key)));
+
+  const hostname = await currentHostname();
+
+  if (result.organizationSlug && isNeutralAppHostname(hostname)) {
+    redirect(`https://${tenantDomainForSlug(result.organizationSlug)}/dashboard`);
+  }
+
   redirect("/dashboard");
 }
 

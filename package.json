@@ -49,6 +49,7 @@
     "monitor:health": "node scripts/monitor-health.mjs",
     "readiness:check": "node scripts/readiness-check.mjs",
     "browser:qa": "node scripts/browser-qa-audit.mjs",
+    "browser:trial-signup": "node scripts/trial-signup-browser-smoke.mjs",
     "encoding:check": "node scripts/check-encoding.mjs",
     "agent:health": "node scripts/check-encoding.mjs && node scripts/agent-health-check.mjs",
     "agent:audit": "node scripts/agent-module-audit.mjs",
