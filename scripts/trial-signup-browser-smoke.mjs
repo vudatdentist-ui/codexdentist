@@ -44,6 +44,7 @@ try {
     page.waitForURL((url) => url.pathname === "/dashboard", { timeout: 30_000 }),
     page.getByRole("button", { name: "Tạo tài khoản dùng thử" }).click(),
   ]);
+  await page.getByLabel("Trạng thái dùng thử").getByText(/Còn 30 ngày/).waitFor();
 
   const user = await prisma.user.findUnique({
     where: { email },
