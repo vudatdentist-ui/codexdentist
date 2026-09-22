@@ -373,7 +373,10 @@ export async function signIn(
       }),
     );
 
-    return { ok: true as const };
+    return {
+      ok: true as const,
+      organizationSlug: null,
+    };
   }
 }
 
