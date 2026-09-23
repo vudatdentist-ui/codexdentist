@@ -1,0 +1,45 @@
+name: Apply reviewed patient copy correction
+on:
+  pull_request:
+    paths: [.github/workflows/design-copy-review.yml]
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.head_ref == 'design/narrative-workspace-20260923' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Correct display sentinels without rewriting clinical data
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('src/modules/patients/PatientsPanel.tsx')
+          s = p.read_text(encoding='utf-8')
+          replacements = [
+            ('function patientVisitLabel(value: string | null | undefined, language: Language) {', 'function patientVisitLabel(value: string | null | undefined, language: Language) {\n  if (value?.trim().toLowerCase() === "no visit") return language === "vi" ? "Ch\u01b0a ghi nh\u1eadn l\u1ea7n kh\u00e1m" : "No visit";'),
+            ('  const viStatus: Record<string, string> = {', '  const viStatus: Record<string, string> = {\n    "NEEDS RENEWAL": "C\u1ea7n c\u1eadp nh\u1eadt",\n    PARTIAL: "\u0110\u1ed3ng \u00fd m\u1ed9t ph\u1ea7n",'),
+            ('<span key={flag}>{flag}</span>', '<span key={flag}>{language === "vi" && flag.trim().toLowerCase() === "no medical alerts recorded" ? "Ch\u01b0a ghi nh\u1eadn l\u01b0u \u00fd y khoa" : flag}</span>'),
+            ('{selectedPatient.lastVisit || text.unknown}', '{selectedPatient.lastVisit ? patientVisitLabel(selectedPatient.lastVisit, language) : text.unknown}'),
+          ]
+          for old, new in replacements:
+            assert s.count(old) == 1, old
+            s = s.replace(old, new)
+          p.write_text(s, encoding='utf-8')
+          p = Path('scripts/workspace-redesign-qa.mjs')
+          s = p.read_text(encoding='utf-8')
+          old = "    await page.locator('.patient-edit-action').click();"
+          assert s.count(old) == 1
+          new = "    assert.doesNotMatch(await page.locator('.patient-card').innerText(), /Needs renewal|No medical alerts recorded|No visit/);\n" + old
+          p.write_text(s.replace(old, new), encoding='utf-8')
+          PY
+          git diff --check
+          git add src/modules/patients/PatientsPanel.tsx scripts/workspace-redesign-qa.mjs
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'fix(ui): localize patient empty states without translating clinical notes'
+          git push origin HEAD:design/narrative-workspace-20260923
