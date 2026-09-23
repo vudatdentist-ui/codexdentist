@@ -1,5 +1,6 @@
 /* A record reads in care order: identity, encounter, chart, treatment, follow-up. */
 .app-shell .patient-layout { grid-template-columns: minmax(260px, .8fr) minmax(0, 1.4fr); gap: 24px; }
+.app-shell .patient-layout .patient-card { position: static; max-height: none; overflow: visible; align-self: start; }
 .app-shell .patient-layout .table-list { max-height: 860px; overflow-y: auto; scrollbar-gutter: stable; }
 .app-shell .patient-layout .table-row { padding: 18px 12px; gap: 9px; text-align: left; }
 .app-shell .patient-layout .table-row strong { font-size: 14px; font-weight: 600; line-height: 1.65; }
@@ -10,10 +11,11 @@
 .patient-record-number { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
 .app-shell .patient-dossier-heading h2 { margin: 8px 0; font-family: var(--font-editorial), Georgia, serif; font-weight: 400; font-size: 29px; line-height: 1.5; color: var(--ink); overflow-wrap: anywhere; }
 .patient-dossier-heading p { margin: 0; font-size: 13px; color: var(--muted); }
-.app-shell .patient-profile-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); background: transparent; padding: 20px 0; gap: 20px; }
+.app-shell .patient-profile-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); background: transparent; padding: 20px 0; gap: 20px; border: 0; border-radius: 0; }
+.app-shell .patient-profile-strip > div, .app-shell .patient-operation-strip > span { min-width: 0; padding: 0; background: transparent; border: 0; }
 .app-shell .patient-profile-strip strong { font-size: 14px; line-height: 1.7; font-weight: 500; overflow-wrap: anywhere; }
 .app-shell .patient-profile-strip span { font-size: 12px; line-height: 1.6; }
-.app-shell .patient-operation-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; padding: 22px 0; }
+.app-shell .patient-operation-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; padding: 22px 0; background: transparent; border: 0; border-radius: 0; }
 .app-shell .patient-operation-strip > span > span { font-size: 12px; }
 .app-shell .patient-operation-strip strong { font-size: 14px; line-height: 1.7; font-weight: 600; }
 .app-shell .patient-quick-actions { gap: 10px; padding-block: 8px; }

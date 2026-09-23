@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict';
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
 
 const base = process.env.BROWSER_QA_BASE_URL ?? 'http://127.0.0.1:3000';
 const output = 'output/workspace-qa/review';
 await mkdir(output, { recursive: true });
+// Preserve the exact vendor layout contract for screenshot-driven integration review.
+await writeFile(`${output}/odontogram-vendor.css`, await readFile(new URL(import.meta.resolve('codexdentist-odontogram/style.css')), 'utf8'));
 const browser = await chromium.launch();
 const context = await browser.newContext({ viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
 const page = await context.newPage();
@@ -49,9 +51,16 @@ async function modalKeyboard(dialog, trigger) {
 }
 try {
   await page.goto(`${base}/login`);
+  await settled();
   const login = page.locator('form.login-form').first();
-  await login.locator('[name=email]').fill(process.env.BROWSER_QA_EMAIL ?? 'owner@nhavista.vn');
-  await login.locator('[name=password]').fill(process.env.BROWSER_QA_PASSWORD ?? 'CodexSmoke2026!');
+  const email = process.env.BROWSER_QA_EMAIL ?? 'owner@nhavista.vn';
+  const password = process.env.BROWSER_QA_PASSWORD ?? 'CodexSmoke2026!';
+  await login.locator('[name=email]').click();
+  await login.locator('[name=email]').fill('');
+  await login.locator('[name=email]').pressSequentially(email);
+  await login.locator('[name=password]').fill(password);
+  assert.equal(await login.locator('[name=email]').inputValue(), email);
+  assert.equal(await login.locator('[name=password]').inputValue(), password);
   await login.locator('button[type=submit]').click();
   await page.waitForURL(url => !url.pathname.endsWith('/login'));
   await goto('dashboard');
@@ -152,6 +161,7 @@ try {
     await page.locator('.patient-edit-action').click();
     assert.equal(await page.locator('dialog[open] input[name=fullName]').inputValue(), name);
     await modalKeyboard(page.locator('dialog[open]'), page.locator('.patient-edit-action'));
+    assert.equal(await page.locator('.patient-card').evaluate(node => node.scrollHeight > node.clientHeight + 2), false, 'The dossier must not clip its actions inside a nested scroll region');
     await shot('vi-patient-dossier-1440');
     await page.locator('.patient-quick-actions a[href^="/journey?"]').click();
     await page.waitForURL(url => url.pathname === '/journey' && url.searchParams.get('patientId') === id);
@@ -161,7 +171,7 @@ try {
     await chartLink.click();
     await page.waitForURL(url => url.hash === '#chart-odontogram');
     await shot('vi-record-chart-1440', false);
-    const geometry = await page.locator('.patient-odontogram-editor').evaluate(root => [...root.querySelectorAll('div,section,aside,img')].slice(0, 160).map(node => {
+    const geometry = await page.locator('.patient-odontogram-editor').evaluate(root => [...root.querySelectorAll('div,section,aside,img')].filter((node, index, nodes) => node.tagName === 'ASIDE' || nodes.findIndex(other => other.className === node.className) === index).map(node => {
       const rect = node.getBoundingClientRect(); const style = getComputedStyle(node);
       return { tag: node.tagName, className: node.className, x: rect.x, y: rect.y, width: rect.width, height: rect.height, display: style.display, columns: style.gridTemplateColumns, overflow: style.overflow, font: style.fontFamily };
     }));
