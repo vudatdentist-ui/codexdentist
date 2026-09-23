@@ -24,7 +24,7 @@ export default function ProtectedAppError({
           <p className="eyebrow">Không tải được màn hình</p>
           <h1>Màn hình này chưa mở được.</h1>
           <p>
-            Phiên đăng nhập vẫn còn hiệu lực. Thử tải lại màn hình hoặc quay về trang trước.
+            Thử tải lại màn hình hoặc quay về trang trước để tiếp tục công việc.
           </p>
         </div>
         <button className="primary-button" type="button" onClick={reset}>

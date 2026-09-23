@@ -24,39 +24,32 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
 
   return (
     <main className="login-shell">
+      <section className="login-story" aria-label="Codexdentist">
+        <div className="workspace-brand"><img src="/icons/codexmed-icon.svg" width="38" height="38" alt="" aria-hidden="true" /><div><strong>Codexdentist</strong><span>Sổ chăm sóc phòng khám</span></div></div>
+        <h1>Mỗi lần hẹn,<br />một lần tiếp nối.</h1>
+        <p>Lịch hẹn, bệnh án và công việc của đội ngũ trong cùng một không gian.</p>
+        <ol><li><span>01</span>Chuẩn bị cho ngày làm việc</li><li><span>02</span>Theo suốt hành trình bệnh nhân</li><li><span>03</span>Khép lại và hẹn lần chăm sóc tiếp theo</li></ol>
+      </section>
       <section className="login-panel">
-        <div className="brand login-brand">
-          <div className="brand-mark">
-            <img src="/icons/codexmed-icon.svg" alt="" aria-hidden="true" />
-          </div>
-          <div>
-            <strong>Codexdentist</strong>
-            <span>SMART DENTAL SOLUTIONS</span>
-          </div>
-        </div>
-
-        <div>
-          <p className="eyebrow">Dành cho nhân sự</p>
-          <h1>Đăng nhập Codexdentist</h1>
-        </div>
+        <div><h2>Đăng nhập</h2><p className="workspace-caption">Trở lại công việc của bạn.</p></div>
 
         {params?.error && (
-          <p className="login-error">
+          <p className="login-error" role="alert">
             {loginErrorText(params.error)}
           </p>
         )}
         {params?.reset === "success" && (
-          <p className="login-success">
+          <p className="login-success" role="status">
             Đã lưu mật khẩu. Hãy đăng nhập bằng mật khẩu mới.
           </p>
         )}
         {params?.signup === "created" && (
-          <p className="login-success">
+          <p className="login-success" role="status">
             Tài khoản dùng thử 30 ngày đã được tạo. Hãy đăng nhập để bắt đầu.
           </p>
         )}
         {params?.forgot === "sent" && (
-          <p className="login-success">
+          <p className="login-success" role="status">
             Nếu email thuộc tài khoản đang hoạt động, hệ thống đã gửi liên kết đặt lại mật khẩu.
           </p>
         )}
@@ -143,7 +136,7 @@ function loginErrorText(error: string) {
   }
 
   if (error === "trial-expired") {
-    return "Thời gian dùng thử 30 ngày đã kết thúc. Vui lòng liên hệ để tiếp tục sử dụng workspace.";
+    return "Thời gian dùng thử 30 ngày đã kết thúc. Vui lòng liên hệ để tiếp tục sử dụng không gian làm việc.";
   }
 
   return "Email hoặc mật khẩu không đúng.";

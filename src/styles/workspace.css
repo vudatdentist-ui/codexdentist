@@ -1,0 +1,275 @@
+/* The clinic journal: editorial navigation, quiet work surfaces, explicit states.
+   Scoped to the working app so public landing layouts retain their own system. */
+.app-shell, .workspace-dialog, .login-shell {
+  --bg: #f6f4ee;
+  --surface: #fffefa;
+  --surface-raised: #fffefa;
+  --surface-muted: #f2f1e9;
+  --surface-tint: #edf2eb;
+  --soft: #f2f1e9;
+  --line: #dedfd4;
+  --line-strong: #b7c4b5;
+  --ink: #233b31;
+  --muted: #59655c;
+  --subtle: #657064;
+  --teal: #28533f;
+  --teal-strong: #193e2d;
+  --teal-soft: #e5eee0;
+  --radius: 5px;
+  --radius-sm: 4px;
+  --shadow: none;
+  --shadow-raised: 0 20px 60px rgb(20 39 27 / 14%);
+  --focus-ring: 0 0 0 3px #bacbbb;
+  color: var(--ink);
+  background: var(--bg);
+}
+.app-shell { grid-template-columns: 256px minmax(0, 1fr); overflow-x: visible; }
+.app-shell .workspace { min-width: 0; padding: 0 clamp(20px, 3vw, 48px) 100px; }
+.app-shell .story-sidebar {
+  background: #efeee5; border-right: 1px solid var(--line); color: var(--ink);
+  padding: 28px 16px 24px; gap: 28px; height: 100dvh; top: 0;
+  position: sticky; display: flex; flex-direction: column; overflow-y: auto;
+}
+.workspace-brand { display: flex; align-items: center; gap: 10px; padding: 0 6px; }
+.workspace-brand img { flex: 0 0 38px; }
+.workspace-brand strong { display: block; font-family: Georgia, "Times New Roman", serif; font-size: 22px; font-weight: 600; letter-spacing: -.7px; }
+.workspace-brand span { display: block; margin-top: 5px; font-size: 10px; color: var(--muted); letter-spacing: .02em; }
+.workspace-desktop-navigation { display: grid; gap: 24px; }
+.workspace-nav-search { display: flex; gap: 8px; align-items: center; border-bottom: 1px solid var(--line-strong); padding: 0 6px; color: var(--muted); }
+.workspace-nav-search input { min-height: 42px; width: 100%; min-width: 0; background: transparent; border: 0; color: var(--ink); font-size: 12px; outline-offset: -2px; }
+.story-nav { display: grid; gap: 22px; }
+.story-nav-chapter { display: grid; gap: 2px; }
+.story-nav-chapter h2 { display: flex; align-items: baseline; gap: 8px; margin: 0 10px 9px; font-size: 10px; line-height: 1.5; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.story-nav-chapter h2 span { color: #725137; font-variant-numeric: tabular-nums; }
+.story-nav-link { display: flex; align-items: center; gap: 11px; min-height: 41px; padding: 8px 10px; border-left: 2px solid transparent; color: var(--ink); text-decoration: none; font-size: 12px; line-height: 1.5; }
+.story-nav-link svg { flex: 0 0 20px; color: #536851; }
+.story-nav-link:hover { background: #e5e8dc; }
+.story-nav-link.is-current { border-left-color: #94603f; background: #e0e7d9; font-weight: 650; }
+.workspace-menu-button { display: none; }
+.workspace-skip { position: fixed; z-index: 100; left: 12px; top: -100px; background: var(--teal-strong); color: white; padding: 12px 16px; }
+.workspace-skip:focus { top: 12px; }
+.app-shell .story-topbar { position: relative; inset: auto; z-index: 35; margin: 0 0 28px; padding: 0; background: transparent; border: 0; gap: 0; }
+.workspace-utility-bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 72px; border-bottom: 1px solid var(--line); }
+.workspace-organization { color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.workspace-utility-bar .topbar-actions { flex-wrap: nowrap; }
+.workspace-utility-bar .icon-button { width: 40px; height: 40px; background: transparent; border-color: transparent; position: relative; }
+.workspace-account { position: relative; }
+.workspace-account summary { display: flex; align-items: center; gap: 8px; min-height: 40px; cursor: pointer; font-size: 12px; list-style: none; padding: 6px; }
+.workspace-account summary::-webkit-details-marker { display: none; }
+.workspace-account summary span { max-width: 180px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.workspace-account-menu { display: grid; gap: 10px; position: absolute; right: 0; top: calc(100% + 8px); z-index: 45; width: min(280px, 85vw); padding: 20px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow-raised); font-size: 13px; overflow-wrap: anywhere; }
+.workspace-account-menu span { color: var(--muted); }
+.workspace-account-menu form { margin-top: 8px; }
+.workspace-page-heading { padding: 30px 0 20px; }
+.workspace-chapter { margin: 0 0 12px; display: flex; align-items: baseline; gap: 10px; color: var(--muted); font-size: 10px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; line-height: 1.5; }
+.workspace-chapter > span { color: #725137; }
+.app-shell .workspace-page-heading h1 { margin: 0; color: var(--ink); font-family: Georgia, "Times New Roman", serif; font-style: normal; font-size: clamp(29px, 3vw, 40px); font-weight: 400; line-height: 1.2; letter-spacing: -.6px; text-wrap: balance; }
+.workspace-purpose { margin: 12px 0 0; color: var(--muted); font-size: 13px; line-height: 1.7; max-width: 80ch; }
+.workspace-context-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.workspace-context-controls:empty { display: none; }
+.workspace-context-controls .topbar-controls { width: auto; flex: 1; }
+.workspace-context-controls .topbar-chain-field { max-width: 280px; }
+.app-shell :is(.primary-button, .secondary-button, .icon-button, .segmented, .search-field, .select-field, .metric-card, .panel, .surface-card, .table-row, .clinic-row, .timeline-item, .invoice-row, .permission-row, .patient-summary div, .record-tile, .audit-box, .appointment-card, .journey-billing-item, .service-catalog-card, .inventory-category-card, .inventory-equipment-card, .pharmacy-medication-card, .staff-row, .mobile-card, .portal-row) { box-shadow: none; }
+.app-shell :is(.primary-button, .secondary-button), .workspace-dialog :is(.primary-button, .secondary-button) { min-height: 40px; font-size: 12px; font-weight: 600; padding: 9px 14px; text-decoration: none; }
+.app-shell .primary-button, .workspace-dialog .primary-button { background: var(--teal); color: white; border-color: var(--teal); }
+.app-shell .primary-button:hover, .workspace-dialog .primary-button:hover { background: var(--teal-strong); }
+.app-shell .primary-button.danger { background: var(--rose); border-color: var(--rose); }
+.app-shell .secondary-button, .workspace-dialog .secondary-button { background: var(--surface); border-color: var(--line-strong); color: var(--ink); }
+.app-shell .segmented { background: var(--surface-muted); border: 1px solid var(--line); box-shadow: none; }
+.app-shell .segmented button { font-weight: 600; }
+.app-shell .segmented button.active { background: var(--surface); color: var(--teal-strong); box-shadow: none; }
+.app-shell .language-switch { border: 0; background: transparent; }
+.app-shell .language-switch button { min-height: 34px; min-width: 34px; font-size: 11px; padding: 4px 7px; }
+.app-shell .language-switch button.active { background: #e0e7d9; }
+.app-shell .view-stack { gap: 24px; }
+.app-shell .panel { border: 1px solid var(--line); background: var(--surface); padding: 22px; border-radius: 5px; }
+.app-shell .panel-header { margin: 0 0 16px; padding-bottom: 14px; border-color: var(--line); }
+.app-shell .panel-header strong, .app-shell .panel-title { color: var(--ink); font-size: 15px; font-weight: 600; margin: 0; font-family: inherit; }
+.app-shell .panel-header-action { color: var(--muted); font-weight: 400; }
+.app-shell .metric-card { border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; padding: 12px 2px 20px; min-height: 0; }
+.app-shell .metric-card strong { color: var(--ink); font-size: 26px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.app-shell .metric-card span { color: var(--muted); }
+.app-shell :is(.table-row, .clinic-row, .invoice-row, .timeline-item, .permission-row) { border-radius: 0; border-width: 0 0 1px; border-color: var(--line); background: transparent; padding-block: 15px; }
+.app-shell :is(.table-row, .clinic-row, .invoice-row, .timeline-item, .permission-row):hover { box-shadow: none; background: var(--surface-muted); }
+.app-shell .table-row.active { background: var(--surface-tint); border-left: 2px solid var(--teal); }
+.app-shell .empty-state { color: var(--muted); background: transparent; border: 0; padding: 26px 10px; text-align: left; font-size: 13px; line-height: 1.7; }
+.app-shell .status { border: 0; font-weight: 550; min-height: 24px; border-radius: 4px; }
+.app-shell :is(input, select, textarea) { border-radius: 4px; }
+.app-shell :is(input, select, textarea):not([type=checkbox]):not([type=radio]) { color: var(--ink); }
+.app-shell :is(button, a, input, select, textarea, summary):focus-visible,
+.workspace-dialog :is(button, a, input, select, textarea, summary):focus-visible { outline: 2px solid #527448; outline-offset: 3px; box-shadow: none; }
+.workspace-caption { color: var(--muted); font-size: 12px; line-height: 1.7; margin: 12px 0; }
+.workspace-text-link { display: inline-flex; align-items: center; gap: 8px; color: var(--teal-strong); font-size: 12px; font-weight: 600; text-decoration-thickness: 1px; text-underline-offset: 4px; min-height: 36px; }
+.workspace-text-button { border: 0; padding: 8px 0; background: none; color: var(--teal-strong); text-decoration: underline; text-underline-offset: 4px; font-size: 12px; }
+/* Native dialogs supply focus containment, inert background, Escape and focus return. */
+.workspace-dialog { pointer-events: auto; padding: 0; border: 1px solid var(--line); border-radius: 8px; width: min(640px, calc(100vw - 32px)); max-height: calc(100dvh - 40px); margin: auto; overflow: auto; color: var(--ink); box-shadow: var(--shadow-raised); }
+.workspace-dialog::backdrop { background: rgb(24 42 31 / 40%); }
+.workspace-dialog-surface { padding: 24px; background: var(--surface); min-width: 0; }
+.workspace-dialog-heading { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding-bottom: 20px; border-bottom: 1px solid var(--line); margin-bottom: 20px; }
+.workspace-dialog-heading h2 { font-family: Georgia, "Times New Roman", serif; font-size: 24px; font-weight: 400; line-height: 1.25; margin: 0; color: var(--ink); }
+.workspace-dialog .icon-button { flex-shrink: 0; min-width: 40px; min-height: 40px; }
+.workspace-menu-dialog { width: min(380px, calc(100vw - 24px)); margin: 12px auto 12px 12px; max-height: calc(100dvh - 24px); }
+.workspace-menu-dialog .story-nav { margin-top: 24px; }
+.workspace-menu-dialog .story-nav-link { font-size: 14px; min-height: 44px; }
+.story-notifications .notification-tabs { flex-wrap: wrap; padding: 0 0 16px; gap: 4px; }
+.story-notifications .notification-tabs button { min-height: 38px; }
+.story-notifications .notification-list { max-height: none; }
+.story-notifications .notification-row { display: flex; align-items: flex-start; gap: 16px; padding: 16px 0; background: transparent; border: 0; border-bottom: 1px solid var(--line); }
+.story-notifications .notification-row-main { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.story-notifications small { color: var(--muted); }
+.workspace-dialog .notification-targets { border: 1px solid var(--line); padding: 16px; }
+.app-shell .module-ai-floating { bottom: 20px; right: 24px; }
+.app-shell .module-ai-bubble { width: auto; height: 44px; padding: 0 16px; display: flex; gap: 8px; align-items: center; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--surface); color: var(--ink); box-shadow: 0 4px 14px rgb(20 39 27 / 8%); font-size: 12px; font-weight: 600; }
+.app-shell .module-ai-bubble:hover { transform: none; background: var(--surface-muted); }
+.workspace-assistant-dialog { margin: auto 24px 80px auto; }
+.workspace-assistant-dialog .module-ai-chat-form { padding: 0; }
+/* The working day is a reading order, not a wall of KPI cards. */
+.day-opening { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.day-context { display: grid; gap: 5px; color: var(--muted); font-size: 12px; }
+.day-context small { font-size: 11px; }
+.day-pulse { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 0; padding: 4px 0 26px; border-bottom: 1px solid var(--line-strong); }
+.day-pulse > div { padding: 0 24px; border-left: 1px solid var(--line); }
+.day-pulse > div:first-child { border: 0; padding-left: 0; }
+.day-pulse dt { color: var(--muted); font-size: 12px; line-height: 1.5; }
+.day-pulse dd { margin: 10px 0 0; font-size: 42px; font-family: Georgia, "Times New Roman", serif; line-height: 1; font-variant-numeric: tabular-nums; }
+.day-work-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.day-section-heading { display: flex; justify-content: space-between; gap: 16px; align-items: flex-end; margin-bottom: 18px; }
+.day-section-heading h2 { font-family: Georgia, "Times New Roman", serif; color: var(--ink); font-size: 25px; font-weight: 400; line-height: 1.25; }
+.day-section-heading .workspace-chapter { margin-bottom: 8px; }
+.day-appointment-list { list-style: none; padding: 0; margin: 0; }
+.day-appointment-list li { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 5px 14px; padding: 18px 0; border-top: 1px solid var(--line); }
+.day-appointment-list time { color: var(--teal-strong); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.day-appointment-person { display: grid; gap: 6px; min-width: 0; overflow-wrap: anywhere; }
+.day-appointment-person strong { font-size: 14px; font-weight: 600; }
+.day-appointment-person span, .day-appointment-person small { font-size: 12px; color: var(--muted); line-height: 1.5; }
+.day-appointment-list .status { grid-column: 2; justify-self: start; margin-top: 3px; }
+.day-preview-note, .day-scope-note { color: var(--muted); font-size: 11px; line-height: 1.65; }
+.day-task { padding: 18px 0; border-top: 1px solid var(--line); }
+.day-task strong { font-size: 14px; font-weight: 600; }
+.day-task p { color: var(--muted); font-size: 12px; line-height: 1.65; margin: 6px 0; }
+.day-task small { color: var(--muted); font-size: 11px; }
+.day-task-actions { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; }
+.day-handoff { display: grid; gap: 12px; }
+.day-handoff details { border-bottom: 1px solid var(--line); padding-bottom: 10px; }
+.day-handoff summary { cursor: pointer; min-height: 38px; font-size: 13px; font-weight: 600; padding: 8px 0; }
+.day-handoff .staff-form { margin-top: 16px; }
+.day-practice-review { padding-top: 16px; }
+.day-financial-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; border-block: 1px solid var(--line); margin: 20px 0 24px; padding: 22px 0; }
+.day-financial-summary dt { color: var(--muted); font-size: 12px; }
+.day-financial-summary dd { margin: 8px 0 0; font-size: clamp(17px, 1.8vw, 23px); font-weight: 550; overflow-wrap: anywhere; }
+.day-review-details { margin: 20px 0; }
+.day-review-details summary { display: flex; align-items: center; gap: 12px; font-size: 14px; cursor: pointer; min-height: 36px; }
+.day-review-details summary::after { content: "+"; font-size: 22px; margin-left: auto; }
+.day-review-details[open] summary::after { content: "−"; }
+.day-clinic-list article { display: grid; gap: 14px; padding: 20px 0; border-bottom: 1px solid var(--line); }
+.day-clinic-list strong { display: block; font-size: 14px; }
+.day-clinic-list small { display: block; color: var(--muted); margin-top: 6px; }
+.day-clinic-list dl { display: flex; flex-wrap: wrap; gap: 24px; margin: 0; }
+.day-clinic-list dt { font-size: 11px; color: var(--muted); }
+.day-clinic-list dd { margin: 4px 0 0; font-size: 14px; }
+.day-review-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+.day-risk-list a { display: flex; align-items: center; gap: 16px; color: var(--ink); text-decoration: none; padding: 16px 0; border-bottom: 1px solid var(--line); }
+.day-risk-list a > div { flex: 1; min-width: 0; }
+.day-risk-list strong { display: block; font-size: 13px; font-weight: 600; }
+.day-risk-list small { display: block; margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.6; }
+.day-risk-list a > span { font-size: 20px; }
+.app-shell .dashboard-provider-row { background: transparent; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; box-shadow: none; padding: 16px 0; }
+/* Patient directory and longitudinal record use the same journal hierarchy. */
+.app-shell .patient-layout { grid-template-columns: minmax(300px, .85fr) minmax(0, 1.3fr); align-items: start; }
+.app-shell .patient-layout .table-row { grid-template-columns: 1fr; gap: 7px; }
+.app-shell .patient-layout .table-row > span:not(:first-child) { font-size: 11px; }
+.app-shell .patient-profile-strip { background: var(--surface-muted); border: 0; padding: 18px; gap: 18px; }
+.app-shell .patient-operation-strip { border-block: 1px solid var(--line); border-radius: 0; background: transparent; padding-block: 16px; }
+.app-shell .patient-quick-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.app-shell :is(.journey-timeline .chart-timeline-event, .journey-billing-item) { box-shadow: none; border-radius: 4px; }
+.app-shell .phone-frame { box-shadow: none; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.app-shell .phone-top { background: var(--surface-muted); color: var(--ink); }
+.app-shell .mobile-card { background: var(--surface); }
+/* Login is the opening page of the same journal. */
+.login-shell { min-height: 100dvh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 480px); align-items: center; gap: clamp(40px, 8vw, 150px); padding: 64px max(6vw, 24px); }
+.login-story { max-width: 600px; }
+.login-story h1 { font-family: Georgia, "Times New Roman", serif; font-size: clamp(38px, 5vw, 64px); font-weight: 400; line-height: 1.15; color: var(--ink); margin: 48px 0 28px; }
+.login-story p { color: var(--muted); font-size: 15px; line-height: 1.85; max-width: 42ch; }
+.login-story ol { list-style: none; padding: 28px 0 0; margin: 30px 0 0; border-top: 1px solid var(--line-strong); }
+.login-story li { display: flex; gap: 16px; font-size: 13px; line-height: 1.7; padding: 10px 0; }
+.login-story li span { font-size: 11px; color: #725137; }
+.login-shell .login-panel { width: 100%; max-width: none; background: var(--surface); padding: 36px; border: 1px solid var(--line); border-radius: 6px; box-shadow: none; }
+.login-shell .login-panel h2 { font-family: Georgia, "Times New Roman", serif; font-size: 30px; font-weight: 400; color: var(--ink); }
+.login-shell .login-brand { display: none; }
+.login-shell .primary-button { background: var(--teal); box-shadow: none; min-height: 44px; }
+@media (min-width: 1800px) {
+  .app-shell .workspace { max-width: 1570px; width: 100%; margin: 0 auto; }
+}
+@media (max-width: 1100px) {
+  .app-shell { display: block; }
+  .app-shell .story-sidebar { height: auto; min-height: 72px; width: 100%; padding: 16px 24px; position: relative; flex-direction: row; justify-content: space-between; align-items: center; gap: 16px; overflow: visible; border-right: 0; border-bottom: 1px solid var(--line); }
+  .workspace-desktop-navigation { display: none; }
+  .workspace-menu-button { display: flex; align-items: center; gap: 8px; background: transparent; color: var(--ink); border: 1px solid var(--line-strong); border-radius: 4px; min-height: 42px; padding: 8px 12px; font-size: 12px; }
+  .app-shell .workspace { padding-inline: 24px; }
+  .workspace-page-heading { padding-top: 25px; }
+  .app-shell .workspace-page-heading h1 { font-size: 34px; }
+  .app-shell .patient-layout { grid-template-columns: minmax(280px, .8fr) minmax(0, 1.2fr); }
+}
+@media (max-width: 760px) {
+  .day-work-grid, .day-review-grid, .app-shell .patient-layout { grid-template-columns: 1fr; }
+  .app-shell .panel { padding: 20px; }
+  .day-work-grid { gap: 24px; }
+  .app-shell .workspace-page-heading h1 { font-size: 31px; }
+  .workspace-utility-bar { min-height: 60px; }
+  .workspace-account summary span { display: none; }
+  .workspace-utility-bar .topbar-actions { gap: 4px; }
+  .workspace-organization { font-size: 11px; }
+  .login-shell { grid-template-columns: 1fr; padding: 32px 24px; gap: 32px; }
+  .login-story h1 { font-size: 36px; margin: 32px 0 14px; }
+  .login-story p { font-size: 13px; }
+  .login-story ol { display: none; }
+  .login-shell .login-panel { max-width: 540px; padding: 26px; }
+  .app-shell :is(.primary-button, .secondary-button, .icon-button, .segmented button) { min-height: 44px; }
+  .app-shell .language-switch button { min-width: 36px; }
+}
+@media (max-width: 480px) {
+  .app-shell .story-sidebar { padding: 14px 16px; }
+  .workspace-brand strong { font-size: 20px; }
+  .workspace-brand span { font-size: 9px; }
+  .workspace-menu-button span { display: none; }
+  .app-shell .workspace { padding: 0 16px 92px; }
+  .workspace-page-heading { padding: 24px 0 18px; }
+  .app-shell .workspace-page-heading h1 { font-size: 29px; }
+  .workspace-purpose { font-size: 12px; }
+  .workspace-context-controls { align-items: stretch; }
+  .workspace-context-controls .topbar-chain-field { width: 100%; max-width: none; }
+  .workspace-context-controls .topbar-controls { flex-basis: 100%; }
+  .day-opening { align-items: flex-start; flex-direction: column; }
+  .day-pulse { padding-bottom: 20px; }
+  .day-pulse > div { padding-inline: 12px; }
+  .day-pulse dt { font-size: 10px; min-height: 30px; }
+  .day-pulse dd { font-size: 34px; }
+  .app-shell .panel { padding: 18px 16px; }
+  .day-section-heading h2 { font-size: 23px; }
+  .day-section-heading { align-items: flex-start; flex-wrap: wrap; gap: 4px; }
+  .day-financial-summary { grid-template-columns: 1fr; gap: 20px; }
+  .day-financial-summary > div { display: flex; gap: 12px; justify-content: space-between; align-items: baseline; }
+  .day-financial-summary dd { font-size: 18px; margin: 0; }
+  .workspace-dialog { width: calc(100vw - 20px); max-height: calc(100dvh - 20px); }
+  .workspace-dialog-surface { padding: 20px 16px; }
+  .workspace-dialog-heading h2 { font-size: 22px; }
+  .workspace-menu-dialog { margin: 10px; }
+  .workspace-assistant-dialog { margin: auto 10px 76px; }
+  .app-shell .module-ai-floating { right: 16px; bottom: 16px; }
+  .story-notifications .notification-row { flex-wrap: wrap; }
+  .app-shell .patient-profile-strip { grid-template-columns: 1fr 1fr; }
+}
+/* Legacy mobile portal rules must not remove the shared navigation or account controls. */
+@media (max-width: 620px) {
+  body:has(.mobile-app-view) .app-shell .story-sidebar { display: flex; }
+  body:has(.mobile-app-view) .app-shell .workspace { padding: 0 16px 92px; }
+  body:has(.mobile-app-view) .app-shell .story-topbar { position: relative; margin: 0 0 24px; padding: 0; }
+  body:has(.mobile-app-view) .app-shell .topbar-actions { display: flex; }
+  body:has(.mobile-app-view) .app-shell .topbar-controls :is(.select-field, .search-field, .topbar-clear-search) { display: flex; }
+}
+@media print {
+  .story-sidebar, .workspace-utility-bar, .module-ai-floating, .workspace-context-controls { display: none !important; }
+  .app-shell { display: block; }
+  .app-shell .workspace { padding: 0; }
+  .app-shell .story-topbar { position: static; }
+}
