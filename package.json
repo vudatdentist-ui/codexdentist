@@ -48,7 +48,7 @@
     "test:seed-users": "node scripts/seed-smoke-users.mjs",
     "monitor:health": "node scripts/monitor-health.mjs",
     "readiness:check": "node scripts/readiness-check.mjs",
-    "browser:qa": "npm run test:workspace && node scripts/browser-qa-audit.mjs && node scripts/workspace-narrative-qa.mjs",
+    "browser:qa": "npm run test:workspace && node scripts/browser-qa-audit.mjs && node scripts/workspace-narrative-qa.mjs && node scripts/workspace-redesign-qa.mjs",
     "browser:trial-signup": "node scripts/trial-signup-browser-smoke.mjs",
     "encoding:check": "node scripts/check-encoding.mjs",
     "agent:health": "node scripts/check-encoding.mjs && node scripts/agent-health-check.mjs",
@@ -70,7 +70,7 @@
     "db:seed:schedule": "node scripts/seed-schedule-demo.mjs",
     "odontogram:assets": "codexdentist-odontogram-assets public/odontogram-assets",
     "browser:landing": "node scripts/landing-page-qa.mjs",
-    "test:workspace": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/workspace-story.test.mjs"
+    "test:workspace": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/workspace-story.test.mjs scripts/workspace-controls.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1040.0",
