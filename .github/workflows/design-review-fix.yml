@@ -1,0 +1,37 @@
+name: Apply reviewed font probe correction
+on:
+  pull_request:
+    paths: [.github/workflows/design-review-fix.yml]
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.head_ref == 'design/narrative-workspace-20260923' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Apply exact source corrections
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('scripts/workspace-redesign-qa.mjs')
+          s = p.read_text(encoding='utf-8')
+          corrections = [
+            ('probe.style.fontFamily = getComputedStyle(target).fontFamily;', "probe.style.fontFamily = getComputedStyle(target).fontFamily.split(',')[0];"),
+            ("    await shot('vi-record-chart-390', false);", "    await page.locator('.patient-odontogram-editor').scrollIntoViewIfNeeded();\n    await shot('vi-record-chart-390', false);"),
+          ]
+          for old, new in corrections:
+            assert s.count(old) == 1
+            s = s.replace(old, new)
+          p.write_text(s, encoding='utf-8')
+          PY
+          git diff --check
+          git add scripts/workspace-redesign-qa.mjs
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'test(ui): inspect the primary rendered font rather than forcing an unavailable local fallback'
+          git push origin HEAD:design/narrative-workspace-20260923
