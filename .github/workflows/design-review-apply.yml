@@ -1,0 +1,33 @@
+name: Apply reviewed design patch
+on:
+  pull_request:
+    paths:
+      - .design-review-patch/**
+      - .github/workflows/design-review-apply.yml
+permissions:
+  contents: write
+jobs:
+  apply:
+    if: github.head_ref == 'design/narrative-workspace-20260923' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Verify and apply exact reviewed patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat .design-review-patch/part-{00,01,02,03}.b64 | base64 --decode | gzip --decompress > "$RUNNER_TEMP/narrative-review.patch"
+          echo "1007151d5b7396506065befe927607e72d20b1fa0c3e711213ad562aa78b5836  $RUNNER_TEMP/narrative-review.patch" | sha256sum --check
+          git apply --check "$RUNNER_TEMP/narrative-review.patch"
+          git apply --index "$RUNNER_TEMP/narrative-review.patch"
+          git restore --source=HEAD --staged --worktree .github/workflows/design-review-snapshot.yml
+          git rm -r .design-review-patch
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'design: rebuild operational journal, type system and accessible workflows'
+          git push origin HEAD:design/narrative-workspace-20260923
+          git rev-parse HEAD
