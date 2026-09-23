@@ -69,7 +69,7 @@ try {
         probe.textContent = `${sample} ${sample.toUpperCase()} ${sample.normalize('NFD')}`;
         const target = kind === 'body' ? document.body : document.querySelector('h1');
         probe.style.cssText = 'position:fixed;left:0;bottom:0;opacity:0;pointer-events:none;white-space:nowrap;max-width:1px;overflow:hidden;font-size:24px;line-height:2';
-        probe.style.fontFamily = getComputedStyle(target).fontFamily; probe.style.fontWeight = String(weight);
+        probe.style.fontFamily = getComputedStyle(target).fontFamily.split(',')[0]; probe.style.fontWeight = String(weight);
         document.body.append(probe);
         await document.fonts.load(`${weight} 24px ${probe.style.fontFamily}`, probe.textContent);
       }, { kind, weight, sample });
@@ -172,6 +172,7 @@ try {
     }));
     await writeFile(`${output}/odontogram-layout.json`, JSON.stringify(geometry, null, 2));
     await page.setViewportSize({ width: 390, height: 844 });
+    await page.locator('.patient-odontogram-editor').scrollIntoViewIfNeeded();
     await shot('vi-record-chart-390', false);
     await goto(`patients?patientId=${encodeURIComponent(id)}`);
     await page.locator('.patient-dossier-heading').scrollIntoViewIfNeeded();
