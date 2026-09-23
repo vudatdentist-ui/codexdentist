@@ -60,6 +60,11 @@ try {
   await page.waitForFunction(() => document.documentElement.lang === 'vi');
 
   await check('Vietnamese glyphs use the actual self-hosted body and editorial fonts, including decomposed accents', async () => {
+    for (const asset of ['be-vietnam-pro-400.ttf', 'be-vietnam-pro-500.ttf', 'be-vietnam-pro-600.ttf', 'be-vietnam-pro-700.ttf', 'noto-serif-400.ttf']) {
+      const response = await page.request.get(`${base}/fonts/${asset}`);
+      assert.equal(response.status(), 200, `${asset}: expected a self-hosted font response`);
+      assert.ok((await response.body()).length > 100_000, `${asset}: expected a complete font face`);
+    }
     const cdp = await context.newCDPSession(page);
     await cdp.send('DOM.enable'); await cdp.send('CSS.enable');
     const sample = 'Ti\u1ebfp t\u1ee5c ch\u0103m s\u00f3c \u0111\u1ec3 ng\u01b0\u1eddi b\u1ec7nh y\u00ean t\u00e2m. \u0103 \u00e2 \u0111 \u00ea \u00f4 \u01a1 \u01b0 \u1eef \u1ed7 \u1ef5 \u1ea5 \u1eab \u1ed9 \u1ec7';
@@ -68,10 +73,12 @@ try {
         const probe = document.createElement('span'); probe.id = 'typography-probe';
         probe.textContent = `${sample} ${sample.toUpperCase()} ${sample.normalize('NFD')}`;
         const target = kind === 'body' ? document.body : document.querySelector('h1');
-        probe.style.cssText = 'position:fixed;left:0;bottom:0;opacity:0;pointer-events:none;white-space:nowrap;max-width:1px;overflow:hidden;font-size:24px;line-height:2';
+        probe.style.cssText = 'position:fixed;left:-12000px;top:0;opacity:.01;pointer-events:none;white-space:nowrap;width:max-content;font-size:24px;line-height:2';
         probe.style.fontFamily = getComputedStyle(target).fontFamily.split(',')[0]; probe.style.fontWeight = String(weight);
         document.body.append(probe);
         await document.fonts.load(`${weight} 24px ${probe.style.fontFamily}`, probe.textContent);
+        await document.fonts.ready;
+        await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
       }, { kind, weight, sample });
       const { root } = await cdp.send('DOM.getDocument');
       const { nodeId } = await cdp.send('DOM.querySelector', { nodeId: root.nodeId, selector: '#typography-probe' });
