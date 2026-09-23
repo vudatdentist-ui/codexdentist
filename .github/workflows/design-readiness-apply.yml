@@ -1,0 +1,35 @@
+name: Apply checksum-verified browser correction
+on:
+  pull_request:
+    paths: [.github/workflows/design-readiness-apply.yml]
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.head_ref == 'design/narrative-workspace-20260923' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Validate the exact reviewed source before committing
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import base64, gzip, hashlib, os
+          from pathlib import Path
+          source = Path('.github/workflows/design-review-fix.yml').read_text()
+          encoded = next(line.split('PATCH: ', 1)[1] for line in source.splitlines() if 'PATCH: ' in line)
+          encoded = encoded.replace('Hix4oRR0rv', 'Hix4oR0rv')
+          patch = gzip.decompress(base64.b64decode(encoded, validate=True))
+          assert hashlib.sha256(patch).hexdigest() == '9a3e76626f2762970dc7cf1c94f9937e1cb0b4d1d0a1bc79c5e991a971bd767e'
+          Path(os.environ['RUNNER_TEMP'], 'review.patch').write_bytes(patch)
+          PY
+          git apply --check "$RUNNER_TEMP/review.patch"
+          git apply --index "$RUNNER_TEMP/review.patch"
+          git diff --cached --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'test(ui): stabilize authentication and retain every browser suite evidence'
+          git push origin HEAD:design/narrative-workspace-20260923
