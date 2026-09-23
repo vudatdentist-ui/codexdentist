@@ -118,7 +118,7 @@ jobs:
         run: npm run browser:landing
       - name: Upload landing evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: landing-qa-${{ github.sha }}
           path: output/landing-qa
@@ -130,7 +130,7 @@ jobs:
           NODE_ENV: test
       - name: Upload application browser evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: workspace-qa-${{ github.sha }}
           path: |
@@ -227,7 +227,7 @@ jobs:
             --output /dev/null http://127.0.0.1:3001/login
       - name: Upload production release artifact
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: codexdentist-production-${{ github.sha }}
           path: ${{ runner.temp }}/codexdentist-artifact/release.tar.gz
