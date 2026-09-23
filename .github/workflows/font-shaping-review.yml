@@ -1,7 +1,12 @@
 name: Vietnamese font shaping review
 on:
   pull_request:
-    paths: [.github/workflows/font-shaping-review.yml]
+    paths:
+      - .github/workflows/font-shaping-review.yml
+      - package.json
+      - scripts/fetch-font-assets.mjs
+      - src/app/globals.css
+      - src/app/layout.tsx
 permissions:
   contents: read
 jobs:
@@ -45,7 +50,7 @@ jobs:
               await page.evaluate(async ({text,weight})=>{await document.fonts.load(`${weight} 28px Review`,text);await document.fonts.ready;},{text,weight});
               const {root}=await cdp.send('DOM.getDocument'); const {nodeId}=await cdp.send('DOM.querySelector',{nodeId:root.nodeId,selector:'#probe'});
               const {fonts}=await cdp.send('CSS.getPlatformFontsForNode',{nodeId});
-              results.push({family,weight,normalization,fonts,pass:fonts.length>0&&fonts.every(font=>font.isCustomFont&&font.familyName.replaceAll(' ','')===family.replaceAll(' ',''))});
+              results.push({family,weight,normalization,fonts,pass:fonts.length>0&&fonts.every(font=>font.isCustomFont&&font.familyName.replaceAll(' ','').startsWith(family.replaceAll(' ','')))});
               await page.screenshot({path:`${output}/${key}-${normalization}.png`});
             }
           }

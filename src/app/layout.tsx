@@ -1,5 +1,4 @@
 import type { Metadata, Viewport } from "next";
-import { bodyFont, editorialFont } from "./fonts";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 import "codexdentist-odontogram/style.css";
 import "react-day-picker/style.css";
@@ -62,7 +61,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
-      <body className={`${bodyFont.variable} ${editorialFont.variable}`}>
+      <body>
         {children}
         <PwaInstallPrompt />
       </body>
