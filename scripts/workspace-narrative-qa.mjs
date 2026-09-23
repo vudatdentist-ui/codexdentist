@@ -26,7 +26,7 @@ async function test(name, run) {
 async function closeWithEscape(dialog, trigger) {
   await dialog.waitFor({state:'visible'});
   for (let index=0;index<20;index++) {
-    await page.keyboard.press(index % 2 ? 'Shift+Tab' : 'Tab');
+    await page.keyboard.press(index < 10 ? 'Tab' : 'Shift+Tab');
     assert.equal(await dialog.evaluate(node => node.contains(document.activeElement)), true, 'Modal must contain keyboard focus');
   }
   await page.keyboard.press('Escape');
@@ -90,6 +90,20 @@ try {
     for (const width of [320,390,768,1100]) {
       await page.setViewportSize({width,height:844});
       await shot(`dashboard-${width}`);
+      const controls = await page.locator('.workspace-utility-bar').evaluate(bar => {
+        const selectors = ['.workspace-organization', '.language-switch button:first-child', '.language-switch button:last-child', '.topbar-actions > button', '.workspace-account summary'];
+        return selectors.map(selector => {
+          const node = bar.querySelector(selector);
+          const rect = node.getBoundingClientRect();
+          return {left:rect.left, right:rect.right, width:rect.width, height:rect.height,
+            hit:selector === '.workspace-organization' || node.contains(document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2))};
+        });
+      });
+      for (let index = 1; index < controls.length; index++) {
+        assert.ok(controls[index - 1].right <= controls[index].left + 1, `Overlapping utility controls at ${width}px`);
+        assert.ok(controls[index].hit, `Obscured utility control at ${width}px`);
+        assert.ok(controls[index].width >= 32 && controls[index].height >= 32, 'Utility controls must retain usable hit areas');
+      }
       const trigger=page.getByRole('button',{name:'Open workspace menu',exact:true});
       await trigger.click();
       const dialog=page.locator('.workspace-menu-dialog');
@@ -106,7 +120,9 @@ try {
     await page.setViewportSize({width:1440,height:900});
     await page.goto(`${base}/patients`); await settled();
     const row=page.locator('.patient-layout .table-row').first();
-    await row.click(); await settled();
+    await row.click();
+    await page.waitForURL(url => Boolean(url.searchParams.get('patientId')));
+    await settled();
     const id=new URL(page.url()).searchParams.get('patientId'); assert.ok(id,'Patient selection must update URL');
     await shot('desktop-patient-selected');
     for (const route of ['journey','billing','schedule']) {

@@ -5,6 +5,7 @@ import "react-day-picker/style.css";
 import "@/styles/globals.css";
 import "./globals.css";
 import "@/styles/workspace.css";
+import "@/styles/workspace-legacy-bridge.css";
 
 export const metadata: Metadata = {
   applicationName: "Codexdentist",

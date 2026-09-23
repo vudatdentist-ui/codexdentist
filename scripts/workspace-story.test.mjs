@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync, existsSync } from 'node:fs';
 import { workspaceStories, workspaceNavigation, visibleWorkspaceNavigation, normalizeWorkspaceSearch, viewFromPath } from '../src/workspaces/workspace-story.ts';
 import { summarizeClinicDay } from '../src/workspaces/clinic-day.ts';
 import { accessibleViews, viewRoutes } from '../src/lib/permissions.ts';
@@ -38,4 +39,17 @@ test('day totals use complete selected-clinic aggregates, not the capped preview
   assert.deepEqual(summarizeClinicDay(clinics,new Set(['a','b'])),{appointments:63,inChair:5,completed:19,collected:300});
   assert.equal(summarizeClinicDay(clinics,new Set(['b'])).appointments,26);
   assert.deepEqual(summarizeClinicDay(clinics,new Set()),{appointments:0,inChair:0,completed:0,collected:0});
+});
+const root = new URL('../', import.meta.url);
+const pkg = JSON.parse(readFileSync(new URL('package.json', root), 'utf8'));
+const lock = JSON.parse(readFileSync(new URL('package-lock.json', root), 'utf8'));
+test('UI changes retain the locked runtime and development dependencies', () => {
+  for (const key of ['dependencies', 'devDependencies']) assert.deepEqual(pkg[key], lock.packages[''][key], key);
+});
+test('package scripts reference existing repository files', () => {
+  for (const [name, command] of Object.entries(pkg.scripts)) {
+    for (const match of command.matchAll(/scripts\/[\w.-]+\.(?:mjs|ps1)/g)) {
+      assert.ok(existsSync(new URL(match[0], root)), `${name}: ${match[0]}`);
+    }
+  }
 });
