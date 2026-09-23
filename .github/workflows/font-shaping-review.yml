@@ -1,0 +1,64 @@
+name: Vietnamese font shaping review
+on:
+  pull_request:
+    paths: [.github/workflows/font-shaping-review.yml]
+permissions:
+  contents: read
+jobs:
+  fonts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --include=dev --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Compare complete upstream faces against composed and decomposed Vietnamese
+        run: |
+          node --input-type=module <<'JS'
+          import { chromium } from 'playwright';
+          import { createHash } from 'node:crypto';
+          import { mkdir, writeFile } from 'node:fs/promises';
+          const output = 'output/font-shaping'; await mkdir(output, {recursive:true});
+          const browser = await chromium.launch(); const page = await browser.newPage({viewport:{width:1440,height:1000}});
+          const cdp = await page.context().newCDPSession(page); await cdp.send('DOM.enable'); await cdp.send('CSS.enable');
+          const sample = 'Ti\u1ebfp t\u1ee5c ch\u0103m s\u00f3c \u0111\u1ec3 ng\u01b0\u1eddi b\u1ec7nh y\u00ean t\u00e2m. \u0103 \u00e2 \u0111 \u00ea \u00f4 \u01a1 \u01b0 \u1eef \u1ed7 \u1ef5 \u1ea5 \u1eab \u1ed9 \u1ec7';
+          const manifest = [], results = [];
+          for (const [family, weight] of [['Be Vietnam Pro',400],['Be Vietnam Pro',500],['Be Vietnam Pro',600],['Be Vietnam Pro',700],['Noto Serif',400]]) {
+            const key = `${family.toLowerCase().replaceAll(' ','-')}-${weight}`;
+            const url = `https://fonts.googleapis.com/css2?family=${family.replaceAll(' ','+')}:wght@${weight}&display=swap`;
+            const css = await (await fetch(url,{headers:{'User-Agent':'CodexDentist-font-review/1.0'}})).text();
+            await writeFile(`${output}/${key}.css`,css);
+            const sources = [...css.matchAll(/url\((https:[^)]+)\)/g)].map(match=>match[1]);
+            if (sources.length !== 1) throw new Error(`${key}: expected a complete face, received ${sources.length}`);
+            const response = await fetch(sources[0]); if (!response.ok) throw new Error(`Font HTTP ${response.status}`);
+            const bytes = Buffer.from(await response.arrayBuffer());
+            manifest.push({family,weight,file:`${key}.ttf`,url:sources[0],sha256:createHash('sha256').update(bytes).digest('hex'),bytes:bytes.length});
+            await page.setContent(`<style>@font-face{font-family:Review;src:url(data:font/ttf;base64,${bytes.toString('base64')});font-weight:${weight}}body{margin:36px}#probe{font: ${weight} 28px/2 Review;white-space:pre-wrap}</style><div id="probe"></div>`);
+            for (const [normalization,text] of [['NFC',sample+' '+sample.toUpperCase()],['NFD',(sample+' '+sample.toUpperCase()).normalize('NFD')]]) {
+              await page.locator('#probe').evaluate((node,text)=>node.textContent=text,text);
+              await page.evaluate(async ({text,weight})=>{await document.fonts.load(`${weight} 28px Review`,text);await document.fonts.ready;},{text,weight});
+              const {root}=await cdp.send('DOM.getDocument'); const {nodeId}=await cdp.send('DOM.querySelector',{nodeId:root.nodeId,selector:'#probe'});
+              const {fonts}=await cdp.send('CSS.getPlatformFontsForNode',{nodeId});
+              results.push({family,weight,normalization,fonts,pass:fonts.length>0&&fonts.every(font=>font.isCustomFont&&font.familyName.replaceAll(' ','')===family.replaceAll(' ',''))});
+              await page.screenshot({path:`${output}/${key}-${normalization}.png`});
+            }
+          }
+          await browser.close();
+          await writeFile(`${output}/manifest.json`,JSON.stringify(manifest,null,2));
+          await writeFile(`${output}/report.json`,JSON.stringify(results,null,2));
+          console.log(JSON.stringify({manifest,results},null,2));
+          if(results.some(result=>!result.pass)) process.exitCode=1;
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: vietnamese-font-shaping
+          path: output/font-shaping
+          retention-days: 1
+          if-no-files-found: error
