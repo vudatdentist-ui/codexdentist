@@ -3,6 +3,7 @@
 import { Bell, ChevronDown, LogOut, Menu, Search, UserRound, MessageCircle, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { logoutAction } from "@/app/(app)/actions";
 import { useAppLanguage } from "@/components/AppLanguage";
 import { WorkspaceNotifications, useNotificationReadState } from "@/components/WorkspaceNotifications";
@@ -73,6 +74,7 @@ export function AppTopbar({ activeLanguage, allChainsLabel, chainOptions, chainS
   return <header className="topbar story-topbar">
     <div className="workspace-utility-bar"><span className="workspace-organization">{organizationName}</span><div className="topbar-actions">
       <div className="segmented language-switch" role="group" aria-label={languageLabel}>{(["vi", "en"] as const).map(language => <button key={language} type="button" className={activeLanguage === language ? "active" : ""} aria-pressed={activeLanguage === language} onClick={() => onLanguageChange(language)}>{language.toUpperCase()}</button>)}</div>
+      <div id="workspace-assistant-slot" className="workspace-assistant-slot" />
       <button className="icon-button" type="button" aria-label={notificationLabel} aria-haspopup="dialog" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen(true)}><Bell size={19} aria-hidden="true" />{unreadCount > 0 && <span className="notification-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}</button>
       <details className="workspace-account"><summary aria-label={vi ? "Tài khoản của tôi" : "My account"}><UserRound size={18} aria-hidden="true" /><span>{userName}</span><ChevronDown size={14} aria-hidden="true" /></summary>
         <div className="workspace-account-menu"><strong>{userName}</strong><span>{roleLabel}</span><span>{organizationName}</span><form action={logoutAction}><button className="secondary-button" type="submit"><LogOut size={16} aria-hidden="true" />{signOutLabel}</button></form></div>
@@ -92,7 +94,12 @@ export function ModuleAiFloatingShell({ children, closeLabel, isOpen, onClose, o
 }) {
   const { language } = useAppLanguage();
   const title = language === "vi" ? "Trợ lý công việc" : "Workspace assistant";
-  return <div className="module-ai-floating"><button className="module-ai-bubble" type="button" aria-label={title} aria-haspopup="dialog" aria-expanded={isOpen} onClick={onOpen}><MessageCircle size={19} aria-hidden="true" /><span>{language === "vi" ? "Trợ lý" : "Assistant"}</span></button>
+  const [launcherTarget, setLauncherTarget] = useState<HTMLElement | null>(null);
+  useEffect(() => { setLauncherTarget(document.getElementById("workspace-assistant-slot")); }, []);
+  // Preserve each module's assistant state while keeping its launcher out of the work surface.
+  const launcher = <button className="module-ai-bubble" type="button" title={title} aria-label={title} aria-haspopup="dialog" aria-expanded={isOpen} onClick={onOpen}><MessageCircle size={19} aria-hidden="true" /><span>{language === "vi" ? "Trợ lý" : "Assistant"}</span></button>;
+  return <>
+    {launcherTarget && createPortal(launcher, launcherTarget)}
     <WorkspaceDialog open={isOpen} onClose={onClose} title={title} closeLabel={closeLabel} className="workspace-assistant-dialog"><p className="workspace-caption">{routeTitle}</p>{children}</WorkspaceDialog>
-  </div>;
+  </>;
 }

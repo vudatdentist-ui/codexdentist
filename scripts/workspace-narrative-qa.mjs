@@ -85,6 +85,7 @@ try {
   });
   await test('Assistant modal keyboard behavior', async () => {
     const trigger=page.getByRole('button',{name:'Workspace assistant',exact:true});
+    assert.equal(await trigger.evaluate(node => Boolean(node.closest('.workspace-utility-bar'))),true,'The assistant launcher must not float over work surfaces');
     await trigger.click(); await shot('desktop-assistant');
     await closeWithEscape(page.locator('.workspace-assistant-dialog'),trigger);
   });
@@ -93,7 +94,7 @@ try {
       await page.setViewportSize({width,height:844});
       await shot(`dashboard-${width}`);
       const controls = await page.locator('.workspace-utility-bar').evaluate(bar => {
-        const selectors = ['.workspace-organization', '.language-switch button:first-child', '.language-switch button:last-child', '.topbar-actions > button', '.workspace-account summary'];
+        const selectors = ['.workspace-organization', '.language-switch button:first-child', '.language-switch button:last-child', '.workspace-assistant-slot button', '.topbar-actions > button', '.workspace-account summary'];
         return selectors.map(selector => {
           const node = bar.querySelector(selector);
           const rect = node.getBoundingClientRect();

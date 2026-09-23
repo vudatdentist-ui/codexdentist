@@ -42,3 +42,25 @@
   font-size: 14px;
   box-shadow: none;
 }
+
+/* Global tools belong in the toolbar, never on top of records or install prompts. */
+.app-shell .workspace-utility-bar .workspace-assistant-slot {
+  display: flex;
+  width: auto;
+  flex: 0 0 auto;
+}
+.app-shell .workspace-utility-bar .workspace-assistant-slot:empty { display: none; }
+.app-shell .workspace-assistant-slot .module-ai-bubble {
+  min-width: 40px;
+  min-height: 40px;
+  height: 40px;
+  padding: 8px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.app-shell .workspace-assistant-slot .module-ai-bubble:hover { background: var(--surface-muted); }
+@media (max-width: 760px) {
+  .app-shell .workspace-assistant-slot .module-ai-bubble { min-height: 44px; height: 44px; }
+  .workspace-assistant-slot .module-ai-bubble span { display: none; }
+}
