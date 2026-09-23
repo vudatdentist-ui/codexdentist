@@ -4,6 +4,9 @@ import "codexdentist-odontogram/style.css";
 import "react-day-picker/style.css";
 import "@/styles/globals.css";
 import "./globals.css";
+import "@/styles/workspace.css";
+import "@/styles/workspace-legacy-bridge.css";
+import "@/styles/care-record.css";
 
 export const metadata: Metadata = {
   applicationName: "Codexdentist",
@@ -13,7 +16,7 @@ export const metadata: Metadata = {
     title: "Codexdentist",
   },
   title: "Codexdentist",
-  description: "Phần mềm quản lý phòng khám nha khoa mã nguồn mở.",
+  description: "Phần mềm quản lý phòng khám nha khoa và hành trình chăm sóc bệnh nhân.",
   formatDetection: {
     telephone: false,
   },
@@ -47,7 +50,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0f766e",
+  themeColor: "#234936",
   viewportFit: "cover",
 };
 

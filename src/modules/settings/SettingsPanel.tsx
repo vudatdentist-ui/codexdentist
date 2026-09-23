@@ -1,5 +1,7 @@
 "use client";
 
+import { OperationalDialog, WorkspaceTabs } from "@/components/ui/WorkspaceControls";
+
 import {
   Activity,
   Archive,
@@ -195,16 +197,6 @@ function StatusPill({ status }: { status: string }) {
   return <BaseStatusPill label={displayStatus(status, language)} status={status} />;
 }
 
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { language } = useAppLanguage();
-  const labels = sourceLabels[language];
-
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? labels.databaseLive : labels.demoMode}
-    </span>
-  );
-}
 
 function workspaceMessageText(message: string | null | undefined, _language: Language) {
   return message;
@@ -1113,11 +1105,8 @@ export function SettingsPanel({
 
   return (
     <section className="view-stack">
-      <div className="toolbar">
-        <div>
-          <p className="eyebrow">{text.admin}</p>
-          <h2>{text.heading}</h2>
-        </div>
+      <div className="workspace-actions">
+
         <div className="service-action-row">
           <button
             className="primary-button"
@@ -1128,7 +1117,7 @@ export function SettingsPanel({
             <UsersRound size={16} />
             {text.createStaff}
           </button>
-          <SourceBadge source={settingsWorkspace?.source} />
+
         </div>
       </div>
 
@@ -1157,7 +1146,7 @@ export function SettingsPanel({
         <MetricCard label={accountLabels.visibleClinics} value={String(formClinics.length)} tone="blue" />
       </section>
 
-      <div className="segmented settings-section-tabs" role="tablist" aria-label={text.admin}>
+      <WorkspaceTabs className="segmented settings-section-tabs" role="tablist" aria-label={text.admin}>
         {settingsSections.map((section) => (
           <button
             aria-selected={settingsSection === section.key}
@@ -1170,7 +1159,7 @@ export function SettingsPanel({
             {section.label}
           </button>
         ))}
-      </div>
+      </WorkspaceTabs>
 
       <section className="settings-overview-grid" data-settings-section={settingsSection}>
         <section className="panel settings-staff-panel" data-settings-block="accounts">
@@ -2088,16 +2077,10 @@ export function SettingsPanel({
       )}
 
       {settingsModal === "staff-config" && selectedStaff && (
-        <div
-          aria-label={accountLabels.accountControls}
-          aria-modal="true"
-          className="progress-modal-backdrop"
-          onClick={() => {
+        <OperationalDialog label={accountLabels.accountControls} onClose={() => {
             setSettingsModal(null);
             setSelectedStaffId(null);
-          }}
-          role="dialog"
-        >
+          }}>
           <div
             className="progress-modal settings-staff-modal settings-staff-config-modal"
             onClick={(event) => event.stopPropagation()}
@@ -2127,7 +2110,7 @@ export function SettingsPanel({
               </span>
             </div>
 
-            <div className="segmented settings-staff-config-tabs" role="tablist" aria-label={accountLabels.accountControls}>
+            <WorkspaceTabs className="segmented settings-staff-config-tabs" role="tablist" aria-label={accountLabels.accountControls}>
               {!selectedStaffIsPatient && (
                 <>
                   <button
@@ -2159,7 +2142,7 @@ export function SettingsPanel({
               >
                 {accountLabels.securityTab}
               </button>
-            </div>
+            </WorkspaceTabs>
 
             {staffConfigTab === "profile" && !selectedStaffIsPatient && (
               <form action={updateStaffProfileAction} className="settings-staff-config-form">
@@ -2352,17 +2335,11 @@ export function SettingsPanel({
               </div>
             )}
           </div>
-        </div>
+        </OperationalDialog>
       )}
 
       {settingsModal === "staff" && (
-        <div
-          aria-label={accountLabels.createStaffTitle}
-          aria-modal="true"
-          className="progress-modal-backdrop"
-          onClick={() => setSettingsModal(null)}
-          role="dialog"
-        >
+        <OperationalDialog label={accountLabels.createStaffTitle} onClose={() => setSettingsModal(null)}>
           <form
             action={createStaffAction}
             className="progress-modal settings-staff-modal"
@@ -2436,7 +2413,7 @@ export function SettingsPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
     </section>
   );

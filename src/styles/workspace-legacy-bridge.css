@@ -1,0 +1,111 @@
+/* Bound the new workspace chrome against full-width legacy mobile action rules. */
+.app-shell .workspace-utility-bar .topbar-actions {
+  width: auto;
+  flex: 0 0 auto;
+  align-items: center;
+  min-width: 0;
+}
+.app-shell .workspace-utility-bar .language-switch {
+  display: inline-flex;
+  width: auto;
+  flex: 0 0 auto;
+}
+.app-shell .workspace-utility-bar .language-switch button {
+  width: 36px;
+  flex: 0 0 36px;
+  min-width: 36px;
+}
+.app-shell .workspace-utility-bar .workspace-account {
+  width: auto;
+  flex: 0 0 auto;
+}
+.workspace-utility-bar .workspace-organization {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.story-notifications .notification-tabs { margin-bottom: 14px; }
+.login-shell .forgot-password-panel summary { color: var(--teal-strong); }
+
+/* The direct-receipt form predates the shared field selectors. */
+.app-shell .billing-balance-form { margin-top: 18px; }
+.app-shell .billing-balance-form label { font-size: 12px; font-weight: 500; color: var(--muted); }
+.app-shell .billing-balance-form input:not([type="hidden"]),
+.app-shell .billing-balance-form select {
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  box-shadow: none;
+}
+
+/* Global tools belong in the toolbar, never on top of records or install prompts. */
+.app-shell .workspace-utility-bar .workspace-assistant-slot {
+  display: flex;
+  width: auto;
+  flex: 0 0 auto;
+}
+.app-shell .workspace-utility-bar .workspace-assistant-slot:empty { display: none; }
+.app-shell .workspace-assistant-slot .module-ai-bubble {
+  min-width: 40px;
+  min-height: 40px;
+  height: 40px;
+  padding: 8px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.app-shell .workspace-assistant-slot .module-ai-bubble:hover { background: var(--surface-muted); }
+@media (max-width: 760px) {
+  .app-shell .workspace-assistant-slot .module-ai-bubble { min-height: 44px; height: 44px; }
+  .workspace-assistant-slot .module-ai-bubble span { display: none; }
+}
+
+/* These older section navigations still use native buttons. Keep their visual
+   hierarchy consistent with the shared tabs without altering selection logic. */
+.app-shell :is(.accounting-section-tabs, .crm-section-tabs, .forms-section-tabs, .learning-section-tabs, .inventory-section-tabs, .service-config-tabs) {
+  display: flex;
+  flex-wrap: nowrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  gap: 4px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  border-radius: 0;
+  scrollbar-width: thin;
+}
+.app-shell :is(.accounting-section-tabs, .crm-section-tabs, .forms-section-tabs, .learning-section-tabs, .inventory-section-tabs, .service-config-tabs) > button {
+  flex: 0 0 auto;
+  min-height: 48px;
+  padding: 10px 16px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: none;
+}
+.app-shell :is(.accounting-section-tabs, .crm-section-tabs, .forms-section-tabs, .learning-section-tabs, .inventory-section-tabs, .service-config-tabs) > button.active {
+  color: var(--teal-strong);
+  border-bottom-color: var(--teal);
+  background: transparent;
+  font-weight: 600;
+  box-shadow: none;
+}
+.app-shell :is(.accounting-section-tabs, .crm-section-tabs, .forms-section-tabs, .learning-section-tabs, .inventory-section-tabs) > button > span {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  min-width: 0;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}

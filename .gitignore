@@ -33,3 +33,4 @@ selfhost-notes/
 *.key
 *.p12
 *.pfx
+public/fonts/*.ttf

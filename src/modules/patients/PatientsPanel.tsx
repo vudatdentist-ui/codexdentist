@@ -1,6 +1,8 @@
 "use client";
 
-import { FileText, UsersRound, X } from "lucide-react";
+import { OperationalDialog } from "@/components/ui/WorkspaceControls";
+
+import { ArrowRight, CalendarDays, CreditCard, FileText, SquarePen, UserRoundPlus, UsersRound, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -17,21 +19,13 @@ import { formatVnd, type Clinic, type Patient } from "@/lib/data";
 import type { PatientWorkspace } from "@/lib/patient-types";
 import type { AppRole } from "@/lib/permissions";
 
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { t } = useAppLanguage();
-
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? t.databaseLive : t.demoMode}
-    </span>
-  );
-}
 
 function clinicIsActive(clinic: Pick<Clinic, "active">) {
   return clinic.active !== false;
 }
 
 function patientVisitLabel(value: string | null | undefined, language: Language) {
+  if (value?.trim().toLowerCase() === "no visit") return language === "vi" ? "Chưa ghi nhận lần khám" : "No visit";
   if (!value || /^not booked$/i.test(value)) {
     return language === "vi" ? "Chưa có lịch hẹn" : "Not booked";
   }
@@ -79,6 +73,8 @@ function useNoticeText(notice: string | null) {
 function displayStatus(status: string, language: Language) {
   const normalizedStatus = String(status ?? "").toUpperCase();
   const viStatus: Record<string, string> = {
+    "NEEDS RENEWAL": "Cần cập nhật",
+    PARTIAL: "Đồng ý một phần",
     GRANTED: "\u0110\u00e3 \u0111\u1ed3ng \u00fd",
     PENDING: "Ch\u1edd \u0111\u1ed3ng \u00fd",
     REVOKED: "\u0110\u00e3 thu h\u1ed3i",
@@ -261,13 +257,7 @@ export function PatientsPanel({
 
   return (
     <section className="view-stack">
-      <div className="toolbar">
-        <div>
-          <p className="eyebrow">{text.registry}</p>
-          <h2>{text.heading}</h2>
-        </div>
-        <SourceBadge source={patientWorkspace?.source} />
-      </div>
+
 
       {(patientWorkspace?.message || notice) && (
         <div className={notice ? "schedule-alert action" : "schedule-alert"}>
@@ -286,19 +276,13 @@ export function PatientsPanel({
             setCreatePatientModalOpen(true);
           }}
         >
-          <UsersRound size={16} />
+          <UserRoundPlus size={16} aria-hidden="true" />
           {text.createPatient}
         </button>
       </div>
 
       {createPatientModalOpen && (
-        <div
-          className="progress-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={text.newPatient}
-          onClick={closeCreatePatientModal}
-        >
+        <OperationalDialog label={text.newPatient} onClose={closeCreatePatientModal}>
           <form
             action={createPatientAction}
             className="progress-modal patient-create-modal"
@@ -426,12 +410,12 @@ export function PatientsPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       <section className="content-grid patient-layout">
         <section className="panel">
-          <PanelHeader icon={UsersRound} title={text.patientRegistry} action={text.live} />
+          <PanelHeader icon={UsersRound} title={text.patientRegistry} action={String(operationalPatients.length)} />
           <div className="table-list">
             {operationalPatients.length > 0 ? (
               operationalPatients.map((patient) => (
@@ -440,6 +424,7 @@ export function PatientsPanel({
                     selectedPatient?.id === patient.id ? "table-row active" : "table-row"
                   }
                   key={patient.id}
+                  aria-pressed={selectedPatient?.id === patient.id}
                   onClick={() => selectPatient(patient.id)}
                   type="button"
                 >
@@ -450,7 +435,7 @@ export function PatientsPanel({
                     </small>
                   </span>
                   <span>{patientVisitLabel(patient.nextVisit, language)}</span>
-                  <span>{formatVnd(patient.balance)}</span>
+                  <span className="patient-list-balance">{text.balance}: {formatVnd(patient.balance)}</span>
                 </button>
               ))
             ) : (
@@ -466,11 +451,11 @@ export function PatientsPanel({
         >
           {selectedPatient ? (
             <>
-              <PanelHeader
-                icon={FileText}
-                title={selectedPatient.name}
-                action={patientCodeFor(selectedPatient)}
-              />
+              <header className="patient-dossier-heading">
+                <span className="patient-record-number">{patientCodeFor(selectedPatient)}</span>
+                <h2>{selectedPatient.name}</h2>
+                <p>{visibleClinics.find((clinic) => clinic.id === selectedPatient.clinicId)?.name ?? text.unknown}</p>
+              </header>
 
               <div className="patient-profile-strip">
                 <div>
@@ -493,16 +478,13 @@ export function PatientsPanel({
                   <span>{text.consent}</span>
                   <strong>{displayStatus(selectedPatient.consent, language)}</strong>
                 </div>
-                <div>
-                  <span>{text.balance}</span>
-                  <strong>{formatVnd(selectedPatient.balance)}</strong>
-                </div>
+
               </div>
 
               {selectedPatient.flags.length > 0 ? (
                 <div className="flag-list patient-flag-list">
                   {selectedPatient.flags.map((flag) => (
-                    <span key={flag}>{flag}</span>
+                    <span key={flag}>{language === "vi" && flag.trim().toLowerCase() === "no medical alerts recorded" ? "Chưa ghi nhận lưu ý y khoa" : flag}</span>
                   ))}
                 </div>
               ) : null}
@@ -510,12 +492,11 @@ export function PatientsPanel({
               <div className="patient-operations">
                 <div className="chart-header">
                   <strong>{text.operationSummary}</strong>
-                  <span>{text.profile}</span>
                 </div>
                 <div className="patient-operation-strip">
                   <span>
                     <span>{text.lastVisit}</span>
-                    <strong>{selectedPatient.lastVisit || text.unknown}</strong>
+                    <strong>{selectedPatient.lastVisit ? patientVisitLabel(selectedPatient.lastVisit, language) : text.unknown}</strong>
                   </span>
                   <span>
                     <span>{text.nextVisit}</span>
@@ -532,30 +513,30 @@ export function PatientsPanel({
                 </div>
                 <div className="patient-quick-actions" aria-label={text.quickActions}>
                   <Link
-                    className="secondary-button"
+                    className="primary-button"
                     href={`/journey?patientId=${encodeURIComponent(selectedPatient.id)}`}
                   >
-                    {text.openJourney}
+                    {text.openJourney}<ArrowRight size={16} aria-hidden="true" />
                   </Link>
                   <Link
                     className="secondary-button"
                     href={`/billing?patientId=${encodeURIComponent(selectedPatient.id)}`}
                   >
-                    {text.openBilling}
+                    <CreditCard size={16} aria-hidden="true" />{text.openBilling}
                   </Link>
                   <Link
                     className="secondary-button"
                     href={`/schedule?patientId=${encodeURIComponent(selectedPatient.id)}`}
                   >
-                    {text.openSchedule}
+                    <CalendarDays size={16} aria-hidden="true" />{text.openSchedule}
                   </Link>
                   <button
-                    className="primary-button patient-edit-action"
+                    className="secondary-button patient-edit-action"
                     type="button"
                     disabled={!formReady}
                     onClick={() => setEditPatientModalOpen(true)}
                   >
-                    <FileText size={16} />
+                    <SquarePen size={16} aria-hidden="true" />
                     {text.editProfile}
                   </button>
                 </div>
@@ -565,7 +546,7 @@ export function PatientsPanel({
                 <summary>
                   <strong>{text.consent}</strong>
                   <span>
-                    {text.consentVersion} {selectedPatient.consentVersion ?? "none"} ·{" "}
+                    {text.consentVersion} {selectedPatient.consentVersion ?? text.unknown} ·{" "}
                     {text.consentSigned} {selectedPatient.consentSignedAt ?? text.noConsentDate}
                   </span>
                 </summary>
@@ -612,13 +593,7 @@ export function PatientsPanel({
               </details>
 
               {editPatientModalOpen ? (
-                <div
-                  className="progress-modal-backdrop"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label={text.editProfile}
-                  onClick={() => setEditPatientModalOpen(false)}
-                >
+                <OperationalDialog label={text.editProfile} onClose={() => setEditPatientModalOpen(false)}>
                   <div
                     className="progress-modal patient-profile-modal"
                     onClick={(event) => event.stopPropagation()}
@@ -798,7 +773,7 @@ export function PatientsPanel({
                       </div>
                     </form>
                   </div>
-                </div>
+                </OperationalDialog>
               ) : null}
             </>
           ) : (

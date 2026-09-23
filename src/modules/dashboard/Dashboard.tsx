@@ -1,668 +1,116 @@
 "use client";
 
-import { Activity, Building2, CalendarDays, CheckCircle2, Inbox, ShieldCheck, UsersRound } from "lucide-react";
+import { ArrowRight, Building2, CalendarDays, CheckCircle2, ShieldCheck, UsersRound } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useMemo } from "react";
 import { completeWorkItemAction, createWorkItemAction, retryFailedNotificationAction } from "@/app/(app)/dashboard/actions";
-import { createInAppNotificationAction } from "@/app/(app)/notifications/actions";
-import { useAppLanguage, type Language } from "@/components/AppLanguage";
+import { useAppLanguage } from "@/components/AppLanguage";
+import { NotificationComposer } from "@/components/WorkspaceNotifications";
 import { visibleActionNoticeParam } from "@/lib/action-notices";
-import { EmptyState, MetricCard, PanelHeader, StatusPill as BaseStatusPill } from "@/components/suite-primitives";
+import { EmptyState, PanelHeader, StatusPill } from "@/components/suite-primitives";
 import { formatVnd, type Appointment, type Clinic } from "@/lib/data";
 import type { DashboardWorkspace } from "@/lib/dashboard-types";
 import type { TaskInboxWorkspace } from "@/lib/task-inbox-types";
+import { summarizeClinicDay } from "@/workspaces/clinic-day";
 
-const dashboardText = {
-  vi: {
-    chairUtilization: "Hiệu suất ghế",
-    chairs: "ghế",
-    collected: "Đã thu",
-    compare: "So sánh",
-    liveAppointmentFlow: "Luồng lịch hẹn hôm nay",
-    open: "Mở",
-    production: "Doanh thu",
-    todayVisits: "Lượt hẹn hôm nay",
-    visits: "lượt hẹn",
-  },
-  en: {
-    chairUtilization: "Chair utilization",
-    chairs: "chairs",
-    collected: "Collected",
-    compare: "Compare",
-    liveAppointmentFlow: "Live appointment flow",
-    open: "Open",
-    production: "Production",
-    todayVisits: "Today's visits",
-    visits: "visits",
-  },
+const statusNames: Record<string, [string, string]> = {
+  REQUESTED: ["Chờ xác nhận", "Requested"], CONFIRMED: ["Đã xác nhận", "Confirmed"], ARRIVED: ["Đã đến", "Arrived"],
+  IN_CHAIR: ["Đang trên ghế", "In chair"], COMPLETED: ["Hoàn tất", "Completed"], CANCELLED: ["Đã hủy", "Cancelled"],
+  NO_SHOW: ["Không đến", "No-show"], HIGH: ["Cao", "High"], MEDIUM: ["Trung bình", "Medium"], LOW: ["Thấp", "Low"],
+  DENTIST: ["Bác sĩ", "Dentist"], HYGIENIST: ["Điều dưỡng", "Hygienist"], OWNER: ["Chủ hệ thống", "Owner"],
+  AREA_MANAGER: ["Quản lý khu vực", "Area manager"], CLINIC_MANAGER: ["Quản lý phòng khám", "Clinic manager"],
+  FRONT_DESK: ["Lễ tân", "Front desk"], BILLING: ["Thu ngân", "Billing"],
+};
+const notices: Record<string, [string, string]> = {
+  "task-created": ["Đã giao công việc.", "Task assigned."], "task-completed": ["Đã hoàn tất công việc.", "Task completed."],
+  "notification-sent": ["Đã gửi thông báo.", "Notification sent."],
+  "notification-target-missing": ["Chọn ít nhất một nhóm hoặc người nhận.", "Choose at least one recipient."],
+  "notification-missing": ["Nhập tiêu đề và nội dung thông báo.", "Enter a subject and message."],
+  "notification-denied": ["Bạn không có quyền gửi thông báo.", "You cannot send notifications."],
+  "notification-retried": ["Đã gửi lại thông báo.", "Notification retried."],
 };
 
-const statusText: Record<Language, Record<string, string>> = {
-  vi: {
-    high: "Cao",
-    medium: "Trung bình",
-    low: "Thấp",
-    notification: "Thông báo",
-    work_item: "Công việc",
-    DENTIST: "Nha sĩ",
-    HYGIENIST: "Điều dưỡng",
-    FRONT_DESK: "Lễ tân",
-    BILLING: "Thu ngân",
-    OWNER: "Chủ hệ thống",
-    AREA_MANAGER: "Quản lý khu vực",
-    CLINIC_MANAGER: "Quản lý phòng khám",
-    Confirmed: "Đã xác nhận",
-    Arrived: "Đã đến",
-    "In chair": "Đang trên ghế",
-    Completed: "Hoàn tất",
-    Cancelled: "Đã hủy",
-    "No-show": "Không đến",
-  },
-  en: {},
-};
-
-function displayStatus(status: string, language: Language) {
-  return statusText[language][status] ?? status;
-}
-
-function StatusPill({ status }: { status: string }) {
-  const { language } = useAppLanguage();
-  return <BaseStatusPill label={displayStatus(status, language)} status={status} />;
-}
-
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { t } = useAppLanguage();
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? t.databaseLive : t.demoMode}
-    </span>
-  );
-}
-
-function noticeText(notice: string | null, language: Language) {
-  const notices: Record<string, Record<Language, string>> = {
-    "task-created": { vi: "Đã tạo công việc.", en: "Task created." },
-    "task-completed": { vi: "Đã hoàn tất công việc.", en: "Task completed." },
-    "notification-sent": { vi: "Đã gửi thông báo.", en: "Notification sent." },
-    "notification-target-missing": { vi: "Chọn ít nhất một nhóm hoặc người nhận.", en: "Choose at least one target." },
-    "notification-missing": { vi: "Nhập đủ tiêu đề và nội dung thông báo.", en: "Enter notification subject and body." },
-    "notification-denied": { vi: "Bạn không có quyền gửi thông báo.", en: "You cannot send notifications." },
-    "notification-database": { vi: "Không lưu được thông báo vào cơ sở dữ liệu.", en: "Could not save notification." },
-    "notification-retried": { vi: "Đã gửi lại thông báo.", en: "Notification retried." },
-  };
-  return notice ? notices[notice]?.[language] ?? notice : null;
-}
-
-function useNoticeText(notice: string | null) {
-  const { language } = useAppLanguage();
-  return noticeText(notice, language);
-}
-
-function workspaceMessageText(message: string | null | undefined, _language: Language) {
-  return message;
-}
-
-function sumBy<T extends Record<K, number>, K extends keyof T>(items: T[], key: K) {
-  return items.reduce((total, item) => total + item[key], 0);
-}
-
-export function Dashboard({
-  collection,
-  dashboardWorkspace,
-  production,
-  todayVisits,
-  utilization,
-  visibleClinics,
-  visibleAppointments,
-  taskInboxWorkspace,
-}: {
-  collection: number;
-  dashboardWorkspace?: DashboardWorkspace | null;
-  production: number;
-  todayVisits: number;
-  utilization: number;
-  visibleClinics: Clinic[];
-  visibleAppointments: Appointment[];
-  taskInboxWorkspace?: TaskInboxWorkspace | null;
+export function Dashboard({ collection, dashboardWorkspace, production, todayVisits, utilization, visibleClinics, visibleAppointments, taskInboxWorkspace }: {
+  collection: number; dashboardWorkspace?: DashboardWorkspace | null; production: number; todayVisits: number;
+  utilization: number; visibleClinics: Clinic[]; visibleAppointments: Appointment[]; taskInboxWorkspace?: TaskInboxWorkspace | null;
 }) {
   const { language } = useAppLanguage();
-  const searchParams = useSearchParams();
-  const notice = useNoticeText(visibleActionNoticeParam(searchParams.get("notice")));
-  const text = dashboardText[language];
-  const inboxItems = taskInboxWorkspace?.items ?? [];
-  const dashboardLabels =
-    language === "vi"
-      ? {
-          commandCenter: "Điều hành hôm nay",
-          commandSubtitle: "Theo dõi lịch hẹn, luồng bệnh nhân, thu tiền và rủi ro cần xử lý.",
-          patientFlow: "Luồng bệnh nhân hôm nay",
-          clinics: "Phòng khám",
-          risks: "Tín hiệu cần xử lý",
-          providers: "Tải bác sĩ/phụ tá",
-          appointments: "Lịch hẹn sắp tới",
-          emptyAppointments: "Chưa có lịch hẹn trong hôm nay",
-          emptyProviders: "Chưa có tải nhân sự trong hôm nay",
-          emptyRisks: "Không có tín hiệu rủi ro",
-          updated: "Cập nhật",
-          inChair: "Đang điều trị",
-          completed: "Hoàn tất",
-          collectedToday: "Thu hôm nay",
-        }
-      : {
-          commandCenter: "Today command center",
-          commandSubtitle: "Track appointments, patient flow, collections, and operational risk.",
-          patientFlow: "Today's patient flow",
-          clinics: "Clinics",
-          risks: "Signals to handle",
-          providers: "Provider load",
-          appointments: "Upcoming appointments",
-          emptyAppointments: "No appointments today",
-          emptyProviders: "No provider load today",
-          emptyRisks: "No risk signals",
-          updated: "Updated",
-          inChair: "In chair",
-          completed: "Completed",
-          collectedToday: "Collected today",
-        };
-  const dashboardMetrics =
-    [
-      { label: text.todayVisits, value: String(todayVisits), detail: null, tone: "blue" as const },
-      { label: text.chairUtilization, value: `${utilization}%`, detail: null, tone: "teal" as const },
-      { label: text.production, value: formatVnd(production), detail: null, tone: "violet" as const },
-      { label: text.collected, value: formatVnd(collection), detail: null, tone: "green" as const },
-    ];
-  const fallbackDashboardClinics =
-    visibleClinics.map((clinic) => ({
-      clinicId: clinic.id,
-      chainId: clinic.chainId ?? null,
-      chainName: clinic.chainName ?? null,
-      name: clinic.name,
-      city: clinic.city,
-      chairs: clinic.chairs,
-      providers: clinic.doctors,
-      todayAppointments: clinic.todayVisits,
-      inChair: 0,
-      completed: 0,
-      utilization: clinic.utilization,
-      collectedToday: clinic.collection,
-    }));
-  const visibleClinicIdSet = useMemo(
-    () => new Set(visibleClinics.map((clinic) => clinic.id)),
-    [visibleClinics],
-  );
-  const dashboardClinics = (
-    dashboardWorkspace?.clinicSummaries ?? fallbackDashboardClinics
-  ).filter((clinic) => visibleClinicIdSet.has(clinic.clinicId));
-  const scopedDashboardMetrics =
-    dashboardWorkspace
-      ? [
-          {
-            label: dashboardMetrics[0].label,
-            value: String(sumBy(dashboardClinics, "todayAppointments")),
-            tone: "blue" as const,
-          },
-          {
-            label: dashboardMetrics[1].label,
-            value: `${Math.round(
-              dashboardClinics.reduce((total, clinic) => total + clinic.utilization, 0) /
-                Math.max(dashboardClinics.length, 1),
-            )}%`,
-            tone: "teal" as const,
-          },
-          dashboardWorkspace.metrics[2] ?? dashboardMetrics[2],
-          {
-            label: dashboardMetrics[3].label,
-            value: formatVnd(sumBy(dashboardClinics, "collectedToday")),
-            tone: "green" as const,
-          },
-        ]
-      : dashboardMetrics;
-  const dashboardAppointments =
-    (dashboardWorkspace?.appointments?.filter((appointment) =>
-      visibleClinicIdSet.has(appointment.clinicId),
-    ) ??
-    visibleAppointments.slice(0, 8).map((appointment) => ({
-      id: appointment.id,
-      clinicId: appointment.clinicId,
-      time: appointment.time,
-      patientName: appointment.patient,
-      providerName: appointment.provider,
-      clinicName:
-        visibleClinics.find((clinic) => clinic.id === appointment.clinicId)?.name ??
-        appointment.clinicId,
-      procedure: appointment.procedure,
-      status: appointment.status,
-    }))).slice(0, 8);
-  const dashboardFlow =
-    dashboardWorkspace
-      ? dashboardWorkspace.flow.map((step) => ({
-          ...step,
-          count: dashboardAppointments.filter((appointment) => appointment.status === step.key).length,
-        }))
-      : [
-      { key: "REQUESTED", label: "Yêu cầu", count: 0 },
-      { key: "CONFIRMED", label: "Đã hẹn", count: todayVisits },
-      { key: "ARRIVED", label: "Đã đến", count: 0 },
-      { key: "IN_CHAIR", label: "Đang điều trị", count: 0 },
-      { key: "COMPLETED", label: "Hoàn tất", count: 0 },
-    ];
-  const inboxLabels =
-    language === "vi"
-      ? {
-          action: "Việc cần xử lý",
-          empty: "Không có việc cần xử lý",
-          generated: "Cập nhật",
-          create: "Tạo công việc",
-          complete: "Hoàn tất",
-          patient: "Bệnh nhân",
-          assignee: "Người phụ trách",
-          due: "Hạn xử lý",
-          priority: "Ưu tiên",
-          detail: "Ghi chú xử lý",
-          title: "Trung tâm thông báo và công việc",
-          notificationForm: "Gửi thông báo",
-          taskForm: "Giao việc nội bộ",
-        }
-      : {
-          action: "Tasks",
-          empty: "No pending tasks",
-          generated: "Updated",
-          create: "Create task",
-          complete: "Complete",
-          patient: "Patient",
-          assignee: "Assignee",
-          due: "Due",
-          priority: "Priority",
-          detail: "Task note",
-          title: "Notifications and task inbox",
-          notificationForm: "Send notification",
-          taskForm: "Create internal task",
-        };
-  const retryNotificationLabel = language === "vi" ? "Gửi lại" : "Retry";
-  const notificationLabels =
-    language === "vi"
-      ? {
-          actionUrl: "Link hành động",
-          allSystem: "Toàn hệ thống",
-          body: "Nội dung",
-          bodyPlaceholder: "Viết nội dung cần thông báo.",
-          chains: "Chuỗi",
-          clinics: "Chi nhánh",
-          high: "Cao",
-          low: "Thấp",
-          medium: "Trung bình",
-          priority: "Ưu tiên",
-          roles: "Nhóm vai trò",
-          send: "Gửi thông báo",
-          subject: "Tiêu đề",
-          subjectPlaceholder: "Ví dụ: Họp giao ban cuối ngày",
-          targets: "Gửi tới",
-          users: "Người nhận cụ thể",
-        }
-      : {
-          actionUrl: "Action link",
-          allSystem: "Whole system",
-          body: "Body",
-          bodyPlaceholder: "Write the announcement.",
-          chains: "Chains",
-          clinics: "Branches",
-          high: "High",
-          low: "Low",
-          medium: "Medium",
-          priority: "Priority",
-          roles: "Role groups",
-          send: "Send notification",
-          subject: "Subject",
-          subjectPlaceholder: "Example: End-of-day huddle",
-          targets: "Send to",
-          users: "Specific recipients",
-        };
-  const notificationRoles = [
-    "OWNER",
-    "AREA_MANAGER",
-    "CLINIC_MANAGER",
-    "DENTIST",
-    "HYGIENIST",
-    "FRONT_DESK",
-    "BILLING",
-  ];
-
-  return (
-    <section className="view-stack">
-      <section className="dashboard-command-panel">
-        <div className="dashboard-command-copy">
-          <p className="eyebrow">{dashboardLabels.commandCenter}</p>
-          <h2>{dashboardLabels.commandCenter}</h2>
-          <span>{dashboardLabels.commandSubtitle}</span>
-        </div>
-        <div className="dashboard-command-status">
-          <SourceBadge source={dashboardWorkspace?.source} />
-          <span>
-            {dashboardLabels.updated}: {dashboardWorkspace?.generatedAt ?? taskInboxWorkspace?.generatedAt ?? "-"}
-          </span>
-        </div>
-        {scopedDashboardMetrics.map((metric) => (
-          <MetricCard
-            key={metric.label}
-            label={metric.label}
-            value={metric.value}
-            tone={metric.tone}
-          />
-        ))}
+  const vi = language === "vi";
+  const text = (v: string, e: string) => vi ? v : e;
+  const status = (value: string) => statusNames[value.toUpperCase().replace(/[ -]/g, "_")]?.[vi ? 0 : 1] ?? value;
+  const search = useSearchParams();
+  const noticeKey = visibleActionNoticeParam(search.get("notice"));
+  const notice = noticeKey ? notices[noticeKey]?.[vi ? 0 : 1] ?? text("Chưa hoàn tất thao tác. Kiểm tra thông tin và thử lại.", "The action could not be completed. Review the information and retry.") : null;
+  const clinicIds = new Set(visibleClinics.map(clinic => clinic.id));
+  const clinics = (dashboardWorkspace?.clinicSummaries ?? []).filter(clinic => clinicIds.has(clinic.clinicId));
+  const day = summarizeClinicDay(clinics, clinicIds);
+  const hasSummary = Boolean(dashboardWorkspace);
+  const total = hasSummary ? day.appointments : todayVisits;
+  const appointments = dashboardWorkspace?.appointments.filter(item => clinicIds.has(item.clinicId)) ?? visibleAppointments.filter(item => clinicIds.has(item.clinicId)).slice(0, 10).map(item => ({
+    id: item.id, time: item.time, patientName: item.patient, providerName: item.provider, procedure: item.procedure, status: item.status,
+    clinicName: visibleClinics.find(clinic => clinic.id === item.clinicId)?.name ?? "",
+  }));
+  const items = taskInboxWorkspace?.items ?? [];
+  const updated = dashboardWorkspace?.generatedAt ?? taskInboxWorkspace?.generatedAt;
+  return <section className="view-stack narrative-day">
+    {dashboardWorkspace?.message && <div className="schedule-alert" role="status">{dashboardWorkspace.message}</div>}
+    {notice && <div className="schedule-alert action" role="status">{notice}</div>}
+    <div className="day-opening"><div className="day-context"><span>{text("Trong phạm vi phòng khám đang chọn", "For the selected clinics")}</span>{updated && <small>{text("Cập nhật", "Updated")}: {updated}</small>}</div>
+      <Link className="primary-button" href="/schedule"><CalendarDays size={17} aria-hidden="true" />{text("Mở lịch hẹn", "Open appointments")}<ArrowRight size={16} aria-hidden="true" /></Link>
+    </div>
+    <dl className="day-pulse" aria-label={text("Tình hình lịch hẹn", "Appointment overview")}>
+      <div><dt>{text("Lịch hẹn hôm nay", "Appointments today")}</dt><dd data-day-total>{total}</dd></div>
+      <div><dt>{text("Đang trên ghế", "In chair")}</dt><dd>{hasSummary ? day.inChair : "—"}</dd></div>
+      <div><dt>{text("Lượt hẹn hoàn tất", "Completed visits")}</dt><dd>{hasSummary ? day.completed : "—"}</dd></div>
+    </dl>
+    <div className="day-work-grid">
+      <section className="panel day-appointments" aria-labelledby="day-appointments-title">
+        <div className="day-section-heading"><div><p className="workspace-chapter">01 / {text("Tiếp đón", "Welcome")}</p><h2 id="day-appointments-title">{text("Lịch hẹn hôm nay", "Today's appointments")}</h2></div><Link className="workspace-text-link" href="/schedule">{text("Xem lịch", "View schedule")}<ArrowRight size={16} aria-hidden="true" /></Link></div>
+        <ol className="day-appointment-list">{appointments.map(item => <li key={item.id}><time>{item.time}</time><div className="day-appointment-person"><strong>{item.patientName}</strong><span>{item.procedure}</span><small>{item.providerName} · {item.clinicName}</small></div><StatusPill status={item.status} label={status(item.status)} /></li>)}</ol>
+        {!appointments.length && <EmptyState label={total > 0 ? text("Mở lịch để xem các lượt hẹn của phòng khám này.", "Open the schedule to see this clinic's appointments.") : text("Chưa có lịch hẹn hôm nay. Thêm lịch hẹn từ màn hình Lịch hẹn.", "No appointments today. Add a visit from the schedule.")} />}
+        {total > appointments.length && <p className="day-preview-note">{text(`Hiển thị ${appointments.length} / ${total} lượt hẹn. Mở lịch để xem đầy đủ.`, `Showing ${appointments.length} of ${total} visits. Open the schedule for the full list.`)}</p>}
       </section>
-
-      {dashboardWorkspace?.message && (
-        <div className="schedule-alert">{workspaceMessageText(dashboardWorkspace.message, language)}</div>
-      )}
-
-      <section className="panel dashboard-flow-panel">
-        <PanelHeader icon={Activity} title={dashboardLabels.patientFlow} action={text.liveAppointmentFlow} />
-        <div className="dashboard-flow">
-          {dashboardFlow.map((step, index) => (
-            <div className="dashboard-flow-step" key={step.key}>
-              <span>{step.label}</span>
-              <strong>{step.count}</strong>
-              {index < dashboardFlow.length - 1 && <i />}
-            </div>
-          ))}
-        </div>
+      <section className="panel day-tasks" aria-labelledby="day-tasks-title">
+        <div className="day-section-heading"><div><p className="workspace-chapter">02 / {text("Tiếp nối", "Follow through")}</p><h2 id="day-tasks-title">{text("Việc cần xử lý", "Work to follow up")}</h2></div></div>
+        <p className="day-scope-note">{text("Thông báo và công việc trong phạm vi bạn được truy cập.", "Notifications and work across your accessible clinics.")}</p>
+        {taskInboxWorkspace?.message && <div className="schedule-alert">{taskInboxWorkspace.message}</div>}
+        <div className="day-task-list">{items.slice(0, 12).map(item => <article className="day-task" key={item.id}>
+          <strong>{item.title}</strong><p>{item.detail}</p><small>{[item.patientName, item.clinicName, item.assignedToName, item.dueAt].filter(Boolean).join(" · ")}</small>
+          <div className="day-task-actions"><StatusPill status={item.priority} label={status(item.priority)} />
+            {item.kind === "notification" && item.status === "FAILED" && item.sourceId ? <form action={retryFailedNotificationAction}><input name="notificationId" type="hidden" value={item.sourceId} /><button className="secondary-button compact-button" type="submit" disabled={!taskInboxWorkspace?.canMutate}>{text("Gửi lại", "Retry notification")}</button></form>
+            : item.actionable && item.sourceId ? <form action={completeWorkItemAction}><input name="workItemId" type="hidden" value={item.sourceId} /><button className="secondary-button compact-button" type="submit" disabled={!taskInboxWorkspace?.canMutate}><CheckCircle2 size={15} aria-hidden="true" />{text("Hoàn tất", "Complete")}</button></form>
+            : <Link className="workspace-text-link" href={item.href}>{text("Mở công việc", "Open task")}<ArrowRight size={15} aria-hidden="true" /></Link>}
+          </div>
+        </article>)}</div>
+        {!items.length && <EmptyState label={text("Chưa có công việc cần xử lý.", "No work to follow up right now.")} />}
+        {items.length > 12 && <p className="day-preview-note">{text(`Hiển thị 12 / ${items.length} mục. Mở Thông báo để xem tất cả.`, `Showing 12 of ${items.length} items. Open Notifications for the full list.`)}</p>}
       </section>
-
-      <section className="panel dashboard-inbox-panel">
-        <PanelHeader
-          icon={Inbox}
-          title={inboxLabels.title}
-          action={`${inboxItems.length}`}
-        />
-        {taskInboxWorkspace?.message && (
-          <div className="schedule-alert">{workspaceMessageText(taskInboxWorkspace.message, language)}</div>
-        )}
-        {notice && <div className="schedule-alert action">{notice}</div>}
-        {taskInboxWorkspace?.canMutate ? (
-        <details className="dashboard-compose-details">
-          <summary>{inboxLabels.notificationForm}</summary>
-        <form action={createInAppNotificationAction} className="notification-compose-form dashboard-notification-form">
-          <input name="redirectTo" type="hidden" value="/dashboard" />
-          <div className="notification-compose-grid">
-            <label>
-              <span>{notificationLabels.subject}</span>
-              <input
-                name="subject"
-                required
-                placeholder={notificationLabels.subjectPlaceholder}
-                disabled={!taskInboxWorkspace?.canMutate}
-              />
-            </label>
-            <label>
-              <span>{notificationLabels.priority}</span>
-              <select name="priority" defaultValue="medium" disabled={!taskInboxWorkspace?.canMutate}>
-                <option value="high">{notificationLabels.high}</option>
-                <option value="medium">{notificationLabels.medium}</option>
-                <option value="low">{notificationLabels.low}</option>
-              </select>
-            </label>
-          </div>
-          <label>
-            <span>{notificationLabels.body}</span>
-            <textarea
-              name="body"
-              rows={2}
-              required
-              placeholder={notificationLabels.bodyPlaceholder}
-              disabled={!taskInboxWorkspace?.canMutate}
-            />
-          </label>
-          <div className="notification-compose-grid">
-            <label>
-              <span>{notificationLabels.actionUrl}</span>
-              <input name="actionUrl" placeholder="/schedule" disabled={!taskInboxWorkspace?.canMutate} />
-            </label>
-            <button className="primary-button compact-button" type="submit" disabled={!taskInboxWorkspace?.canMutate}>
-              <Inbox size={15} />
-              {notificationLabels.send}
-            </button>
-          </div>
-          <div className="notification-targets">
-            <div className="notification-targets-title">{notificationLabels.targets}</div>
-            <label className="notification-check">
-              <input name="targetSystem" type="checkbox" value="true" disabled={!taskInboxWorkspace?.canMutate} />
-              <span>{notificationLabels.allSystem}</span>
-            </label>
-            <details className="notification-target-section" open>
-              <summary>{notificationLabels.roles}</summary>
-              <div className="notification-check-grid">
-                {notificationRoles.map((role) => (
-                  <label className="notification-check" key={role}>
-                    <input name="targetRoles" type="checkbox" value={role} disabled={!taskInboxWorkspace?.canMutate} />
-                    <span>{displayStatus(role, language)}</span>
-                  </label>
-                ))}
-              </div>
-            </details>
-            {(taskInboxWorkspace?.chains ?? []).length > 0 && (
-              <details className="notification-target-section" open>
-                <summary>{notificationLabels.chains}</summary>
-                <div className="notification-check-grid">
-                  {(taskInboxWorkspace?.chains ?? []).map((chain) => (
-                    <label className="notification-check" key={chain.id}>
-                      <input name="targetChainIds" type="checkbox" value={chain.id} disabled={!taskInboxWorkspace?.canMutate} />
-                      <span>{chain.name}</span>
-                    </label>
-                  ))}
-                </div>
-              </details>
-            )}
-            <details className="notification-target-section" open>
-              <summary>{notificationLabels.clinics}</summary>
-              <div className="notification-check-grid">
-                {(taskInboxWorkspace?.clinics ?? []).map((clinic) => (
-                  <label className="notification-check" key={clinic.id}>
-                    <input name="targetClinicIds" type="checkbox" value={clinic.id} disabled={!taskInboxWorkspace?.canMutate} />
-                    <span>{clinic.name}</span>
-                  </label>
-                ))}
-              </div>
-            </details>
-            <details className="notification-target-section" open>
-              <summary>{notificationLabels.users}</summary>
-              <div className="notification-check-grid">
-                {(taskInboxWorkspace?.users ?? []).map((user) => (
-                  <label className="notification-check" key={user.id}>
-                    <input name="targetUserIds" type="checkbox" value={user.id} disabled={!taskInboxWorkspace?.canMutate} />
-                    <span>{user.fullName}</span>
-                  </label>
-                ))}
-              </div>
-            </details>
-          </div>
-        </form>
-        </details>
-        ) : null}
-        {taskInboxWorkspace?.canMutate ? (
-        <details className="dashboard-compose-details">
-          <summary>{inboxLabels.taskForm}</summary>
-        <form action={createWorkItemAction} className="staff-form compact task-inbox-form">
-          <input name="title" placeholder={inboxLabels.create} disabled={!taskInboxWorkspace?.canMutate} required />
-          <select name="patientId" disabled={!taskInboxWorkspace?.canMutate}>
-            <option value="">{inboxLabels.patient}</option>
-            {(taskInboxWorkspace?.patients ?? []).map((patient) => (
-              <option value={patient.id} key={patient.id}>
-                {patient.name} - {patient.phone}
-              </option>
-            ))}
-          </select>
-          <select name="assignedToId" disabled={!taskInboxWorkspace?.canMutate}>
-            <option value="">{inboxLabels.assignee}</option>
-            {(taskInboxWorkspace?.users ?? []).map((user) => (
-              <option value={user.id} key={user.id}>
-                {user.fullName}
-              </option>
-            ))}
-          </select>
-          <select name="priority" defaultValue="medium" disabled={!taskInboxWorkspace?.canMutate}>
-            <option value="high">{displayStatus("high", language)}</option>
-            <option value="medium">{displayStatus("medium", language)}</option>
-            <option value="low">{displayStatus("low", language)}</option>
-          </select>
-          <input name="dueAt" type="date" disabled={!taskInboxWorkspace?.canMutate} />
-          <input name="detail" placeholder={inboxLabels.detail} disabled={!taskInboxWorkspace?.canMutate} />
-          <button className="primary-button compact-button" type="submit" disabled={!taskInboxWorkspace?.canMutate}>
-            <Inbox size={15} />
-            {inboxLabels.create}
-          </button>
-        </form>
-        </details>
-        ) : null}
-        <div className="invoice-list task-inbox-list">
-          {inboxItems.length > 0 ? (
-            inboxItems.slice(0, 12).map((item) => (
-              <div className="invoice-row billing-invoice-row task-inbox-row" key={item.id}>
-                <div>
-                  <strong>{item.title}</strong>
-                  <span>
-                    {displayStatus(item.kind, language)} · {item.detail}
-                  </span>
-                  <small>
-                    {item.patientName ?? item.clinicName ?? "-"}
-                    {item.dueAt ? ` · ${item.dueAt}` : ""}
-                    {item.assignedToName ? ` · ${item.assignedToName}` : ""}
-                  </small>
-                </div>
-                <StatusPill status={item.priority} />
-                {item.kind === "notification" && item.status === "FAILED" && item.sourceId ? (
-                  <form action={retryFailedNotificationAction}>
-                    <input name="notificationId" type="hidden" value={item.sourceId} />
-                    <button className="secondary-button compact-button task-action-button" type="submit" disabled={!taskInboxWorkspace?.canMutate}>
-                      {retryNotificationLabel}
-                    </button>
-                  </form>
-                ) : item.actionable && item.sourceId ? (
-                  <form action={completeWorkItemAction}>
-                    <input name="workItemId" type="hidden" value={item.sourceId} />
-                    <button className="secondary-button compact-button task-action-button" type="submit" disabled={!taskInboxWorkspace?.canMutate}>
-                      <CheckCircle2 size={15} />
-                      {inboxLabels.complete}
-                    </button>
-                  </form>
-                ) : (
-                  <Link className="secondary-button compact-button task-action-button" href={item.href}>
-                    {inboxLabels.action}
-                  </Link>
-                )}
-              </div>
-            ))
-          ) : (
-            <EmptyState label={inboxLabels.empty} />
-          )}
-        </div>
-        {taskInboxWorkspace?.generatedAt && (
-          <p className="billing-panel-note">
-            {inboxLabels.generated}: {taskInboxWorkspace.generatedAt}
-          </p>
-        )}
-      </section>
-
-      <div className="content-grid two">
-        <section className="panel">
-          <PanelHeader
-            icon={Building2}
-            title={dashboardLabels.clinics}
-            action={text.compare}
-          />
-          <div className="dashboard-clinic-grid">
-            {dashboardClinics.map((clinic) => (
-              <div className="dashboard-clinic-card" key={clinic.clinicId}>
-                <div>
-                  <strong>{clinic.name}</strong>
-                  <span>
-                    {clinic.city} · {clinic.chairs} {text.chairs} · {clinic.providers} {language === "vi" ? "nhân sự" : "staff"}
-                  </span>
-                </div>
-                <div className="dashboard-clinic-stats">
-                  <span>{clinic.todayAppointments} {text.visits}</span>
-                  <span>{clinic.inChair} {dashboardLabels.inChair}</span>
-                  <span>{clinic.completed} {dashboardLabels.completed}</span>
-                  <span>{formatVnd(clinic.collectedToday)} {dashboardLabels.collectedToday}</span>
-                </div>
-                <div className="clinic-stats">
-                  <div
-                    className="progress"
-                    aria-label={`${clinic.utilization}% ${text.chairUtilization}`}
-                  >
-                    <i style={{ width: `${clinic.utilization}%` }} />
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
+    </div>
+    {taskInboxWorkspace?.canMutate && <section className="panel day-handoff" aria-label={text("Giao việc cho đội ngũ", "Team handoff")}>
+      <details><summary>{text("Giao một công việc", "Assign a task")}</summary><form action={createWorkItemAction} className="staff-form compact task-inbox-form">
+        <label>{text("Công việc", "Task")}<input name="title" required /></label>
+        <label>{text("Bệnh nhân (không bắt buộc)", "Patient (optional)")}<select name="patientId"><option value="">{text("Chọn bệnh nhân", "Select patient")}</option>{taskInboxWorkspace.patients.map(patient => <option key={patient.id} value={patient.id}>{patient.name} - {patient.phone}</option>)}</select></label>
+        <label>{text("Người phụ trách", "Assignee")}<select name="assignedToId"><option value="">{text("Chọn người phụ trách", "Select assignee")}</option>{taskInboxWorkspace.users.map(user => <option key={user.id} value={user.id}>{user.fullName}</option>)}</select></label>
+        <label>{text("Mức ưu tiên", "Priority")}<select name="priority" defaultValue="medium">{["high", "medium", "low"].map(value => <option key={value} value={value}>{status(value)}</option>)}</select></label>
+        <label>{text("Hạn xử lý", "Due date")}<input name="dueAt" type="date" /></label><label>{text("Ghi chú", "Notes")}<input name="detail" /></label>
+        <button className="primary-button" type="submit">{text("Giao công việc", "Assign task")}</button>
+      </form></details>
+      <details><summary>{text("Gửi thông báo cho đội ngũ", "Send a team notification")}</summary><NotificationComposer currentPath="/dashboard" language={language} workspace={taskInboxWorkspace} /></details>
+    </section>}
+    <section className="day-practice-review" aria-labelledby="day-review-title">
+      <div className="day-section-heading"><div><p className="workspace-chapter">03 / {text("Nhìn lại", "Review")}</p><h2 id="day-review-title">{text("Tình hình phòng khám", "The practice at a glance")}</h2></div><Link href="/reports" className="workspace-text-link">{text("Xem báo cáo", "View reports")}<ArrowRight size={16} aria-hidden="true" /></Link></div>
+      <dl className="day-financial-summary"><div><dt>{text("Đã thu hôm nay", "Collected today")}</dt><dd>{formatVnd(hasSummary ? day.collected : collection)}</dd></div><div><dt>{text("Doanh thu", "Production")}</dt><dd>{formatVnd(production)}</dd></div><div><dt>{text("Hiệu suất ghế", "Chair utilization")}</dt><dd>{utilization}%</dd></div></dl>
+      <details className="panel day-review-details"><summary><Building2 size={18} aria-hidden="true" />{text("Chi tiết từng phòng khám", "Clinic-by-clinic detail")}</summary><div className="day-clinic-list">{clinics.map(clinic => <article key={clinic.clinicId}><div><strong>{clinic.name}</strong><small>{clinic.city} · {clinic.chairs} {text("ghế", "chairs")}</small></div><dl><div><dt>{text("Lịch hẹn", "Visits")}</dt><dd>{clinic.todayAppointments}</dd></div><div><dt>{text("Đang trên ghế", "In chair")}</dt><dd>{clinic.inChair}</dd></div><div><dt>{text("Đã thu", "Collected")}</dt><dd>{formatVnd(clinic.collectedToday)}</dd></div></dl></article>)}</div></details>
+      <div className="day-review-grid">
+        <section className="panel"><PanelHeader icon={ShieldCheck} title={text("Những điểm cần lưu ý", "Items needing attention")} /><p className="day-scope-note">{text("Tất cả phòng khám bạn được truy cập", "All your accessible clinics")}</p>
+          <div className="day-risk-list">{(dashboardWorkspace?.risks ?? []).map(risk => <Link key={risk.label} href={risk.href}><div><strong>{risk.label}</strong><small>{risk.detail}</small></div><span>{risk.value}</span><ArrowRight size={16} aria-hidden="true" /></Link>)}</div>
+          {!dashboardWorkspace?.risks.length && <EmptyState label={text("Chưa có thông tin cần lưu ý.", "No attention items available.")} />}
         </section>
-
-        <section className="panel">
-          <PanelHeader
-            icon={CalendarDays}
-            title={dashboardLabels.appointments}
-            action={text.open}
-          />
-          <div className="timeline">
-            {dashboardAppointments.length > 0 ? (
-              dashboardAppointments.map((appointment) => (
-                <div className="timeline-item" key={appointment.id}>
-                <time>{appointment.time}</time>
-                <div>
-                  <strong>{appointment.patientName}</strong>
-                  <span>
-                    {appointment.procedure} · {appointment.providerName} · {appointment.clinicName}
-                  </span>
-                </div>
-                <StatusPill status={appointment.status} />
-                </div>
-              ))
-            ) : (
-              <EmptyState label={dashboardLabels.emptyAppointments} />
-            )}
-          </div>
+        <section className="panel"><PanelHeader icon={UsersRound} title={text("Lịch làm việc của đội ngũ", "The team's appointments")} /><p className="day-scope-note">{text("Đang xử lý / tổng lượt hẹn trong các phòng khám bạn được truy cập", "Active / total visits across your accessible clinics")}</p>
+          <div className="dashboard-provider-list">{(dashboardWorkspace?.providerLoads ?? []).map(provider => <div className="dashboard-provider-row" key={provider.providerId}><div><strong>{provider.name}</strong><span>{status(provider.role)}</span></div><span>{provider.activeCount} / {provider.appointmentCount}</span></div>)}</div>
+          {!dashboardWorkspace?.providerLoads.length && <EmptyState label={text("Chưa có lịch hẹn của đội ngũ hôm nay.", "No team appointments today.")} />}
         </section>
       </div>
-
-      <section className="content-grid two">
-        <section className="panel">
-          <PanelHeader icon={ShieldCheck} title={dashboardLabels.risks} action={text.open} />
-          <div className="dashboard-risk-grid">
-            {(dashboardWorkspace?.risks ?? []).length > 0 ? (
-              dashboardWorkspace?.risks.map((risk) => (
-                <Link className={`dashboard-risk-card tone-${risk.tone}`} href={risk.href} key={risk.label}>
-                  <span>{risk.label}</span>
-                  <strong>{risk.value}</strong>
-                  <small>{risk.detail}</small>
-                </Link>
-              ))
-            ) : (
-              <EmptyState label={dashboardLabels.emptyRisks} />
-            )}
-          </div>
-        </section>
-
-        <section className="panel">
-          <PanelHeader icon={UsersRound} title={dashboardLabels.providers} action={text.liveAppointmentFlow} />
-          <div className="dashboard-provider-list">
-            {(dashboardWorkspace?.providerLoads ?? []).length > 0 ? (
-              dashboardWorkspace?.providerLoads.map((provider) => (
-                <div className="dashboard-provider-row" key={provider.providerId}>
-                  <div>
-                    <strong>{provider.name}</strong>
-                    <span>{displayStatus(provider.role, language)}</span>
-                  </div>
-                  <span>{provider.activeCount}/{provider.appointmentCount}</span>
-                </div>
-              ))
-            ) : (
-              <EmptyState label={dashboardLabels.emptyProviders} />
-            )}
-          </div>
-        </section>
-      </section>
     </section>
-  );
+  </section>;
 }
-

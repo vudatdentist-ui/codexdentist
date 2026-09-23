@@ -13,8 +13,8 @@ export function PanelHeader({
   return (
     <div className="panel-header">
       <div>
-        <Icon size={18} aria-hidden="true" />
-        <strong>{title}</strong>
+        <Icon size={18} strokeWidth={1.65} aria-hidden="true" />
+        <h2 className="panel-title">{title}</h2>
       </div>
       {action != null && <span className="panel-header-action">{action}</span>}
     </div>

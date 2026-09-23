@@ -131,13 +131,7 @@ export function CommunityPanel({
 
   return (
     <section className="view-stack">
-      <div className="toolbar">
-        <div>
-          <p className="eyebrow">{text.internalCommunity}</p>
-          <h2>{text.heading}</h2>
-        </div>
-        <SourceBadge source={communityWorkspace?.source} />
-      </div>
+
 
       {(communityWorkspace?.message || notice) && (
         <div className={notice ? "schedule-alert action" : "schedule-alert"}>
@@ -286,16 +280,6 @@ function noticeFor(notice: string | null, language: Language) {
   return noticeText[notice]?.[language] ?? null;
 }
 
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { language } = useAppLanguage();
-  const text = communityText[language];
-
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? text.databaseLive : text.demoMode}
-    </span>
-  );
-}
 
 function workspaceMessageText(message: string | null | undefined, language: Language) {
   if (!message || language !== "vi") {

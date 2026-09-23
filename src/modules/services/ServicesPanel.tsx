@@ -1,5 +1,7 @@
 "use client";
 
+import { OperationalDialog, WorkspaceTabs } from "@/components/ui/WorkspaceControls";
+
 import { ClipboardList, Settings, Trash2, WalletCards, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useState, type ChangeEvent } from "react";
@@ -20,15 +22,6 @@ import { EmptyState, MetricCard, PanelHeader, StatusPill as BaseStatusPill } fro
 import { formatVnd } from "@/lib/data";
 import type { ServicesWorkspace } from "@/lib/services-types";
 
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { t } = useAppLanguage();
-
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? t.databaseLive : t.demoMode}
-    </span>
-  );
-}
 
 function workspaceMessageText(message: string | null | undefined, _language: Language) {
   return message;
@@ -289,13 +282,7 @@ export function ServicesPanel({
 
   return (
     <section className="view-stack">
-      <div className="toolbar">
-        <div>
-          <p className="eyebrow">{labels.action}</p>
-          <h2>{labels.heading}</h2>
-        </div>
-        <SourceBadge source={servicesWorkspace?.source} />
-      </div>
+
 
       {(servicesWorkspace?.message || notice) && (
         <div className={notice ? "schedule-alert action" : "schedule-alert"}>
@@ -310,7 +297,7 @@ export function ServicesPanel({
         <MetricCard label={labels.steps} value={String(stepCount)} tone="violet" />
       </div>
 
-      <div className="service-section-tabs" role="tablist" aria-label={labels.services}>
+      <WorkspaceTabs className="service-section-tabs" role="tablist" aria-label={labels.services}>
         <button
           className={serviceSection === "catalog" ? "active" : ""}
           type="button"
@@ -329,7 +316,7 @@ export function ServicesPanel({
         >
           {labels.compensation}
         </button>
-      </div>
+      </WorkspaceTabs>
 
       <div className="service-action-row">
         {serviceSection === "catalog" ? (
@@ -386,13 +373,7 @@ export function ServicesPanel({
       )}
 
       {serviceModal === "service" && (
-        <div
-          className="progress-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={labels.addService}
-          onClick={() => setServiceModal(null)}
-        >
+        <OperationalDialog label={labels.addService} onClose={() => setServiceModal(null)}>
           <form
             action={createServiceCatalogItemAction}
             className="progress-modal service-modal"
@@ -473,17 +454,11 @@ export function ServicesPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       {serviceModal === "policy" && (
-        <div
-          className="progress-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={labels.addPolicy}
-          onClick={() => setServiceModal(null)}
-        >
+        <OperationalDialog label={labels.addPolicy} onClose={() => setServiceModal(null)}>
           <form
             action={createCompensationPolicyAction}
             className="progress-modal service-modal"
@@ -595,7 +570,7 @@ export function ServicesPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       {serviceSection === "compensation" && (
@@ -728,13 +703,7 @@ export function ServicesPanel({
       )}
 
       {editingService && (
-        <div
-          className="progress-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={editingService.name}
-          onClick={() => setEditingServiceId("")}
-        >
+        <OperationalDialog label={editingService.name} onClose={() => setEditingServiceId("")}>
           <div
             className="progress-modal service-modal service-config-modal"
             onClick={(event) => event.stopPropagation()}
@@ -754,7 +723,7 @@ export function ServicesPanel({
               </button>
             </div>
 
-            <div className="service-config-tabs" role="tablist" aria-label={labels.configure}>
+            <WorkspaceTabs className="service-config-tabs" role="tablist" aria-label={labels.configure}>
               <button
                 className={serviceConfigTab === "details" ? "active" : ""}
                 type="button"
@@ -782,7 +751,7 @@ export function ServicesPanel({
               >
                 {labels.material}
               </button>
-            </div>
+            </WorkspaceTabs>
 
             {serviceConfigTab === "details" && (
             <>
@@ -994,7 +963,7 @@ export function ServicesPanel({
             </>
             )}
           </div>
-        </div>
+        </OperationalDialog>
       )}
     </section>
   );

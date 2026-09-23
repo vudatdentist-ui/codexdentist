@@ -1,4 +1,4 @@
-const CACHE_VERSION = "codexdentist-pwa-v2";
+const CACHE_VERSION = "codexdentist-pwa-v3";
 const STATIC_CACHE = `${CACHE_VERSION}-static`;
 const STATIC_ASSETS = [
   "/offline.html",

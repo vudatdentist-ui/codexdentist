@@ -1,0 +1,86 @@
+/* A record reads in care order: identity, encounter, chart, treatment, follow-up. */
+.app-shell .patient-layout { grid-template-columns: minmax(260px, .8fr) minmax(0, 1.4fr); gap: 24px; }
+.app-shell .patient-layout .patient-card { position: static; max-height: none; overflow: visible; align-self: start; }
+.app-shell .patient-layout .table-list { max-height: 860px; overflow-y: auto; scrollbar-gutter: stable; }
+.app-shell .patient-layout .table-row { padding: 18px 12px; gap: 9px; text-align: left; }
+.app-shell .patient-layout .table-row strong { font-size: 14px; font-weight: 600; line-height: 1.65; }
+.app-shell .patient-layout .table-row small { line-height: 1.7; font-size: 12px; }
+.app-shell .patient-layout .table-row > span:not(:first-child) { font-size: 12px; }
+.app-shell .patient-list-balance { font-variant-numeric: tabular-nums; color: var(--muted); }
+.patient-dossier-heading { border-bottom: 1px solid var(--line); padding-bottom: 22px; }
+.patient-record-number { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+.app-shell .patient-dossier-heading h2 { margin: 8px 0; font-family: var(--font-editorial), Georgia, serif; font-weight: 400; font-size: 29px; line-height: 1.5; color: var(--ink); overflow-wrap: anywhere; }
+.patient-dossier-heading p { margin: 0; font-size: 13px; color: var(--muted); }
+.app-shell .patient-profile-strip { grid-template-columns: repeat(3, minmax(0, 1fr)); background: transparent; padding: 20px 0; gap: 20px; border: 0; border-radius: 0; }
+.app-shell .patient-profile-strip > div, .app-shell .patient-operation-strip > span { min-width: 0; padding: 0; background: transparent; border: 0; }
+.app-shell .patient-profile-strip strong { font-size: 14px; line-height: 1.7; font-weight: 500; overflow-wrap: anywhere; }
+.app-shell .patient-profile-strip span { font-size: 12px; line-height: 1.6; }
+.app-shell .patient-operation-strip { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; padding: 22px 0; background: transparent; border: 0; border-radius: 0; }
+.app-shell .patient-operation-strip > span > span { font-size: 12px; }
+.app-shell .patient-operation-strip strong { font-size: 14px; line-height: 1.7; font-weight: 600; }
+.app-shell .patient-quick-actions { gap: 10px; padding-block: 8px; }
+.app-shell .patient-secondary-details { border: 0; border-top: 1px solid var(--line); border-radius: 0; background: transparent; padding: 18px 0; }
+.app-shell .patient-secondary-details summary { gap: 10px; line-height: 1.7; }
+.app-shell .patient-secondary-details summary span { font-size: 12px; overflow-wrap: anywhere; }
+.app-shell .patient-chart-paired-blocks { grid-template-columns: minmax(0, 1fr); gap: 24px; }
+.app-shell .patient-chart-paired-blocks .patient-chart-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.app-shell .patient-chart-stats div { background: transparent; border: 0; border-left: 2px solid var(--line); border-radius: 0; padding: 8px 16px; }
+.app-shell .patient-chart-stats strong { font-size: 17px; line-height: 1.65; font-weight: 500; }
+.app-shell .patient-chart-identity h2 { font-size: 25px; line-height: 1.5; font-weight: 500; }
+.record-section-nav { position: sticky; top: 8px; z-index: 25; display: flex; gap: 4px; max-width: 100%; overflow-x: auto; padding: 5px; background: var(--surface); border: 1px solid var(--line); border-radius: 5px; scrollbar-width: thin; }
+.record-section-nav a { display: inline-flex; flex: 1 0 auto; justify-content: center; align-items: center; gap: 9px; min-height: 46px; padding: 9px 13px; font-size: 12px; color: var(--muted); text-decoration: none; white-space: nowrap; border-bottom: 2px solid transparent; }
+.record-section-nav a > span { font-size: 11px; color: #725137; font-variant-numeric: tabular-nums; }
+.record-section-nav a[aria-current] { color: var(--teal-strong); background: var(--surface-tint); border-bottom-color: var(--teal); }
+.record-section-nav a:hover { background: var(--surface-muted); }
+.app-shell .patient-chart-flow > [id], .app-shell .patient-chart-paired-blocks > [id] { scroll-margin-top: 90px; }
+.app-shell .billing-selected-patient-bar { background: var(--surface); border-block: 1px solid var(--line-strong); border-inline: 0; border-radius: 0; padding: 18px 0; }
+.app-shell .billing-selected-patient-bar strong { font-size: 20px; line-height: 1.6; font-weight: 500; }
+.app-shell .billing-balance-form { gap: 16px; padding-block: 20px 0; border-top: 1px solid var(--line); }
+.app-shell .billing-patient-balance-panel .record-tile { border: 0; border-radius: 0; border-left: 2px solid var(--line); background: transparent; padding: 8px 14px; }
+.app-shell .billing-patient-balance-panel .record-tile strong { font-size: 18px; line-height: 1.6; font-weight: 500; }
+@media (max-width: 900px) {
+  .app-shell .patient-layout { grid-template-columns: minmax(0, 1fr); }
+  .app-shell .patient-layout .table-list { max-height: 360px; }
+  .app-shell .billing-balance-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 600px) {
+  .app-shell .patient-profile-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .app-shell .patient-dossier-heading h2 { font-size: 25px; }
+  .app-shell .patient-chart-paired-blocks .patient-chart-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .record-section-nav a { flex-grow: 0; padding-inline: 12px; }
+  .app-shell .billing-balance-form { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The pinned odontogram's 1040px split leaves too little room for 16 teeth
+   beside a 300px inspector. Size the integration by its actual host, not the
+   viewport. Prefix selectors deliberately exclude CSS-module build hashes. */
+.patient-odontogram-editor { container: patient-chart / inline-size; }
+.app-shell .patient-odontogram-editor > main {
+  --od-bg: var(--surface-muted);
+  --od-surface: var(--surface);
+  --od-ink: var(--ink);
+  --od-muted: var(--muted);
+  --od-line: var(--line);
+  --od-line-strong: var(--line-strong);
+  --od-accent: var(--teal);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+.patient-odontogram-editor [class*="_chartPanel_"] { overflow-x: auto; }
+.patient-odontogram-editor [class*="_inspectorHeading_"] h2 { font-size: 22px; line-height: 1.5; }
+@container patient-chart (max-width: 1200px) {
+  .patient-odontogram-editor [class*="_workspace_"] { grid-template-columns: minmax(0, 1fr); }
+  .patient-odontogram-editor [class*="_inspector_"] {
+    display: grid; grid-template-columns: minmax(170px, .7fr) minmax(0, 1.3fr);
+    gap: 24px; align-items: start; border-left: 0; border-top: 1px solid var(--line);
+  }
+  .patient-odontogram-editor [class*="_inspectorHeading_"] { grid-column: 1; grid-row: 1; display: block; }
+  .patient-odontogram-editor :is([class*="_focusTooth_"], [class*="_multiSelectionSummary_"]) { grid-column: 1; grid-row: 2; min-width: 0; margin: 0; }
+  .patient-odontogram-editor [class*="_clinicalMarkers_"] { grid-column: 2; grid-row: 1 / span 2; margin: 0; padding: 0; border-top: 0; }
+  .patient-odontogram-editor [class*="_clinicalMarkerGrid_"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .patient-odontogram-editor [class*="_inspectorActions_"] { grid-column: 1 / -1; grid-row: 3; margin: 0; }
+}
+@container patient-chart (max-width: 700px) {
+  .patient-odontogram-editor [class*="_inspector_"] { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .patient-odontogram-editor [class*="_inspector_"] > div { grid-column: 1; grid-row: auto; }
+  .patient-odontogram-editor [class*="_clinicalMarkerGrid_"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

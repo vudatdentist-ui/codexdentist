@@ -1,3 +1,4 @@
+import { loginForBrowserAudit } from "./browser-login.mjs";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { chromium } from "playwright";
@@ -110,31 +111,8 @@ if (summary.critical + summary.high > 0) {
 }
 
 async function login(page) {
-  const response = await page.goto(`${baseUrl}/login`, {
-    waitUntil: "domcontentloaded",
-  });
-
-  if (!response || response.status() >= 400) {
-    throw new Error(`/login returned HTTP ${response?.status() ?? "unknown"}`);
-  }
-
-  const loginForm = page.locator("form.login-form").first();
-  const emailInput = loginForm.locator('input[type="email"]').first();
-  await emailInput.click();
-  await emailInput.pressSequentially(email);
-  await loginForm.locator('input[name="password"]').fill(password);
-  await loginForm.locator('button[type="submit"]').click();
-  await page.waitForURL((url) => !url.pathname.endsWith("/login"), { timeout: 15000 }).catch(() => null);
-  await page.waitForLoadState("networkidle", { timeout: 8000 }).catch(() => null);
-  await page.waitForTimeout(1500);
-
-  const currentPath = new URL(page.url()).pathname;
-  if (currentPath.endsWith("/login")) {
-    const bodyText = await page.locator("body").innerText().catch(() => "");
-    throw new Error(
-      `Login failed for ${email}; still on ${page.url()}. ${bodyText.slice(0, 300)}`,
-    );
-  }
+  await loginForBrowserAudit(page, { baseUrl, email, password,
+    evidencePath: path.join(outputDir, "login-failure") });
 }
 
 async function auditRoute(page, viewport, route, consoleErrors, networkErrors) {

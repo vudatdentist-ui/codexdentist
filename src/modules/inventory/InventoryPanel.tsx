@@ -1,5 +1,7 @@
 "use client";
 
+import { OperationalDialog } from "@/components/ui/WorkspaceControls";
+
 import { Activity, Building2, CalendarDays, CheckCircle2, ClipboardList, Inbox, Settings, Tag, WalletCards, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -655,11 +657,8 @@ export function InventoryPanel({
 
   return (
     <section className="view-stack">
-      <div className="toolbar">
-        <div>
-          <p className="eyebrow">{labels.eyebrow}</p>
-          <h2>{labels.heading}</h2>
-        </div>
+      <div className="workspace-actions">
+
         <div className="service-action-row">
           {actionButtons}
         </div>
@@ -1297,13 +1296,7 @@ export function InventoryPanel({
       )}
 
       {inventoryModal && (
-        <div
-          aria-label={labels.heading}
-          aria-modal="true"
-          className="progress-modal-backdrop"
-          onClick={() => setInventoryModal(null)}
-          role="dialog"
-        >
+        <OperationalDialog label={labels.heading} onClose={() => setInventoryModal(null)}>
           <div className="progress-modal inventory-modal" onClick={(event) => event.stopPropagation()}>
             <div className="progress-modal-header">
               <div>
@@ -1642,7 +1635,7 @@ export function InventoryPanel({
               </form>
             )}
           </div>
-        </div>
+        </OperationalDialog>
       )}
     </section>
   );

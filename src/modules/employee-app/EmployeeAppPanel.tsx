@@ -1,5 +1,7 @@
 "use client";
 
+import { OperationalDialog } from "@/components/ui/WorkspaceControls";
+
 import { Activity, CalendarDays, FileText, Smartphone, WalletCards, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -262,13 +264,7 @@ export function EmployeeAppPanel({
 
   return (
     <section className="view-stack mobile-app-view employee-mobile-view">
-      <div className="toolbar mobile-app-toolbar">
-        <div>
-          <p className="eyebrow">{labels.appTitle}</p>
-          <h2>{labels.subtitle}</h2>
-        </div>
-        <SourceBadge source={staffPayrollWorkspace?.source} />
-      </div>
+
 
       {(staffPayrollWorkspace?.message || notice) && (
         <div className={notice ? "schedule-alert action" : "schedule-alert"}>
@@ -511,13 +507,7 @@ export function EmployeeAppPanel({
       </section>
 
       {incomeFormulaOpen && (
-        <div
-          aria-label={labels.formulaTitle}
-          aria-modal="true"
-          className="progress-modal-backdrop"
-          onClick={() => setIncomeFormulaOpen(false)}
-          role="dialog"
-        >
+        <OperationalDialog label={labels.formulaTitle} onClose={() => setIncomeFormulaOpen(false)}>
           <div
             className="progress-modal employee-formula-modal"
             onClick={(event) => event.stopPropagation()}
@@ -570,17 +560,11 @@ export function EmployeeAppPanel({
               </div>
             </div>
           </div>
-        </div>
+        </OperationalDialog>
       )}
 
       {leaveModalOpen && (
-        <div
-          aria-label={labels.requestLeave}
-          aria-modal="true"
-          className="progress-modal-backdrop"
-          onClick={() => setLeaveModalOpen(false)}
-          role="dialog"
-        >
+        <OperationalDialog label={labels.requestLeave} onClose={() => setLeaveModalOpen(false)}>
           <form
             action={createCurrentStaffLeaveRequestAction}
             className="progress-modal employee-leave-modal"
@@ -650,21 +634,12 @@ export function EmployeeAppPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
     </section>
   );
 }
 
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { t } = useAppLanguage();
-
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? t.databaseLive : t.demoMode}
-    </span>
-  );
-}
 
 function StatusPill({ status }: { status: string }) {
   const { language } = useAppLanguage();

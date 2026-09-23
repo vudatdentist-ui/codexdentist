@@ -150,13 +150,7 @@ export function PatientAppPanel({
 
   return (
     <section className="view-stack mobile-app-view patient-mobile-view">
-      <div className="toolbar mobile-app-toolbar">
-        <div>
-          <p className="eyebrow">{text.patientPortal}</p>
-          <h2>{text.heading}</h2>
-        </div>
-        <SourceBadge source={patientPortalWorkspace?.source} />
-      </div>
+
 
       {(patientPortalWorkspace?.message || notice) && (
         <div className={notice ? "schedule-alert action" : "schedule-alert"}>
@@ -166,7 +160,7 @@ export function PatientAppPanel({
 
       <section className="content-grid portal-layout mobile-app-grid">
         <section className="panel">
-          <PanelHeader icon={Smartphone} title={text.mobileFlow} action={text.live} />
+          <PanelHeader icon={Smartphone} title={text.mobileFlow}  />
           {patient ? (
             <div className="phone-frame" aria-label={text.mobileAria}>
               <div className="phone-top">
@@ -354,16 +348,6 @@ function noticeFor(notice: string | null, language: Language) {
   return noticeText[notice]?.[language] ?? null;
 }
 
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { language } = useAppLanguage();
-  const text = portalText[language];
-
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? text.databaseLive : text.demoMode}
-    </span>
-  );
-}
 
 function workspaceMessageText(message: string | null | undefined, language: Language) {
   if (!message || language !== "vi") {

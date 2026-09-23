@@ -283,3 +283,10 @@ Do not create a permanent session log. For each phase/PR, the PR description or 
 - any advisory explicitly deferred without violating exit criteria.
 
 Git history/PR discussion is the change record. The active docs remain concise sources of current truth.
+### Narrative workspace and typography gate
+
+`npm run browser:qa` also exercises the operational journal in Vietnamese at 1440px and 390px, with a 320px record/form check. Keep the record, appointment, receipt, section-navigation, native-dialog and keyboard-tab workflows in `scripts/workspace-redesign-qa.mjs` executable. Screenshots and the report belong to `output/workspace-qa/review` and are CI artifacts, not production data.
+
+The font gate uses Chromium's actual glyph-to-font report for composed and decomposed Vietnamese accents; a CSS family name alone is not proof. Body text uses self-hosted Be Vietnam Pro and editorial headings use self-hosted Noto Serif through `next/font`. Do not restore machine-dependent font loading or browser font-CDN requests. Review fresh desktop/mobile captures after typography or responsive changes.
+
+Operational modal surfaces must use `OperationalDialog`/`WorkspaceDialog`, not a div with `aria-modal`. `WorkspaceTabs` preserves each module's existing selection handlers while supplying roving focus and arrow/Home/End navigation. The associated source guards and keyboard unit checks run with `test:workspace`; real-browser checks remain the interaction evidence. Keep section numbers distinct from clinical stages and preserve the independent odontogram snapshots.

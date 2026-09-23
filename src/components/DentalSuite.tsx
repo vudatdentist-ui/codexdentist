@@ -42,7 +42,6 @@ import {
   AppSidebar,
   AppTopbar,
   ModuleAiFloatingShell,
-  type AppShellNavGroup,
 } from "@/components/AppShell";
 import { type Appointment, type Patient } from "@/lib/data";
 import {
@@ -148,53 +147,6 @@ const StaffPayrollPanel = dynamic(() =>
 const SettingsPanel = dynamic(() =>
   import("@/modules/settings/SettingsPanel").then((module) => module.SettingsPanel),
 );
-
-const navGroups: AppShellNavGroup[] = [
-  {
-    title: { vi: "Tổng quan", en: "Overview" },
-    items: [
-      { key: "dashboard", icon: LayoutDashboard },
-      { key: "reports", icon: BarChart3 },
-      { key: "accounting", icon: WalletCards },
-    ],
-  },
-  {
-    title: { vi: "Bệnh nhân", en: "Patients" },
-    items: [
-      { key: "schedule", icon: CalendarDays },
-      { key: "patients", icon: UsersRound },
-      { key: "journey", icon: Stethoscope },
-      { key: "billing", icon: CreditCard },
-      { key: "crm", icon: Inbox },
-      { key: "patient-app", icon: Smartphone },
-    ],
-  },
-  {
-    title: { vi: "Lâm sàng", en: "Clinical" },
-    items: [
-      { key: "services", icon: ClipboardList },
-      { key: "pharmacy", icon: FileText },
-      { key: "forms", icon: ShieldCheck },
-    ],
-  },
-  {
-    title: { vi: "Nội bộ", en: "Internal" },
-    items: [
-      { key: "staff", icon: Building2 },
-      { key: "employee-app", icon: Smartphone },
-      { key: "learning", icon: Bell },
-      { key: "community", icon: MessageSquareText },
-    ],
-  },
-  {
-    title: { vi: "Kho", en: "Stock" },
-    items: [{ key: "inventory", icon: ClipboardList }],
-  },
-  {
-    title: { vi: "Hệ thống", en: "System" },
-    items: [{ key: "settings", icon: Settings }],
-  },
-];
 
 const languageStorageKey = "nhavista.language";
 const chainScopeStorageKey = "codexmed.chainScope";
@@ -428,7 +380,7 @@ const workspaceText = {
       consentRecorded: "Ghi nhận",
       consentSigned: "Đã ký",
       consentVersion: "Phiên bản",
-      createPatient: "Tạo bệnh nhân",
+      createPatient: "Thêm hồ sơ bệnh nhân",
       dob: "Ngày sinh",
       duplicateContactWarning: "Có bệnh nhân đang dùng thông tin liên hệ này:",
       email: "Email",
@@ -453,13 +405,13 @@ const workspaceText = {
       male: "Nam",
       nationalId: "CMND/CCCD",
       needsRenewal: "Cần gia hạn",
-      newPatient: "Bệnh nhân mới",
+      newPatient: "Hồ sơ bệnh nhân mới",
       nextVisit: "Lịch hẹn tiếp theo",
       noConsentDate: "chưa ghi nhận",
-      openBilling: "Mở thanh toán",
-      openJourney: "Mở bệnh án",
-      openSchedule: "Mở lịch hẹn",
-      operationSummary: "Tổng quan vận hành",
+      openBilling: "Xem khoản thu",
+      openJourney: "Tiếp tục chăm sóc",
+      openSchedule: "Xem lịch hẹn",
+      operationSummary: "Lần hẹn và điều trị",
       patientRegistry: "Danh sách bệnh nhân",
       phone: "Điện thoại",
       profile: "Hồ sơ bệnh nhân",
@@ -689,7 +641,7 @@ const workspaceText = {
       consentRecorded: "Recorded",
       consentSigned: "Signed",
       consentVersion: "Version",
-      createPatient: "Create patient",
+      createPatient: "Add patient record",
       dob: "Date of birth",
       duplicateContactWarning: "A patient already uses this contact:",
       email: "Email",
@@ -714,13 +666,13 @@ const workspaceText = {
       male: "Male",
       nationalId: "National ID",
       needsRenewal: "Needs renewal",
-      newPatient: "New patient",
+      newPatient: "New patient record",
       nextVisit: "Next visit",
       noConsentDate: "not recorded",
-      openBilling: "Open billing",
-      openJourney: "Open chart",
-      openSchedule: "Open schedule",
-      operationSummary: "Operational summary",
+      openBilling: "View payments",
+      openJourney: "Continue care",
+      openSchedule: "View appointments",
+      operationSummary: "Visits and treatment",
       patientRegistry: "Patient registry",
       phone: "Phone",
       profile: "Patient profile",
@@ -1681,8 +1633,6 @@ export function DentalSuite({
       <AppSidebar
         activeView={activeView}
         language={language}
-        navGroups={navGroups}
-        navLabels={t.nav}
         permittedViews={permittedViews}
       />
 

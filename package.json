@@ -13,9 +13,9 @@
     "url": "https://github.com/vudatdentist-ui/codexdentist/issues"
   },
   "scripts": {
-    "dev": "codexdentist-odontogram-assets public/odontogram-assets && next dev --webpack",
+    "dev": "npm run fonts:assets && codexdentist-odontogram-assets public/odontogram-assets && next dev --webpack",
     "prebuild": "npm run typecheck",
-    "build": "codexdentist-odontogram-assets public/odontogram-assets && next build",
+    "build": "npm run fonts:assets && codexdentist-odontogram-assets public/odontogram-assets && next build",
     "postinstall": "prisma generate",
     "start": "next start",
     "start:cpanel": "node server.cjs",
@@ -43,12 +43,12 @@
     "test:pilot-workflows": "node scripts/pilot-workflow-smoke.mjs",
     "test:data-integrity": "node scripts/data-integrity-smoke.mjs",
     "go-live:check": "node scripts/go-live-check.mjs",
-    "test:smoke": "node scripts/smoke-routes.mjs",
+    "test:smoke": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types scripts/smoke-routes.mjs",
     "test:roles": "node scripts/role-smoke.mjs",
     "test:seed-users": "node scripts/seed-smoke-users.mjs",
     "monitor:health": "node scripts/monitor-health.mjs",
     "readiness:check": "node scripts/readiness-check.mjs",
-    "browser:qa": "node scripts/browser-qa-audit.mjs",
+    "browser:qa": "npm run test:workspace && node scripts/workspace-browser-suite.mjs",
     "browser:trial-signup": "node scripts/trial-signup-browser-smoke.mjs",
     "encoding:check": "node scripts/check-encoding.mjs",
     "agent:health": "node scripts/check-encoding.mjs && node scripts/agent-health-check.mjs",
@@ -69,7 +69,9 @@
     "db:seed": "prisma db seed",
     "db:seed:schedule": "node scripts/seed-schedule-demo.mjs",
     "odontogram:assets": "codexdentist-odontogram-assets public/odontogram-assets",
-    "browser:landing": "node scripts/landing-page-qa.mjs"
+    "browser:landing": "node scripts/landing-page-qa.mjs",
+    "test:workspace": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/workspace-story.test.mjs scripts/workspace-controls.test.mjs",
+    "fonts:assets": "node scripts/fetch-font-assets.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1040.0",
