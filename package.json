@@ -14,8 +14,8 @@
   },
   "scripts": {
     "dev": "npm run fonts:assets && codexdentist-odontogram-assets public/odontogram-assets && next dev --webpack",
-    "prebuild": "npm run fonts:assets && npm run typecheck",
-    "build": "codexdentist-odontogram-assets public/odontogram-assets && next build",
+    "prebuild": "npm run typecheck",
+    "build": "npm run fonts:assets && codexdentist-odontogram-assets public/odontogram-assets && next build",
     "postinstall": "prisma generate",
     "start": "next start",
     "start:cpanel": "node server.cjs",
