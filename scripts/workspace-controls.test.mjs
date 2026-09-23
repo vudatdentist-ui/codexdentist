@@ -30,12 +30,16 @@ test('operational modals cannot regress to unfocused div backdrops', () => {
   }
   assert.equal(native, 33);
 });
-test('font families are explicit and include the Vietnamese build-time subsets', () => {
-  const fonts = text('src/app/fonts.ts');
-  assert.match(fonts, /Be_Vietnam_Pro/);
-  assert.match(fonts, /Noto_Serif/);
-  assert.equal([...fonts.matchAll(/subsets: \["latin", "vietnamese"\]/g)].length, 2);
-  assert.match(text('src/app/layout.tsx'), /bodyFont.variable/);
+test('font families use checksum-pinned complete self-hosted Vietnamese faces', () => {
+  const assets = text('scripts/fetch-font-assets.mjs');
+  const globals = text('src/app/globals.css');
+  const packageJson = JSON.parse(text('package.json'));
+  assert.equal([...assets.matchAll(/sha256: "[0-9a-f]{64}"/g)].length, 5);
+  assert.equal([...globals.matchAll(/@font-face/g)].length, 5);
+  assert.match(globals, /--font-body: "Be Vietnam Pro"/);
+  assert.match(globals, /--font-editorial: "Noto Serif"/);
+  assert.match(packageJson.scripts.build, /npm run fonts:assets/);
+  assert.doesNotMatch(text('src/app/layout.tsx'), /next\/font|bodyFont\.variable|editorialFont\.variable/);
   assert.match(text('src/styles/workspace.css'), /font-synthesis: none/);
 });
 test('navigation has no stale second grouping or icon registry in the application composer', () => {
