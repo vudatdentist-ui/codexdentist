@@ -25,6 +25,7 @@ function clinicIsActive(clinic: Pick<Clinic, "active">) {
 }
 
 function patientVisitLabel(value: string | null | undefined, language: Language) {
+  if (value?.trim().toLowerCase() === "no visit") return language === "vi" ? "Chưa ghi nhận lần khám" : "No visit";
   if (!value || /^not booked$/i.test(value)) {
     return language === "vi" ? "Chưa có lịch hẹn" : "Not booked";
   }
@@ -72,6 +73,8 @@ function useNoticeText(notice: string | null) {
 function displayStatus(status: string, language: Language) {
   const normalizedStatus = String(status ?? "").toUpperCase();
   const viStatus: Record<string, string> = {
+    "NEEDS RENEWAL": "Cần cập nhật",
+    PARTIAL: "Đồng ý một phần",
     GRANTED: "\u0110\u00e3 \u0111\u1ed3ng \u00fd",
     PENDING: "Ch\u1edd \u0111\u1ed3ng \u00fd",
     REVOKED: "\u0110\u00e3 thu h\u1ed3i",
@@ -481,7 +484,7 @@ export function PatientsPanel({
               {selectedPatient.flags.length > 0 ? (
                 <div className="flag-list patient-flag-list">
                   {selectedPatient.flags.map((flag) => (
-                    <span key={flag}>{flag}</span>
+                    <span key={flag}>{language === "vi" && flag.trim().toLowerCase() === "no medical alerts recorded" ? "Chưa ghi nhận lưu ý y khoa" : flag}</span>
                   ))}
                 </div>
               ) : null}
@@ -493,7 +496,7 @@ export function PatientsPanel({
                 <div className="patient-operation-strip">
                   <span>
                     <span>{text.lastVisit}</span>
-                    <strong>{selectedPatient.lastVisit || text.unknown}</strong>
+                    <strong>{selectedPatient.lastVisit ? patientVisitLabel(selectedPatient.lastVisit, language) : text.unknown}</strong>
                   </span>
                   <span>
                     <span>{text.nextVisit}</span>

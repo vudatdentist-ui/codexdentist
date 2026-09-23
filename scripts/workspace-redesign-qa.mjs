@@ -153,6 +153,7 @@ try {
     const id = new URL(page.url()).searchParams.get('patientId');
     await page.reload(); await settled();
     assert.ok((await page.locator('.patient-dossier-heading').innerText()).includes(name));
+    assert.doesNotMatch(await page.locator('.patient-card').innerText(), /Needs renewal|No medical alerts recorded|No visit/);
     await page.locator('.patient-edit-action').click();
     assert.equal(await page.locator('dialog[open] input[name=fullName]').inputValue(), name);
     await modalKeyboard(page.locator('dialog[open]'), page.locator('.patient-edit-action'));
