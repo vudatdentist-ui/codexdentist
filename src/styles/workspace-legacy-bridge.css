@@ -25,3 +25,20 @@
 }
 .story-notifications .notification-tabs { margin-bottom: 14px; }
 .login-shell .forgot-password-panel summary { color: var(--teal-strong); }
+
+/* The direct-receipt form predates the shared field selectors. */
+.app-shell .billing-balance-form { margin-top: 18px; }
+.app-shell .billing-balance-form label { font-size: 12px; font-weight: 500; color: var(--muted); }
+.app-shell .billing-balance-form input:not([type="hidden"]),
+.app-shell .billing-balance-form select {
+  min-width: 0;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  box-shadow: none;
+}

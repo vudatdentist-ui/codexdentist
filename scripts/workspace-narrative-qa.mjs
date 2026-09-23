@@ -139,8 +139,17 @@ try {
     assert.equal(await page.locator('.workspace-desktop-navigation [aria-current=page]').getAttribute('href'),'/journey');
     assert.equal(new URL(page.url()).searchParams.get('patientId'),id);
     await shot('desktop-journey-selected');
-    await page.goto(`${base}/billing?patientId=${encodeURIComponent(id)}`); await shot('desktop-billing-selected');
-    await page.setViewportSize({width:390,height:844}); await shot('mobile-billing-selected');
+    await page.goto(`${base}/billing?patientId=${encodeURIComponent(id)}`);
+    for (const width of [1440,390]) {
+      await page.setViewportSize({width,height:900});
+      await shot(width === 1440 ? 'desktop-billing-selected' : 'mobile-billing-selected');
+      const fields = await page.locator('.billing-balance-form input:not([type=hidden]), .billing-balance-form select').evaluateAll(nodes => nodes.map(node => {
+        const rect = node.getBoundingClientRect();
+        return {width:rect.width,height:rect.height};
+      }));
+      assert.equal(fields.length,3,'The receipt form must retain amount, method and reference fields');
+      for (const field of fields) assert.ok(field.height >= 44 && field.width >= 100, `Receipt field is too small at ${width}px`);
+    }
     await page.goto(`${base}/patients?patientId=${encodeURIComponent(id)}`); await shot('mobile-patient-selected');
     await page.goto(`${base}/journey?patientId=${encodeURIComponent(id)}`); await shot('mobile-journey-selected');
   });
