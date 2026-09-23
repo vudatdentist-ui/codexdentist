@@ -15,6 +15,8 @@ page.on('pageerror', error => errors.push(error.message));
 async function settled() { await page.waitForLoadState('networkidle'); }
 async function shot(name) {
   await settled();
+  await page.evaluate(() => { window.scrollTo(0, 0); });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const width = await page.evaluate(() => ({viewport:innerWidth,document:document.documentElement.scrollWidth}));
   assert.ok(width.document <= width.viewport + 2, `${name}: horizontal overflow ${JSON.stringify(width)}`);
   await page.screenshot({path:`${output}/${name}.png`, fullPage:true});
@@ -129,8 +131,14 @@ try {
       const href=await page.locator(`.patient-quick-actions a[href^="/${route}?"]`).getAttribute('href');
       assert.equal(new URL(href,base).searchParams.get('patientId'),id);
     }
-    await page.locator('.patient-quick-actions a[href^="/journey?"]').click(); await settled();
-    assert.equal(new URL(page.url()).searchParams.get('patientId'),id); await shot('desktop-journey-selected');
+    await page.locator('.patient-quick-actions a[href^="/journey?"]').click();
+    await page.waitForURL(url => url.pathname === '/journey' && url.searchParams.get('patientId') === id);
+    await page.locator('.patient-chart').waitFor({state:'visible'});
+    await settled();
+    assert.equal(await page.locator('h1').innerText(),'One record, the whole journey');
+    assert.equal(await page.locator('.workspace-desktop-navigation [aria-current=page]').getAttribute('href'),'/journey');
+    assert.equal(new URL(page.url()).searchParams.get('patientId'),id);
+    await shot('desktop-journey-selected');
     await page.goto(`${base}/billing?patientId=${encodeURIComponent(id)}`); await shot('desktop-billing-selected');
     await page.setViewportSize({width:390,height:844}); await shot('mobile-billing-selected');
     await page.goto(`${base}/patients?patientId=${encodeURIComponent(id)}`); await shot('mobile-patient-selected');
