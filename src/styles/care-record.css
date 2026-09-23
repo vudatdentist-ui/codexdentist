@@ -50,3 +50,37 @@
   .record-section-nav a { flex-grow: 0; padding-inline: 12px; }
   .app-shell .billing-balance-form { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* The pinned odontogram's 1040px split leaves too little room for 16 teeth
+   beside a 300px inspector. Size the integration by its actual host, not the
+   viewport. Prefix selectors deliberately exclude CSS-module build hashes. */
+.patient-odontogram-editor { container: patient-chart / inline-size; }
+.app-shell .patient-odontogram-editor > main {
+  --od-bg: var(--surface-muted);
+  --od-surface: var(--surface);
+  --od-ink: var(--ink);
+  --od-muted: var(--muted);
+  --od-line: var(--line);
+  --od-line-strong: var(--line-strong);
+  --od-accent: var(--teal);
+  font-family: var(--font-body), system-ui, sans-serif;
+}
+.patient-odontogram-editor [class*="_chartPanel_"] { overflow-x: auto; }
+.patient-odontogram-editor [class*="_inspectorHeading_"] h2 { font-size: 22px; line-height: 1.5; }
+@container patient-chart (max-width: 1200px) {
+  .patient-odontogram-editor [class*="_workspace_"] { grid-template-columns: minmax(0, 1fr); }
+  .patient-odontogram-editor [class*="_inspector_"] {
+    display: grid; grid-template-columns: minmax(170px, .7fr) minmax(0, 1.3fr);
+    gap: 24px; align-items: start; border-left: 0; border-top: 1px solid var(--line);
+  }
+  .patient-odontogram-editor [class*="_inspectorHeading_"] { grid-column: 1; grid-row: 1; display: block; }
+  .patient-odontogram-editor :is([class*="_focusTooth_"], [class*="_multiSelectionSummary_"]) { grid-column: 1; grid-row: 2; min-width: 0; margin: 0; }
+  .patient-odontogram-editor [class*="_clinicalMarkers_"] { grid-column: 2; grid-row: 1 / span 2; margin: 0; padding: 0; border-top: 0; }
+  .patient-odontogram-editor [class*="_clinicalMarkerGrid_"] { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .patient-odontogram-editor [class*="_inspectorActions_"] { grid-column: 1 / -1; grid-row: 3; margin: 0; }
+}
+@container patient-chart (max-width: 700px) {
+  .patient-odontogram-editor [class*="_inspector_"] { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .patient-odontogram-editor [class*="_inspector_"] > div { grid-column: 1; grid-row: auto; }
+  .patient-odontogram-editor [class*="_clinicalMarkerGrid_"] { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}

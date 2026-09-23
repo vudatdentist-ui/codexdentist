@@ -64,3 +64,48 @@
   .app-shell .workspace-assistant-slot .module-ai-bubble { min-height: 44px; height: 44px; }
   .workspace-assistant-slot .module-ai-bubble span { display: none; }
 }
+
+/* These older section navigations still use native buttons. Keep their visual
+   hierarchy consistent with the shared tabs without altering selection logic. */
+.app-shell :is(.accounting-section-tabs, .crm-section-tabs, .forms-section-tabs, .learning-section-tabs, .inventory-section-tabs, .service-config-tabs) {
+  display: flex;
+  flex-wrap: nowrap;
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  gap: 4px;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--line-strong);
+  border-radius: 0;
+  scrollbar-width: thin;
+}
+.app-shell :is(.accounting-section-tabs, .crm-section-tabs, .forms-section-tabs, .learning-section-tabs, .inventory-section-tabs, .service-config-tabs) > button {
+  flex: 0 0 auto;
+  min-height: 48px;
+  padding: 10px 16px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 500;
+  white-space: nowrap;
+  box-shadow: none;
+}
+.app-shell :is(.accounting-section-tabs, .crm-section-tabs, .forms-section-tabs, .learning-section-tabs, .inventory-section-tabs, .service-config-tabs) > button.active {
+  color: var(--teal-strong);
+  border-bottom-color: var(--teal);
+  background: transparent;
+  font-weight: 600;
+  box-shadow: none;
+}
+.app-shell :is(.accounting-section-tabs, .crm-section-tabs, .forms-section-tabs, .learning-section-tabs, .inventory-section-tabs) > button > span {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+  min-width: 0;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
