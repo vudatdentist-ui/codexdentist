@@ -1,3 +1,4 @@
+import { loginForBrowserAudit } from './browser-login.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -41,11 +42,10 @@ try {
     await page.goto(`${base}/login`); await shot('desktop-login');
     await page.setViewportSize({width:390,height:844}); await shot('mobile-login');
     await page.setViewportSize({width:1440,height:900});
-    const form=page.locator('form.login-form').first();
-    await form.locator('[name=email]').fill(process.env.BROWSER_QA_EMAIL ?? 'owner@nhavista.vn');
-    await form.locator('[name=password]').fill(process.env.BROWSER_QA_PASSWORD ?? 'CodexSmoke2026!');
-    await form.locator('button[type=submit]').click();
-    await page.waitForURL(url => !url.pathname.endsWith('/login')); await settled();
+    await loginForBrowserAudit(page, { baseUrl: base,
+      email: process.env.BROWSER_QA_EMAIL ?? 'owner@nhavista.vn',
+      password: process.env.BROWSER_QA_PASSWORD ?? 'CodexSmoke2026!',
+      evidencePath: `${output}/login-failure` });
     await page.goto(`${base}/dashboard`); await settled();
     assert.equal(await page.locator('.narrative-day').count(),1);
   });
@@ -140,6 +140,7 @@ try {
     assert.equal(await page.locator('.workspace-desktop-navigation [aria-current=page]').getAttribute('href'),'/journey');
     assert.equal(new URL(page.url()).searchParams.get('patientId'),id);
     await shot('desktop-journey-selected');
+    await writeFile(`${output}/odontogram-dom.html`, await page.locator('.patient-odontogram-editor').evaluate(node => node.outerHTML));
     await page.goto(`${base}/billing?patientId=${encodeURIComponent(id)}`);
     for (const width of [1440,390]) {
       await page.setViewportSize({width,height:900});

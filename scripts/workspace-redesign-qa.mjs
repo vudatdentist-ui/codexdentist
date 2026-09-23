@@ -1,3 +1,4 @@
+import { loginForBrowserAudit } from './browser-login.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
@@ -50,19 +51,10 @@ async function modalKeyboard(dialog, trigger) {
   assert.notEqual(await page.evaluate(() => document.body.style.overflow), 'hidden');
 }
 try {
-  await page.goto(`${base}/login`);
-  await settled();
-  const login = page.locator('form.login-form').first();
-  const email = process.env.BROWSER_QA_EMAIL ?? 'owner@nhavista.vn';
-  const password = process.env.BROWSER_QA_PASSWORD ?? 'CodexSmoke2026!';
-  await login.locator('[name=email]').click();
-  await login.locator('[name=email]').fill('');
-  await login.locator('[name=email]').pressSequentially(email);
-  await login.locator('[name=password]').fill(password);
-  assert.equal(await login.locator('[name=email]').inputValue(), email);
-  assert.equal(await login.locator('[name=password]').inputValue(), password);
-  await login.locator('button[type=submit]').click();
-  await page.waitForURL(url => !url.pathname.endsWith('/login'));
+  await loginForBrowserAudit(page, { baseUrl: base,
+    email: process.env.BROWSER_QA_EMAIL ?? 'owner@nhavista.vn',
+    password: process.env.BROWSER_QA_PASSWORD ?? 'CodexSmoke2026!',
+    evidencePath: `${output}/login-failure` });
   await goto('dashboard');
   await page.locator('.language-switch').getByRole('button', { name: 'VI', exact: true }).click();
   await page.waitForFunction(() => document.documentElement.lang === 'vi');
@@ -126,7 +118,10 @@ try {
       await page.setViewportSize({ width: 1440, height: 1000 });
       await goto(route);
       const selector = '.workspace-actions button.primary-button[type=button]:visible:not(:disabled), .service-action-row button.primary-button[type=button]:visible:not(:disabled), .toolbar-actions button.primary-button[type=button]:visible:not(:disabled)';
-      const trigger = page.locator(selector).first();
+      if (route === 'accounting') await page.locator('.accounting-section-tabs button').last().click();
+      const trigger = page.locator(route === 'accounting'
+        ? '.accounting-budget-summary button:not(:disabled)'
+        : route === 'forms' ? '.toolbar-actions > button.secondary-button:not(:disabled)' : selector).first();
       assert.ok(await trigger.count(), `${route}: expected a create or assign control`);
       await trigger.click(); const dialog = page.locator('dialog.operational-dialog[open]');
       await dialog.waitFor({ state: 'visible' });
