@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, ChevronDown, LogOut, Menu, Search, UserRound, MessageCircle, type LucideIcon } from "lucide-react";
+import { Bell, ChevronDown, LogOut, Menu, Search, UserRound, MessageCircle } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
@@ -13,11 +13,9 @@ import { WorkspaceDialog } from "@/shared/ui/WorkspaceDialog/WorkspaceDialog";
 import { WorkspaceIcon } from "@/workspaces/WorkspaceIcon";
 import { visibleWorkspaceNavigation, viewFromPath, workspaceChapters, workspaceStories, type StoryLanguage } from "@/workspaces/workspace-story";
 
-export type AppShellNavGroup = { title: Record<StoryLanguage, string>; items: { key: ViewKey; icon: LucideIcon }[] };
-
 export function AppSidebar({ activeView, language, permittedViews }: {
-  activeView: ViewKey; language: StoryLanguage; navGroups: AppShellNavGroup[];
-  navLabels: Record<ViewKey, string>; permittedViews: Set<ViewKey>;
+  activeView: ViewKey; language: StoryLanguage;
+  permittedViews: Set<ViewKey>;
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");

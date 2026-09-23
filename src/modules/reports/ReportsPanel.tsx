@@ -1,4 +1,5 @@
 "use client";
+import { OperationalDialog } from "@/components/ui/WorkspaceControls";
 
 import {
   Activity,
@@ -317,10 +318,10 @@ export function ReportsPanel({
 
   return (
     <section className="view-stack">
-      <div className="toolbar">
+      <div className="workspace-actions">
         <div>
-          <p className="eyebrow">{text.operationalReporting}</p>
-          <h2>{text.heading}</h2>
+
+
           <span className="toolbar-subtitle">
             {text.period}: {reportsWorkspace?.periodLabel ?? text.monthToDate}
           </span>
@@ -330,7 +331,7 @@ export function ReportsPanel({
             <Download size={14} />
             {text.exportCsv}
           </Link>
-          <SourceBadge source={reportsWorkspace?.source} />
+
         </div>
       </div>
 
@@ -408,7 +409,7 @@ export function ReportsPanel({
         </section>
 
         <section className="panel">
-          <PanelHeader icon={Activity} title={text.operationalSignals} action={text.live} />
+          <PanelHeader icon={Activity} title={text.operationalSignals}  />
           <div className="record-grid">
             {signals.map((signal) => (
               <RecordTile
@@ -646,17 +647,13 @@ export function ReportsPanel({
       </section>
 
       {reportDrilldown && (
-        <div
-          className="progress-modal-backdrop"
-          onClick={() => setReportDrilldown(null)}
-          role="presentation"
-        >
+        <OperationalDialog label={text.drilldown} onClose={() => setReportDrilldown(null)}>
           <div
             className="progress-modal report-drilldown-modal"
             onClick={(event) => event.stopPropagation()}
-            role="dialog"
-            aria-modal="true"
-            aria-label={text.drilldown}
+
+
+
           >
             <div className="progress-modal-header">
               <span>{text.drilldown}</span>
@@ -726,7 +723,7 @@ export function ReportsPanel({
               )}
             </div>
           </div>
-        </div>
+        </OperationalDialog>
       )}
 
       <section className="panel">
@@ -762,16 +759,6 @@ export function ReportsPanel({
   );
 }
 
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { language } = useAppLanguage();
-  const text = reportsText[language];
-
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? text.databaseLive : text.demoMode}
-    </span>
-  );
-}
 
 function workspaceMessageText(message: string | null | undefined, language: Language) {
   if (!message || language !== "vi") {

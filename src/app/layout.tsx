@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { bodyFont, editorialFont } from "./fonts";
 import { PwaInstallPrompt } from "@/components/PwaInstallPrompt";
 import "codexdentist-odontogram/style.css";
 import "react-day-picker/style.css";
@@ -6,6 +7,7 @@ import "@/styles/globals.css";
 import "./globals.css";
 import "@/styles/workspace.css";
 import "@/styles/workspace-legacy-bridge.css";
+import "@/styles/care-record.css";
 
 export const metadata: Metadata = {
   applicationName: "Codexdentist",
@@ -60,7 +62,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="vi">
-      <body>
+      <body className={`${bodyFont.variable} ${editorialFont.variable}`}>
         {children}
         <PwaInstallPrompt />
       </body>

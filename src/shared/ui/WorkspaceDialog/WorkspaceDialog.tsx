@@ -2,9 +2,9 @@
 import { useEffect, useId, useRef, type ReactNode, type KeyboardEvent } from "react";
 import { X } from "lucide-react";
 
-export function WorkspaceDialog({ open, onClose, title, closeLabel, className = "", children }: {
+export function WorkspaceDialog({ open, onClose, title, closeLabel, className = "", hideHeader = false, children }: {
   open: boolean; onClose: () => void; title: string; closeLabel: string;
-  className?: string; children: ReactNode;
+  className?: string; hideHeader?: boolean; children: ReactNode;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -36,13 +36,13 @@ export function WorkspaceDialog({ open, onClose, title, closeLabel, className = 
     }
   }
   return (
-    <dialog ref={ref} className={`workspace-dialog ${className}`} aria-labelledby={titleId} onKeyDown={containTab}
+    <dialog ref={ref} className={`workspace-dialog ${className}`} aria-labelledby={hideHeader ? undefined : titleId} aria-label={hideHeader ? title : undefined} onKeyDown={containTab}
       onCancel={event => { event.preventDefault(); onClose(); }} onClose={onClose}
       onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
       <div className="workspace-dialog-surface">
-        <header className="workspace-dialog-heading"><h2 id={titleId}>{title}</h2>
+        {!hideHeader && <header className="workspace-dialog-heading"><h2 id={titleId}>{title}</h2>
           <button type="button" className="icon-button" aria-label={closeLabel} onClick={onClose}><X size={20} aria-hidden="true" /></button>
-        </header>
+        </header>}
         {open ? children : null}
       </div>
     </dialog>

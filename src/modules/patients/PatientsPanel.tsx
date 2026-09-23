@@ -1,6 +1,8 @@
 "use client";
 
-import { FileText, UsersRound, X } from "lucide-react";
+import { OperationalDialog } from "@/components/ui/WorkspaceControls";
+
+import { ArrowRight, CalendarDays, CreditCard, FileText, SquarePen, UserRoundPlus, UsersRound, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -17,15 +19,6 @@ import { formatVnd, type Clinic, type Patient } from "@/lib/data";
 import type { PatientWorkspace } from "@/lib/patient-types";
 import type { AppRole } from "@/lib/permissions";
 
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { t } = useAppLanguage();
-
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? t.databaseLive : t.demoMode}
-    </span>
-  );
-}
 
 function clinicIsActive(clinic: Pick<Clinic, "active">) {
   return clinic.active !== false;
@@ -261,13 +254,7 @@ export function PatientsPanel({
 
   return (
     <section className="view-stack">
-      <div className="toolbar">
-        <div>
-          <p className="eyebrow">{text.registry}</p>
-          <h2>{text.heading}</h2>
-        </div>
-        <SourceBadge source={patientWorkspace?.source} />
-      </div>
+
 
       {(patientWorkspace?.message || notice) && (
         <div className={notice ? "schedule-alert action" : "schedule-alert"}>
@@ -286,19 +273,13 @@ export function PatientsPanel({
             setCreatePatientModalOpen(true);
           }}
         >
-          <UsersRound size={16} />
+          <UserRoundPlus size={16} aria-hidden="true" />
           {text.createPatient}
         </button>
       </div>
 
       {createPatientModalOpen && (
-        <div
-          className="progress-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={text.newPatient}
-          onClick={closeCreatePatientModal}
-        >
+        <OperationalDialog label={text.newPatient} onClose={closeCreatePatientModal}>
           <form
             action={createPatientAction}
             className="progress-modal patient-create-modal"
@@ -426,12 +407,12 @@ export function PatientsPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       <section className="content-grid patient-layout">
         <section className="panel">
-          <PanelHeader icon={UsersRound} title={text.patientRegistry} action={text.live} />
+          <PanelHeader icon={UsersRound} title={text.patientRegistry} action={String(operationalPatients.length)} />
           <div className="table-list">
             {operationalPatients.length > 0 ? (
               operationalPatients.map((patient) => (
@@ -440,6 +421,7 @@ export function PatientsPanel({
                     selectedPatient?.id === patient.id ? "table-row active" : "table-row"
                   }
                   key={patient.id}
+                  aria-pressed={selectedPatient?.id === patient.id}
                   onClick={() => selectPatient(patient.id)}
                   type="button"
                 >
@@ -450,7 +432,7 @@ export function PatientsPanel({
                     </small>
                   </span>
                   <span>{patientVisitLabel(patient.nextVisit, language)}</span>
-                  <span>{formatVnd(patient.balance)}</span>
+                  <span className="patient-list-balance">{text.balance}: {formatVnd(patient.balance)}</span>
                 </button>
               ))
             ) : (
@@ -466,11 +448,11 @@ export function PatientsPanel({
         >
           {selectedPatient ? (
             <>
-              <PanelHeader
-                icon={FileText}
-                title={selectedPatient.name}
-                action={patientCodeFor(selectedPatient)}
-              />
+              <header className="patient-dossier-heading">
+                <span className="patient-record-number">{patientCodeFor(selectedPatient)}</span>
+                <h2>{selectedPatient.name}</h2>
+                <p>{selectedPatient.clinic}</p>
+              </header>
 
               <div className="patient-profile-strip">
                 <div>
@@ -493,10 +475,7 @@ export function PatientsPanel({
                   <span>{text.consent}</span>
                   <strong>{displayStatus(selectedPatient.consent, language)}</strong>
                 </div>
-                <div>
-                  <span>{text.balance}</span>
-                  <strong>{formatVnd(selectedPatient.balance)}</strong>
-                </div>
+
               </div>
 
               {selectedPatient.flags.length > 0 ? (
@@ -510,7 +489,6 @@ export function PatientsPanel({
               <div className="patient-operations">
                 <div className="chart-header">
                   <strong>{text.operationSummary}</strong>
-                  <span>{text.profile}</span>
                 </div>
                 <div className="patient-operation-strip">
                   <span>
@@ -532,30 +510,30 @@ export function PatientsPanel({
                 </div>
                 <div className="patient-quick-actions" aria-label={text.quickActions}>
                   <Link
-                    className="secondary-button"
+                    className="primary-button"
                     href={`/journey?patientId=${encodeURIComponent(selectedPatient.id)}`}
                   >
-                    {text.openJourney}
+                    {text.openJourney}<ArrowRight size={16} aria-hidden="true" />
                   </Link>
                   <Link
                     className="secondary-button"
                     href={`/billing?patientId=${encodeURIComponent(selectedPatient.id)}`}
                   >
-                    {text.openBilling}
+                    <CreditCard size={16} aria-hidden="true" />{text.openBilling}
                   </Link>
                   <Link
                     className="secondary-button"
                     href={`/schedule?patientId=${encodeURIComponent(selectedPatient.id)}`}
                   >
-                    {text.openSchedule}
+                    <CalendarDays size={16} aria-hidden="true" />{text.openSchedule}
                   </Link>
                   <button
-                    className="primary-button patient-edit-action"
+                    className="secondary-button patient-edit-action"
                     type="button"
                     disabled={!formReady}
                     onClick={() => setEditPatientModalOpen(true)}
                   >
-                    <FileText size={16} />
+                    <SquarePen size={16} aria-hidden="true" />
                     {text.editProfile}
                   </button>
                 </div>
@@ -565,7 +543,7 @@ export function PatientsPanel({
                 <summary>
                   <strong>{text.consent}</strong>
                   <span>
-                    {text.consentVersion} {selectedPatient.consentVersion ?? "none"} ·{" "}
+                    {text.consentVersion} {selectedPatient.consentVersion ?? text.unknown} ·{" "}
                     {text.consentSigned} {selectedPatient.consentSignedAt ?? text.noConsentDate}
                   </span>
                 </summary>
@@ -612,13 +590,7 @@ export function PatientsPanel({
               </details>
 
               {editPatientModalOpen ? (
-                <div
-                  className="progress-modal-backdrop"
-                  role="dialog"
-                  aria-modal="true"
-                  aria-label={text.editProfile}
-                  onClick={() => setEditPatientModalOpen(false)}
-                >
+                <OperationalDialog label={text.editProfile} onClose={() => setEditPatientModalOpen(false)}>
                   <div
                     className="progress-modal patient-profile-modal"
                     onClick={(event) => event.stopPropagation()}
@@ -798,7 +770,7 @@ export function PatientsPanel({
                       </div>
                     </form>
                   </div>
-                </div>
+                </OperationalDialog>
               ) : null}
             </>
           ) : (

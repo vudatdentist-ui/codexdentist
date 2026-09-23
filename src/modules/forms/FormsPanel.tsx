@@ -1,5 +1,7 @@
 "use client";
 
+import { OperationalDialog } from "@/components/ui/WorkspaceControls";
+
 import { FileText, LockKeyhole, Printer, Search, ShieldCheck, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -20,15 +22,6 @@ import type { PatientWorkspace } from "@/lib/patient-types";
 type PatientSearchRecord = Pick<Patient, "id" | "name" | "phone"> &
   Partial<Pick<Patient, "email" | "patientCode">>;
 
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { t } = useAppLanguage();
-
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? t.databaseLive : t.demoMode}
-    </span>
-  );
-}
 
 function workspaceMessageText(message: string | null | undefined, language: Language) {
   if (!message || language !== "vi") {
@@ -433,13 +426,7 @@ export function FormsPanel({
 
   return (
     <section className="view-stack">
-      <div className="toolbar">
-        <div>
-          <p className="eyebrow">{language === "vi" ? "Biểu mẫu" : "Forms"}</p>
-          <h2>{text.heading}</h2>
-        </div>
-        <SourceBadge source={formsWorkspace?.source} />
-      </div>
+
 
       {(formsWorkspace?.message || notice) && (
         <div className={notice ? "schedule-alert action" : "schedule-alert"}>
@@ -498,7 +485,7 @@ export function FormsPanel({
       </nav>
 
       {formsModal === "assign" && (
-        <div className="progress-modal-backdrop" role="dialog" aria-modal="true" aria-label={text.assign} onClick={() => setFormsModal(null)}>
+        <OperationalDialog label={text.assign} onClose={() => setFormsModal(null)}>
           <form action={assignPatientFormAction} className="progress-modal pharmacy-modal" onClick={(event) => event.stopPropagation()} onSubmit={() => setFormsModal(null)}>
             <div className="progress-modal-header">
               <div>
@@ -584,11 +571,11 @@ export function FormsPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       {formsModal === "template" && (
-        <div className="progress-modal-backdrop" role="dialog" aria-modal="true" aria-label={text.createTemplate} onClick={() => setFormsModal(null)}>
+        <OperationalDialog label={text.createTemplate} onClose={() => setFormsModal(null)}>
           <form action={createFormTemplateAction} className="progress-modal pharmacy-modal" onClick={(event) => event.stopPropagation()} onSubmit={() => setFormsModal(null)}>
             <div className="progress-modal-header">
               <div>
@@ -642,11 +629,11 @@ export function FormsPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       {printingFormTemplate && (
-        <div className="progress-modal-backdrop" role="dialog" aria-modal="true" aria-label={`${text.print} ${printingFormTemplate.name}`} onClick={() => setPrintingFormTemplateId("")}>
+        <OperationalDialog label={`${text.print} ${printingFormTemplate.name}`} onClose={() => setPrintingFormTemplateId("")}>
           <div className="progress-modal pharmacy-modal" onClick={(event) => event.stopPropagation()}>
             <div className="progress-modal-header">
               <div>
@@ -710,11 +697,11 @@ export function FormsPanel({
               </Link>
             </div>
           </div>
-        </div>
+        </OperationalDialog>
       )}
 
       {completingForm && (
-        <div className="progress-modal-backdrop" role="dialog" aria-modal="true" aria-label={text.completeForm} onClick={() => setCompletingFormId("")}>
+        <OperationalDialog label={text.completeForm} onClose={() => setCompletingFormId("")}>
           <form
             action={completePatientFormAction}
             className="progress-modal pharmacy-modal"
@@ -797,11 +784,11 @@ export function FormsPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       {voidingForm && (
-        <div className="progress-modal-backdrop" role="dialog" aria-modal="true" aria-label={text.void} onClick={() => setVoidingFormId("")}>
+        <OperationalDialog label={text.void} onClose={() => setVoidingFormId("")}>
           <form
             action={voidPatientFormAction}
             className="progress-modal pharmacy-modal"
@@ -850,7 +837,7 @@ export function FormsPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       {formsSection === "forms" && (

@@ -1,5 +1,9 @@
 "use client";
 
+import { RecordSectionNav } from "@/components/ui/RecordSectionNav";
+
+import { OperationalDialog } from "@/components/ui/WorkspaceControls";
+
 import { Activity, CalendarDays, CheckCircle2, ClipboardList, FileText, MessageSquareText, Search, Stethoscope, Trash2, UsersRound, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -233,16 +237,6 @@ function timelineFileKindLabel(kind: string | null | undefined, language: Langua
   return kind ? labels[kind]?.[language] ?? kind : "";
 }
 
-
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { t } = useAppLanguage();
-
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? t.databaseLive : t.demoMode}
-    </span>
-  );
-}
 
 function noticeText(notice: string | null, language: Language) {
   const notices: Record<string, Record<Language, string>> = {
@@ -2819,14 +2813,6 @@ export function PatientJourneyPanel({
 
   return (
     <section className="view-stack patient-chart">
-      <div className="toolbar">
-        <div className="patient-chart-toolbar-title">
-          <p className="eyebrow">{jt.chart.eyebrow}</p>
-          <h2>{selectedPatient ? jt.chart.title : jt.chart.emptyTitle}</h2>
-        </div>
-        <SourceBadge source={source} />
-      </div>
-
       <div className="chart-search-meta patient-chart-search-meta">
         <span>{searchSummary}</span>
       </div>
@@ -2839,6 +2825,13 @@ export function PatientJourneyPanel({
 
       {selectedPatient ? (
         <section className="patient-chart-flow">
+          <RecordSectionNav label={jt.chart.sectionNavAria} items={[
+            { id: "chart-admin", label: jt.nav.admin },
+            { id: "chart-note", label: jt.nav.exam },
+            { id: "chart-odontogram", label: jt.nav.odontogram },
+            { id: "chart-services", label: jt.nav.services },
+            { id: "chart-timeline", label: jt.nav.timeline },
+          ]} />
           <section className="patient-chart-paired-blocks">
           <section className="panel patient-chart-header" id="chart-admin">
             <PanelHeader
@@ -2847,16 +2840,6 @@ export function PatientJourneyPanel({
               action={jt.actions.admin}
             />
 
-            <nav
-              className="chart-section-nav"
-              aria-label={jt.chart.sectionNavAria}
-            >
-              <a href="#chart-admin">{jt.nav.admin}</a>
-              <a href="#chart-note">{jt.nav.exam}</a>
-              <a href="#chart-odontogram">{jt.nav.odontogram}</a>
-              <a href="#chart-services">{jt.nav.services}</a>
-              <a href="#chart-timeline">{jt.nav.timeline}</a>
-            </nav>
 
             <div className="patient-chart-topline">
               <div className="patient-chart-identity">
@@ -3748,13 +3731,7 @@ export function PatientJourneyPanel({
       )}
 
       {pendingProgressUpdate && selectedPatient && (
-        <div
-          className="progress-modal-backdrop journey-progress-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={jt.services.recordProgress}
-          onClick={() => setPendingProgressUpdate(null)}
-        >
+        <OperationalDialog label={jt.services.recordProgress} onClose={() => setPendingProgressUpdate(null)}>
           <form
             action={recordJourneyServiceProgressAction}
             className="progress-modal journey-progress-modal"
@@ -3881,7 +3858,7 @@ export function PatientJourneyPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       {openTimelineImage && (

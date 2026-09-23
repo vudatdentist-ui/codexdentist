@@ -1,5 +1,7 @@
 "use client";
 
+import { OperationalDialog } from "@/components/ui/WorkspaceControls";
+
 import { Activity, ClipboardList, FileText, UsersRound, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -245,11 +247,8 @@ export function LearningPanel({
 
   return (
     <section className="view-stack">
-      <div className="toolbar">
-        <div>
-          <p className="eyebrow">{labels.eyebrow}</p>
-          <h2>{labels.heading}</h2>
-        </div>
+      <div className="workspace-actions">
+
         <div className="service-action-row">
           {canMutate && (
             <>
@@ -272,7 +271,7 @@ export function LearningPanel({
               </button>
             </>
           )}
-          <SourceBadge source={learningWorkspace?.source} />
+
         </div>
       </div>
 
@@ -474,13 +473,7 @@ export function LearningPanel({
       )}
 
       {learningModal === "course" && (
-        <div
-          aria-label={labels.create}
-          aria-modal="true"
-          className="progress-modal-backdrop"
-          onClick={() => setLearningModal(null)}
-          role="dialog"
-        >
+        <OperationalDialog label={labels.create} onClose={() => setLearningModal(null)}>
           <form
             action={createLearningContentAction}
             className="progress-modal learning-course-modal"
@@ -588,17 +581,11 @@ export function LearningPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       {learningModal === "assign" && (
-        <div
-          aria-label={labels.assign}
-          aria-modal="true"
-          className="progress-modal-backdrop"
-          onClick={() => setLearningModal(null)}
-          role="dialog"
-        >
+        <OperationalDialog label={labels.assign} onClose={() => setLearningModal(null)}>
           <form
             action={assignLearningContentAction}
             className="progress-modal learning-assign-modal"
@@ -655,7 +642,7 @@ export function LearningPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
     </section>
   );
@@ -771,16 +758,6 @@ function noticeFor(notice: string | null, language: Language) {
   return learningNoticeText[language][notice] ?? null;
 }
 
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { language } = useAppLanguage();
-  const text = learningText[language];
-
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? text.databaseLive : text.demoMode}
-    </span>
-  );
-}
 
 function workspaceMessageText(message: string | null | undefined, language: Language) {
   if (!message || language !== "vi") {

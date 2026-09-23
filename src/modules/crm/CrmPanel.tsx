@@ -1,5 +1,7 @@
 "use client";
 
+import { OperationalDialog } from "@/components/ui/WorkspaceControls";
+
 import { Bell, Inbox, MessageSquareText, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -16,15 +18,6 @@ import { EmptyState, MetricCard, PanelHeader, RecordTile, StatusPill as BaseStat
 import type { CrmWorkspace } from "@/lib/crm-types";
 import type { PatientWorkspace } from "@/lib/patient-types";
 
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { t } = useAppLanguage();
-
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? t.databaseLive : t.demoMode}
-    </span>
-  );
-}
 
 function workspaceMessageText(message: string | null | undefined, language: Language) {
   if (!message || language !== "vi") {
@@ -223,11 +216,8 @@ export function CrmPanel({
 
   return (
     <section className="view-stack">
-      <div className="toolbar">
-        <div>
-          <p className="eyebrow">CRM</p>
-          <h2>{labels.heading}</h2>
-        </div>
+      <div className="workspace-actions">
+
         <div className="invoice-actions">
           <form
             action={generateCrmRecallTasksAction}
@@ -242,7 +232,7 @@ export function CrmPanel({
               {labels.generateRecalls}
             </button>
           </form>
-          <SourceBadge source={crmWorkspace?.source} />
+
         </div>
       </div>
 
@@ -307,13 +297,7 @@ export function CrmPanel({
       </nav>
 
       {crmModal === "lead" && (
-        <div
-          className="progress-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={labels.createLead}
-          onClick={() => setCrmModal(null)}
-        >
+        <OperationalDialog label={labels.createLead} onClose={() => setCrmModal(null)}>
           <form
             action={createCrmLeadAction}
             className="progress-modal crm-modal"
@@ -382,17 +366,11 @@ export function CrmPanel({
             </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       {crmModal === "activity" && (
-        <div
-          className="progress-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={labels.addActivity}
-          onClick={() => setCrmModal(null)}
-        >
+        <OperationalDialog label={labels.addActivity} onClose={() => setCrmModal(null)}>
           <form
             action={addCrmActivityAction}
             className="progress-modal crm-modal"
@@ -485,7 +463,7 @@ export function CrmPanel({
             </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       {crmSection === "queue" && (

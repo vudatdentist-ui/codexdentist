@@ -1,5 +1,7 @@
 "use client";
 
+import { OperationalDialog, WorkspaceTabs } from "@/components/ui/WorkspaceControls";
+
 import { Activity, CheckCircle2, ClipboardList, FileText, Printer, Search, Settings, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -130,15 +132,6 @@ function PatientSearchCombobox({
   );
 }
 
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { t } = useAppLanguage();
-
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? t.databaseLive : t.demoMode}
-    </span>
-  );
-}
 
 function workspaceMessageText(message: string | null | undefined, _language: Language) {
   return message;
@@ -782,13 +775,6 @@ export function PharmacyPanel({
         ))}
       </datalist>
 
-      <div className="toolbar">
-        <div>
-          <p className="eyebrow">{language === "vi" ? "Đơn thuốc" : "Rx"}</p>
-          <h2>{text.heading}</h2>
-        </div>
-        <SourceBadge source={pharmacyWorkspace?.source} />
-      </div>
 
       {(pharmacyWorkspace?.message || notice) && (
         <div className={notice ? "schedule-alert action" : "schedule-alert"}>
@@ -807,7 +793,7 @@ export function PharmacyPanel({
         />
       </div>
 
-      <div className="segmented pharmacy-section-tabs" role="tablist" aria-label={text.heading}>
+      <WorkspaceTabs className="segmented pharmacy-section-tabs" role="tablist" aria-label={text.heading}>
         {[
           { key: "prescriptions", label: text.tabPrescriptions },
           { key: "medications", label: text.tabMedications },
@@ -828,7 +814,7 @@ export function PharmacyPanel({
             {section.label}
           </button>
         ))}
-      </div>
+      </WorkspaceTabs>
 
       <div className="service-action-row">
         {activePharmacySection === "prescriptions" ? (
@@ -870,13 +856,7 @@ export function PharmacyPanel({
       </div>
 
       {pharmacyModal === "prescription" && (
-        <div
-          className="progress-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={text.prescription}
-          onClick={() => setPharmacyModal(null)}
-        >
+        <OperationalDialog label={text.prescription} onClose={() => setPharmacyModal(null)}>
           <form
             action={createPrescriptionAction}
             className="progress-modal pharmacy-modal pharmacy-prescription-modal"
@@ -1153,11 +1133,11 @@ export function PharmacyPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       {pharmacyModal === "template" && (
-        <div className="progress-modal-backdrop" role="dialog" aria-modal="true" aria-label={text.template} onClick={() => setPharmacyModal(null)}>
+        <OperationalDialog label={text.template} onClose={() => setPharmacyModal(null)}>
           <form action={createPrescriptionTemplateAction} className="progress-modal pharmacy-modal" onClick={(event) => event.stopPropagation()} onSubmit={() => setPharmacyModal(null)}>
             <div className="progress-modal-header">
               <div>
@@ -1210,11 +1190,11 @@ export function PharmacyPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       {pharmacyModal === "medication" && (
-        <div className="progress-modal-backdrop" role="dialog" aria-modal="true" aria-label={text.medication} onClick={() => setPharmacyModal(null)}>
+        <OperationalDialog label={text.medication} onClose={() => setPharmacyModal(null)}>
           <form action={createMedicationAction} className="progress-modal pharmacy-modal" onClick={(event) => event.stopPropagation()} onSubmit={() => setPharmacyModal(null)}>
             <div className="progress-modal-header">
               <div>
@@ -1273,11 +1253,11 @@ export function PharmacyPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       {editingMedication && (
-        <div className="progress-modal-backdrop" role="dialog" aria-modal="true" aria-label={pharmacyMedicationDisplayName(editingMedication)} onClick={() => setEditingMedicationId("")}>
+        <OperationalDialog label={pharmacyMedicationDisplayName(editingMedication)} onClose={() => setEditingMedicationId("")}>
           <form action={createMedicationAction} className="progress-modal pharmacy-modal" onClick={(event) => event.stopPropagation()} onSubmit={() => setEditingMedicationId("")}>
             <div className="progress-modal-header">
               <div>
@@ -1336,11 +1316,11 @@ export function PharmacyPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       {editingTemplate && (
-        <div className="progress-modal-backdrop" role="dialog" aria-modal="true" aria-label={editingTemplate.name} onClick={() => setEditingTemplateId("")}>
+        <OperationalDialog label={editingTemplate.name} onClose={() => setEditingTemplateId("")}>
           <form action={createPrescriptionTemplateAction} className="progress-modal pharmacy-modal pharmacy-template-modal" onClick={(event) => event.stopPropagation()} onSubmit={() => setEditingTemplateId("")}>
             <div className="progress-modal-header">
               <div>
@@ -1434,11 +1414,11 @@ export function PharmacyPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       {printingTemplate && (
-        <div className="progress-modal-backdrop" role="dialog" aria-modal="true" aria-label={`${text.print} ${printingTemplate.name}`} onClick={() => setPrintingTemplateId("")}>
+        <OperationalDialog label={`${text.print} ${printingTemplate.name}`} onClose={() => setPrintingTemplateId("")}>
           <div className="progress-modal pharmacy-modal" onClick={(event) => event.stopPropagation()}>
             <div className="progress-modal-header">
               <div>
@@ -1491,7 +1471,7 @@ export function PharmacyPanel({
               </Link>
             </div>
           </div>
-        </div>
+        </OperationalDialog>
       )}
 
       {activePharmacySection === "prescriptions" ? (
@@ -1734,7 +1714,7 @@ export function PharmacyPanel({
       ) : null}
 
       {viewingPrescription && (
-        <div className="progress-modal-backdrop" role="dialog" aria-modal="true" aria-label={viewingPrescription.prescriptionNo} onClick={() => setViewingPrescriptionId("")}>
+        <OperationalDialog label={viewingPrescription.prescriptionNo} onClose={() => setViewingPrescriptionId("")}>
           <div className="progress-modal pharmacy-modal" onClick={(event) => event.stopPropagation()}>
             <div className="progress-modal-header">
               <div>
@@ -1795,7 +1775,7 @@ export function PharmacyPanel({
               ) : null}
             </div>
           </div>
-        </div>
+        </OperationalDialog>
       )}
 
     </section>

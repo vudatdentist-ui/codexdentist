@@ -1,5 +1,7 @@
 "use client";
 
+import { OperationalDialog } from "@/components/ui/WorkspaceControls";
+
 import { BarChart3, ClipboardList, FileText, Settings, WalletCards, X } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -54,15 +56,6 @@ function vietnamTodayDate() {
   }).format(new Date());
 }
 
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { t } = useAppLanguage();
-
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? t.databaseLive : t.demoMode}
-    </span>
-  );
-}
 
 function workspaceMessageText(message: string | null | undefined, language: Language) {
   if (!message || language !== "vi") return message;
@@ -299,11 +292,8 @@ export function AccountingPanel({
 
   return (
     <section className="view-stack">
-      <div className="toolbar">
-        <div>
-          <p className="eyebrow">{language === "vi" ? "Kế toán" : "Accounting"}</p>
-          <h2>{labels.heading}</h2>
-        </div>
+      <div className="workspace-actions">
+
         <div className="accounting-toolbar-actions">
           <button
             className="primary-button compact-button"
@@ -323,7 +313,7 @@ export function AccountingPanel({
               {labels.viewPeriod}
             </button>
           </form>
-          <SourceBadge source={workspace?.source} />
+
         </div>
       </div>
 
@@ -510,13 +500,7 @@ export function AccountingPanel({
       )}
 
       {entryModalOpen && (
-        <div
-          className="progress-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={labels.addEntry}
-          onClick={() => setEntryModalOpen(false)}
-        >
+        <OperationalDialog label={labels.addEntry} onClose={() => setEntryModalOpen(false)}>
           <form
             action={createAccountingEntryAction}
             className="progress-modal accounting-entry-modal"
@@ -618,17 +602,11 @@ export function AccountingPanel({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       {budgetModalOpen && (
-        <div
-          className="progress-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={labels.budgetModalTitle}
-          onClick={() => setBudgetModalOpen(false)}
-        >
+        <OperationalDialog label={labels.budgetModalTitle} onClose={() => setBudgetModalOpen(false)}>
           <div
             className="progress-modal accounting-budget-modal"
             onClick={(event) => event.stopPropagation()}
@@ -694,7 +672,7 @@ export function AccountingPanel({
               ))}
             </div>
           </div>
-        </div>
+        </OperationalDialog>
       )}
     </section>
   );

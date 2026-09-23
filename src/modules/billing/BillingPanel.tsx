@@ -1,5 +1,7 @@
 "use client";
 
+import { WorkspaceTabs } from "@/components/ui/WorkspaceControls";
+
 import { Bell, CreditCard, Download, FileText, Printer, Search, UsersRound, WalletCards } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -137,9 +139,6 @@ function statementBalanceLabel(balance: number, language: Language) {
   return language === "vi" ? "Đã tất toán" : "Settled";
 }
 
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  return null;
-}
 
 function workspaceMessageText(message: string | null | undefined, language: Language) {
   if (!message || language !== "vi") return message;
@@ -2474,13 +2473,13 @@ export function BillingPanel({
 
   return (
     <section className="view-stack">
-      <div className="toolbar">
+      <div className="workspace-actions">
         <div>
-          <p className="eyebrow">{bt.workflow}</p>
-          <h2>{bt.title}</h2>
+
+
           {bt.subtitle ? <p className="billing-subtitle">{bt.subtitle}</p> : null}
         </div>
-        <SourceBadge source={billingWorkspace?.source} />
+
       </div>
 
       {billingSearchSummary ? (
@@ -2662,7 +2661,7 @@ export function BillingPanel({
               </option>
             </select>
           </label>
-          <input name="reference" placeholder={billingAdvancedLabels.reason} />
+          <label>{billingAdvancedLabels.reason}<input name="reference" placeholder={billingAdvancedLabels.reason} /></label>
           <button className="primary-button" type="submit" disabled={!canMutate}>
             {bt.recordReceiptOnly}
           </button>
@@ -2692,7 +2691,7 @@ export function BillingPanel({
         />
       </div>
 
-      <div
+      <WorkspaceTabs
         className="segmented billing-workbench-tabs"
         role="tablist"
         aria-label={bt.workflow}
@@ -2709,7 +2708,7 @@ export function BillingPanel({
             {option.label} <span>{option.count}</span>
           </button>
         ))}
-      </div>
+      </WorkspaceTabs>
 
       {billingSection === "collection" && (
       <section className="panel">

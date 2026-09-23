@@ -1,5 +1,7 @@
 "use client";
 
+import { OperationalDialog, WorkspaceTabs } from "@/components/ui/WorkspaceControls";
+
 import { Activity, Building2, CalendarDays, FileText, WalletCards, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -59,15 +61,6 @@ const uiText: Record<Language, { allClinics: string; clinicScope: string; roles:
   },
 };
 
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { t } = useAppLanguage();
-
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? t.databaseLive : t.demoMode}
-    </span>
-  );
-}
 
 function workspaceMessageText(message: string | null | undefined, language: Language) {
   if (!message || language !== "vi") return message;
@@ -740,13 +733,7 @@ export function StaffPayrollPanel({
 
   return (
     <section className="view-stack">
-      <div className="toolbar">
-        <div>
-          <p className="eyebrow">{hrLabels.hrOperations}</p>
-          <h2>{labels.heading}</h2>
-        </div>
-        <SourceBadge source={staffPayrollWorkspace?.source} />
-      </div>
+
 
       {(staffPayrollWorkspace?.message || notice) && (
         <div className={notice ? "schedule-alert action" : "schedule-alert"}>
@@ -771,7 +758,7 @@ export function StaffPayrollPanel({
         </label>
       </div>
 
-      <div className="segmented staff-section-tabs" role="tablist" aria-label={labels.heading}>
+      <WorkspaceTabs className="segmented staff-section-tabs" role="tablist" aria-label={labels.heading}>
         {[
           { key: "overview", label: labels.tabOverview },
           { key: "time", label: labels.tabTime },
@@ -793,7 +780,7 @@ export function StaffPayrollPanel({
             {section.label}
           </button>
         ))}
-      </div>
+      </WorkspaceTabs>
 
       {activeStaffSection === "overview" ? (
         <>
@@ -829,16 +816,12 @@ export function StaffPayrollPanel({
       </section>
 
       {staffDayModalDay ? (
-        <div
-          className="progress-modal-backdrop"
-          role="presentation"
-          onMouseDown={() => setStaffDayModalDate(null)}
-        >
+        <OperationalDialog label={hrLabels.selectedDayModalTitle} onClose={() => setStaffDayModalDate(null)}>
           <div
             className="progress-modal staff-day-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label={hrLabels.selectedDayModalTitle}
+
+
+
             onMouseDown={(event) => event.stopPropagation()}
           >
             <div className="progress-modal-header">
@@ -893,7 +876,7 @@ export function StaffPayrollPanel({
               />
             </div>
           </div>
-        </div>
+        </OperationalDialog>
       ) : null}
 
       <section className="panel">

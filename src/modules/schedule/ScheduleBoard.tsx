@@ -1,5 +1,7 @@
 "use client";
 
+import { OperationalDialog } from "@/components/ui/WorkspaceControls";
+
 import { CalendarDays, Inbox, Search, Stethoscope, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -78,15 +80,6 @@ function StatusPill({ status }: { status: string }) {
   return <BaseStatusPill label={displayStatus(status, language)} status={status} />;
 }
 
-function SourceBadge({ source }: { source?: "database" | "demo" }) {
-  const { t } = useAppLanguage();
-
-  return (
-    <span className={source === "database" ? "source-badge live" : "source-badge demo"}>
-      {source === "database" ? t.databaseLive : t.demoMode}
-    </span>
-  );
-}
 
 function noticeText(notice: string | null, language: Language) {
   const notices: Record<string, Record<Language, string>> = {
@@ -171,6 +164,7 @@ function PatientSearchCombobox({
   selectedPatient?: PatientSearchRecord | null;
   selectLabel: string;
 }) {
+  const { language } = useAppLanguage();
   const showDropdown = !disabled && query.trim().length > 0 && !selectedPatient;
   return (
     <div className="patient-search-combobox">
@@ -184,7 +178,7 @@ function PatientSearchCombobox({
         value={selectedPatient ? patientSearchDisplayLabel(selectedPatient) : query}
       />
       {selectedPatient && !disabled ? (
-        <button aria-label="Clear patient" type="button" onClick={() => onQueryChange("")}>
+        <button aria-label={language === "vi" ? "Xóa tìm kiếm bệnh nhân" : "Clear patient search"} type="button" onClick={() => onQueryChange("")}>
           <X size={14} />
         </button>
       ) : null}
@@ -194,7 +188,7 @@ function PatientSearchCombobox({
             matches.slice(0, 8).map((patient) => (
               <button key={patient.id} type="button" role="option" onMouseDown={(event) => event.preventDefault()} onClick={() => onSelect(patient)}>
                 <strong>{patientSearchDisplayLabel(patient)}</strong>
-                <span>{[patient.email, patient.address, patient.city].filter(Boolean).join(" ? ")}</span>
+                <span>{[patient.email, patient.address, patient.city].filter(Boolean).join(" \u00b7 ")}</span>
               </button>
             ))
           ) : (
@@ -562,7 +556,7 @@ export function ScheduleBoard({
           <MetricCard label={labels.waiting} value={String(arrivedAppointments.length)} tone="amber" />
           <MetricCard label={labels.busy} value={String(inChairAppointments.length)} tone="teal" />
         </div>
-        <SourceBadge source={scheduleWorkspace?.source} />
+
       </div>
 
       {(scheduleWorkspace?.message || notice) && (
@@ -584,13 +578,7 @@ export function ScheduleBoard({
       </div>
 
       {createAppointmentModalOpen && (
-        <div
-          className="progress-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={labels.createTitle}
-          onClick={() => setCreateAppointmentModalOpen(false)}
-        >
+        <OperationalDialog label={labels.createTitle} onClose={() => setCreateAppointmentModalOpen(false)}>
           <form
             action={createAppointmentAction}
             className="progress-modal schedule-create-modal"
@@ -731,7 +719,7 @@ export function ScheduleBoard({
               </button>
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       )}
 
       <section className="schedule-filters panel">
@@ -1111,16 +1099,10 @@ function AppointmentStatusSelect({
         ))}
       </select>
       {chairModalOpen ? (
-        <div
-          className="progress-modal-backdrop"
-          role="dialog"
-          aria-modal="true"
-          aria-label={labels.selectChair}
-          onClick={() => {
+        <OperationalDialog label={labels.selectChair} onClose={() => {
             setChairModalOpen(false);
             setSelectedStatus(currentStatus);
-          }}
-        >
+          }}>
           <form
             action={updateAppointmentStatusAction}
             className="progress-modal appointment-chair-modal"
@@ -1159,7 +1141,7 @@ function AppointmentStatusSelect({
               )}
             </div>
           </form>
-        </div>
+        </OperationalDialog>
       ) : null}
     </div>
   );
