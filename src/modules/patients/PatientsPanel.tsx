@@ -451,7 +451,7 @@ export function PatientsPanel({
               <header className="patient-dossier-heading">
                 <span className="patient-record-number">{patientCodeFor(selectedPatient)}</span>
                 <h2>{selectedPatient.name}</h2>
-                <p>{selectedPatient.clinic}</p>
+                <p>{visibleClinics.find((clinic) => clinic.id === selectedPatient.clinicId)?.name ?? text.unknown}</p>
               </header>
 
               <div className="patient-profile-strip">
