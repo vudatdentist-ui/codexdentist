@@ -96,6 +96,7 @@ Required principles:
 - `infrastructure` does not depend on app/workspace UI and does not own product workflow policy.
 - `integrations` cannot depend on app/workspace UI and cannot directly import Prisma/core DB implementations to mutate canonical domain records.
 - `workspaces` cannot depend on app routes, Prisma/storage implementations, or concrete provider adapters.
+- `app` is the allowed composition/transport layer.
 - Existing `src/components`, `src/modules`, and broad `src/lib` remain migration territory. Do not add a route-specific migration exception or a legacy component name as the architecture target.
 
 Architecture checks should become stricter as code is migrated, not by retroactively declaring all baseline legacy code invalid.
