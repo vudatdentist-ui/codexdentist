@@ -57,7 +57,10 @@ try {
   }
   await check('Login error and password recovery remain available', async () => {
     await page.goto(new URL('/login?error=invalid', base).href); await settle();
-    assert.ok((await page.getByRole('alert').innerText()).length > 0);
+    const error = page.locator('.login-panel').getByRole('alert');
+    assert.equal(await error.count(), 1);
+    assert.ok(await error.isVisible());
+    assert.ok((await error.innerText()).length > 0);
     await page.locator('.forgot-password-panel summary').click();
     assert.ok(await page.locator('.forgot-password-panel input[type=email]').isVisible());
     await page.screenshot({ path: `${output}/login-error-and-recovery-320.png`, fullPage: true });
