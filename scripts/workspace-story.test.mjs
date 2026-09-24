@@ -5,9 +5,9 @@ import { workspaceStories, workspaceNavigation, visibleWorkspaceNavigation, norm
 import { summarizeClinicDay } from '../src/workspaces/clinic-day.ts';
 import { accessibleViews, viewRoutes } from '../src/lib/permissions.ts';
 
-test('every route has a complete bilingual story without changing route keys', () => {
+test('every route has complete bilingual labels without changing route keys', () => {
   assert.deepEqual(Object.keys(workspaceStories).sort(), Object.keys(viewRoutes).sort());
-  for (const story of Object.values(workspaceStories)) for (const field of ['label','title','purpose']) for (const language of ['vi','en']) assert.ok(story[field][language].trim().length > 0);
+  for (const story of Object.values(workspaceStories)) for (const field of ['label','title']) for (const language of ['vi','en']) assert.ok(story[field][language].trim().length > 0);
 });
 test('navigation contains each direct destination once; clinical aliases remain in care journey', () => {
   const views = workspaceNavigation.flatMap(group => group.views);
@@ -52,4 +52,46 @@ test('package scripts reference existing repository files', () => {
       assert.ok(existsSync(new URL(match[0], root)), `${name}: ${match[0]}`);
     }
   }
+});
+
+test('page titles use the navigation label and cannot acquire a subtitle field', () => {
+  for (const entry of Object.values(workspaceStories)) {
+    assert.deepEqual(entry.title, entry.label);
+    assert.deepEqual(Object.keys(entry).sort(), ['chapter', 'label', 'title']);
+  }
+});
+
+test('application headings and the brand have no narrative copy layer', () => {
+  const source = readFileSync(new URL('src/components/AppShell.tsx', root), 'utf8');
+  assert.doesNotMatch(source, /workspace-purpose|workspace-chapter|story\.purpose|The clinic care journal/);
+  assert.doesNotMatch(source, /<p className="workspace-caption">\{routeTitle\}/);
+  assert.match(source, /id="workspace-content" tabIndex=\{-1\}/);
+});
+
+test('dashboard section headings have no descriptive subtitles', () => {
+  const source = readFileSync(new URL('src/modules/dashboard/Dashboard.tsx', root), 'utf8');
+  assert.doesNotMatch(source, /workspace-chapter|day-scope-note|For the selected clinics/);
+  assert.match(source, /item\.detail/);
+  assert.match(source, /risk\.detail/);
+  assert.match(source, /data-day-total/);
+});
+
+test('selection notices keep their states and retry action without a second copy line', () => {
+  const source = readFileSync(new URL('src/workspaces/patients/PatientSelectionNotice.tsx', root), 'utf8');
+  assert.doesNotMatch(source, /<p[\s>]|\bdetail\s*:/);
+  for (const state of ['unselected', 'empty', 'invalid', 'unavailable', 'loading']) assert.match(source, new RegExp(`${state}:`));
+  assert.match(source, /onClick=\{onRetry\}/);
+  assert.match(source, /aria-busy=/);
+});
+
+test('authentication screens contain forms, not slogan panels or time estimates', () => {
+  const login = readFileSync(new URL('src/app/(auth)/login/page.tsx', root), 'utf8');
+  const signup = readFileSync(new URL('src/app/signup/page.tsx', root), 'utf8');
+  assert.doesNotMatch(login, /login-story|workspace-caption|<ol>/);
+  assert.doesNotMatch(signup, /styles\.(?:story|lead|benefits|eyebrow)|2 ph\u00fat/);
+  assert.match(login, /action=\{loginAction\}/);
+  assert.match(login, /action=\{forgotPasswordAction\}/);
+  assert.match(login, /role="alert"/);
+  assert.match(signup, /minLength=\{12\}/);
+  assert.match(signup, /styles\.finePrint/);
 });

@@ -63,10 +63,10 @@ try {
   await test('English language, document language and persisted preference', async () => {
     await page.locator('.language-switch').getByRole('button',{name:'EN',exact:true}).click();
     await page.waitForFunction(() => document.documentElement.lang === 'en');
-    assert.equal(await page.locator('h1').innerText(),'The working day');
+    assert.equal(await page.locator('h1').innerText(),'Today');
     await shot('desktop-dashboard-en');
     await page.reload(); await settled();
-    assert.equal(await page.locator('h1').innerText(),'The working day');
+    assert.equal(await page.locator('h1').innerText(),'Today');
   });
   await test('Notification modal, read-state, filters and compose fields', async () => {
     const trigger=page.getByRole('button',{name:'Notifications and tasks',exact:true});
@@ -139,7 +139,7 @@ try {
     await page.waitForURL(url => url.pathname === '/journey' && url.searchParams.get('patientId') === id);
     await page.locator('.patient-chart').waitFor({state:'visible'});
     await settled();
-    assert.equal(await page.locator('h1').innerText(),'One record, the whole journey');
+    assert.equal(await page.locator('h1').innerText(),'Care journey');
     assert.equal(await page.locator('.workspace-desktop-navigation [aria-current=page]').getAttribute('href'),'/journey');
     assert.equal(new URL(page.url()).searchParams.get('patientId'),id);
     await shot('desktop-journey-selected');

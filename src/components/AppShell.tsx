@@ -43,7 +43,7 @@ export function AppSidebar({ activeView, language, permittedViews }: {
   </>;
   return <aside className="sidebar story-sidebar">
     <a className="workspace-skip" href="#workspace-content">{vi ? "Chuyển tới nội dung" : "Skip to content"}</a>
-    <div className="workspace-brand"><img src="/icons/codexmed-icon.svg" width="38" height="38" alt="" aria-hidden="true" /><div><strong>Codexdentist</strong><span>{vi ? "Sổ chăm sóc phòng khám" : "The clinic care journal"}</span></div></div>
+    <div className="workspace-brand"><img src="/icons/codexmed-icon.svg" width="38" height="38" alt="" aria-hidden="true" /><div><strong>Codexdentist</strong></div></div>
     <button className="workspace-menu-button" type="button" aria-haspopup="dialog" aria-expanded={open} aria-label={vi ? "Mở menu công việc" : "Open workspace menu"} onClick={() => setOpen(true)}><Menu size={21} aria-hidden="true" /><span>Menu</span></button>
     <div className="workspace-desktop-navigation">{navigation}</div>
     <WorkspaceDialog open={open} onClose={() => setOpen(false)} title={label} closeLabel={vi ? "Đóng menu" : "Close menu"} className="workspace-menu-dialog">{navigation}</WorkspaceDialog>
@@ -67,7 +67,6 @@ export function AppTopbar({ activeLanguage, allChainsLabel, chainOptions, chainS
   const vi = activeLanguage === "vi";
   const view = viewFromPath(currentPath);
   const story = view ? workspaceStories[view] : undefined;
-  const chapter = story ? workspaceChapters[story.chapter] : undefined;
   const notificationLabel = vi ? "Thông báo và công việc" : "Notifications and tasks";
   useEffect(() => { document.documentElement.lang = activeLanguage; }, [activeLanguage]);
   return <header className="topbar story-topbar">
@@ -79,15 +78,15 @@ export function AppTopbar({ activeLanguage, allChainsLabel, chainOptions, chainS
         <div className="workspace-account-menu"><strong>{userName}</strong><span>{roleLabel}</span><span>{organizationName}</span><form action={logoutAction}><button className="secondary-button" type="submit"><LogOut size={16} aria-hidden="true" />{signOutLabel}</button></form></div>
       </details>
     </div></div>
-    <div className="workspace-page-heading">{chapter && <p className="workspace-chapter"><span>{chapter.number}</span>{chapter.title[activeLanguage]}</p>}
-      <h1 id="workspace-content" tabIndex={-1}>{story?.title[activeLanguage] ?? title}</h1>{story && <p className="workspace-purpose">{story.purpose[activeLanguage]}</p>}
+    <div className="workspace-page-heading">
+      <h1 id="workspace-content" tabIndex={-1}>{story?.title[activeLanguage] ?? title}</h1>
     </div>
     <div className="workspace-context-controls">{chainOptions.length > 1 && <label className="select-field compact topbar-chain-field"><span>{chainScopeLabel}</span><select aria-label={chainScopeLabel} value={chainScopeId} onChange={event => onChainScopeChange(event.target.value)}><option value="all">{allChainsLabel}</option>{chainOptions.map(chain => <option value={chain.id} key={chain.id}>{chain.name}</option>)}</select></label>}{children}</div>
     <WorkspaceDialog open={notificationsOpen} onClose={() => setNotificationsOpen(false)} title={notificationLabel} closeLabel={vi ? "Đóng thông báo" : "Close notifications"} className="workspace-notifications-dialog"><WorkspaceNotifications readIds={readIds} markRead={markRead} currentPath={currentPath} language={activeLanguage} workspace={notificationWorkspace} onClose={() => setNotificationsOpen(false)} /></WorkspaceDialog>
   </header>;
 }
 
-export function ModuleAiFloatingShell({ children, closeLabel, isOpen, onClose, onOpen, routeTitle }: {
+export function ModuleAiFloatingShell({ children, closeLabel, isOpen, onClose, onOpen }: {
   children: ReactNode; closeLabel: string; isOpen: boolean; moduleTitle: string;
   onClose: () => void; onOpen: () => void; openLabel: string; routeTitle: string;
 }) {
@@ -99,6 +98,6 @@ export function ModuleAiFloatingShell({ children, closeLabel, isOpen, onClose, o
   const launcher = <button className="module-ai-bubble" type="button" title={title} aria-label={title} aria-haspopup="dialog" aria-expanded={isOpen} onClick={onOpen}><MessageCircle size={19} aria-hidden="true" /><span>{language === "vi" ? "Trợ lý" : "Assistant"}</span></button>;
   return <>
     {launcherTarget && createPortal(launcher, launcherTarget)}
-    <WorkspaceDialog open={isOpen} onClose={onClose} title={title} closeLabel={closeLabel} className="workspace-assistant-dialog"><p className="workspace-caption">{routeTitle}</p>{children}</WorkspaceDialog>
+    <WorkspaceDialog open={isOpen} onClose={onClose} title={title} closeLabel={closeLabel} className="workspace-assistant-dialog">{children}</WorkspaceDialog>
   </>;
 }
