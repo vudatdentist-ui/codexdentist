@@ -1,6 +1,6 @@
 # Codexdentist QA Playbook
 
-Last updated: 2026-08-27
+Last updated: 2026-09-24
 Status: ACTIVE
 
 This playbook implements the closed-loop quality process defined in `docs/PROJECT_CONTEXT.md`:
@@ -96,7 +96,6 @@ Required principles:
 - `infrastructure` does not depend on app/workspace UI and does not own product workflow policy.
 - `integrations` cannot depend on app/workspace UI and cannot directly import Prisma/core DB implementations to mutate canonical domain records.
 - `workspaces` cannot depend on app routes, Prisma/storage implementations, or concrete provider adapters.
-- `app` is the allowed composition/transport layer.
 - Existing `src/components`, `src/modules`, and broad `src/lib` remain migration territory. Do not add a route-specific migration exception or a legacy component name as the architecture target.
 
 Architecture checks should become stricter as code is migrated, not by retroactively declaring all baseline legacy code invalid.
@@ -283,10 +282,19 @@ Do not create a permanent session log. For each phase/PR, the PR description or 
 - any advisory explicitly deferred without violating exit criteria.
 
 Git history/PR discussion is the change record. The active docs remain concise sources of current truth.
+
 ### Narrative workspace and typography gate
 
 `npm run browser:qa` also exercises the operational journal in Vietnamese at 1440px and 390px, with a 320px record/form check. Keep the record, appointment, receipt, section-navigation, native-dialog and keyboard-tab workflows in `scripts/workspace-redesign-qa.mjs` executable. Screenshots and the report belong to `output/workspace-qa/review` and are CI artifacts, not production data.
 
-The font gate uses Chromium's actual glyph-to-font report for composed and decomposed Vietnamese accents; a CSS family name alone is not proof. Body text uses self-hosted Be Vietnam Pro and editorial headings use self-hosted Noto Serif through `next/font`. Do not restore machine-dependent font loading or browser font-CDN requests. Review fresh desktop/mobile captures after typography or responsive changes.
+The font gate uses Chromium's actual glyph-to-font report for composed and decomposed Vietnamese accents; a CSS family name alone is not proof. Body text uses self-hosted Be Vietnam Pro and editorial headings use self-hosted Noto Serif, staged as checksum-pinned complete faces by `scripts/fetch-font-assets.mjs`. Do not restore machine-dependent font loading or browser font-CDN requests. Review fresh desktop/mobile captures after typography or responsive changes.
 
 Operational modal surfaces must use `OperationalDialog`/`WorkspaceDialog`, not a div with `aria-modal`. `WorkspaceTabs` preserves each module's existing selection handlers while supplying roving focus and arrow/Home/End navigation. The associated source guards and keyboard unit checks run with `test:workspace`; real-browser checks remain the interaction evidence. Keep section numbers distinct from clinical stages and preserve the independent odontogram snapshots.
+
+### Patient lookup and optional browser storage
+
+Patient lookup presentation and matching live in `src/workspaces/patients`; the route composer owns navigation and passes authorized patient data. Keep `scripts/patient-workspace.test.mjs` in `test:workspace` and `scripts/workspace-interaction-qa.mjs` in the complete browser suite. Its browser checks cover ArrowDown/Enter/Escape selection and listbox relationships, mouse selection opening the intended record, URL-bound patient identity after reload, native patient-menu focus containment/return, and mobile directory geometry. Verify real destination content, not merely a changed search label.
+
+Language, scope preferences and scroll restoration are optional enhancements. Denied localStorage/sessionStorage access must not prevent opening the authenticated workspace or editing an unsent form. Read/write failures belong behind `src/shared/browser/storage.ts`; browser tests exercise throwing Storage property getters, not just empty stores. Unit tests cover storage isolation, failed methods and server rendering without a window. Do not use optional browser storage as the source of truth for patient, clinical or financial data.
+
+Interaction captures and the commit-bound report are retained under `output/workspace-qa/interaction-audit`. Use an isolated test database; do not run these authenticated tests against real patient records. Touch-device and input-method behavior require additional verification; the current interaction regression does not certify them.
