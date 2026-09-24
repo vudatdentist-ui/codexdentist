@@ -42,7 +42,7 @@ async function main() {
     "INFECTED",
     "patient_file.governance_updated",
   ]);
-  await assertSource("src/modules/journey/PatientJourneyPanel.tsx", [
+  await assertSource("src/modules/journey/PatientJourneyRecord.tsx", [
     "patient-file-governance-form",
     "retentionUntilIso",
     "updatePatientFileGovernanceAction",

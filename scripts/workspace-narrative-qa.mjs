@@ -63,10 +63,10 @@ try {
   await test('English language, document language and persisted preference', async () => {
     await page.locator('.language-switch').getByRole('button',{name:'EN',exact:true}).click();
     await page.waitForFunction(() => document.documentElement.lang === 'en');
-    assert.equal(await page.locator('h1').innerText(),'The working day');
+    assert.equal(await page.locator('h1').innerText(),'Today');
     await shot('desktop-dashboard-en');
     await page.reload(); await settled();
-    assert.equal(await page.locator('h1').innerText(),'The working day');
+    assert.equal(await page.locator('h1').innerText(),'Today');
   });
   await test('Notification modal, read-state, filters and compose fields', async () => {
     const trigger=page.getByRole('button',{name:'Notifications and tasks',exact:true});
@@ -98,12 +98,15 @@ try {
         return selectors.map(selector => {
           const node = bar.querySelector(selector);
           const rect = node.getBoundingClientRect();
-          return {left:rect.left, right:rect.right, width:rect.width, height:rect.height,
+          return {left:rect.left, right:rect.right, top:rect.top, bottom:rect.bottom, width:rect.width, height:rect.height,
             hit:selector === '.workspace-organization' || node.contains(document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2))};
         });
       });
       for (let index = 1; index < controls.length; index++) {
-        assert.ok(controls[index - 1].right <= controls[index].left + 1, `Overlapping utility controls at ${width}px`);
+        for (let prior = 0; prior < index; prior++) {
+          const a = controls[prior], b = controls[index];
+          assert.ok(a.right <= b.left + 1 || b.right <= a.left + 1 || a.bottom <= b.top + 1 || b.bottom <= a.top + 1, `Overlapping utility controls at ${width}px`);
+        }
         assert.ok(controls[index].hit, `Obscured utility control at ${width}px`);
         assert.ok(controls[index].width >= 32 && controls[index].height >= 32, 'Utility controls must retain usable hit areas');
       }
@@ -136,7 +139,7 @@ try {
     await page.waitForURL(url => url.pathname === '/journey' && url.searchParams.get('patientId') === id);
     await page.locator('.patient-chart').waitFor({state:'visible'});
     await settled();
-    assert.equal(await page.locator('h1').innerText(),'One record, the whole journey');
+    assert.equal(await page.locator('h1').innerText(),'Care journey');
     assert.equal(await page.locator('.workspace-desktop-navigation [aria-current=page]').getAttribute('href'),'/journey');
     assert.equal(new URL(page.url()).searchParams.get('patientId'),id);
     await shot('desktop-journey-selected');

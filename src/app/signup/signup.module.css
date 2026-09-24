@@ -55,103 +55,15 @@
 
 .layout {
   display: grid;
-  gap: 76px;
-  grid-template-columns: minmax(0, 0.95fr) minmax(460px, 0.82fr);
+  grid-template-columns: minmax(0, 1fr);
   margin: 0 auto;
-  max-width: 1180px;
-  padding: 72px 24px 88px;
+  max-width: 600px;
+  padding: 48px 24px 64px;
 }
 
-.story {
-  align-self: center;
-  padding-right: 24px;
-}
-
-.backLink {
-  align-items: center;
-  color: var(--quiet);
-  display: inline-flex;
-  font-size: 12px;
-  gap: 8px;
-  margin-bottom: 46px;
-  min-height: 40px;
-  text-decoration: none;
-}
-
-.backLink:hover,
 .loginLink:hover {
   text-decoration: underline;
   text-underline-offset: 5px;
-}
-
-.eyebrow {
-  color: var(--leaf);
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 1.25px;
-  margin: 0;
-  text-transform: uppercase;
-}
-
-.story h1 {
-  color: var(--forest);
-  font-family: var(--font-editorial), Georgia, serif;
-  font-size: clamp(50px, 5.1vw, 72px);
-  font-weight: 400;
-  letter-spacing: -2.4px;
-  line-height: 1.06;
-  margin: 22px 0 0;
-}
-
-.story h1 em {
-  color: var(--leaf);
-  font-style: normal;
-  font-weight: 400;
-}
-
-.lead {
-  color: var(--quiet);
-  font-size: 15px;
-  line-height: 1.85;
-  margin: 26px 0 0;
-  max-width: 500px;
-}
-
-.benefits {
-  border-top: 1px solid var(--rule);
-  margin-top: 44px;
-}
-
-.benefits article {
-  align-items: flex-start;
-  border-bottom: 1px solid var(--rule);
-  display: grid;
-  gap: 16px;
-  grid-template-columns: 28px 1fr;
-  padding: 20px 0;
-}
-
-.benefits svg {
-  color: var(--leaf);
-  margin-top: 2px;
-  stroke-width: 1.6;
-}
-
-.benefits strong,
-.benefits span {
-  display: block;
-}
-
-.benefits strong {
-  font-size: 14px;
-  font-weight: 700;
-}
-
-.benefits span {
-  color: var(--quiet);
-  font-size: 12px;
-  line-height: 1.65;
-  margin-top: 4px;
 }
 
 .formCard {
@@ -162,28 +74,12 @@
   padding: 36px;
 }
 
-.formHeading p {
-  color: var(--leaf);
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 1.2px;
-  margin: 0;
-  text-transform: uppercase;
-}
-
-.formHeading h2 {
+.formHeading h1 {
   color: var(--forest);
   font-size: 28px;
   letter-spacing: -0.8px;
   line-height: 1.25;
-  margin: 8px 0 0;
-}
-
-.formHeading > span {
-  color: var(--quiet);
-  display: block;
-  font-size: 12px;
-  margin-top: 7px;
+  margin: 0;
 }
 
 .error {
@@ -290,41 +186,8 @@
   .layout {
     gap: 42px;
     grid-template-columns: 1fr;
-    max-width: 720px;
+    max-width: 600px;
     padding-top: 50px;
-  }
-
-  .story {
-    padding-right: 0;
-  }
-
-  .backLink {
-    margin-bottom: 28px;
-  }
-
-  .benefits {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .benefits article {
-    border-bottom: 0;
-    border-right: 1px solid var(--rule);
-    display: block;
-    padding: 18px 20px;
-  }
-
-  .benefits article:first-child {
-    padding-left: 0;
-  }
-
-  .benefits article:last-child {
-    border-right: 0;
-    padding-right: 0;
-  }
-
-  .benefits article div {
-    margin-top: 10px;
   }
 }
 
@@ -356,48 +219,13 @@
     padding: 34px 20px 48px;
   }
 
-  .backLink {
-    display: none;
-  }
-
-  .story h1 {
-    font-size: clamp(42px, 12vw, 56px);
-    letter-spacing: -1.7px;
-  }
-
-  .lead {
-    font-size: 14px;
-  }
-
-  .benefits {
-    display: block;
-    margin-top: 32px;
-  }
-
-  .benefits article,
-  .benefits article:first-child,
-  .benefits article:last-child {
-    border-bottom: 1px solid var(--rule);
-    border-right: 0;
-    display: grid;
-    padding: 17px 0;
-  }
-
-  .benefits article:first-child {
-    border-top: 0;
-  }
-
-  .benefits article div {
-    margin-top: 0;
-  }
-
   .formCard {
     border-radius: 11px;
     margin-inline: -4px;
     padding: 26px 20px;
   }
 
-  .formHeading h2 {
+  .formHeading h1 {
     font-size: 24px;
   }
 

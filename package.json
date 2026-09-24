@@ -70,7 +70,7 @@
     "db:seed:schedule": "node scripts/seed-schedule-demo.mjs",
     "odontogram:assets": "codexdentist-odontogram-assets public/odontogram-assets",
     "browser:landing": "node scripts/landing-page-qa.mjs",
-    "test:workspace": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/workspace-story.test.mjs scripts/workspace-controls.test.mjs",
+    "test:workspace": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/workspace-story.test.mjs scripts/workspace-controls.test.mjs scripts/patient-workspace.test.mjs scripts/patient-selection.test.mjs",
     "fonts:assets": "node scripts/fetch-font-assets.mjs"
   },
   "dependencies": {

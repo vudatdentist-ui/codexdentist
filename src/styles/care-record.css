@@ -1,6 +1,14 @@
 /* A record reads in care order: identity, encounter, chart, treatment, follow-up. */
 .app-shell .patient-layout { grid-template-columns: minmax(260px, .8fr) minmax(0, 1.4fr); gap: 24px; }
 .app-shell .patient-layout .patient-card { position: static; max-height: none; overflow: visible; align-self: start; }
+.app-shell .patient-layout .patient-card:not(:has(.patient-dossier-heading)) { min-height: 0; }
+.app-shell .patient-layout .patient-card > .empty-state { min-height: 0; padding: 20px 0; }
+.app-shell .patient-search-option[aria-selected="true"] { background: var(--surface-tint); outline: 2px solid var(--teal); outline-offset: -2px; }
+.patient-lookup-dialog.workspace-dialog { width: min(460px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); margin: 12px 12px 12px auto; }
+.patient-lookup-dialog > .workspace-dialog-surface { padding: 0; }
+.patient-lookup-dialog .journey-patient-menu { position: static; margin: 0; width: 100%; max-width: none; height: auto; max-height: none; overflow: visible; border: 0; box-shadow: none; }
+.patient-lookup-dialog .journey-patient-menu-list { overflow: visible; }
+
 .app-shell .patient-layout .table-list { max-height: 860px; overflow-y: auto; scrollbar-gutter: stable; }
 .app-shell .patient-layout .table-row { padding: 18px 12px; gap: 9px; text-align: left; }
 .app-shell .patient-layout .table-row strong { font-size: 14px; font-weight: 600; line-height: 1.65; }
@@ -41,6 +49,9 @@
 @media (max-width: 900px) {
   .app-shell .patient-layout { grid-template-columns: minmax(0, 1fr); }
   .app-shell .patient-layout .table-list { max-height: 360px; }
+  .app-shell .patient-layout:has(.patient-card > .empty-state) .table-list { max-height: none; overflow: visible; }
+  .app-shell .patient-layout .patient-card:not(:has(.patient-dossier-heading)) { order: -1; border: 0; padding: 0; background: transparent; }
+  .app-shell .patient-layout .patient-card > .empty-state { padding: 0; }
   .app-shell .billing-balance-form { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 600px) {

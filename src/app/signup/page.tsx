@@ -1,14 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import {
-  ArrowLeft,
-  ArrowRight,
-  CalendarCheck2,
-  Check,
-  ShieldCheck,
-  UsersRound,
-} from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { trialSignupEnabled } from "@/lib/env";
 import { createTrialAccountAction } from "./actions";
 import styles from "./signup.module.css";
@@ -45,51 +38,9 @@ export default async function SignupPage({ searchParams }: SignupPageProps) {
       </header>
 
       <section className={styles.layout}>
-        <div className={styles.story}>
-          <Link className={styles.backLink} href="/">
-            <ArrowLeft size={16} aria-hidden="true" /> Trang chủ
-          </Link>
-          <p className={styles.eyebrow}>30 ngày miễn phí · Không cần thẻ</p>
-          <h1>
-            Đưa cả phòng khám
-            <br />
-            vào <em>cùng một nhịp.</em>
-          </h1>
-          <p className={styles.lead}>
-            Tạo workspace riêng cho phòng khám, mời đội ngũ vào dùng và thử luồng
-            vận hành thực tế trước khi quyết định tiếp tục.
-          </p>
-
-          <div className={styles.benefits}>
-            <article>
-              <CalendarCheck2 size={22} aria-hidden="true" />
-              <div>
-                <strong>30 ngày để dùng thật</strong>
-                <span>Không giới hạn ở một phiên demo ngắn.</span>
-              </div>
-            </article>
-            <article>
-              <UsersRound size={22} aria-hidden="true" />
-              <div>
-                <strong>Workspace riêng cho phòng khám</strong>
-                <span>Lịch hẹn, hồ sơ, thu chi và vận hành ở cùng một nơi.</span>
-              </div>
-            </article>
-            <article>
-              <ShieldCheck size={22} aria-hidden="true" />
-              <div>
-                <strong>Bắt đầu không cần thẻ</strong>
-                <span>Tạo tài khoản trước, đánh giá sản phẩm sau.</span>
-              </div>
-            </article>
-          </div>
-        </div>
-
         <div className={styles.formCard}>
           <div className={styles.formHeading}>
-            <p>Bắt đầu dùng thử</p>
-            <h2>Tạo tài khoản phòng khám</h2>
-            <span>Khoảng 2 phút để hoàn tất.</span>
+            <h1>Tạo tài khoản phòng khám</h1>
           </div>
 
           {params?.error && (
