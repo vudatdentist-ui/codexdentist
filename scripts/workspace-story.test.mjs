@@ -1,3 +1,4 @@
+import { headingText } from "./qa-heading.mjs";
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
@@ -94,4 +95,14 @@ test('authentication screens contain forms, not slogan panels or time estimates'
   assert.match(login, /role="alert"/);
   assert.match(signup, /minLength=\{12\}/);
   assert.match(signup, /styles\.finePrint/);
+});
+
+
+test('route smoke reads the visible h1 text including escaped symbols, not body labels', () => {
+  assert.equal(headingText('<h1 id="workspace-content">People &amp; payroll</h1>'), 'People & payroll');
+  assert.equal(headingText('<h1><span>Forms</span> &#38; consent</h1>'), 'Forms & consent');
+  assert.equal(headingText('<h1>&lt;Record&gt; &quot;A&quot; &#x27;B&#39;</h1>'), '<Record> "A" \'B\'');
+  assert.equal(headingText('<h1>&amp;lt;</h1>'), '&lt;');
+  assert.equal(headingText('<h1>Unrelated</h1><nav>People &amp; payroll</nav>'), 'Unrelated');
+  assert.equal(headingText('<nav>People &amp; payroll</nav>'), '');
 });
