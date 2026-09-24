@@ -65,11 +65,29 @@ try {
     assert.equal(await input.inputValue(), 'le', 'Escape dismisses results without destroying the query');
   });
 
+  await check('Patient-directory search selection opens the intended persistent record', async () => {
+    await visit('patients');
+    const input = page.locator('.patient-search-combobox input');
+    await input.fill('nguyen');
+    const option = page.locator('.patient-search-option').first();
+    const name = await option.locator('strong').innerText();
+    await option.click();
+    await page.screenshot({ path: `${output}/directory-selection.png` });
+    await page.waitForURL(url => url.pathname === '/patients' && Boolean(url.searchParams.get('patientId')), { timeout: 12000 });
+    await settle();
+    assert.equal(await page.locator('.patient-dossier-heading h2').innerText(), name);
+    const id = new URL(page.url()).searchParams.get('patientId');
+    await page.reload(); await settle();
+    assert.equal(new URL(page.url()).searchParams.get('patientId'), id);
+    assert.equal(await page.locator('.patient-dossier-heading h2').innerText(), name);
+    await page.screenshot({ path: `${output}/directory-record-reopened.png` });
+  });
+
   await check('Patient drawer is a native modal with keyboard containment and focus return', async () => {
     await visit('journey', 390);
     const trigger = page.locator('.journey-patient-menu-trigger');
     await trigger.click();
-    const dialog = page.getByRole('dialog', { name: 'Menu bệnh nhân', exact: true });
+    const dialog = page.getByRole('dialog', { name: 'Menu b\u1ec7nh nh\u00e2n', exact: true });
     await dialog.waitFor();
     await page.screenshot({ path: `${output}/patient-drawer-390.png` });
     assert.ok(await dialog.evaluate(node => node.matches('dialog:modal')), 'aria-modal alone does not make background content inert');
@@ -109,9 +127,33 @@ try {
       await settle(restrictedPage);
       await restrictedPage.screenshot({ path: `${output}/storage-blocked.png` });
       assert.deepEqual(faults, [], 'Preferences are optional, not a requirement for patient work');
-      await restrictedPage.locator('.language-switch').getByRole('button', { name: 'EN', exact: true }).click();
+      await restrictedPage.locator('.language-switch').getByRole('button', { name: 'EN', exact: true }).click({ timeout: 12000 });
       assert.equal(await restrictedPage.locator('html').getAttribute('lang'), 'en');
       assert.deepEqual(faults, []);
+    } finally { await restricted.close(); }
+  });
+
+  await check('Blocked session storage does not prevent opening and editing a form', async () => {
+    const restricted = await browser.newContext({ storageState: await context.storageState(), viewport: { width: 390, height: 844 } });
+    const restrictedPage = await restricted.newPage();
+    const faults = [];
+    restrictedPage.on('pageerror', error => faults.push(error.message));
+    await restricted.addInitScript(() => {
+      Object.defineProperty(window, 'sessionStorage', { configurable: true, get() { throw new DOMException('Storage blocked for audit', 'SecurityError'); } });
+    });
+    try {
+      await restrictedPage.goto(`${base}/patients`);
+      await settle(restrictedPage);
+      await restrictedPage.screenshot({ path: `${output}/session-storage-blocked.png` });
+      await restrictedPage.locator('.service-action-row button.primary-button').click({ timeout: 12000 });
+      const form = restrictedPage.locator('dialog[open]');
+      await form.locator('input[name=fullName]').click();
+      await form.locator('input[name=fullName]').fill('UI storage audit - not submitted');
+      await form.locator('input[name=phone]').focus();
+      assert.deepEqual(faults, []);
+      await restrictedPage.screenshot({ path: `${output}/session-storage-form.png` });
+      await restrictedPage.keyboard.press('Escape');
+      await form.waitFor({ state: 'hidden' });
     } finally { await restricted.close(); }
   });
 
