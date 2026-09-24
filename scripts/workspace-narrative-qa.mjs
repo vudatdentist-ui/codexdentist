@@ -98,12 +98,15 @@ try {
         return selectors.map(selector => {
           const node = bar.querySelector(selector);
           const rect = node.getBoundingClientRect();
-          return {left:rect.left, right:rect.right, width:rect.width, height:rect.height,
+          return {left:rect.left, right:rect.right, top:rect.top, bottom:rect.bottom, width:rect.width, height:rect.height,
             hit:selector === '.workspace-organization' || node.contains(document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2))};
         });
       });
       for (let index = 1; index < controls.length; index++) {
-        assert.ok(controls[index - 1].right <= controls[index].left + 1, `Overlapping utility controls at ${width}px`);
+        for (let prior = 0; prior < index; prior++) {
+          const a = controls[prior], b = controls[index];
+          assert.ok(a.right <= b.left + 1 || b.right <= a.left + 1 || a.bottom <= b.top + 1 || b.bottom <= a.top + 1, `Overlapping utility controls at ${width}px`);
+        }
         assert.ok(controls[index].hit, `Obscured utility control at ${width}px`);
         assert.ok(controls[index].width >= 32 && controls[index].height >= 32, 'Utility controls must retain usable hit areas');
       }

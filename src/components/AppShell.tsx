@@ -2,6 +2,7 @@
 
 import { Bell, ChevronDown, LogOut, Menu, Search, UserRound, MessageCircle } from "lucide-react";
 import Link from "next/link";
+import styles from "./AppShell.module.css";
 import { useEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { logoutAction } from "@/app/(app)/actions";
@@ -70,7 +71,7 @@ export function AppTopbar({ activeLanguage, allChainsLabel, chainOptions, chainS
   const notificationLabel = vi ? "Thông báo và công việc" : "Notifications and tasks";
   useEffect(() => { document.documentElement.lang = activeLanguage; }, [activeLanguage]);
   return <header className="topbar story-topbar">
-    <div className="workspace-utility-bar"><span className="workspace-organization">{organizationName}</span><div className="topbar-actions">
+    <div className={`workspace-utility-bar ${styles.utilityBar}`}><span className={`workspace-organization ${styles.organization}`}>{organizationName}</span><div className="topbar-actions">
       <div className="segmented language-switch" role="group" aria-label={languageLabel}>{(["vi", "en"] as const).map(language => <button key={language} type="button" className={activeLanguage === language ? "active" : ""} aria-pressed={activeLanguage === language} onClick={() => onLanguageChange(language)}>{language.toUpperCase()}</button>)}</div>
       <div id="workspace-assistant-slot" className="workspace-assistant-slot" />
       <button className="icon-button" type="button" aria-label={notificationLabel} aria-haspopup="dialog" aria-expanded={notificationsOpen} onClick={() => setNotificationsOpen(true)}><Bell size={19} aria-hidden="true" />{unreadCount > 0 && <span className="notification-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>}</button>

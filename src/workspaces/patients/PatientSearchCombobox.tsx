@@ -3,6 +3,7 @@
 import { Search } from "lucide-react";
 import { useId, useRef, useState, type KeyboardEvent } from "react";
 import { normalizeSearchText, patientCodeFor, patientSearchDisplayLabel, type PatientSearchRecord } from "./patient-search";
+import { patientLookupCommand } from "./patient-search-keyboard";
 
 export function PatientSearchCombobox({
   disabled = false, hideIcon = false, query, onQueryChange, matches,
@@ -45,23 +46,22 @@ export function PatientSearchCombobox({
     close();
   }
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    // Enter belongs to the input method while Vietnamese text is composing.
-    if (event.nativeEvent.isComposing || event.keyCode === 229) return;
-    if (event.key === "Escape" && expanded) {
+    const command = patientLookupCommand(event.nativeEvent);
+    if (command === "dismiss" && expanded) {
       event.preventDefault();
       event.stopPropagation();
       close();
       return;
     }
-    if (event.key === "Tab") { close(); return; }
-    if (event.key === "Enter" && activeIndex >= 0) {
+    if (command === "leave") { close(); return; }
+    if (command === "select" && activeIndex >= 0) {
       event.preventDefault();
       choose(visibleMatches[activeIndex]);
       return;
     }
-    if ((event.key !== "ArrowDown" && event.key !== "ArrowUp") || !visibleMatches.length) return;
+    if ((command !== "next" && command !== "previous") || !visibleMatches.length) return;
     event.preventDefault();
-    const index = event.key === "ArrowDown"
+    const index = command === "next"
       ? (activeIndex + 1) % visibleMatches.length
       : activeIndex <= 0 ? visibleMatches.length - 1 : activeIndex - 1;
     setIsOpen(true);
