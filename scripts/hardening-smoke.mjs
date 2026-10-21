@@ -50,7 +50,7 @@ async function main() {
   assertSource("src/app/(app)/settings/actions.ts", [
     "preservedAssignments",
     "roleAssignmentDeleteWhere",
-    "!session.clinicIds.includes(existingAssignment.clinicId)",
+    "!accessibleClinicIds(session).includes(existingAssignment.clinicId)",
   ]);
   assertFunctionSourceMissing(
     "src/app/(app)/patients/actions.ts",

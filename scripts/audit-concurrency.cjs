@@ -37,6 +37,27 @@ async function main() {
     const patientB = await prisma.patient.create({ data: { organizationId: orgId, clinicId: clinicB.id, fullName: "Synthetic audit B", phone: "0000000001", medicalAlerts: [] } });
     const session = { userId: providers[0].id, organizationId: orgId, role: "OWNER", roles: ["OWNER"],
       roleAssignments: [{ role: "OWNER", organizationId: orgId, clinicId: null }], clinicIds: [clinic.id, clinicB.id], activeClinicId: null };
+    const scope = load("src/lib/tenant-scope.ts", { "@/lib/permissions": permissions });
+    const sharedMocks = {
+      "@/lib/permissions": permissions, "@/lib/tenant-scope": scope,
+      "@/lib/actions/permissions": actions, "@/lib/prisma": { prisma },
+      "@/lib/form-validation": load("src/lib/form-validation.ts"),
+      "@/lib/application/errors": load("src/lib/application/errors.ts"),
+    };
+    const patients = load("src/lib/application/patient/commands.ts", sharedMocks);
+    const revenue = load("src/lib/application/revenue/commands.ts", {
+      ...sharedMocks, "@/lib/document-sequence": {}, "@/lib/transaction": {},
+      "@/lib/notification-templates": load("src/lib/notification-templates.ts"),
+    });
+    const manager = { ...session, role: "CLINIC_MANAGER", roles: ["CLINIC_MANAGER", "DENTIST"], activeClinicId: clinic.id,
+      roleAssignments: [{ role: "CLINIC_MANAGER", organizationId: orgId, clinicId: clinic.id },
+        { role: "DENTIST", organizationId: orgId, clinicId: clinicB.id }] };
+    await assert.rejects(patients.createPatientCommand(manager, { clinicId: clinicB.id }), error => error.code === "clinic-denied");
+    await assert.rejects(revenue.createInvoiceCommand(manager, { patientId: patientB.id, amount: 100, dueDate: new Date() }),
+      error => error.code === "billing-patient-not-found");
+    assert.equal(await prisma.invoice.count({ where: { organizationId: orgId } }), 0);
+    assert.equal(await prisma.patient.count({ where: { organizationId: orgId } }), 2);
+    console.log("ok cross-clinic patient and revenue mutation denial");
     const base = { clinicId: clinic.id, patientId: patient.id, providerId: providers[0].id, chairId: chairs[0].id,
       startsAt: new Date("2035-01-01T01:00:00Z"), endsAt: new Date("2035-01-01T02:00:00Z"), reason: "Synthetic concurrency regression" };
     for (const [label, second] of [
