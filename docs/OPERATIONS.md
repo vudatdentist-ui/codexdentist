@@ -56,6 +56,10 @@ The public domain currently points through Cloudflare to the Hostinger VPS at
 `/opt/namecheap-migration/compose.yml`, outside Coolify's managed projects.
 The Namecheap procedure below describes the previous deployment target; verify
 the active target before deploying a GitHub release there.
+The historical Namecheap deploy workflow now requires the repository variable
+`ENABLE_NAMECHEAP_DEPLOY=true`; leave it unset for the current VPS target.
+Hostinger image replacement is a separate operation and must preserve the
+existing Compose environment, networks, database, and rollback image.
 
 The signup route must render dynamically: availability depends on runtime
 `DEPLOYMENT_MODE` / `TRIAL_SIGNUP_ENABLED`. An image built with signup disabled
