@@ -1,5 +1,7 @@
 "use server";
 
+import { accessibleClinicIds } from "@/lib/tenant-scope";
+
 import type { Prisma, UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -138,7 +140,7 @@ async function resolveRecipients(
   },
 ) {
   const canTargetAllClinics = canUseAllClinics(session);
-  const allowedClinicIds = new Set(session.clinicIds);
+  const allowedClinicIds = new Set(accessibleClinicIds(session));
   const chainClinicIds =
     input.targetChainIds.length > 0
       ? (
@@ -149,7 +151,7 @@ async function resolveRecipients(
               chainId: {
                 in: input.targetChainIds,
               },
-              ...(canTargetAllClinics ? {} : { id: { in: session.clinicIds } }),
+              ...(canTargetAllClinics ? {} : { id: { in: accessibleClinicIds(session) } }),
             },
             select: {
               id: true,

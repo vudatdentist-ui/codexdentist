@@ -1,5 +1,7 @@
 "use server";
 
+import { accessibleClinicIds } from "@/lib/tenant-scope";
+
 import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -1009,13 +1011,13 @@ function normalizeClinicId(value: FormDataEntryValue | null, session: AppSession
     return canUseAllClinics(session) ? "all" : session.activeClinicId ?? "denied";
   }
 
-  return session.clinicIds.includes(parsed) ? parsed : "denied";
+  return accessibleClinicIds(session).includes(parsed) ? parsed : "denied";
 }
 
 function resolveInventoryClinicId(session: AppSession, ...clinicIds: Array<string | null | undefined>) {
   return clinicIds.find((clinicId): clinicId is string => Boolean(clinicId))
     ?? session.activeClinicId
-    ?? session.clinicIds[0]
+    ?? accessibleClinicIds(session)[0]
     ?? null;
 }
 
@@ -1245,10 +1247,10 @@ async function uniqueInventoryItemCode(organizationId: string, codeBase: string)
 
 function allowedClinicIds(session: AppSession) {
   if (canUseAllClinics(session)) {
-    return session.clinicIds;
+    return accessibleClinicIds(session);
   }
 
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
+  return session.activeClinicId ? [session.activeClinicId] : accessibleClinicIds(session);
 }
 
 function revalidateInventoryViews() {

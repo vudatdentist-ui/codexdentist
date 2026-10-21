@@ -69,7 +69,7 @@ export type BillingPaymentPlanReminderSummary = {
   subject: string | null;
   body: string;
   scheduledAt: string | null;
-  status: "DRAFT" | "SCHEDULED" | "SENT" | "FAILED" | "CANCELLED";
+  status: "DRAFT" | "SCHEDULED" | "PROCESSING" | "SENT" | "FAILED" | "CANCELLED";
   amount: number | null;
 };
 

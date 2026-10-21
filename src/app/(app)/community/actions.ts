@@ -1,5 +1,7 @@
 "use server";
 
+import { accessibleClinicIds } from "@/lib/tenant-scope";
+
 import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -266,7 +268,7 @@ function canWriteCommunity(session: AppSession) {
 function allowedClinicIds(session: AppSession) {
   return session.activeClinicId
     ? [session.activeClinicId]
-    : session.clinicIds;
+    : accessibleClinicIds(session);
 }
 
 function normalizeClinicId(value: FormDataEntryValue | null, session: AppSession) {
@@ -276,7 +278,7 @@ function normalizeClinicId(value: FormDataEntryValue | null, session: AppSession
     return canUseAllClinics(session) ? null : session.activeClinicId ?? "denied";
   }
 
-  return session.clinicIds.includes(parsed) ? parsed : "denied";
+  return accessibleClinicIds(session).includes(parsed) ? parsed : "denied";
 }
 
 function parsePostType(value: FormDataEntryValue | null) {

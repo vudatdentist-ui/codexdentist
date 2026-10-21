@@ -1,3 +1,4 @@
+import { accessibleClinicIds } from "@/lib/tenant-scope";
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
@@ -43,7 +44,7 @@ export async function getSourceCommissionWorkspace(session: AppSession) {
       where: {
         organizationId: session.organizationId,
         clinicId: {
-          in: session.clinicIds,
+          in: accessibleClinicIds(session),
         },
       },
       include: {

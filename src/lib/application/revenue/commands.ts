@@ -1,3 +1,4 @@
+import { accessibleClinicIds } from "@/lib/tenant-scope";
 import type { Prisma } from "@prisma/client";
 import { canPerformAction } from "@/lib/actions/permissions";
 import { ApplicationCommandError } from "@/lib/application/errors";
@@ -22,7 +23,7 @@ export async function createInvoiceCommand(session: AppSession, input: {
     where: {
       id: input.patientId,
       organizationId: session.organizationId,
-      clinicId: { in: session.clinicIds },
+      clinicId: { in: accessibleClinicIds(session) },
     },
     select: { id: true, clinicId: true },
   });
@@ -85,7 +86,7 @@ export async function recordInvoicePaymentCommand(session: AppSession, input: {
     const invoice = await tx.invoice.findFirst({
       where: {
         invoiceNo: input.invoiceNo,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: accessibleClinicIds(session) },
         patient: { organizationId: session.organizationId },
       },
       select: {
@@ -197,7 +198,7 @@ export async function recordPatientReceiptCommand(session: AppSession, input: {
       where: {
         id: input.patientId,
         organizationId: session.organizationId,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: accessibleClinicIds(session) },
       },
       select: { id: true, clinicId: true },
     });
@@ -329,7 +330,7 @@ export async function voidInvoiceCommand(session: AppSession, invoiceNo: string)
       where: {
         invoiceNo,
         organizationId: session.organizationId,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: accessibleClinicIds(session) },
         patient: { organizationId: session.organizationId },
       },
       select: { id: true, clinicId: true, patientId: true },
@@ -404,7 +405,7 @@ export async function adjustInvoiceAmountCommand(session: AppSession, input: {
     const invoice = await tx.invoice.findFirst({
       where: {
         invoiceNo: input.invoiceNo,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: accessibleClinicIds(session) },
         patient: { organizationId: session.organizationId },
       },
       include: { items: { orderBy: { createdAt: "asc" }, take: 1 } },
@@ -452,7 +453,7 @@ export async function recordInvoiceRefundCommand(session: AppSession, input: {
     const invoice = await tx.invoice.findFirst({
       where: {
         invoiceNo: input.invoiceNo,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: accessibleClinicIds(session) },
         patient: { organizationId: session.organizationId },
       },
       select: { id: true, amount: true, paidAmount: true, status: true, patientId: true },
@@ -501,7 +502,7 @@ export async function createPaymentPlanReminderCommand(session: AppSession, inpu
     where: {
       id: input.patientId,
       organizationId: session.organizationId,
-      clinicId: { in: session.clinicIds },
+      clinicId: { in: accessibleClinicIds(session) },
     },
     select: { id: true, clinicId: true, fullName: true, phone: true, email: true },
   });
@@ -561,7 +562,7 @@ export async function createPaymentPlanCommand(session: AppSession, input: {
       where: {
         id: input.patientId,
         organizationId: session.organizationId,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: accessibleClinicIds(session) },
       },
       select: { id: true, clinicId: true, fullName: true, phone: true, email: true },
     });
@@ -800,7 +801,7 @@ async function findScopedTreatmentService(client: BillingDbClient, session: AppS
     where: {
       id: treatmentServiceId,
       organizationId: session.organizationId,
-      clinicId: { in: session.clinicIds },
+      clinicId: { in: accessibleClinicIds(session) },
     },
     include: {
       patient: { select: { id: true, fullName: true } },

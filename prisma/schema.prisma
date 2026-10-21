@@ -181,6 +181,7 @@ enum NotificationChannel {
 enum NotificationStatus {
   DRAFT
   SCHEDULED
+  PROCESSING
   SENT
   FAILED
   CANCELLED

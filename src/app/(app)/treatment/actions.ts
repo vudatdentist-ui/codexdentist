@@ -1,5 +1,7 @@
 "use server";
 
+import { accessibleClinicIds } from "@/lib/tenant-scope";
+
 import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -52,7 +54,7 @@ export async function createTreatmentPlanAction(formData: FormData) {
         id: patientId,
         organizationId: session.organizationId,
         clinicId: {
-          in: session.clinicIds,
+          in: accessibleClinicIds(session),
         },
       },
       select: {
@@ -132,7 +134,7 @@ export async function updateTreatmentStatusAction(formData: FormData) {
         patient: {
           organizationId: session.organizationId,
           clinicId: {
-            in: session.clinicIds,
+            in: accessibleClinicIds(session),
           },
         },
       },
@@ -204,7 +206,7 @@ export async function addTreatmentPhaseAction(formData: FormData) {
         patient: {
           organizationId: session.organizationId,
           clinicId: {
-            in: session.clinicIds,
+            in: accessibleClinicIds(session),
           },
         },
       },

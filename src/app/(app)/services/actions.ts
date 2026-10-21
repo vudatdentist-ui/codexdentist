@@ -1,5 +1,7 @@
 "use server";
 
+import { accessibleClinicIds } from "@/lib/tenant-scope";
+
 import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -518,7 +520,7 @@ export async function addServiceMaterialAction(formData: FormData) {
                 },
                 {
                   clinicId: {
-                    in: session.clinicIds,
+                    in: accessibleClinicIds(session),
                   },
                 },
               ],

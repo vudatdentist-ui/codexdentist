@@ -1,3 +1,4 @@
+import { accessibleClinicIds } from "@/lib/tenant-scope";
 import "server-only";
 
 import { defaultDataSeedEnabled } from "@/lib/env";
@@ -459,7 +460,7 @@ export async function ensureStaffProfiles(
       clinics: {
         some: {
           clinicId: {
-            in: session.clinicIds,
+            in: accessibleClinicIds(session),
           },
         },
       },
@@ -752,10 +753,10 @@ function roleTitle(role: AppRole) {
 
 function allowedClinicIds(session: AppSession) {
   if (canUseAllClinics(session)) {
-    return session.clinicIds;
+    return accessibleClinicIds(session);
   }
 
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
+  return session.activeClinicId ? [session.activeClinicId] : accessibleClinicIds(session);
 }
 
 function vietnamDate(date: Date) {

@@ -7,7 +7,6 @@ import { renderNotificationTemplate } from "@/lib/notification-templates";
 import { processNotificationNow } from "@/lib/notifications";
 import { createPasswordSetupToken } from "@/lib/password-reset";
 import { prisma } from "@/lib/prisma";
-import { superAdminEmails } from "@/lib/super-admin";
 import {
   currentHostname,
   findTenantOrganization,
@@ -94,7 +93,7 @@ export async function forgotPasswordAction(formData: FormData) {
 
     const canResetOnThisDomain = tenant
       ? user?.organizationId === tenant.id
-      : !isNeutralAppHostname(hostname) || superAdminEmails().includes(email);
+      : true;
 
     if (user?.active && canResetOnThisDomain) {
       const reset = await createPasswordSetupToken({

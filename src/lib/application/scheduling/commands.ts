@@ -6,6 +6,7 @@ import { allowedClinicIds } from "@/lib/patient-access";
 import type { AppRole } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
+import { runSerializableTransaction } from "@/lib/transaction";
 
 const schedulableProviderRoles: AppRole[] = ["DENTIST", "HYGIENIST", "CLINIC_MANAGER"];
 export type AppointmentStatus = "REQUESTED" | "CONFIRMED" | "ARRIVED" | "IN_CHAIR" | "COMPLETED" | "NO_SHOW";
@@ -48,19 +49,18 @@ export async function createAppointmentCommand(session: AppSession, input: {
   if (!clinic) throw new ApplicationCommandError("clinic-inactive");
   if (!patient || !provider || (input.chairId && !chair)) throw new ApplicationCommandError("invalid-relation");
 
-  const conflict = await prisma.appointment.findFirst({
-    where: {
-      clinicId: input.clinicId,
-      status: { notIn: ["CANCELLED", "NO_SHOW"] },
-      startsAt: { lt: input.endsAt },
-      endsAt: { gt: input.startsAt },
-      OR: [{ providerId: input.providerId }, ...(input.chairId ? [{ chairId: input.chairId }] : [])],
-    },
-    select: { id: true },
-  });
-  if (conflict) throw new ApplicationCommandError("conflict");
+  return runSerializableTransaction(async (tx) => {
+    const conflict = await tx.appointment.findFirst({
+      where: {
+        status: { notIn: ["CANCELLED", "NO_SHOW"] },
+        startsAt: { lt: input.endsAt },
+        endsAt: { gt: input.startsAt },
+        OR: [{ providerId: input.providerId }, ...(input.chairId ? [{ chairId: input.chairId }] : [])],
+      },
+      select: { id: true },
+    });
+    if (conflict) throw new ApplicationCommandError("conflict");
 
-  return prisma.$transaction(async (tx) => {
     const appointment = await tx.appointment.create({
       data: {
         clinicId: input.clinicId,

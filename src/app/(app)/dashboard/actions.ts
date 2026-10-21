@@ -219,9 +219,10 @@ export async function retryFailedNotificationAction(formData: FormData) {
       redirect("/dashboard?notice=notification-not-found");
     }
 
-    await prisma.notification.update({
+    const retry = await prisma.notification.updateMany({
       where: {
         id: notification.id,
+        status: "FAILED",
       },
       data: {
         status: "SCHEDULED",
@@ -230,6 +231,8 @@ export async function retryFailedNotificationAction(formData: FormData) {
         failedReason: null,
       },
     });
+
+    if (retry.count !== 1) redirect("/dashboard?notice=notification-not-found");
 
     await prisma.auditLog.create({
       data: {
