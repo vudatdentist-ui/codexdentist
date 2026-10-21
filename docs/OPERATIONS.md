@@ -49,6 +49,24 @@ Self-host storage:
 
 ## Namecheap Shared Hosting
 
+### Hostinger migration observed 2026-10-21
+
+The public domain currently points through Cloudflare to the Hostinger VPS at
+`187.127.116.53`. The running app is the `codexdentist` service in
+`/opt/namecheap-migration/compose.yml`, outside Coolify's managed projects.
+The Namecheap procedure below describes the previous deployment target; verify
+the active target before deploying a GitHub release there.
+The historical Namecheap deploy workflow now requires the repository variable
+`ENABLE_NAMECHEAP_DEPLOY=true`; leave it unset for the current VPS target.
+Hostinger image replacement is a separate operation and must preserve the
+existing Compose environment, networks, database, and rollback image.
+
+The signup route must render dynamically: availability depends on runtime
+`DEPLOYMENT_MODE` / `TRIAL_SIGNUP_ENABLED`. An image built with signup disabled
+must not cache a permanent 404 when started in hosted mode. Verify `/signup`
+after building with the self-host defaults and starting with signup enabled.
+Keep the disabled runtime setting returning 404 as an emergency kill switch.
+
 ### Automatic deploy from GitHub `main`
 
 The repository deploys to the Namecheap cPanel app after a successful push CI run for the current `main` SHA through `.github/workflows/deploy-namecheap.yml`. The workflow downloads that run's verified hosted release archive and uploads it over SSH. It stages the archive separately, installs dependencies, generates Prisma, runs backward-compatible migrations while the old application remains live, and prunes development dependencies. It stops only the existing CloudLinux Node.js app for the final file cutover; it does not build Next.js on the hosting server.

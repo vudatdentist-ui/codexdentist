@@ -21,17 +21,24 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          failed=0
           for url in \
             "https://codexdentist.com/" \
             "https://codexdentist.com/signup" \
             "https://codexdentist.com/features" \
             "https://demo.codexdentist.com/"; do
-            curl --fail --silent --show-error \
+            echo "Checking $url"
+            if ! curl --fail --silent --show-error \
               --location --max-time 20 --retry 2 --retry-all-errors \
-              --output /dev/null "$url"
+              --output /dev/null "$url"; then
+              echo "::error::Public page check failed: $url"
+              failed=1
+            fi
           done
+          exit "$failed"
 
       - name: Check application and database health
+        if: ${{ !cancelled() }}
         shell: bash
         run: |
           set -euo pipefail

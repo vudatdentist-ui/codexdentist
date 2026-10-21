@@ -13,6 +13,9 @@ import { trialSignupEnabled } from "@/lib/env";
 import { createTrialAccountAction } from "./actions";
 import styles from "./signup.module.css";
 
+// Signup availability is a runtime deployment setting, including the kill switch.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Dùng thử miễn phí 30 ngày | Codexdentist",
   description:

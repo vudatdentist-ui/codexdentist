@@ -18,6 +18,7 @@ concurrency:
 jobs:
   deploy:
     if: >-
+      vars.ENABLE_NAMECHEAP_DEPLOY == 'true' &&
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'push' &&
       github.event.workflow_run.head_branch == 'main'
