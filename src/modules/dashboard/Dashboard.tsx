@@ -55,7 +55,7 @@ export function Dashboard({ collection, dashboardWorkspace, production, todayVis
   return <section className="view-stack narrative-day">
     {dashboardWorkspace?.message && <div className="schedule-alert" role="status">{dashboardWorkspace.message}</div>}
     {notice && <div className="schedule-alert action" role="status">{notice}</div>}
-    <div className="day-opening"><div className="day-context"><span>{text("Trong phạm vi phòng khám đang chọn", "For the selected clinics")}</span>{updated && <small>{text("Cập nhật", "Updated")}: {updated}</small>}</div>
+    <div className="day-opening"><div className="day-context">{updated && <small>{text("Cập nhật", "Updated")}: {updated}</small>}</div>
       <Link className="primary-button" href="/schedule"><CalendarDays size={17} aria-hidden="true" />{text("Mở lịch hẹn", "Open appointments")}<ArrowRight size={16} aria-hidden="true" /></Link>
     </div>
     <dl className="day-pulse" aria-label={text("Tình hình lịch hẹn", "Appointment overview")}>
@@ -65,14 +65,14 @@ export function Dashboard({ collection, dashboardWorkspace, production, todayVis
     </dl>
     <div className="day-work-grid">
       <section className="panel day-appointments" aria-labelledby="day-appointments-title">
-        <div className="day-section-heading"><div><p className="workspace-chapter">01 / {text("Tiếp đón", "Welcome")}</p><h2 id="day-appointments-title">{text("Lịch hẹn hôm nay", "Today's appointments")}</h2></div><Link className="workspace-text-link" href="/schedule">{text("Xem lịch", "View schedule")}<ArrowRight size={16} aria-hidden="true" /></Link></div>
+        <div className="day-section-heading"><div><h2 id="day-appointments-title">{text("Lịch hẹn hôm nay", "Today's appointments")}</h2></div><Link className="workspace-text-link" href="/schedule">{text("Xem lịch", "View schedule")}<ArrowRight size={16} aria-hidden="true" /></Link></div>
         <ol className="day-appointment-list">{appointments.map(item => <li key={item.id}><time>{item.time}</time><div className="day-appointment-person"><strong>{item.patientName}</strong><span>{item.procedure}</span><small>{item.providerName} · {item.clinicName}</small></div><StatusPill status={item.status} label={status(item.status)} /></li>)}</ol>
-        {!appointments.length && <EmptyState label={total > 0 ? text("Mở lịch để xem các lượt hẹn của phòng khám này.", "Open the schedule to see this clinic's appointments.") : text("Chưa có lịch hẹn hôm nay. Thêm lịch hẹn từ màn hình Lịch hẹn.", "No appointments today. Add a visit from the schedule.")} />}
+        {!appointments.length && <EmptyState label={total > 0 ? text("Mở lịch để xem các lượt hẹn của phòng khám này.", "Open the schedule to see this clinic's appointments.") : text("Chưa có lịch hẹn hôm nay.", "No appointments today.")} />}
         {total > appointments.length && <p className="day-preview-note">{text(`Hiển thị ${appointments.length} / ${total} lượt hẹn. Mở lịch để xem đầy đủ.`, `Showing ${appointments.length} of ${total} visits. Open the schedule for the full list.`)}</p>}
       </section>
       <section className="panel day-tasks" aria-labelledby="day-tasks-title">
-        <div className="day-section-heading"><div><p className="workspace-chapter">02 / {text("Tiếp nối", "Follow through")}</p><h2 id="day-tasks-title">{text("Việc cần xử lý", "Work to follow up")}</h2></div></div>
-        <p className="day-scope-note">{text("Thông báo và công việc trong phạm vi bạn được truy cập.", "Notifications and work across your accessible clinics.")}</p>
+        <div className="day-section-heading"><div><h2 id="day-tasks-title">{text("Công việc liên cơ sở", "Cross-clinic tasks")}</h2></div></div>
+
         {taskInboxWorkspace?.message && <div className="schedule-alert">{taskInboxWorkspace.message}</div>}
         <div className="day-task-list">{items.slice(0, 12).map(item => <article className="day-task" key={item.id}>
           <strong>{item.title}</strong><p>{item.detail}</p><small>{[item.patientName, item.clinicName, item.assignedToName, item.dueAt].filter(Boolean).join(" · ")}</small>
@@ -98,15 +98,15 @@ export function Dashboard({ collection, dashboardWorkspace, production, todayVis
       <details><summary>{text("Gửi thông báo cho đội ngũ", "Send a team notification")}</summary><NotificationComposer currentPath="/dashboard" language={language} workspace={taskInboxWorkspace} /></details>
     </section>}
     <section className="day-practice-review" aria-labelledby="day-review-title">
-      <div className="day-section-heading"><div><p className="workspace-chapter">03 / {text("Nhìn lại", "Review")}</p><h2 id="day-review-title">{text("Tình hình phòng khám", "The practice at a glance")}</h2></div><Link href="/reports" className="workspace-text-link">{text("Xem báo cáo", "View reports")}<ArrowRight size={16} aria-hidden="true" /></Link></div>
+      <div className="day-section-heading"><div><h2 id="day-review-title">{text("Tình hình phòng khám", "The practice at a glance")}</h2></div><Link href="/reports" className="workspace-text-link">{text("Xem báo cáo", "View reports")}<ArrowRight size={16} aria-hidden="true" /></Link></div>
       <dl className="day-financial-summary"><div><dt>{text("Đã thu hôm nay", "Collected today")}</dt><dd>{formatVnd(hasSummary ? day.collected : collection)}</dd></div><div><dt>{text("Doanh thu", "Production")}</dt><dd>{formatVnd(production)}</dd></div><div><dt>{text("Hiệu suất ghế", "Chair utilization")}</dt><dd>{utilization}%</dd></div></dl>
       <details className="panel day-review-details"><summary><Building2 size={18} aria-hidden="true" />{text("Chi tiết từng phòng khám", "Clinic-by-clinic detail")}</summary><div className="day-clinic-list">{clinics.map(clinic => <article key={clinic.clinicId}><div><strong>{clinic.name}</strong><small>{clinic.city} · {clinic.chairs} {text("ghế", "chairs")}</small></div><dl><div><dt>{text("Lịch hẹn", "Visits")}</dt><dd>{clinic.todayAppointments}</dd></div><div><dt>{text("Đang trên ghế", "In chair")}</dt><dd>{clinic.inChair}</dd></div><div><dt>{text("Đã thu", "Collected")}</dt><dd>{formatVnd(clinic.collectedToday)}</dd></div></dl></article>)}</div></details>
       <div className="day-review-grid">
-        <section className="panel"><PanelHeader icon={ShieldCheck} title={text("Những điểm cần lưu ý", "Items needing attention")} /><p className="day-scope-note">{text("Tất cả phòng khám bạn được truy cập", "All your accessible clinics")}</p>
+        <section className="panel"><PanelHeader icon={ShieldCheck} title={text("Lưu ý liên cơ sở", "Cross-clinic alerts")} />
           <div className="day-risk-list">{(dashboardWorkspace?.risks ?? []).map(risk => <Link key={risk.label} href={risk.href}><div><strong>{risk.label}</strong><small>{risk.detail}</small></div><span>{risk.value}</span><ArrowRight size={16} aria-hidden="true" /></Link>)}</div>
           {!dashboardWorkspace?.risks.length && <EmptyState label={text("Chưa có thông tin cần lưu ý.", "No attention items available.")} />}
         </section>
-        <section className="panel"><PanelHeader icon={UsersRound} title={text("Lịch làm việc của đội ngũ", "The team's appointments")} /><p className="day-scope-note">{text("Đang xử lý / tổng lượt hẹn trong các phòng khám bạn được truy cập", "Active / total visits across your accessible clinics")}</p>
+        <section className="panel"><PanelHeader icon={UsersRound} action={text("Đang xử lý / tổng", "Active / total")} title={text("Lịch hẹn nhân sự liên cơ sở", "Cross-clinic staff appointments")} />
           <div className="dashboard-provider-list">{(dashboardWorkspace?.providerLoads ?? []).map(provider => <div className="dashboard-provider-row" key={provider.providerId}><div><strong>{provider.name}</strong><span>{status(provider.role)}</span></div><span>{provider.activeCount} / {provider.appointmentCount}</span></div>)}</div>
           {!dashboardWorkspace?.providerLoads.length && <EmptyState label={text("Chưa có lịch hẹn của đội ngũ hôm nay.", "No team appointments today.")} />}
         </section>

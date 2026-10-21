@@ -1,4 +1,5 @@
 import { LockKeyhole } from "lucide-react";
+import styles from "./LoginPage.module.css";
 import { demoAuthEnabled } from "@/lib/env";
 import { forgotPasswordAction, loginAction } from "./actions";
 
@@ -23,15 +24,10 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const showDemoAccounts = demoAuthEnabled();
 
   return (
-    <main className="login-shell">
-      <section className="login-story" aria-label="Codexdentist">
-        <div className="workspace-brand"><img src="/icons/codexmed-icon.svg" width="38" height="38" alt="" aria-hidden="true" /><div><strong>Codexdentist</strong><span>Sổ chăm sóc phòng khám</span></div></div>
-        <h1>Mỗi lần hẹn,<br />một lần tiếp nối.</h1>
-        <p>Lịch hẹn, bệnh án và công việc của đội ngũ trong cùng một không gian.</p>
-        <ol><li><span>01</span>Chuẩn bị cho ngày làm việc</li><li><span>02</span>Theo suốt hành trình bệnh nhân</li><li><span>03</span>Khép lại và hẹn lần chăm sóc tiếp theo</li></ol>
-      </section>
+    <main className={`login-shell ${styles.page}`}>
       <section className="login-panel">
-        <div><h2>Đăng nhập</h2><p className="workspace-caption">Trở lại công việc của bạn.</p></div>
+        <div className="workspace-brand"><img src="/icons/codexmed-icon.svg" width="38" height="38" alt="" aria-hidden="true" /><strong>Codexdentist</strong></div>
+        <h1>Đăng nhập</h1>
 
         {params?.error && (
           <p className="login-error" role="alert">

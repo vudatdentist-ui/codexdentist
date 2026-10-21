@@ -1,3 +1,4 @@
+import { headingText } from "./qa-heading.mjs";
 import { workspaceStories } from "../src/workspaces/workspace-story.ts";
 import {
   enabledMigrationRoutes,
@@ -47,7 +48,7 @@ async function main() {
     if (response.status !== 200) throw new Error(`/${resolvedRoute} returned HTTP ${response.status}.`);
     if (html.includes("Runtime Error")) throw new Error(`/${resolvedRoute} rendered a runtime error.`);
     const markers = routeMarkers[route];
-    const heading = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]?.replace(/<[^>]+>/g, "") ?? "";
+    const heading = headingText(html);
     const markerSurface = route.includes("[") ? html : heading;
     if (markers && !markers.some((marker) => markerSurface.includes(marker))) throw new Error(`/${resolvedRoute} did not include expected heading "${markers.join('" or "')}".`);
     assertSecurityHeaders(response, `/${resolvedRoute}`);
