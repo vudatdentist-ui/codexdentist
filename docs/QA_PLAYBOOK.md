@@ -11,6 +11,15 @@ baseline -> implement -> audit -> classify -> fix -> re-audit -> repeat -> phase
 
 A passing build alone is not enough. Every changed high-risk boundary must pass its focused negative/regression tests before a phase can close.
 
+For clinic permissions, signup/recovery, scheduling, notification delivery, or mobile
+dependency changes, run `npm run test:audit` and `npm audit --audit-level=high`.
+Run `NODE_ENV=test npm run test:audit-db` against a disposable PostgreSQL database on
+loopback after applying migrations. This invokes the actual scheduling and delivery
+functions, races provider/chair bookings and batch/immediate notification workers,
+and verifies credential emails cannot be sent from redacted persisted bodies.
+The database tests create and clean up only their own randomly identified workspace.
+CI runs both suites; a mock-only race test is insufficient for these database boundaries.
+
 ## 1. Universal Baseline Gate
 
 Run before and after every non-trivial phase/change:

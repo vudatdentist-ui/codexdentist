@@ -265,7 +265,7 @@ export async function signIn(
     );
     const roles = rolesFromAssignments(roleAssignments);
     const role = primaryRoleForRoles(roles);
-    const scopedClinics = canUseAllClinics({ role, roles, roleAssignments })
+    const scopedClinics = canUseAllClinics({ role, roles, roleAssignments, organizationId: user.organizationId })
       ? user.organization.clinics
       : user.clinics
           .map((membership) => membership.clinic)
@@ -555,13 +555,13 @@ export async function getSession(): Promise<AppSession | null> {
     );
     const roles = rolesFromAssignments(roleAssignments);
     const role = primaryRoleForRoles(roles);
-    const clinics = canUseAllClinics({ role, roles, roleAssignments })
+    const clinics = canUseAllClinics({ role, roles, roleAssignments, organizationId: storedSession.user.organizationId })
       ? storedSession.user.organization.clinics
       : storedSession.user.clinics
           .map((membership) => membership.clinic)
           .filter((clinic) => clinic.active);
     const clinicIds = clinics.map((clinic) => clinic.id);
-    const activeClinicId = canUseAllClinics({ role, roles, roleAssignments })
+    const activeClinicId = canUseAllClinics({ role, roles, roleAssignments, organizationId: storedSession.user.organizationId })
       ? null
       : storedSession.activeClinicId && clinicIds.includes(storedSession.activeClinicId)
         ? storedSession.activeClinicId
@@ -664,7 +664,7 @@ function createSession(input: {
     workspaceExpiresAt: input.workspaceExpiresAt ?? null,
     clinicIds,
     clinics: input.clinics,
-    activeClinicId: canUseAllClinics({ role, roles, roleAssignments }) ? null : clinicIds[0] ?? null,
+    activeClinicId: canUseAllClinics({ role, roles, roleAssignments, organizationId: input.organizationId }) ? null : clinicIds[0] ?? null,
     expiresAt: Date.now() + (input.ttlSeconds ?? SESSION_TTL_SECONDS) * 1000,
   };
 }

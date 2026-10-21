@@ -92,7 +92,7 @@ async function assertGuardMarkers() {
     'requireAction(session, "patient.create"',
     'requireAction(session, "patient.update"',
     "organizationId: session.organizationId",
-    "clinicId: { in: session.clinicIds }",
+    "clinicId: { in: accessibleClinicIds(session) }",
   ]);
   await assertSourceMissing("src/app/(app)/patients/actions.ts", [
     "canPerformAction(",

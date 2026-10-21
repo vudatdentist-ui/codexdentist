@@ -100,7 +100,8 @@ const viewAccess: Record<ViewKey, AppRole[]> = {
   settings: ["OWNER", "AREA_MANAGER", "CLINIC_MANAGER"],
 };
 
-export type RoleSource = AppRole | Pick<AppSession, "role" | "roles" | "roleAssignments">;
+export type RoleSource = AppRole | (Pick<AppSession, "role" | "roles" | "roleAssignments"> &
+  Partial<Pick<AppSession, "organizationId" | "activeClinicId">>);
 
 export function effectiveRoles(source: RoleSource): AppRole[] {
   if (typeof source === "string") {
@@ -109,11 +110,17 @@ export function effectiveRoles(source: RoleSource): AppRole[] {
 
   const roles = new Set<AppRole>();
 
-  roles.add(source.role);
-  source.roles?.forEach((role) => roles.add(role));
-  source.roleAssignments
-    ?.filter((assignment) => assignment.organizationId)
-    .forEach((assignment) => roles.add(assignment.role));
+  if (source.roleAssignments?.length) {
+    // Assignment-backed accounts must never regain their strongest legacy role
+    // in a different clinic (or organization).
+    source.roleAssignments
+      .filter((assignment) => assignment.organizationId === source.organizationId &&
+        (assignment.clinicId === null || assignment.clinicId === source.activeClinicId))
+      .forEach((assignment) => roles.add(assignment.role));
+  } else {
+    roles.add(source.role);
+    source.roles?.forEach((role) => roles.add(role));
+  }
 
   return rolePriority.filter((role) => roles.has(role));
 }
@@ -151,5 +158,5 @@ export function defaultViewForRole(source: RoleSource): ViewKey {
 }
 
 export function canUseAllClinics(source: RoleSource) {
-  return hasAnyRole(source, ["OWNER", "AREA_MANAGER"]);
+  return hasAnyRole(typeof source === "string" ? source : { ...source, activeClinicId: null }, ["OWNER", "AREA_MANAGER"]);
 }

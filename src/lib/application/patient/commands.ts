@@ -1,3 +1,4 @@
+import { accessibleClinicIds } from "@/lib/tenant-scope";
 import type { Prisma } from "@prisma/client";
 import { canPerformAction } from "@/lib/actions/permissions";
 import { databaseActorId } from "@/lib/form-validation";
@@ -119,7 +120,7 @@ export async function updatePatientCommand(
       where: {
         id: patientId,
         organizationId: session.organizationId,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: accessibleClinicIds(session) },
       },
       select: { id: true },
     }),
@@ -227,7 +228,7 @@ function requireAction(session: AppSession, action: Parameters<typeof canPerform
 }
 
 function requireClinicAccess(session: AppSession, clinicId: string) {
-  if (!session.clinicIds.includes(clinicId)) throw new ApplicationCommandError("clinic-denied");
+  if (!accessibleClinicIds(session).includes(clinicId)) throw new ApplicationCommandError("clinic-denied");
 }
 
 async function requireScopedPatient(session: AppSession, patientId: string) {
@@ -235,7 +236,7 @@ async function requireScopedPatient(session: AppSession, patientId: string) {
     where: {
       id: patientId,
       organizationId: session.organizationId,
-      clinicId: { in: session.clinicIds },
+      clinicId: { in: accessibleClinicIds(session) },
     },
     select: { id: true },
   });
@@ -248,7 +249,7 @@ async function requireScopedPatientWithLeadSource(session: AppSession, patientId
     where: {
       id: patientId,
       organizationId: session.organizationId,
-      clinicId: { in: session.clinicIds },
+      clinicId: { in: accessibleClinicIds(session) },
     },
     select: { id: true, leadSource: true },
   });

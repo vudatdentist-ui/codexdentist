@@ -10,6 +10,7 @@ import {
   resendEmailConfig,
 } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
+import { credentialNotificationTemplateKeys } from "@/lib/notification-templates";
 
 type ProcessDueNotificationsInput = {
   now?: Date;
@@ -32,6 +33,9 @@ export async function processDueNotifications(input: ProcessDueNotificationsInpu
   const mode = notificationDeliveryMode();
   const notifications = await prisma.notification.findMany({
     where: {
+      // Credential bodies are deliberately redacted at rest. Only the caller
+      // holding the ephemeral link can deliver them with processNotificationNow.
+      AND: [{ OR: [{ templateKey: null }, { templateKey: { notIn: [...credentialNotificationTemplateKeys] } }] }],
       status: {
         in: ["DRAFT", "SCHEDULED"],
       },
@@ -95,12 +99,13 @@ export async function processDueNotifications(input: ProcessDueNotificationsInpu
 
   const sent = results.filter((result) => result.status === "sent").length;
   const failed = results.filter((result) => result.status === "failed").length;
+  const skipped = results.filter((result) => result.status === "skipped").length;
 
   await writeBatchAudit(notifications, {
     processed: results.length,
     sent,
     failed,
-    skipped: 0,
+    skipped,
     mode,
   });
 
@@ -109,7 +114,7 @@ export async function processDueNotifications(input: ProcessDueNotificationsInpu
     processed: results.length,
     sent,
     failed,
-    skipped: 0,
+    skipped,
     results,
   };
 }
@@ -166,6 +171,7 @@ export async function processNotificationNow(
   const result = await deliverNotification(
     deliveryContent ? { ...notification, ...deliveryContent } : notification,
     mode,
+    Boolean(deliveryContent),
   );
 
   await writeBatchAudit([notification], {
@@ -189,7 +195,24 @@ export async function processNotificationNow(
 async function deliverNotification(
   notification: Notification,
   mode: Exclude<ReturnType<typeof notificationDeliveryMode>, "disabled">,
+  hasCredentialContent = false,
 ): Promise<NotificationDeliveryResult> {
+  const skipped = (reason: string): NotificationDeliveryResult => ({
+    id: notification.id, channel: notification.channel,
+    recipient: notification.recipient, status: "skipped", reason,
+  });
+  if (credentialNotificationTemplateKeys.some((key) => key === notification.templateKey) && !hasCredentialContent) {
+    return skipped("Credential delivery requires a fresh one-time link.");
+  }
+  // updateMany performs compare-and-set in the database. A stale batch read or
+  // a concurrent immediate send cannot deliver a record already claimed/sent.
+  const claim = await prisma.notification.updateMany({
+    where: { id: notification.id, status: { in: ["DRAFT", "SCHEDULED"] },
+      OR: [{ scheduledAt: null }, { scheduledAt: { lte: new Date() } }] },
+    data: { status: "PROCESSING" },
+  });
+  if (claim.count !== 1) return skipped("Notification is not due or has already been claimed.");
+
   try {
     const organization = await prisma.organization.findUnique({
       where: {
@@ -285,9 +308,11 @@ async function deliverToResend(notification: Notification) {
 
   const response = await fetch("https://api.resend.com/emails", {
     method: "POST",
+    signal: AbortSignal.timeout(30_000),
     headers: {
       authorization: `Bearer ${config.apiKey}`,
       "content-type": "application/json",
+      "Idempotency-Key": `notification/${notification.id}`,
     },
     body: JSON.stringify({
       from: config.from,
@@ -316,7 +341,9 @@ async function deliverToWebhook(notification: Notification) {
   const payload = webhookPayload(notification);
   const response = await fetch(webhookUrl, {
     method: "POST",
-    headers: webhookHeaders(payload, notification.channel),
+    signal: AbortSignal.timeout(30_000),
+    headers: { ...webhookHeaders(payload, notification.channel),
+      "Idempotency-Key": `notification/${notification.id}` },
     body: payload,
   });
 

@@ -1,5 +1,7 @@
 "use server";
 
+import { accessibleClinicIds } from "@/lib/tenant-scope";
+
 import type { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -455,15 +457,15 @@ function normalizeClinicId(value: FormDataEntryValue | null, session: AppSession
     return canUseAllClinics(session) ? "all" : session.activeClinicId ?? "denied";
   }
 
-  return session.clinicIds.includes(parsed) ? parsed : "denied";
+  return accessibleClinicIds(session).includes(parsed) ? parsed : "denied";
 }
 
 function allowedClinicIds(session: AppSession) {
   if (canUseAllClinics(session)) {
-    return session.clinicIds;
+    return accessibleClinicIds(session);
   }
 
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
+  return session.activeClinicId ? [session.activeClinicId] : accessibleClinicIds(session);
 }
 
 function revalidateLearningViews() {

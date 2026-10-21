@@ -11,5 +11,8 @@ export function superAdminEmails() {
 }
 
 export function isSuperAdminSession(session: AppSession) {
-  return hasAnyRole(session, ["OWNER"]) && superAdminEmails().includes(session.email.toLowerCase());
+  // Trial/demo workspaces are self-service identities, never platform operators.
+  return !session.isDemo && session.workspaceExpiresAt === null &&
+    hasAnyRole({ ...session, activeClinicId: null }, ["OWNER"]) &&
+    superAdminEmails().includes(session.email.toLowerCase());
 }

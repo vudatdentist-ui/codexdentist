@@ -1,5 +1,7 @@
 "use server";
 
+import { accessibleClinicIds } from "@/lib/tenant-scope";
+
 import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -136,7 +138,7 @@ export async function updateJourneyTreatmentServiceDiscountAction(formData: Form
       where: {
         id: treatmentServiceId,
         organizationId: session.organizationId,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: accessibleClinicIds(session) },
       },
       include: {
         serviceCatalogItem: { select: { defaultPrice: true } },
@@ -198,7 +200,7 @@ export async function deleteJourneyTreatmentServiceAction(formData: FormData) {
       where: {
         id: treatmentServiceId,
         organizationId: session.organizationId,
-        clinicId: { in: session.clinicIds },
+        clinicId: { in: accessibleClinicIds(session) },
       },
       select: {
         id: true,
@@ -279,7 +281,7 @@ export async function recordJourneyServiceProgressAction(formData: FormData) {
         where: {
           id: treatmentServiceId,
           organizationId: session.organizationId,
-          clinicId: { in: session.clinicIds },
+          clinicId: { in: accessibleClinicIds(session) },
         },
         include: {
           serviceCatalogItem: {

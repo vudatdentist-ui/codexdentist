@@ -4,6 +4,7 @@ import { randomBytes } from "node:crypto";
 import { Prisma } from "@prisma/client";
 import { createOrganizationWorkspace } from "@/lib/organization-onboarding";
 import { prisma } from "@/lib/prisma";
+import { superAdminEmails } from "@/lib/super-admin";
 import { isValidTenantSlug } from "@/lib/tenant";
 
 export const TRIAL_DURATION_DAYS = 30;
@@ -23,6 +24,12 @@ export async function createTrialWorkspace(input: {
   ownerPassword: string;
 }) {
   const ownerEmail = input.ownerEmail.trim().toLowerCase();
+
+  // Public registration cannot provision an identity reserved for platform access.
+  // Use the existing generic response so the reservation is not disclosed.
+  if (superAdminEmails().includes(ownerEmail)) {
+    throw new TrialAccountAlreadyExistsError();
+  }
 
   if (
     await prisma.user.findUnique({

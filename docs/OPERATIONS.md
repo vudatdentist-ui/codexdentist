@@ -199,6 +199,28 @@ Call with `POST` plus `x-job-secret: <JOB_SECRET>` or `Authorization: Bearer <JO
 
 Failed notification webhooks become `FAILED` rows and should be retried/triaged from Dashboard.
 
+Notification workers atomically claim due rows as `PROCESSING` before delivery.
+Apply the additive `20261021160000_notification_delivery_claim` migration before
+starting this application version. Both batch and immediate delivery reject rows
+already claimed or in a terminal state. The stable `Idempotency-Key` sent to Resend
+and webhook receivers is `notification/<id>`; webhook receivers must persistently
+deduplicate that key. Resend retains keys for 24 hours. Do not automatically replay
+old ambiguous deliveries after that window.
+
+A worker crash can leave a row in `PROCESSING` (use `updatedAt` to identify stale
+claims). Do not reset these rows on a timer: first reconcile the notification ID
+with the provider, then mark confirmed deliveries `SENT` or schedule a confirmed
+undelivered notification for retry through an audited maintenance operation.
+Credential notifications (`PASSWORD_RESET` and `STAFF_PASSWORD_SETUP`) contain
+redacted bodies at rest and are excluded from the batch worker. Request a fresh
+reset/setup link instead of retrying the persisted placeholder body.
+
+Emails in `SUPER_ADMIN_EMAILS` are reserved and cannot be registered through public
+trial signup. Provision platform operators through a trusted administrative path.
+Demo and trial sessions never receive platform access, even for an allowlisted
+email. Check identity ownership before converting an existing allowlisted trial
+account to a non-trial workspace.
+
 Demo cleanup requires `DEMO_WORKSPACE_ENABLED=true`, a strong `JOB_SECRET`, and a scheduled `POST` request. Send an empty JSON body with `Content-Type: application/json` on Namecheap/LiteSpeed so the request is not rejected before it reaches Next.js. Demo organizations are marked by `Organization.isDemo`; never purge organizations by slug/name pattern.
 
 Hosted trial organizations are normal tenant workspaces with `Organization.trialEndsAt` set 30 days after registration; they are not marked `isDemo` and must never be removed by the demo cleanup job. Authentication rejects an expired trial until an operator or future billing flow converts it by clearing/updating `trialEndsAt`.

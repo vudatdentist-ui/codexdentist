@@ -16,6 +16,7 @@ import {
 } from "@/lib/patient-file-storage";
 import { canUseAllClinics, effectiveRoles, type AppRole } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
+import { accessibleClinicIds } from "@/lib/tenant-scope";
 import type { AppSession } from "@/lib/session";
 import { generateSourceCommissionAccruals } from "@/lib/source-commission";
 import { isSuperAdminSession } from "@/lib/super-admin";
@@ -224,7 +225,7 @@ export async function createStaffAction(formData: FormData) {
     !fullName ||
     !email ||
     createAssignmentRoles.length === 0 ||
-    (!canUseAllClinics(session) && !session.clinicIds.includes(clinicId))
+    (!canUseAllClinics(session) && !accessibleClinicIds(session).includes(clinicId))
   ) {
     redirect("/settings?notice=settings-missing");
   }
@@ -372,7 +373,7 @@ export async function createStaffPasswordSetupLinkAction(formData: FormData) {
         clinicId:
           user.clinics[0]?.clinicId ??
           session.activeClinicId ??
-          session.clinicIds[0] ??
+          accessibleClinicIds(session)[0] ??
           null,
       });
       await tx.user.update({
@@ -802,7 +803,7 @@ export async function createChainAction(formData: FormData) {
           createdById: databaseActorId(session.userId),
           email: ownerEmail,
           fullName: ownerFullName,
-          clinicId: session.activeClinicId ?? session.clinicIds[0] ?? null,
+          clinicId: session.activeClinicId ?? accessibleClinicIds(session)[0] ?? null,
         });
         ownerId = owner.id;
       }
@@ -1096,7 +1097,7 @@ export async function updateStaffRoleAction(formData: FormData) {
         assignmentClinicId ??
         user.clinics[0]?.clinicId ??
         session.activeClinicId ??
-        session.clinicIds[0] ??
+        accessibleClinicIds(session)[0] ??
         null;
 
       if (clinicScopedRoles.length > 0) {
@@ -1125,7 +1126,7 @@ export async function updateStaffRoleAction(formData: FormData) {
         : user.roleAssignments.filter(
             (existingAssignment) =>
               !existingAssignment.clinicId ||
-              !session.clinicIds.includes(existingAssignment.clinicId),
+              !accessibleClinicIds(session).includes(existingAssignment.clinicId),
           );
       const role = primaryStaffRoleForAssignments([
         ...preservedAssignments
@@ -1140,7 +1141,7 @@ export async function updateStaffRoleAction(formData: FormData) {
         : {
             userId,
             clinicId: {
-              in: session.clinicIds,
+              in: accessibleClinicIds(session),
             },
           };
       const roleAssignmentDeleteWhere = managesAllClinics
@@ -1152,7 +1153,7 @@ export async function updateStaffRoleAction(formData: FormData) {
             userId,
             organizationId: user.organizationId,
             clinicId: {
-              in: session.clinicIds,
+              in: accessibleClinicIds(session),
             },
           };
       const staffProfileUpdateWhere = managesAllClinics
@@ -1164,7 +1165,7 @@ export async function updateStaffRoleAction(formData: FormData) {
             userId,
             organizationId: user.organizationId,
             clinicId: {
-              in: session.clinicIds,
+              in: accessibleClinicIds(session),
             },
           };
 
@@ -1262,7 +1263,7 @@ export async function updateStaffProfileAction(formData: FormData) {
     redirect("/settings?notice=settings-profile-missing-fields");
   }
 
-  if (clinicId && !canUseAllClinics(session) && !session.clinicIds.includes(clinicId)) {
+  if (clinicId && !canUseAllClinics(session) && !accessibleClinicIds(session).includes(clinicId)) {
     redirect("/settings?notice=settings-user-not-found");
   }
 
@@ -1302,7 +1303,7 @@ export async function updateStaffProfileAction(formData: FormData) {
         clinics: {
           some: {
             clinicId: {
-              in: session.clinicIds,
+              in: accessibleClinicIds(session),
             },
           },
         },
@@ -1528,7 +1529,7 @@ export async function generateSourceCommissionAccrualsAction() {
   try {
     await generateSourceCommissionAccruals({
       organizationId: session.organizationId,
-      clinicIds: session.clinicIds,
+      clinicIds: accessibleClinicIds(session),
       actorId: databaseActorId(session.userId),
     });
   } catch {
@@ -1560,7 +1561,7 @@ export async function updateSourceCommissionAccrualStatusAction(formData: FormDa
         id: accrualId,
         organizationId: session.organizationId,
         clinicId: {
-          in: session.clinicIds,
+          in: accessibleClinicIds(session),
         },
         ...(status === "APPROVED" ? { status: "EARNED" } : {}),
         ...(status === "PAID" ? { status: "APPROVED" } : {}),
@@ -1744,7 +1745,7 @@ async function findScopedUser(session: AppSession, userId: string) {
             clinics: {
               some: {
                 clinicId: {
-                  in: session.clinicIds,
+                  in: accessibleClinicIds(session),
                 },
               },
             },
@@ -1922,7 +1923,7 @@ async function findScopedClinic(session: AppSession, clinicId: string) {
         : {
             id: {
               equals: clinicId,
-              in: session.clinicIds,
+              in: accessibleClinicIds(session),
             },
           }),
     },
@@ -1958,7 +1959,7 @@ async function findActiveScopedClinic(session: AppSession, clinicId: string) {
         : {
             id: {
               equals: clinicId,
-              in: session.clinicIds,
+              in: accessibleClinicIds(session),
             },
           }),
     },

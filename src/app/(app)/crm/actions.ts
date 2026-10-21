@@ -1,5 +1,7 @@
 "use server";
 
+import { accessibleClinicIds } from "@/lib/tenant-scope";
+
 import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -280,7 +282,7 @@ export async function convertCrmLeadToPatientAction(formData: FormData) {
       redirect("/crm?notice=crm-lead-phone-required");
     }
 
-    const clinicId = lead.clinicId ?? session.activeClinicId ?? session.clinicIds[0] ?? null;
+    const clinicId = lead.clinicId ?? session.activeClinicId ?? accessibleClinicIds(session)[0] ?? null;
 
     if (!clinicId || !allowedClinicIds(session).includes(clinicId)) {
       redirect("/crm?notice=crm-denied");
@@ -643,15 +645,15 @@ function normalizeClinicId(value: FormDataEntryValue | null, session: AppSession
     return canUseAllClinics(session) ? "all" : session.activeClinicId ?? "denied";
   }
 
-  return session.clinicIds.includes(parsed) ? parsed : "denied";
+  return accessibleClinicIds(session).includes(parsed) ? parsed : "denied";
 }
 
 function allowedClinicIds(session: AppSession) {
   if (canUseAllClinics(session)) {
-    return session.clinicIds;
+    return accessibleClinicIds(session);
   }
 
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
+  return session.activeClinicId ? [session.activeClinicId] : accessibleClinicIds(session);
 }
 
 function crmLeadSourceToPatientSource(source: string | null) {
