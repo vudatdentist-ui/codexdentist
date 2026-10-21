@@ -34,7 +34,7 @@ async function main() {
     } })));
     const chairs = await Promise.all([1, 2].map(i => prisma.chair.create({ data: { clinicId: clinic.id, name: `Chair ${i}` } })));
     const patient = await prisma.patient.create({ data: { organizationId: orgId, clinicId: clinic.id, fullName: "Synthetic audit", phone: "0000000000", medicalAlerts: [] } });
-    const patientB = await prisma.patient.create({ data: { organizationId: orgId, clinicId: clinicB.id, fullName: "Synthetic audit B", phone: "0000000000", medicalAlerts: [] } });
+    const patientB = await prisma.patient.create({ data: { organizationId: orgId, clinicId: clinicB.id, fullName: "Synthetic audit B", phone: "0000000001", medicalAlerts: [] } });
     const session = { userId: providers[0].id, organizationId: orgId, role: "OWNER", roles: ["OWNER"],
       roleAssignments: [{ role: "OWNER", organizationId: orgId, clinicId: null }], clinicIds: [clinic.id, clinicB.id], activeClinicId: null };
     const base = { clinicId: clinic.id, patientId: patient.id, providerId: providers[0].id, chairId: chairs[0].id,
