@@ -84,7 +84,7 @@ try {
   });
   await check('malformed and negative text cannot submit a hidden amount', async () => {
     for (const invalid of ['-100', 'abc100', '12.34']) {
-      await amount.fill(invalid);
+      await type(amount, invalid);
       await amount.blur();
       assert.equal(await raw.inputValue(), '');
       assert.equal(await amount.inputValue(), invalid);
