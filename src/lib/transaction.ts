@@ -27,10 +27,16 @@ export async function runSerializableTransaction<T>(
 }
 
 function isRetryableTransactionError(error: unknown) {
-  return (
-    typeof error === "object" &&
-    error !== null &&
-    "code" in error &&
-    error.code === "P2034"
-  );
+  // adapter-pg can expose a COMMIT conflict as DriverAdapterError rather than P2034.
+  // Inspect structured SQLSTATEs only; messages are neither stable nor safe classifiers.
+  let current = error;
+  const seen = new Set<unknown>();
+  for (let depth = 0; depth < 4 && current && typeof current === "object" && !seen.has(current); depth++) {
+    seen.add(current);
+    const record = current as { code?: unknown; originalCode?: unknown; cause?: unknown };
+    if (record.code === "P2034" || record.code === "40001" || record.code === "40P01" ||
+        record.originalCode === "40001" || record.originalCode === "40P01") return true;
+    current = record.cause;
+  }
+  return false;
 }

@@ -1,6 +1,5 @@
 "use client";
 import { uiText, displayStatus, } from "./suite-copy";
-import { normalizeSearchText } from "@/shared/search";
 import dynamic from "next/dynamic";
 import { useAppLanguage, type Language } from "@/components/AppLanguage";
 import { type ViewKey } from "@/lib/permissions";
@@ -87,12 +86,7 @@ export function shouldKeepActionNotice(notice: string) {
 export function titleFor(view: ViewKey, language: Language) {
     return uiText[language].titles[view];
 }
-export function matchesChartSearch(query: string, values: Array<string | number | null | undefined>) {
-    if (!query) {
-        return true;
-    }
-    return values.some((value) => normalizeSearchText(value).includes(query));
-}
+
 export function StatusPill({ status }: {
     status: string;
 }) {
@@ -104,3 +98,5 @@ export { normalizeSearchText } from "@/shared/search";
 export { type UiText, uiText, workspaceText, statusText, displayStatus, journeyTopbarText, billingTopbarText } from "./suite-copy";
 export { type AccountingChatOutput, accountingChatOutput, moduleAiOutput, type ModuleAiContextInput, buildModuleAiContext, settingsAiContext, scopeAiWorkspaceToPatient, compactAiValue, stringifyAiContext, normalizeAiStringArray, stringValue } from "./suite-ai-context";
 export { type PatientSearchRecord, PatientSearchCombobox, JourneyPatientMenu, patientSearchDisplayLabel, patientLeadSourceLabel, isJourneyTodayAppointment, patientVisitSortValue, patientMatchesExactSelectorSearch, patientSearchMatches, patientSearchRank } from "./SuitePatientControls";
+
+export { matchesChartSearch } from "@/shared/search";

@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { type Language } from "@/components/AppLanguage";
 import { type Appointment, type Patient } from "@/lib/data";
 import type { BillingWorkspace } from "@/lib/billing-types";
-import { matchesChartSearch } from "./suite-shared";
+import { matchesChartSearch } from "@/shared/search";
 export type PatientSearchRecord = Pick<Patient, "id" | "name" | "phone"> & Partial<Pick<Patient, "address" | "age" | "city" | "clinicId" | "consent" | "email" | "flags" | "gender" | "guardianName" | "lastVisit" | "leadSource" | "nationalId" | "patientCode" | "treatmentProgress" | "visitReason">>;
 export function PatientSearchCombobox({ disabled = false, hideIcon = false, query, onQueryChange, matches, selectedPatient, showSelectedPatientLabel = true, placeholder, selectLabel, noResultsLabel, onSelect, }: {
     disabled?: boolean;

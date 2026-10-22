@@ -1,5 +1,4 @@
 "use client";
-import { normalizeSearchText } from "@/shared/search";
 import { padCodeNumber, patientCodeFor } from "@/lib/patient-presentation";
 import { useAppLanguage, type Language } from "@/components/AppLanguage";
 import { StatusPill as BaseStatusPill } from "@/components/suite-primitives";
@@ -543,12 +542,7 @@ export const journeyTimelineFilters = [
     "Files",
 ] as const;
 export type JourneyTimelineFilter = (typeof journeyTimelineFilters)[number];
-export function matchesChartSearch(query: string, values: Array<string | number | null | undefined>) {
-    if (!query) {
-        return true;
-    }
-    return values.some((value) => normalizeSearchText(value).includes(query));
-}
+
 export function splitClinicalObjective(objective: string | null | undefined) {
     const fields = {
         objective: "",
@@ -595,3 +589,5 @@ export { padCodeNumber, stableNumberFromText, patientCodeFor, patientClassCodeFo
 export { serviceProgressIsCancelled, serviceProgressPercent, serviceProgressLabelFromPercent } from "@/lib/service-presentation";
 export { normalizeSearchText } from "@/shared/search";
 export { journeyText } from "./journey-copy";
+
+export { matchesChartSearch } from "@/shared/search";

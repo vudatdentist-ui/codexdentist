@@ -7,3 +7,10 @@ export function normalizeSearchText(value: string | number | null | undefined) {
     .replace(/Đ/g, "D")
     .toLowerCase().trim();
 }
+
+export function matchesChartSearch(query: string, values: Array<string | number | null | undefined>) {
+    if (!query) {
+        return true;
+    }
+    return values.some((value) => normalizeSearchText(value).includes(query));
+}

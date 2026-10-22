@@ -1,5 +1,4 @@
 "use client";
-import { normalizeSearchText } from "@/shared/search";
 import { padCodeNumber, patientCodeFor } from "@/lib/patient-presentation";
 import { useAppLanguage, type Language } from "@/components/AppLanguage";
 import { StatusPill as BaseStatusPill } from "@/components/suite-primitives";
@@ -547,12 +546,9 @@ export const billingText = {
         workflow: "Billing",
     },
 } as const;
-export function matchesChartSearch(query: string, values: Array<string | number | null | undefined>) {
-    if (!query) {
-        return true;
-    }
-    return values.some((value) => normalizeSearchText(value).includes(query));
-}
+
 export { padCodeNumber, stableNumberFromText, patientCodeFor, patientClassCodeFor } from "@/lib/patient-presentation";
 export { serviceProgressPercent, serviceProgressIsCancelled, serviceProgressLabelFromPercent } from "@/lib/service-presentation";
 export { normalizeSearchText } from "@/shared/search";
+
+export { matchesChartSearch } from "@/shared/search";
