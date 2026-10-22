@@ -1,7 +1,7 @@
 "use client";
 
 import { parseMoneyText } from "@/shared/money";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type MoneyInputProps = {
   name: string;
@@ -35,24 +35,36 @@ export function MoneyInput({
   );
   const [rawValue, setRawValue] = useState(initialValue);
   const [displayValue, setDisplayValue] = useState(formatMoney(initialValue));
+  const editing = useRef(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (controlledValue == null) return;
+    if (controlledValue == null || editing.current) return;
 
     const nextRawValue = toCanonicalMoney(controlledValue);
     setRawValue(nextRawValue);
     setDisplayValue(formatMoney(nextRawValue));
+    inputRef.current?.setCustomValidity("");
   }, [controlledValue]);
 
   return (
     <>
       <input name={name} type="hidden" value={rawValue} readOnly />
       <input
+        ref={inputRef}
         className={className}
         aria-label={ariaLabel}
         disabled={disabled}
         id={id}
         inputMode="decimal"
+        onFocus={() => {
+          editing.current = true;
+          if (rawValue) setDisplayValue(rawValue);
+        }}
+        onBlur={() => {
+          editing.current = false;
+          if (rawValue) setDisplayValue(formatMoney(rawValue));
+        }}
         onChange={(event) => {
           const typedValue = event.target.value;
           const partialSuffix = isPartialSuffixInput(typedValue);
@@ -60,7 +72,16 @@ export function MoneyInput({
           const nextRawValue = parsed == null ? "" : String(parsed);
 
           setRawValue(nextRawValue);
-          setDisplayValue(partialSuffix ? typedValue : formatMoney(nextRawValue));
+          // Keep the user's text/caret while editing. Inserting grouping marks
+          // on every keypress makes the next digit invalidate the grouping.
+          setDisplayValue(typedValue);
+          event.currentTarget.setCustomValidity(
+            typedValue.trim() && parsed == null
+              ? document.documentElement.lang === "en"
+                ? "Enter a valid amount."
+                : "Nhập số tiền hợp lệ."
+              : "",
+          );
           if (!partialSuffix) {
             onValueChange?.(nextRawValue);
           }

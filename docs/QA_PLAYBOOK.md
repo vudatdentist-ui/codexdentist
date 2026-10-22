@@ -318,3 +318,10 @@ profile fields stay out of clinical payloads, proves bootstrap rollback, and che
 repeat provisioning preserves customized inactive forms. CI also runs full runtime and
 browser suites. Ordered legacy CSS imports retain the original cascade (hash regression);
 new styles belong in the owning workspace stylesheet.
+
+`browser:qa` also runs `scripts/money-input-browser-smoke.mjs` on a disposable
+loopback app/database. It types amounts one key at a time in uncontrolled receipt
+and controlled allocation inputs, checks grouping on blur, caret edits, decimal
+suffixes and native rejection of invalid text, then reconciles two actual receipts
+and two separate invoices against PostgreSQL. Keep this keyboard coverage:
+`fill()` and direct Server Action tests do not reproduce caret/formatting defects.
