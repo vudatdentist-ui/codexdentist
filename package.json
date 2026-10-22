@@ -79,16 +79,16 @@
     "test:demo-cleanup-db": "node scripts/demo-cleanup-database.cjs"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "3.1040.0",
-    "@prisma/adapter-pg": "7.8.0",
-    "@prisma/client": "7.8.0",
+    "@aws-sdk/client-s3": "3.1152.0",
+    "@prisma/adapter-pg": "7.10.1",
+    "@prisma/client": "7.10.1",
     "codexdentist-odontogram": "https://github.com/vudatdentist-ui/codexdentist-odontogram/releases/download/v0.8.2/codexdentist-odontogram-0.8.2.tgz",
-    "lucide-react": "1.11.0",
+    "lucide-react": "1.59.0",
     "next": "16.4.2",
-    "pg": "8.20.0",
-    "react": "19.2.8",
+    "pg": "8.23.1",
+    "react": "19.3.1",
     "react-day-picker": "9.14.0",
-    "react-dom": "19.2.8",
+    "react-dom": "19.3.1",
     "sharp": "0.35.5"
   },
   "devDependencies": {
@@ -96,8 +96,8 @@
     "@capacitor/cli": "8.5.3",
     "@capacitor/core": "8.5.3",
     "@types/node": "25.6.0",
-    "@types/react": "19.2.14",
-    "@types/react-dom": "19.2.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
     "playwright": "1.60.0",
     "prisma": "7.8.0",
     "typescript": "6.0.3"
