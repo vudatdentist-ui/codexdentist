@@ -1,4 +1,11 @@
 "use client";
+import { journeyServiceCatalogCode } from "@/lib/billing-presentation";
+
+
+
+
+import { receiptMethodLabel } from "@/lib/billing-presentation";
+
 import { padCodeNumber, patientCodeFor } from "@/lib/patient-presentation";
 import { useAppLanguage, type Language } from "@/components/AppLanguage";
 import { StatusPill as BaseStatusPill } from "@/components/suite-primitives";
@@ -6,7 +13,7 @@ import { invoiceBalanceAmount, isCollectableInvoiceStatus } from "@/lib/billing-
 import { type Invoice, type Patient } from "@/lib/data";
 import { formatJourneyTimelineDay, journeyTimelineDayKey } from "@/lib/journey-timeline";
 import type { ServiceStepSummary } from "@/lib/services-types";
-import { serviceCatalog as serviceLibrary, type DentalServiceCatalogItem } from "@/lib/service-catalog";
+import { type DentalServiceCatalogItem } from "@/lib/service-catalog";
 export const statusText: Record<Language, Record<string, string>> = {
     vi: {
         "Active": "Đang hoạt động",
@@ -247,22 +254,7 @@ export type JourneyCreditAllocation = {
     amount: number;
     allocatedAt: number;
 };
-export function receiptMethodLabel(method: JourneyReceiptMethod, language: Language) {
-    if (language === "vi") {
-        const labels: Record<JourneyReceiptMethod, string> = {
-            bank_transfer: "Chuyển khoản",
-            card: "Thẻ",
-            cash: "Tiền mặt",
-        };
-        return labels[method];
-    }
-    const labels: Record<JourneyReceiptMethod, string> = {
-        bank_transfer: "Bank transfer",
-        card: "Card",
-        cash: "Cash",
-    };
-    return labels[method];
-}
+
 export function receiptMethodLabelForBilling(method: string, language: Language) {
     if (method === "cash" || method === "card" || method === "bank_transfer") {
         return receiptMethodLabel(method, language);
@@ -306,33 +298,9 @@ export function serviceTargetsFromSelection(targets: string[], language: Languag
         ...toothTargets.map((target) => treatmentTargetLabel(target, language)),
     ];
 }
-export function normalizeCodeText(value: string) {
-    return value
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .replace(/đ/g, "d")
-        .replace(/Đ/g, "D")
-        .toLowerCase()
-        .trim();
-}
-export const legacyServiceCatalogCodes: Record<string, string> = {
-    [normalizeCodeText("Cạo vôi và đánh bóng")]: "LCR",
-    [normalizeCodeText("Scaling and polishing")]: "LCR",
-    [normalizeCodeText("Phục hình mão sứ")]: "MSU",
-    [normalizeCodeText("Ceramic crown restoration")]: "MSU",
-    [normalizeCodeText("Chỉnh nha")]: "CHN",
-    [normalizeCodeText("Orthodontics")]: "CHN",
-};
-export function serviceCatalogCodeFromName(serviceName: string) {
-    const normalizedName = normalizeCodeText(serviceName);
-    const legacyCode = legacyServiceCatalogCodes[normalizedName];
-    if (legacyCode) {
-        return legacyCode;
-    }
-    const match = serviceLibrary.find((service) => normalizeCodeText(service.name) === normalizedName ||
-        normalizeCodeText(service.nameEn) === normalizedName);
-    return match?.code ?? "SV";
-}
+
+
+
 export const serviceProgressOptions = [
     "Planned (0%)",
     "In progress",
@@ -424,18 +392,7 @@ export type JourneyServiceCatalogOption = {
 export function serviceCatalogOptionName(service: Pick<JourneyServiceCatalogOption, "name" | "nameEn">, language: Language) {
     return language === "en" ? service.nameEn || service.name : service.name;
 }
-export function journeyServiceCatalogCode(service: Pick<JourneyServiceRow, "catalogCode" | "serviceCode" | "serviceName">) {
-    if (service.catalogCode) {
-        return service.catalogCode;
-    }
-    if (service.serviceCode) {
-        const match = service.serviceCode.match(/-([A-Z0-9]+)\d{2,}$/);
-        if (match?.[1]) {
-            return match[1];
-        }
-    }
-    return serviceCatalogCodeFromName(service.serviceName);
-}
+
 export function serviceSequenceFromInstanceCode(serviceCode: string | undefined, catalogCode: string) {
     if (!serviceCode) {
         return null;
@@ -591,3 +548,13 @@ export { normalizeSearchText } from "@/shared/search";
 export { journeyText } from "./journey-copy";
 
 export { matchesChartSearch } from "@/shared/search";
+
+export { receiptMethodLabel } from "@/lib/billing-presentation";
+
+export { normalizeCodeText } from "@/lib/billing-presentation";
+
+export { legacyServiceCatalogCodes } from "@/lib/billing-presentation";
+
+export { serviceCatalogCodeFromName } from "@/lib/billing-presentation";
+
+export { journeyServiceCatalogCode } from "@/lib/billing-presentation";

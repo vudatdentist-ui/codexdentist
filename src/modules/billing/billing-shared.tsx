@@ -1,10 +1,16 @@
 "use client";
+import { journeyServiceCatalogCode } from "@/lib/billing-presentation";
+
+
+
+
+import { receiptMethodLabel } from "@/lib/billing-presentation";
+
 import { padCodeNumber, patientCodeFor } from "@/lib/patient-presentation";
 import { useAppLanguage, type Language } from "@/components/AppLanguage";
 import { StatusPill as BaseStatusPill } from "@/components/suite-primitives";
 import { isCollectableInvoiceStatus } from "@/lib/billing-calculations";
 import { formatVnd, type Appointment, type Invoice, type Patient } from "@/lib/data";
-import { serviceCatalog as serviceLibrary } from "@/lib/service-catalog";
 export type JourneyReceiptDraftStore = Record<string, {
     amount: string;
     method: JourneyCollectionMethod;
@@ -226,55 +232,16 @@ export function journeyReceiptIdForService(serviceId: string, collectedAt: numbe
 export function journeyCreditAllocationIdForService(serviceId: string, allocatedAt: number) {
     return `CRA-${journeyInvoiceIdForService(`${serviceId}-${allocatedAt}`)}`;
 }
-export function receiptMethodLabel(method: JourneyReceiptMethod, language: Language) {
-    if (language === "vi") {
-        const labels: Record<JourneyReceiptMethod, string> = {
-            bank_transfer: "Chuyển khoản",
-            card: "Thẻ",
-            cash: "Tiền mặt",
-        };
-        return labels[method];
-    }
-    const labels: Record<JourneyReceiptMethod, string> = {
-        bank_transfer: "Bank transfer",
-        card: "Card",
-        cash: "Cash",
-    };
-    return labels[method];
-}
+
 export function collectionMethodLabel(method: JourneyCollectionMethod, language: Language) {
     if (method === "credit_balance") {
         return language === "vi" ? "Tiền dư/chưa phân bổ" : "Advance/unapplied";
     }
     return receiptMethodLabel(method, language);
 }
-export function normalizeCodeText(value: string) {
-    return value
-        .normalize("NFD")
-        .replace(/[\u0300-\u036f]/g, "")
-        .toLowerCase()
-        .replace(/đ/g, "d")
-        .replace(/[^a-z0-9]+/g, " ")
-        .trim();
-}
-export const legacyServiceCatalogCodes: Record<string, string> = {
-    [normalizeCodeText("Cạo vôi và đánh bóng")]: "LCR",
-    [normalizeCodeText("Scaling and polishing")]: "LCR",
-    [normalizeCodeText("Phục hình mão sứ")]: "MSU",
-    [normalizeCodeText("Ceramic crown restoration")]: "MSU",
-    [normalizeCodeText("Chỉnh nha")]: "CHN",
-    [normalizeCodeText("Orthodontics")]: "CHN",
-};
-export function serviceCatalogCodeFromName(serviceName: string) {
-    const normalizedName = normalizeCodeText(serviceName);
-    const legacyCode = legacyServiceCatalogCodes[normalizedName];
-    if (legacyCode) {
-        return legacyCode;
-    }
-    const match = serviceLibrary.find((service) => normalizeCodeText(service.name) === normalizedName ||
-        normalizeCodeText(service.nameEn) === normalizedName);
-    return match?.code ?? "SV";
-}
+
+
+
 export type JourneyServiceProgressEvent = {
     id: string;
     fromProgressPercent: number;
@@ -320,18 +287,7 @@ export type JourneyServiceRow = {
     progressEvents?: JourneyServiceProgressEvent[];
     source: "odontogram" | "plan" | "database";
 };
-export function journeyServiceCatalogCode(service: Pick<JourneyServiceRow, "catalogCode" | "serviceCode" | "serviceName">) {
-    if (service.catalogCode) {
-        return service.catalogCode;
-    }
-    if (service.serviceCode) {
-        const match = service.serviceCode.match(/-([A-Z0-9]+)\d{2,}$/);
-        if (match?.[1]) {
-            return match[1];
-        }
-    }
-    return serviceCatalogCodeFromName(service.serviceName);
-}
+
 export function createServiceInstanceCode(patient: Pick<Patient, "id" | "patientCode"> | null | undefined, catalogCode: string, sequence: number) {
     return `${patientCodeFor(patient)}-${catalogCode}${padCodeNumber(sequence, 2)}`;
 }
@@ -552,3 +508,13 @@ export { serviceProgressPercent, serviceProgressIsCancelled, serviceProgressLabe
 export { normalizeSearchText } from "@/shared/search";
 
 export { matchesChartSearch } from "@/shared/search";
+
+export { receiptMethodLabel } from "@/lib/billing-presentation";
+
+export { normalizeCodeText } from "@/lib/billing-presentation";
+
+export { legacyServiceCatalogCodes } from "@/lib/billing-presentation";
+
+export { serviceCatalogCodeFromName } from "@/lib/billing-presentation";
+
+export { journeyServiceCatalogCode } from "@/lib/billing-presentation";

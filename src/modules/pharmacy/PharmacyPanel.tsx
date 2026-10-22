@@ -1,4 +1,6 @@
 "use client";
+import { displayMedicationName as pharmacyMedicationDisplayName } from "@/lib/medication-presentation";
+
 import { PatientSearchCombobox } from "@/components/PatientSearchCombobox";
 import { normalizeSearchText } from "@/shared/search";
 
@@ -76,26 +78,7 @@ function StatusPill({ status }: { status: string }) {
   const { language } = useAppLanguage();
   return <BaseStatusPill label={displayStatus(status, language)} status={status} />;
 }
-function pharmacyMedicationDisplayName(medication: {
-  genericName: string;
-  brandName: string | null;
-  strength: string | null;
-}) {
-  const strength = medication.strength ? ` ${medication.strength}` : "";
-  const genericName = medication.genericName.trim();
-  const brandName = medication.brandName?.trim();
-  const isCombination = /[+/]|clavulanic|clavulanate|phối hợp/i.test(genericName);
 
-  if (brandName && isCombination) {
-    return `${brandName}${strength}`;
-  }
-
-  if (brandName) {
-    return `${genericName}${strength} (${brandName})`;
-  }
-
-  return `${genericName}${strength}`;
-}
 
 function mergePharmacyDirections(sig: string, instructions: string | null) {
   const cleanSig = sig.trim();

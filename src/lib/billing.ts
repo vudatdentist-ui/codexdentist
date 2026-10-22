@@ -1,3 +1,4 @@
+import { invoiceStatusLabel } from "@/lib/status-presentation";
 import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import "server-only";
 
@@ -5,7 +6,6 @@ import {
   clinics as demoClinics,
   invoices as demoInvoices,
   patients as demoPatients,
-  type Invoice,
 } from "@/lib/data";
 import { patientAccessWhere } from "@/lib/patient-access";
 import { hasAnyRole, type AppRole } from "@/lib/permissions";
@@ -524,22 +524,7 @@ function demoPrintableInvoice(
   };
 }
 
-function invoiceStatusLabel(status: string, dueDate: Date): Invoice["status"] {
-  if (status !== "PAID" && status !== "VOID" && dueDate < new Date()) {
-    return "Overdue";
-  }
 
-  const labels: Record<string, Invoice["status"]> = {
-    DRAFT: "Draft",
-    OPEN: "Open",
-    PARTIAL: "Partial",
-    PAID: "Paid",
-    OVERDUE: "Overdue",
-    VOID: "Void",
-  };
-
-  return labels[status] ?? "Open";
-}
 
 function toBillingTreatmentServiceSummary(service: {
   id: string;

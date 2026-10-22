@@ -1,3 +1,4 @@
+import { ageFromDate } from "@/lib/patient-presentation";
 import "server-only";
 
 import {
@@ -251,17 +252,7 @@ function toPatientSummary(patient: {
   };
 }
 
-function ageFromDate(date: Date) {
-  const today = new Date();
-  let age = today.getFullYear() - date.getFullYear();
-  const monthDelta = today.getMonth() - date.getMonth();
 
-  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < date.getDate())) {
-    age -= 1;
-  }
-
-  return Math.max(age, 0);
-}
 
 function appointmentLabel(
   appointments: Array<{ startsAt: Date; status: string }>,

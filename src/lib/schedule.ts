@@ -1,3 +1,4 @@
+import { appointmentStatusLabel } from "@/lib/status-presentation";
 import "server-only";
 
 import {
@@ -341,19 +342,7 @@ function toScheduleAppointment(appointment: DbAppointment): Appointment {
   };
 }
 
-function appointmentStatusLabel(status: string): Appointment["status"] {
-  const labels: Record<string, Appointment["status"]> = {
-    REQUESTED: "Requested",
-    CONFIRMED: "Confirmed",
-    ARRIVED: "Arrived",
-    IN_CHAIR: "In chair",
-    COMPLETED: "Completed",
-    CANCELLED: "Cancelled",
-    NO_SHOW: "No-show",
-  };
 
-  return labels[status] ?? "Confirmed";
-}
 
 function uniqueProviders(scheduleAppointments: Appointment[]) {
   const providers = new Map<string, ScheduleProviderOption>();

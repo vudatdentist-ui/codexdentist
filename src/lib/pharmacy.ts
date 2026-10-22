@@ -1,3 +1,5 @@
+import { displayMedicationName } from "@/lib/medication-presentation";
+import { ageFromDate } from "@/lib/patient-presentation";
 import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import "server-only";
 import type { ProvisioningClient } from "@/lib/provisioning-client";
@@ -1100,26 +1102,7 @@ export async function ensurePharmacySeed(session: AppSession, client: Provisioni
   }
 }
 
-export function displayMedicationName(medication: {
-  genericName: string;
-  brandName: string | null;
-  strength: string | null;
-}) {
-  const strength = medication.strength ? ` ${medication.strength}` : "";
-  const genericName = medication.genericName.trim();
-  const brandName = medication.brandName?.trim();
-  const isCombination = /[+/]|clavulanic|clavulanate|phối hợp/i.test(genericName);
 
-  if (brandName && isCombination) {
-    return `${brandName}${strength}`;
-  }
-
-  if (brandName) {
-    return `${genericName}${strength} (${brandName})`;
-  }
-
-  return `${genericName}${strength}`;
-}
 
 function repairSeedRecord<T>(value: T): T {
   if (typeof value === "string") {
@@ -1313,20 +1296,7 @@ function databaseUserId(userId: string) {
   return userId.startsWith("demo-") ? null : userId;
 }
 
-function ageFromDate(dateOfBirth: Date) {
-  const today = new Date();
-  let age = today.getFullYear() - dateOfBirth.getFullYear();
-  const monthDelta = today.getMonth() - dateOfBirth.getMonth();
 
-  if (
-    monthDelta < 0 ||
-    (monthDelta === 0 && today.getDate() < dateOfBirth.getDate())
-  ) {
-    age -= 1;
-  }
-
-  return Math.max(age, 0);
-}
 
 function mergePrescriptionDirections(sig: string, instructions: string | null) {
   const cleanSig = sig.trim();
@@ -1356,3 +1326,5 @@ function vietnamDate(value: Date) {
   }).format(value);
 }
 
+
+export { displayMedicationName } from "@/lib/medication-presentation";

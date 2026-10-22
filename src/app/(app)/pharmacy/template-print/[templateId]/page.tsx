@@ -1,3 +1,4 @@
+import { prescriptionGenderLabel as genderLabel } from "@/lib/patient-presentation";
 import { notFound } from "next/navigation";
 import { PrescriptionTemplatePrintActions } from "@/components/PrescriptionTemplatePrintActions";
 import { requireViewSession } from "@/lib/auth";
@@ -159,24 +160,4 @@ export default async function PrescriptionTemplatePrintPage({
   );
 }
 
-function genderLabel(value: string | null) {
-  if (!value) {
-    return null;
-  }
 
-  const normalized = value.trim().toUpperCase();
-
-  if (normalized === "MALE" || normalized === "M" || normalized === "NAM") {
-    return "Nam";
-  }
-
-  if (normalized === "FEMALE" || normalized === "F" || normalized === "NU" || normalized === "NỮ") {
-    return "Nữ";
-  }
-
-  if (normalized === "OTHER") {
-    return "Khác";
-  }
-
-  return value;
-}

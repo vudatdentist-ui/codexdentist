@@ -1,3 +1,4 @@
+import { staffRoleTitle as roleTitle } from "@/lib/staff-presentation";
 import { accessibleClinicIds } from "@/lib/tenant-scope";
 import "server-only";
 
@@ -736,20 +737,7 @@ function toLeaveSummary(request: {
   };
 }
 
-function roleTitle(role: AppRole) {
-  const labels: Record<AppRole, string> = {
-    OWNER: "Owner",
-    AREA_MANAGER: "Area manager",
-    CLINIC_MANAGER: "Clinic manager",
-    DENTIST: "Dentist",
-    HYGIENIST: "Hygienist",
-    FRONT_DESK: "Front desk",
-    BILLING: "Billing",
-    PATIENT: "Patient",
-  };
 
-  return labels[role] ?? role;
-}
 
 function allowedClinicIds(session: AppSession) {
   if (canUseAllClinics(session)) {

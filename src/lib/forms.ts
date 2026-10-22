@@ -1,3 +1,4 @@
+import { ageFromDate } from "@/lib/patient-presentation";
 import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import "server-only";
 import type { ProvisioningClient } from "@/lib/provisioning-client";
@@ -431,20 +432,7 @@ async function fallbackClinic(session: AppSession) {
   });
 }
 
-function ageFromDate(dateOfBirth: Date) {
-  const today = new Date();
-  let age = today.getFullYear() - dateOfBirth.getFullYear();
-  const monthDelta = today.getMonth() - dateOfBirth.getMonth();
 
-  if (
-    monthDelta < 0 ||
-    (monthDelta === 0 && today.getDate() < dateOfBirth.getDate())
-  ) {
-    age -= 1;
-  }
-
-  return Math.max(age, 0);
-}
 
 function vietnamDate(value: Date) {
   return new Intl.DateTimeFormat("vi-VN", {

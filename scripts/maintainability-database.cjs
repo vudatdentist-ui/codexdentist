@@ -17,7 +17,7 @@ await prisma.staffProfile.create({data:{organizationId:orgId,userId:user.id,clin
 const session={organizationId:orgId,userId:user.id,role:'DENTIST',roles:['DENTIST'],activeClinicId:clinic.id,clinicIds:[clinic.id],roleAssignments:[{organizationId:orgId,role:'DENTIST',clinicId:clinic.id}]};
 const directory=load('src/lib/staff-directory.ts',mocks);const staff=await directory.getStaffDirectory(session);assert.equal(staff.length,1);assert.deepEqual(Object.keys(staff[0]).sort(),['active','fullName','id','roleAssignments']);assert.doesNotMatch(JSON.stringify(staff),/SECRET|87654321|1990/);
 console.log('ok real database clinical staff payload excludes private profile fields');
-const template=await prisma.formTemplate.create({data:{organizationId:orgId,type:'CONSENT',code:'fixture',name:'Fixture',body:'Fixture',version:'1'}});
+const template=await prisma.formTemplate.create({data:{organizationId:orgId,type:'CONSENT',code:'fixture',name:'Fixture',body:'Fixture',schema:{},version:'1'}});
 await prisma.patientForm.create({data:{organizationId:orgId,clinicId:clinic.id,patientId:patient.id,templateId:template.id,formNo:`FRM-${year}-000041`,attachments:[]}});
 await prisma.prescription.create({data:{organizationId:orgId,clinicId:clinic.id,patientId:patient.id,prescriberId:user.id,prescriptionNo:`RX-${year}-000041`}});
 const sequence=load('src/lib/global-document-sequence.ts',mocks);

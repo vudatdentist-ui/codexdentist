@@ -1,4 +1,6 @@
 "use server";
+import { normalizeClinicId } from "@/lib/tenant-scope";
+
 import { reportApplicationError } from "@/lib/error-reporting";
 
 import { accessibleClinicIds } from "@/lib/tenant-scope";
@@ -644,15 +646,7 @@ function normalizeChannel(value: FormDataEntryValue | null) {
   return channels.find((channel) => channel === parsed) ?? null;
 }
 
-function normalizeClinicId(value: FormDataEntryValue | null, session: AppSession) {
-  const parsed = requiredString(value);
 
-  if (!parsed || parsed === "all") {
-    return canUseAllClinics(session) ? "all" : session.activeClinicId ?? "denied";
-  }
-
-  return accessibleClinicIds(session).includes(parsed) ? parsed : "denied";
-}
 
 function allowedClinicIds(session: AppSession) {
   if (canUseAllClinics(session)) {

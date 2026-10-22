@@ -242,10 +242,6 @@ export function parseOptionalDate(value: (string | File) | null) {
     }
     return parseDateInVietnam(value);
 }
-export function normalizeClinicId(value: (string | File) | null, session: AppSession) {
-    const parsed = requiredString(value);
-    if (!parsed || parsed === "all") {
-        return canUseAllClinics(session) ? "all" : session.activeClinicId ?? "denied";
-    }
-    return accessibleClinicIds(session).includes(parsed) ? parsed : "denied";
-}
+
+
+export { normalizeClinicId } from "@/lib/tenant-scope";

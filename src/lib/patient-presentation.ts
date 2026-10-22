@@ -85,3 +85,40 @@ export function patientLeadSourceOptions(language: Language) {
     { value: "OTHER", label: language === "vi" ? "Khác" : "Other" },
   ];
 }
+
+export function ageFromDate(dateOfBirth: Date) {
+  const today = new Date();
+  let age = today.getFullYear() - dateOfBirth.getFullYear();
+  const monthDelta = today.getMonth() - dateOfBirth.getMonth();
+
+  if (
+    monthDelta < 0 ||
+    (monthDelta === 0 && today.getDate() < dateOfBirth.getDate())
+  ) {
+    age -= 1;
+  }
+
+  return Math.max(age, 0);
+}
+
+export function prescriptionGenderLabel(value: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  const normalized = value.trim().toUpperCase();
+
+  if (normalized === "MALE" || normalized === "M" || normalized === "NAM") {
+    return "Nam";
+  }
+
+  if (normalized === "FEMALE" || normalized === "F" || normalized === "NU" || normalized === "NỮ") {
+    return "Nữ";
+  }
+
+  if (normalized === "OTHER") {
+    return "Khác";
+  }
+
+  return value;
+}

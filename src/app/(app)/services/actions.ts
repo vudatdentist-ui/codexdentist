@@ -1,4 +1,6 @@
 "use server";
+import { writeDomainAuditLog as writeServicesAuditLog } from "@/lib/audit-log";
+
 import { reportApplicationError } from "@/lib/error-reporting";
 
 import { accessibleClinicIds } from "@/lib/tenant-scope";
@@ -938,22 +940,4 @@ function isNextRedirect(error: unknown) {
   );
 }
 
-async function writeServicesAuditLog(input: {
-  organizationId: string;
-  actorId: string | null;
-  action: string;
-  entityType: string;
-  entityId: string;
-  metadata?: Record<string, unknown>;
-}) {
-  await prisma.auditLog.create({
-    data: {
-      organizationId: input.organizationId,
-      actorId: input.actorId,
-      action: input.action,
-      entityType: input.entityType,
-      entityId: input.entityId,
-      metadata: input.metadata as Prisma.InputJsonValue | undefined,
-    },
-  });
-}
+

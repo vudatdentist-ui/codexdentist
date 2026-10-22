@@ -136,19 +136,7 @@ export function canWriteSettings(session: AppSession) {
 export function defaultEmployeeCode(userId: string) {
     return `NV-${userId.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase()}`;
 }
-export function defaultRoleTitle(role: AppRole) {
-    const labels: Record<AppRole, string> = {
-        OWNER: "Owner",
-        AREA_MANAGER: "Area manager",
-        CLINIC_MANAGER: "Clinic manager",
-        DENTIST: "Dentist",
-        HYGIENIST: "Hygienist",
-        FRONT_DESK: "Front desk",
-        BILLING: "Billing",
-        PATIENT: "Patient",
-    };
-    return labels[role] ?? role;
-}
+
 export function canManageClinics(session: AppSession) {
     return canWriteSettings(session) && canUseAllClinics(session);
 }
@@ -460,3 +448,5 @@ export async function deliverSetupNotification(setup: PasswordSetupArtifacts) {
         reportApplicationError("staff.password_setup_delivery_failed", error);
     }
 }
+
+export { staffRoleTitle as defaultRoleTitle } from "@/lib/staff-presentation";
