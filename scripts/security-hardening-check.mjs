@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 
 const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
 
-assertEqual(packageJson.dependencies.next, "16.3.8", "Next.js security patch");
+assertEqual(packageJson.dependencies.next, "16.4.2", "Next.js security patch");
 assertEqual(packageJson.dependencies.sharp, "0.35.5", "Sharp security patch");
 assertEqual(packageJson.overrides["fast-uri"], "4.2.3", "fast-uri security patch");
 assertEqual(packageJson.overrides.hono, "4.13.13", "Hono security patch");
