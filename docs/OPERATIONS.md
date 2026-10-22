@@ -61,6 +61,55 @@ The historical Namecheap deploy workflow now requires the repository variable
 Hostinger image replacement is a separate operation and must preserve the
 existing Compose environment, networks, database, and rollback image.
 
+### Current Hostinger deployment
+
+The reviewed pull deployer is `scripts/deploy-hostinger.py`, installed as a
+root-owned copy at `/opt/codexdentist-deploy/deploy-hostinger.py`. Its systemd
+service/timer templates are beside it in `scripts/`. The timer checks every
+30 minutes after the previous run finishes. It uses public GitHub reads, requires
+successful **push CI for the exact current main SHA**, and grants no GitHub or
+inbound webhook access to the VPS. The installed deployer never updates itself;
+review and explicitly install changes to deployment policy.
+
+Each release builds an image from a clean exact-commit checkout, validates the
+entire migration range since the deployed revision, saves the existing Compose,
+environment files and a custom-format PostgreSQL dump in a private timestamped
+backup directory, then restores that dump into an isolated temporary PostgreSQL
+container and applies the candidate migrations there. Unattended migration policy
+accepts only new CREATE statements; edited migrations and other SQL require an
+operator review even if CI's broader expand/contract checker passes.
+
+Production migration runs with the candidate image and the existing Compose
+environment while the previous application remains available. A candidate on
+loopback port 3101 must pass health/schema and public-route checks before cutover.
+Only the `codexdentist` image line is changed in the original Compose file; the
+deployer recreates only that service with `--no-deps --pull never`. Verification
+checks loopback port 3100, public HTTPS, and the running image's commit label.
+Old images and database/configuration backups are retained; patient files remain
+in the existing R2 bucket and are neither copied to releases nor overwritten.
+
+After a cutover failure, the previous exact image is restored and checked. The
+additive database migration is retained: never restore an old dump automatically
+over newer writes. Any failure after production migration begins retains
+`/opt/codexdentist-deploy/needs-attention.json`, blocking further deployments.
+Inspect the backup, migration state, service logs and health before resolving that
+marker. A failed rollback must remain unresolved. Never remove a marker merely
+to force a retry.
+
+```sh
+systemctl status codexdentist-deploy.timer
+journalctl -u codexdentist-deploy.service -n 80 --no-pager
+python3 /opt/codexdentist-deploy/deploy-hostinger.py --check
+systemctl start codexdentist-deploy.service
+```
+
+The first deployment from an unlabelled legacy image must be performed manually
+with the same backup/restore, migration, candidate and rollback checks. Automatic
+deployment refuses to infer its source revision. Run `python3
+scripts/deploy-hostinger.test.py` after deployment-policy changes. Before storing
+real clinic records, copy backups to a separately protected destination and test
+R2 object recovery as well as PostgreSQL restoration.
+
 The signup route must render dynamically: availability depends on runtime
 `DEPLOYMENT_MODE` / `TRIAL_SIGNUP_ENABLED`. An image built with signup disabled
 must not cache a permanent 404 when started in hosted mode. Verify `/signup`

@@ -70,6 +70,8 @@ jobs:
           set -euo pipefail
           bash -n scripts/deploy-namecheap.sh
           node --check scripts/check-migration-safety.mjs
+      - name: Hostinger deployment and rollback guards
+        run: python3 scripts/deploy-hostinger.test.py
       - name: Release and rollback regression tests
         run: node --test scripts/package-release.test.mjs scripts/deploy-namecheap.test.mjs
       - name: Enforce backward-compatible migrations
