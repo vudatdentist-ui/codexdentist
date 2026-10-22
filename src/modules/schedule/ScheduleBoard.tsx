@@ -916,6 +916,7 @@ function ScheduleAppointmentRow({
     ? vietnamDateInputFromIso(appointment.startsAt)
     : scheduleContext.date;
   const isPastAppointmentDay = appointmentDate < currentVietnamDateInput();
+  const assignedChair = chairs.find((chair) => chair.id === appointment.chairId);
   const canChangeAppointment = canMutate && !isPastAppointmentDay;
   const pastLockedLabel =
     language === "vi" ? "Đã qua ngày hẹn" : "Past appointment";
@@ -940,7 +941,7 @@ function ScheduleAppointmentRow({
       </div>
       <div>
         <strong>{appointment.room}</strong>
-        <span>{appointment.chairId ? labels.busy : labels.selectChair}</span>
+        <span>{assignedChair ? assignedChair.operationalStatus === "BUSY" ? labels.busy : labels.ready : labels.selectChair}</span>
       </div>
       <div>
         {canChangeAppointment ? (
