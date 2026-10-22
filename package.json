@@ -75,7 +75,8 @@
     "test:audit": "node --test scripts/audit-regression.test.cjs",
     "test:audit-db": "node scripts/audit-concurrency.cjs",
     "test:maintainability": "node --test scripts/maintainability-regression.test.cjs && node scripts/maintainability-check.mjs",
-    "test:maintainability-db": "node scripts/maintainability-database.cjs"
+    "test:maintainability-db": "node scripts/maintainability-database.cjs",
+    "test:demo-cleanup-db": "node scripts/demo-cleanup-database.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1040.0",

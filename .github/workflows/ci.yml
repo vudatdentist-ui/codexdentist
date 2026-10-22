@@ -70,6 +70,8 @@ jobs:
           set -euo pipefail
           bash -n scripts/deploy-namecheap.sh
           node --check scripts/check-migration-safety.mjs
+      - name: Hostinger deployment and rollback guards
+        run: python3 scripts/deploy-hostinger.test.py
       - name: Release and rollback regression tests
         run: node --test scripts/package-release.test.mjs scripts/deploy-namecheap.test.mjs
       - name: Enforce backward-compatible migrations
@@ -89,6 +91,10 @@ jobs:
           NODE_ENV: test
       - name: Maintainability database regressions
         run: npm run test:maintainability-db
+        env:
+          NODE_ENV: test
+      - name: Demo cleanup billing and tenant regression
+        run: npm run test:demo-cleanup-db
         env:
           NODE_ENV: test
       - run: npm run build
@@ -117,6 +123,9 @@ jobs:
           npm run test:billing
           npm run test:billing-concurrency
           npm run test:actions
+          npm run test:roles
+          npm run test:settings-forms
+          npm run test:hardening
           npm run test:integration-substrate
           npm run test:journey-file-command
           npm run test:patient-files

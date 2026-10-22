@@ -1,0 +1,11 @@
+[Unit]
+Description=Check for a successful Codexdentist main release
+
+[Timer]
+OnBootSec=10min
+OnUnitInactiveSec=30min
+RandomizedDelaySec=2min
+Unit=codexdentist-deploy.service
+
+[Install]
+WantedBy=timers.target

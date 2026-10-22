@@ -20,6 +20,11 @@ and verifies credential emails cannot be sent from redacted persisted bodies.
 The database tests create and clean up only their own randomly identified workspace.
 CI runs both suites; a mock-only race test is insufficient for these database boundaries.
 
+After demo lifecycle or organization-purge changes, run `NODE_ENV=test npm run
+test:demo-cleanup-db` against disposable loopback PostgreSQL. It creates an expired
+demo with an invoice, invoice item, receipt and linked allocation, exercises the
+real purge SQL under billing constraints, and proves an unrelated tenant survives.
+
 ## 1. Universal Baseline Gate
 
 Run before and after every non-trivial phase/change:

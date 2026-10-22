@@ -132,7 +132,10 @@ BEGIN
         DELETE FROM "_organization_purge_rows"
         WHERE table_oid = relation_record.table_oid;
         made_progress := true;
-      EXCEPTION WHEN foreign_key_violation THEN
+      -- SET NULL actions can also trip the billing scope CHECK triggers while
+      -- another marked child still refers to the parent being removed. Defer
+      -- that parent until its children are deleted; never disable constraints.
+      EXCEPTION WHEN foreign_key_violation OR check_violation THEN
         NULL;
       END;
     END LOOP;

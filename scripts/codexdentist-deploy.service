@@ -1,0 +1,17 @@
+[Unit]
+Description=Deploy verified Codexdentist main on Hostinger
+After=docker.service network-online.target
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+User=root
+UMask=0077
+ExecStart=/usr/bin/python3 /opt/codexdentist-deploy/deploy-hostinger.py
+TimeoutStartSec=45min
+Nice=10
+CPUWeight=20
+IOWeight=20
+StandardOutput=journal
+StandardError=journal

@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { signIn } from "@/lib/auth";
 import { createDemoWorkspace } from "@/lib/demo-workspaces";
+import { reportApplicationError } from "@/lib/error-reporting";
 import { consumeDemoWorkspaceAttempt } from "@/lib/rate-limit";
 import { clientIpFromHeaders } from "@/lib/request-ip";
 import { currentHostname, systemSubdomainFromHostname } from "@/lib/tenant";
@@ -28,7 +29,7 @@ export async function startDemoWorkspaceAction() {
     });
     signedIn = result.ok;
   } catch (error) {
-    console.error("demo_workspace.create_failed", error);
+    reportApplicationError("demo_workspace.create_failed", error);
     redirect(`${demoEntryPath}?error=unavailable`);
   }
 
