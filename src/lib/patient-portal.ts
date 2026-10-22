@@ -7,7 +7,8 @@ import {
   appointments as demoAppointments,
   invoices as demoInvoices,
   patients as demoPatients,
-  treatmentPlans as demoPlans,} from "@/lib/data";
+  treatmentPlans as demoPlans,
+} from "@/lib/data";
 import type { PatientPortalWorkspace } from "@/lib/patient-portal-types";
 import { prisma } from "@/lib/prisma";
 import { assertDemoFallbackAllowed } from "@/lib/runtime-guards";
