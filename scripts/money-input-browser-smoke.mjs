@@ -18,6 +18,8 @@ const output = 'output/workspace-qa/money-input';
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch();
 const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
+// This page contains only this suite's disposable patient and simulated money.
+page.on('dialog', dialog => dialog.accept());
 const token = randomUUID();
 let patientId;
 const evidence = [];
