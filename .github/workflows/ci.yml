@@ -123,6 +123,9 @@ jobs:
           npm run test:billing
           npm run test:billing-concurrency
           npm run test:actions
+          npm run test:roles
+          npm run test:settings-forms
+          npm run test:hardening
           npm run test:integration-substrate
           npm run test:journey-file-command
           npm run test:patient-files
