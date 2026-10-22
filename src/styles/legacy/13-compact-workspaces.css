@@ -1,0 +1,80 @@
+@media (max-width: 1180px) {
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    border-bottom: 1px solid var(--line);
+    border-right: 0;
+    height: auto;
+    max-height: none;
+    position: static;
+  }
+
+  .nav-list {
+    grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  }
+
+  .sidebar-card {
+    display: none;
+  }
+
+  .topbar {
+    margin-inline: -16px;
+    padding-inline: 16px;
+  }
+}
+
+@media (max-width: 760px) {
+  .workspace {
+    padding: 14px;
+  }
+
+  .topbar {
+    margin: -14px -14px 14px;
+    position: static;
+  }
+
+  .topbar-main,
+  .topbar-actions,
+  .toolbar {
+    align-items: stretch;
+  }
+
+  .topbar-actions > *,
+  .topbar-actions form,
+  .topbar-actions button,
+  .topbar-actions select,
+  .search-field,
+  .select-field,
+  .user-chip,
+  .context-badge {
+    max-width: none;
+    width: 100%;
+  }
+
+  .topbar-actions .notification-bell-wrap,
+  .topbar-actions form:has(.topbar-signout-button) {
+    flex: 0 0 48px;
+    width: 48px;
+  }
+
+  .topbar-actions .notification-bell-button,
+  .topbar-actions form .topbar-signout-button {
+    min-width: 48px;
+    padding: 0;
+    width: 48px;
+  }
+
+  .topbar-signout-button span {
+    display: none;
+  }
+
+  .metric-card {
+    min-height: 78px;
+  }
+
+  .panel {
+    padding: 12px;
+  }
+}

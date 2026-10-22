@@ -1,4 +1,6 @@
 "use client";
+import { normalizeSearchText } from "@/shared/search";
+
 
 import { MessageSquareText, Trash2 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
@@ -292,12 +294,4 @@ function workspaceMessageText(message: string | null | undefined, language: Lang
   };
 
   return viMessages[message] ?? message;
-}
-
-function normalizeSearchText(value: string | number | null | undefined) {
-  return String(value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
 }

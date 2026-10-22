@@ -1,4 +1,5 @@
 "use server";
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import { accessibleClinicIds } from "@/lib/tenant-scope";
 
@@ -109,6 +110,7 @@ export async function createCrmLeadAction(formData: FormData) {
       source,
     });
   } catch (error) {
+    reportApplicationError("app/(app)/crm/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -181,6 +183,7 @@ export async function addCrmActivityAction(formData: FormData) {
 
     await writeCrmAuditLog(session, "crm_activity.created", "CrmActivity", activity.id);
   } catch (error) {
+    reportApplicationError("app/(app)/crm/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -228,6 +231,7 @@ export async function updateCrmLeadStatusAction(formData: FormData) {
       status,
     });
   } catch (error) {
+    reportApplicationError("app/(app)/crm/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -357,6 +361,7 @@ export async function convertCrmLeadToPatientAction(formData: FormData) {
       reusedExistingPatient: Boolean(existingPatient),
     });
   } catch (error) {
+    reportApplicationError("app/(app)/crm/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -383,6 +388,7 @@ export async function generateCrmRecallTasksAction() {
       actorId: session.userId,
     });
   } catch (error) {
+    reportApplicationError("app/(app)/crm/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }

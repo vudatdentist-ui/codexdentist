@@ -1,0 +1,590 @@
+.inventory-edit-button:disabled {
+  color: var(--muted);
+  background: #eef2f4;
+}
+
+.inventory-modal {
+  width: min(900px, 96vw);
+}
+
+.crm-modal {
+  width: min(860px, 96vw);
+}
+
+.service-action-row {
+  display: flex;
+  gap: 10px;
+  justify-content: flex-start;
+}
+
+.service-catalog-toolbar {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(240px, 1fr) minmax(180px, 260px);
+}
+
+.service-catalog-toolbar label {
+  color: var(--muted);
+  display: grid;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 6px;
+}
+
+.service-catalog-toolbar input,
+.service-catalog-toolbar select {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  min-height: 40px;
+  padding: 0 12px;
+}
+
+.service-section-tabs,
+.inventory-section-tabs,
+.crm-section-tabs,
+.forms-section-tabs,
+.learning-section-tabs,
+.accounting-section-tabs,
+.service-config-tabs {
+  background: #f8fafc;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 4px;
+}
+
+.service-section-tabs button,
+.inventory-section-tabs button,
+.crm-section-tabs button,
+.forms-section-tabs button,
+.learning-section-tabs button,
+.accounting-section-tabs button,
+.service-config-tabs button {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.service-section-tabs button.active,
+.inventory-section-tabs button.active,
+.crm-section-tabs button.active,
+.forms-section-tabs button.active,
+.learning-section-tabs button.active,
+.accounting-section-tabs button.active,
+.service-config-tabs button.active {
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(15, 23, 42, 0.08);
+  color: var(--ink);
+}
+
+.inventory-section-tabs button,
+.crm-section-tabs button,
+.forms-section-tabs button,
+.learning-section-tabs button,
+.accounting-section-tabs button {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.inventory-section-tabs button span,
+.crm-section-tabs button span,
+.forms-section-tabs button span,
+.learning-section-tabs button span,
+.accounting-section-tabs button span {
+  align-items: center;
+  background: #e2e8f0;
+  border-radius: 999px;
+  color: #334155;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 900;
+  justify-content: center;
+  min-width: 24px;
+  padding: 2px 7px;
+}
+
+.inventory-section-tabs button.active span,
+.crm-section-tabs button.active span,
+.forms-section-tabs button.active span,
+.learning-section-tabs button.active span,
+.accounting-section-tabs button.active span {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.service-config-tabs {
+  margin-bottom: 2px;
+}
+
+.service-policy-actions {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.service-policy-warning {
+  align-items: flex-start;
+  display: grid;
+  gap: 3px;
+}
+
+.service-policy-warning span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.service-catalog-list,
+.payroll-accrual-list {
+  display: grid;
+  gap: 12px;
+}
+
+.service-catalog-card,
+.payroll-accrual-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f9fbfb;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.service-library-card {
+  gap: 0;
+}
+
+.service-catalog-head,
+.payroll-accrual-card {
+  align-items: start;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.service-catalog-head strong,
+.service-catalog-head small,
+.payroll-accrual-card strong,
+.payroll-accrual-card small {
+  display: block;
+}
+
+.service-catalog-head small,
+.payroll-accrual-card small,
+.payroll-line-list {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+  margin-top: 3px;
+}
+
+.service-edit-form {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+}
+
+.service-edit-form label,
+.service-step-edit-form,
+.service-step-form {
+  color: var(--muted);
+  display: grid;
+  font-size: 12px;
+  gap: 6px;
+}
+
+.service-edit-form input,
+.service-edit-form select,
+.service-step-edit-form input,
+.service-step-edit-form button,
+.service-step-form input,
+.service-step-form button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.service-edit-form button,
+.service-step-edit-form button,
+.service-step-form button {
+  align-self: end;
+  font-weight: 800;
+}
+
+.service-danger-form {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.service-danger-form .danger-button {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+}
+
+.service-step-edit-list {
+  display: grid;
+  gap: 8px;
+}
+
+.service-step-edit-form {
+  align-items: center;
+  grid-template-columns: 36px minmax(180px, 1fr) minmax(240px, 1.2fr) 110px 110px auto;
+}
+
+.service-step-edit-form span {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-weight: 800;
+  height: 32px;
+  justify-content: center;
+  width: 32px;
+}
+
+.service-steps,
+.payroll-line-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.service-steps span,
+.payroll-line-list span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  padding: 6px 9px;
+}
+
+.service-step-form {
+  align-items: end;
+  grid-template-columns: repeat(6, minmax(120px, 1fr));
+}
+
+.service-step-form select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.payroll-accrual-card {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+.billing-subtitle {
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+  margin: 6px 0 0;
+  max-width: 760px;
+}
+
+.billing-search-meta {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.billing-operational-filters {
+  align-items: end;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(160px, 220px) minmax(160px, 220px) minmax(180px, 240px) minmax(180px, 1fr);
+}
+
+.billing-operational-filters label {
+  color: var(--muted);
+  display: grid;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 6px;
+}
+
+.billing-operational-filters select {
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 10px;
+}
+
+.billing-operational-filters span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  padding-bottom: 10px;
+}
+
+.billing-rule-note {
+  margin: 0;
+}
+
+.billing-metric-scope {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  margin: -8px 0 0;
+  text-transform: uppercase;
+}
+
+.billing-panel-note {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  margin: -4px 0 14px;
+}
+
+.billing-admin-details {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0;
+}
+
+.billing-admin-details summary {
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 950;
+  list-style: none;
+  padding: 16px 18px;
+}
+
+.billing-admin-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.billing-admin-details summary::after {
+  color: var(--muted);
+  content: "+";
+  float: right;
+  font-weight: 950;
+}
+
+.billing-admin-details[open] summary {
+  border-bottom: 1px solid var(--line);
+}
+
+.billing-admin-details[open] summary::after {
+  content: "-";
+}
+
+.billing-admin-details > .content-grid {
+  padding: 14px;
+}
+
+.billing-manual-details-body {
+  padding: 14px;
+}
+
+.billing-admin-details:not([open]) > .content-grid {
+  display: none;
+}
+
+.billing-admin-details:not([open]) > .billing-manual-details-body {
+  display: none;
+}
+
+.billing-admin-action-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.billing-service-filters {
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+  width: fit-content;
+  max-width: 100%;
+}
+
+.billing-service-filters button {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.billing-service-filters span {
+  background: var(--surface-muted);
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  min-width: 22px;
+  padding: 2px 6px;
+}
+
+.billing-service-filters button.active span {
+  background: #ffffff24;
+  color: #ffffff;
+}
+
+.journey-billing-list {
+  display: grid;
+  gap: 10px;
+}
+
+.journey-billing-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+}
+
+.journey-billing-head {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.journey-billing-head > div:first-child {
+  min-width: 0;
+}
+
+.journey-billing-head strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.journey-billing-head span {
+  color: var(--muted);
+  display: block;
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.billing-service-badges {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.billing-service-state {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 11px;
+  font-weight: 900;
+  min-height: 24px;
+  padding: 4px 8px;
+  text-transform: uppercase;
+}
+
+.billing-service-state.action {
+  background: var(--amber-soft);
+  color: #92400e;
+}
+
+.billing-service-state.waiting {
+  background: var(--blue-soft);
+  color: var(--blue);
+}
+
+.billing-service-state.settled {
+  background: var(--green-soft);
+  color: var(--green);
+}
+
+.billing-service-state.cancelled {
+  background: var(--rose-soft);
+  color: var(--rose);
+}
+
+.journey-billing-stats {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(130px, 1fr));
+}
+
+.journey-billing-stats span {
+  background: #f8fbfb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+.journey-billing-stats small,
+.journey-billing-stats strong {
+  display: block;
+}
+
+.journey-billing-stats small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 900;
+  margin-bottom: 3px;
+  text-transform: uppercase;
+}
+
+.journey-billing-stats strong {
+  color: var(--ink);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.billing-service-progress {
+  align-items: center;
+  display: grid;
+  gap: 6px;
+}
+
+.billing-service-invoice-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.billing-service-invoice-list span {
+  align-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 10px;
+}
+
+.billing-service-invoice-list strong {
+  color: var(--ink);
+}
+
+.billing-service-progress span {
+  background: var(--surface-muted);
+  border-radius: 999px;
+  display: block;
+  height: 8px;
+  overflow: hidden;
+}

@@ -1,4 +1,5 @@
 "use server";
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -40,6 +41,7 @@ export async function updateJourneyStateAction(formData: FormData) {
       odontogramTeeth,
     });
   } catch (error) {
+    reportApplicationError("app/(app)/journey/actions", error);
     console.error("journey.state_update_failed", error);
     redirect(stateRedirect(applicationErrorCode(error, "journey-database")));
   }
@@ -62,6 +64,7 @@ export async function createJourneyCommentAction(formData: FormData) {
   try {
     await createJourneyCommentCommand(session, { patientId, body, files });
   } catch (error) {
+    reportApplicationError("app/(app)/journey/actions", error);
     console.error("journey.comment_create_failed", error);
     redirect(commentRedirect(applicationErrorCode(error, "journey-database")));
   }

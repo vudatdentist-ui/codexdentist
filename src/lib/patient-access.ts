@@ -1,18 +1,11 @@
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import "server-only";
 
 import type { Prisma } from "@prisma/client";
-import { hasAnyRole, canUseAllClinics, type AppRole } from "@/lib/permissions";
+import { hasAnyRole, type AppRole } from "@/lib/permissions";
 import type { AppSession } from "@/lib/session";
 
 const appointmentAccessRoles: AppRole[] = ["DENTIST", "HYGIENIST"];
-
-export function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
-}
 
 export function patientAccessWhere(
   session: AppSession,
@@ -92,3 +85,5 @@ export function clinicalAccessWindow(now = new Date()) {
     to: new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000),
   };
 }
+
+export { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";

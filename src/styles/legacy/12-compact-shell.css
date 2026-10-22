@@ -1,0 +1,1503 @@
+/* CodexMed OS UI refresh: compact clinical operations system. */
+
+.app-shell {
+  background:
+    linear-gradient(90deg, rgba(8, 118, 111, 0.035), transparent 34%),
+    var(--bg);
+  grid-template-columns: 252px minmax(0, 1fr);
+}
+
+.sidebar {
+  background: var(--brand-canvas);
+  border-right: 1px solid var(--brand-line);
+  color: var(--ink);
+  gap: 18px;
+  padding: 18px 14px;
+  scrollbar-width: thin;
+}
+
+.brand {
+  background: var(--brand-canvas-strong);
+  border: 1px solid var(--brand-line);
+  border-radius: var(--radius);
+  padding: 10px;
+}
+
+.brand-mark {
+  background: var(--brand-canvas);
+  border: 1px solid var(--brand-line);
+  box-shadow: 0 5px 14px rgba(8, 117, 134, 0.08);
+  height: 38px;
+  width: 38px;
+}
+
+.brand strong {
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 1.1;
+}
+
+.brand span {
+  background: rgba(8, 117, 134, 0.08);
+  border: 1px solid rgba(8, 117, 134, 0.14);
+  border-radius: 999px;
+  color: var(--teal-strong);
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 850;
+  line-height: 1.35;
+  margin-top: 5px;
+  padding: 2px 7px;
+}
+
+.nav-list {
+  gap: 12px;
+}
+
+.nav-group-title {
+  color: #6d7c73;
+  font-size: 10px;
+  letter-spacing: 0;
+  padding-inline: 10px;
+}
+
+.nav-item {
+  color: #344d49;
+  min-height: 38px;
+  padding: 0 10px;
+  position: relative;
+}
+
+.nav-item:hover {
+  background: #edf4ed;
+  color: var(--ink);
+}
+
+.nav-item.active {
+  background: #e3f2ee;
+  border-color: rgba(8, 117, 134, 0.2);
+  color: var(--teal-strong);
+  font-weight: 850;
+}
+
+.nav-item.active::before {
+  background: var(--teal);
+  border-radius: 999px;
+  bottom: 8px;
+  content: "";
+  left: 0;
+  position: absolute;
+  top: 8px;
+  width: 3px;
+}
+
+.sidebar-card {
+  background: var(--brand-canvas-strong);
+  border-color: var(--brand-line);
+  color: var(--ink);
+  padding: 12px;
+}
+
+.sidebar-card p {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.workspace {
+  padding: 18px 20px 28px;
+}
+
+.topbar {
+  background: rgba(243, 246, 248, 0.9);
+  border-bottom: 1px solid rgba(219, 228, 232, 0.72);
+  margin: -18px -20px 18px;
+  padding: 16px 20px 14px;
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.topbar-main {
+  align-items: flex-start;
+}
+
+.eyebrow {
+  color: var(--subtle);
+  font-size: 11px;
+}
+
+h1 {
+  color: #101b22;
+  font-size: clamp(23px, 2vw, 30px);
+  line-height: 1.12;
+}
+
+h2 {
+  color: #15222a;
+  font-size: 18px;
+}
+
+.topbar-actions,
+.toolbar,
+.topbar-controls {
+  gap: 8px;
+}
+
+.search-field,
+.select-field,
+.context-badge,
+.user-chip,
+.segmented,
+.icon-button,
+.secondary-button,
+.primary-button,
+.danger-button,
+.ghost-button {
+  border-radius: var(--radius);
+}
+
+.search-field,
+.select-field,
+.context-badge,
+.user-chip,
+.segmented,
+.icon-button,
+.secondary-button {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: var(--line);
+  box-shadow: 0 1px 0 rgba(20, 35, 45, 0.03);
+}
+
+.search-field:focus-within,
+.select-field:focus-within,
+.patient-search-input:focus-within,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  box-shadow: var(--focus-ring);
+  outline: 0;
+}
+
+.primary-button {
+  background: var(--teal);
+  box-shadow: 0 8px 16px rgba(8, 118, 111, 0.18);
+}
+
+.primary-button:hover {
+  background: var(--teal-strong);
+}
+
+.secondary-button:hover,
+.icon-button:hover,
+.panel-action-link:hover {
+  background: var(--surface-muted);
+  border-color: var(--line-strong);
+}
+
+.danger-button,
+.primary-button.danger {
+  background: var(--rose);
+  color: #ffffff;
+}
+
+.ghost-button {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--muted);
+}
+
+.segmented {
+  background: #edf3f4;
+  padding: 3px;
+}
+
+.segmented button {
+  font-size: 12px;
+  font-weight: 850;
+  min-height: 30px;
+}
+
+.segmented button.active {
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(20, 35, 45, 0.08);
+  color: var(--ink);
+}
+
+.view-stack,
+.content-grid {
+  gap: 14px;
+}
+
+.metric-grid {
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+}
+
+.metric-card,
+.panel,
+.surface-card,
+.table-row,
+.clinic-row,
+.timeline-item,
+.invoice-row,
+.permission-row,
+.patient-summary div,
+.record-tile,
+.audit-box,
+.schedule-column-head,
+.schedule-slot,
+.appointment-card,
+.journey-timeline .chart-timeline-event,
+.journey-billing-item,
+.service-catalog-card,
+.payroll-accrual-card,
+.inventory-category-card,
+.inventory-equipment-card,
+.inventory-settings-card,
+.pharmacy-template-card,
+.pharmacy-medication-card,
+.pharmacy-prescription-card,
+.staff-row,
+.dashboard-clinic-card,
+.dashboard-risk-card,
+.dashboard-provider-row,
+.mobile-card,
+.portal-row {
+  background: var(--surface-raised);
+  border-color: var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+
+.metric-card {
+  border-left: 0;
+  border-top: 3px solid var(--line-strong);
+  min-height: 92px;
+  padding: 13px 14px;
+}
+
+.metric-card span {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.metric-card strong {
+  font-size: clamp(19px, 1.8vw, 25px);
+}
+
+.metric-card.blue {
+  border-top-color: var(--blue);
+}
+
+.metric-card.teal {
+  border-top-color: var(--teal);
+}
+
+.metric-card.violet {
+  border-top-color: var(--violet);
+}
+
+.metric-card.green {
+  border-top-color: var(--green);
+}
+
+.metric-card.amber {
+  border-top-color: var(--amber);
+}
+
+.metric-card.rose {
+  border-top-color: var(--rose);
+}
+
+.panel {
+  padding: 14px;
+}
+
+.panel-header {
+  border-bottom: 1px solid var(--line);
+  margin: -2px 0 12px;
+  padding-bottom: 10px;
+}
+
+.panel-header strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.panel-header-action,
+.panel-action-link,
+.compact-button {
+  min-height: 32px;
+}
+
+.table-row,
+.clinic-row,
+.timeline-item,
+.invoice-row,
+.permission-row {
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    box-shadow 140ms ease,
+    transform 140ms ease;
+}
+
+.table-row:hover,
+.clinic-row:hover,
+.timeline-item:hover,
+.invoice-row:hover,
+.permission-row:hover,
+.journey-timeline .chart-timeline-event:hover {
+  border-color: var(--line-strong);
+  box-shadow: 0 12px 28px rgba(20, 35, 45, 0.08);
+}
+
+.table-row.active {
+  background: var(--surface-tint);
+  border-color: #79cfc6;
+}
+
+.status {
+  border: 1px solid currentColor;
+  font-size: 11px;
+  min-height: 24px;
+  padding: 2px 8px;
+}
+
+.booking-form select,
+.booking-form input,
+.patient-form select,
+.patient-form input,
+.patient-edit-form select,
+.patient-edit-form input,
+.patient-edit-form textarea,
+.treatment-form select,
+.treatment-form input,
+.phase-form input,
+.billing-form select,
+.billing-form input,
+.clinical-form select,
+.clinical-form textarea,
+.community-form select,
+.community-form input,
+.community-form textarea,
+.staff-form select,
+.staff-form input,
+.staff-form textarea,
+.staff-row select,
+.progress-modal-grid select,
+.progress-modal-grid input,
+.progress-modal-grid textarea,
+.service-edit-form input,
+.service-edit-form select,
+.service-step-form input,
+.service-step-form button,
+.pharmacy-template-apply-row select,
+.pharmacy-rx-row input,
+.pharmacy-rx-row textarea,
+.pharmacy-template-item select,
+.pharmacy-template-item input,
+.pharmacy-template-item textarea,
+.notification-compose-form input,
+.notification-compose-form select,
+.notification-compose-form textarea {
+  background: #fff;
+  border-color: var(--line);
+  border-radius: var(--radius-sm);
+}
+
+.booking-form label,
+.patient-form label,
+.patient-edit-form label,
+.treatment-form label,
+.phase-form label,
+.billing-form label,
+.clinical-form label,
+.community-form label,
+.staff-form label,
+.notification-compose-form label,
+.notification-compose-grid label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.service-section-tabs,
+.inventory-section-tabs,
+.crm-section-tabs,
+.forms-section-tabs,
+.learning-section-tabs,
+.accounting-section-tabs,
+.service-config-tabs,
+.pharmacy-section-tabs,
+.staff-section-tabs,
+.settings-section-tabs {
+  background: #edf3f4;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  gap: 3px;
+  padding: 3px;
+}
+
+.service-section-tabs button,
+.inventory-section-tabs button,
+.crm-section-tabs button,
+.forms-section-tabs button,
+.learning-section-tabs button,
+.accounting-section-tabs button,
+.service-config-tabs button,
+.pharmacy-section-tabs button,
+.staff-section-tabs button,
+.settings-section-tabs button {
+  border: 0;
+  border-radius: var(--radius-sm);
+  min-height: 34px;
+}
+
+.service-section-tabs button.active,
+.inventory-section-tabs button.active,
+.crm-section-tabs button.active,
+.forms-section-tabs button.active,
+.learning-section-tabs button.active,
+.accounting-section-tabs button.active,
+.service-config-tabs button.active,
+.pharmacy-section-tabs button.active,
+.staff-section-tabs button.active,
+.settings-section-tabs button.active {
+  background: var(--surface);
+  box-shadow: 0 1px 3px rgba(20, 35, 45, 0.08);
+  color: var(--ink);
+}
+
+.notification-panel,
+.module-ai-chat-panel,
+.progress-modal,
+.service-modal,
+.service-config-modal,
+.schedule-create-modal,
+.patient-create-modal,
+.pharmacy-modal,
+.modal-backdrop > * {
+  border-color: var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-raised);
+}
+
+.progress-modal-backdrop,
+.modal-backdrop,
+.image-lightbox {
+  background: rgba(13, 24, 31, 0.46);
+  backdrop-filter: blur(4px);
+}
+
+.patient-profile-strip,
+.patient-operation-strip,
+.invoice-meta-grid,
+.invoice-total-band,
+.invoice-notes-grid,
+.invoice-signature-grid {
+  border-color: var(--line);
+}
+
+.patient-profile-strip > div,
+.patient-operation-strip > span,
+.patient-chart-stats div,
+.patient-admin-details,
+.schedule-alert,
+.credential-box,
+.booking-readiness,
+.pharmacy-template-preview,
+.pharmacy-detail-grid div,
+.pharmacy-detail-note,
+.accounting-budget-summary,
+.accounting-warning {
+  background: var(--surface-muted);
+  border-color: var(--line);
+}
+
+.appointment-card,
+.journey-billing-item,
+.pharmacy-rx-row,
+.pharmacy-template-item,
+.staff-today-pill,
+.inventory-alert-row,
+.dashboard-flow-step,
+.task-inbox-row {
+  background: #fbfdfd;
+}
+
+.module-ai-bubble {
+  background: var(--teal);
+  box-shadow: 0 14px 30px rgba(8, 118, 111, 0.28);
+  height: 54px;
+  width: 54px;
+}
+
+.empty-state {
+  background: var(--surface-muted);
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+}
+
+@media print {
+  body {
+    background: #ffffff;
+  }
+
+  .print-actions {
+    display: none;
+  }
+
+  .print-shell {
+    min-height: auto;
+    padding: 0;
+    background: #ffffff;
+  }
+
+  .invoice-template {
+    max-width: none;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+  }
+}
+
+@media (max-width: 1180px) {
+  .app-shell {
+    grid-template-columns: 88px minmax(0, 1fr);
+  }
+
+  .brand div:last-child,
+  .nav-group-title,
+  .nav-item span,
+  .sidebar-card {
+    display: none;
+  }
+
+  .nav-list {
+    gap: 10px;
+  }
+
+  .nav-group {
+    gap: 6px;
+  }
+
+  .nav-item {
+    justify-content: center;
+  }
+
+  .content-grid.two,
+  .patient-layout,
+  .journey-grid,
+  .patient-chart-paired-blocks,
+  .patient-chart-layout,
+  .portal-layout,
+  .schedule-ops-layout,
+  .schedule-dispatch-layout,
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-side-stack,
+  .schedule-queue {
+    position: static;
+  }
+
+  .patient-chart-paired-blocks > .panel {
+    height: auto;
+  }
+
+  .patient-chart-side {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .patient-card {
+    position: static;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .metric-grid,
+  .metric-grid.three {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+
+  .billing-patient-card {
+    grid-template-columns: minmax(220px, 1fr) repeat(3, minmax(96px, 0.55fr));
+  }
+
+  .billing-patient-card > div:nth-of-type(2),
+  .billing-patient-card > div:nth-of-type(6) {
+    display: none;
+  }
+
+  .billing-balance-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reports-summary-grid,
+  .dashboard-command-panel,
+  .dashboard-flow {
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  html:has(.mobile-app-view),
+  body:has(.mobile-app-view) {
+    background: #f8fbfb;
+  }
+
+  .app-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    padding: 10px;
+    height: auto;
+    overflow-y: visible;
+    overflow-x: auto;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .brand {
+    padding: 0;
+    min-width: 52px;
+  }
+
+  .brand div:last-child {
+    display: none;
+  }
+
+  .nav-list {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+  }
+
+  .nav-group {
+    display: contents;
+  }
+
+  .nav-item {
+    flex: 0 0 44px;
+    width: 44px;
+    padding: 0;
+  }
+
+  .workspace {
+    padding: 14px;
+  }
+
+  body:has(.mobile-app-view) .sidebar {
+    display: none;
+  }
+
+  body:has(.mobile-app-view) .workspace {
+    padding: max(12px, env(safe-area-inset-top)) 12px
+      calc(86px + env(safe-area-inset-bottom));
+  }
+
+  body:has(.mobile-app-view) .topbar {
+    margin-bottom: 10px;
+    min-height: auto;
+  }
+
+  body:has(.mobile-app-view) .topbar-main,
+  body:has(.mobile-app-view) .topbar-controls {
+    gap: 8px;
+  }
+
+  body:has(.mobile-app-view) .topbar-main h1 {
+    font-size: 22px;
+  }
+
+  body:has(.mobile-app-view) .topbar-actions,
+  body:has(.mobile-app-view) .topbar-controls .select-field,
+  body:has(.mobile-app-view) .topbar-controls .search-field,
+  body:has(.mobile-app-view) .topbar-controls .topbar-clear-search {
+    display: none;
+  }
+
+  .mobile-app-toolbar {
+    align-items: stretch;
+    background: #ffffff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+  }
+
+  .mobile-app-toolbar h2 {
+    font-size: 18px;
+    line-height: 1.25;
+  }
+
+  .mobile-app-view .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .mobile-app-view .metric-card {
+    min-height: 86px;
+    padding: 12px;
+  }
+
+  .billing-patient-card {
+    align-items: stretch;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .billing-patient-card > div:first-child,
+  .billing-patient-card > span:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .billing-patient-balance-panel > .record-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .billing-selected-patient-bar {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .billing-selected-patient-bar > div {
+    text-align: left;
+  }
+
+  .billing-balance-form {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-app-grid,
+  .mobile-app-view .content-grid,
+  .mobile-app-view .service-management-grid {
+    gap: 12px;
+  }
+
+  .accounting-layout,
+  .accounting-entry-form,
+  .accounting-period-form,
+  .accounting-ledger-filters,
+  .accounting-budget-summary-row,
+  .accounting-budget-row {
+    grid-template-columns: 1fr;
+  }
+
+  .accounting-toolbar-actions,
+  .accounting-period-form,
+  .accounting-ledger-filters,
+  .accounting-budget-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .accounting-ai-open-button {
+    width: 100%;
+  }
+
+  .mobile-app-view .panel {
+    border-radius: 10px;
+    padding: 14px;
+  }
+
+  .mobile-app-view .phone-frame {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    margin: 0;
+    min-height: auto;
+    padding: 0;
+    width: 100%;
+  }
+
+  .mobile-app-view .phone-top {
+    background: var(--teal-soft);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+
+  .mobile-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .mobile-app-view .mobile-card {
+    border: 1px solid #b7e4dc;
+  }
+
+  .mobile-app-view .portal-data-list {
+    margin-top: 0;
+  }
+
+  .mobile-app-view .portal-row {
+    align-items: start;
+    gap: 6px;
+  }
+
+  .pwa-install-banner {
+    border-radius: 10px 10px 0 0;
+    bottom: 0;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    max-width: none;
+    width: 100%;
+  }
+
+  .pwa-install-hint {
+    display: none;
+  }
+
+  .topbar {
+    align-items: flex-start;
+  }
+
+  .topbar-main {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+    width: 100%;
+  }
+
+  .topbar-actions,
+  .topbar-controls {
+    width: 100%;
+  }
+
+  .topbar-actions {
+    align-items: stretch;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .topbar-actions .context-badge,
+  .topbar-actions .user-chip {
+    flex: 1 1 142px;
+    min-width: 0;
+  }
+
+  .topbar-actions .language-switch {
+    flex: 0 0 auto;
+  }
+
+  .topbar-actions .icon-button {
+    flex: 0 0 38px;
+    height: 38px;
+    width: 38px;
+  }
+
+  .notification-bell-wrap {
+    flex: 0 0 38px;
+  }
+
+  .notification-bell-wrap .icon-button {
+    width: 38px;
+  }
+
+  .notification-panel {
+    max-height: min(680px, calc(100vh - 86px));
+    position: fixed;
+    right: 12px;
+    top: 72px;
+    width: calc(100vw - 24px);
+  }
+
+  .notification-tabs {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .notification-compose-grid,
+  .notification-check-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .topbar-actions .module-ai-topbar-button {
+    flex: 1 1 112px;
+    justify-content: center;
+    min-height: 38px;
+  }
+
+  .module-ai-floating {
+    bottom: max(12px, env(safe-area-inset-bottom));
+    right: 12px;
+  }
+
+  .module-ai-bubble {
+    height: 54px;
+    width: 54px;
+  }
+
+  .module-ai-chat-panel {
+    border-radius: 12px;
+    max-height: min(660px, calc(100vh - 24px));
+    width: calc(100vw - 24px);
+  }
+
+  .topbar-actions form {
+    display: flex;
+    flex: 1 1 96px;
+  }
+
+  .topbar-actions form .secondary-button {
+    min-height: 38px;
+    width: 100%;
+  }
+
+  .topbar-signout-button {
+    padding: 0 12px;
+  }
+
+  .topbar-signout-button span {
+    display: inline;
+  }
+
+  .patient-chart-header {
+    grid-template-columns: 1fr;
+  }
+
+  .patient-chart-tools,
+  .patient-chart-topline,
+  .patient-admin-list {
+    grid-template-columns: 1fr;
+  }
+
+  .chart-search-meta {
+    align-items: stretch;
+    flex-direction: column;
+    text-align: left;
+  }
+
+  .patient-chart-picker {
+    justify-self: stretch;
+    width: 100%;
+  }
+
+  .patient-chart-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .journey-timeline .chart-timeline-event > summary {
+    grid-template-columns: 44px 10px minmax(0, 1fr);
+  }
+
+  .journey-timeline .chart-timeline-event > summary > .status {
+    grid-column: 3;
+    justify-self: start;
+  }
+
+  .timeline-event-detail {
+    margin-left: 64px;
+  }
+
+  .timeline-unfinished article {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .timeline-unfinished article form,
+  .timeline-unfinished article .secondary-button {
+    width: 100%;
+  }
+
+  .chart-event-marker {
+    display: none;
+  }
+
+  .search-field,
+  .select-field,
+  .journey-patient-menu-trigger,
+  .topbar-clear-search {
+    width: 100%;
+  }
+
+  .journey-patient-menu-trigger {
+    justify-content: center;
+  }
+
+  .journey-patient-menu {
+    border-left: 0;
+    border-radius: 12px 12px 0 0;
+    bottom: 0;
+    height: min(82vh, 720px);
+    max-width: none;
+    padding: 14px;
+    position: absolute;
+    width: 100%;
+  }
+
+  .language-switch button {
+    min-height: 30px;
+  }
+
+  .search-field input,
+  .select-field select,
+  .select-field.compact select {
+    width: 100%;
+    max-width: none;
+  }
+
+  .patient-search-combobox {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .staff-day-picker .rdp-months {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-day-picker-button {
+    gap: 5px;
+    min-height: 76px;
+    padding: 6px;
+  }
+
+  .staff-day-picker .rdp-month_grid {
+    border-spacing: 3px;
+  }
+
+  .staff-day-picker-topline {
+    gap: 3px;
+  }
+
+  .staff-day-picker-date {
+    font-size: 12px;
+    height: 24px;
+    width: 24px;
+  }
+
+  .staff-month-start-badge {
+    font-size: 9px;
+    max-width: 34px;
+    padding: 5px 6px;
+  }
+
+  .staff-day-picker-stats {
+    gap: 3px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .staff-day-picker-stats span {
+    font-size: 0;
+    justify-content: center;
+    min-height: 18px;
+    padding: 0;
+  }
+
+  .staff-day-picker-stats span span {
+    font-size: 10px;
+    height: 16px;
+    min-width: 16px;
+    padding: 0 3px;
+  }
+
+  .metric-grid,
+  .metric-grid.three,
+  .reports-summary-grid,
+  .dashboard-command-panel,
+  .dashboard-flow,
+  .learning-metric-grid,
+  .inventory-metric-grid,
+  .settings-metric-grid,
+  .staff-ops-metric-grid,
+  .schedule-metrics.three {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .metric-card {
+    min-height: 86px;
+    padding: 12px;
+  }
+
+  .dashboard-command-copy,
+  .dashboard-command-status {
+    grid-column: 1 / -1;
+  }
+
+  .task-inbox-row,
+  .report-trend-row,
+  .report-aging-row,
+  .report-service-row,
+  .patient-file-governance-form,
+  .inventory-alert-grid,
+  .inventory-main-grid,
+  .settings-overview-grid,
+  .settings-lower-grid,
+  .settings-staff-meta,
+  .settings-staff-profile-summary,
+  .settings-staff-profile-editor form,
+  .settings-staff-actions,
+  .settings-archive-counts,
+  .surface-grid,
+  .patient-profile-strip,
+  .patient-operation-strip,
+  .patient-summary,
+  .patient-operations .patient-summary,
+  .record-grid,
+  .booking-form,
+  .patient-form,
+  .patient-edit-form,
+  .treatment-form,
+  .clinical-intake-form,
+  .phase-form,
+  .billing-form,
+  .clinical-form,
+  .clinical-note-grid,
+  .community-form,
+  .comment-form,
+  .staff-calendar-grid,
+  .staff-day-detail-grid,
+  .staff-day-modal-grid,
+  .staff-form,
+  .staff-roster-grid,
+  .staff-row,
+  .schedule-filters,
+  .vitals-grid,
+  .odontogram-workbench,
+  .journey-service-row,
+  .journey-selector,
+  .journey-timeline article,
+  .portal-row,
+  .invoice-meta-grid,
+  .invoice-total-band,
+  .invoice-notes-grid,
+  .invoice-signature-grid,
+  .invoice-ledger-row,
+  .learning-resource-input-row,
+  .learning-resource-row,
+  .inventory-item-row,
+  .inventory-equipment-card {
+    grid-template-columns: 1fr;
+  }
+
+  .print-shell {
+    padding: 14px;
+  }
+
+  .invoice-template {
+    padding: 20px;
+  }
+
+  .patient-edit-action {
+    margin-left: 0;
+  }
+
+  .invoice-template-header {
+    flex-direction: column;
+  }
+
+  .invoice-brand {
+    text-align: left;
+  }
+
+  .odontogram-workbench > div:first-child {
+    grid-column: auto;
+  }
+
+  .odontogram-planner {
+    grid-template-columns: 1fr;
+  }
+
+  .odontogram-target-toolbar {
+    align-items: stretch;
+  }
+
+  .odontogram-target-actions {
+    align-items: stretch;
+    display: grid;
+    flex-basis: 100%;
+  }
+
+  .odontogram-target-toolbar .selected-teeth-row {
+    justify-content: flex-start;
+    margin-left: 0;
+  }
+
+  .odontogram-stage-switcher {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .odontogram-stage-step {
+    display: block;
+  }
+
+  .odontogram-stage-step > svg {
+    display: none;
+  }
+
+  .odontogram-stage-step button {
+    height: 100%;
+    line-height: 1.2;
+    padding: 7px 5px;
+  }
+
+  .odontogram-stage-context,
+  .odontogram-stage-actions,
+  .odontogram-stage-difference {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .odontogram-stage-actions,
+  .odontogram-stage-difference {
+    width: 100%;
+  }
+
+  .odontogram-stage-actions {
+    position: relative;
+  }
+
+  .odontogram-stage-reset-menu {
+    align-self: flex-end;
+    position: static;
+  }
+
+  .odontogram-stage-reset-popover {
+    top: 100%;
+  }
+
+  .odontogram-stage-difference > span {
+    text-align: left;
+  }
+
+  .journey-service-row {
+    align-items: stretch;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    min-width: 0;
+  }
+
+  .journey-service-row.head {
+    display: none;
+  }
+
+  .journey-service-row:not(.head) > [data-label] {
+    align-content: start;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    display: grid;
+    gap: 5px;
+    min-width: 0;
+    padding: 8px;
+  }
+
+  .journey-service-row:not(.head) > [data-label]::before {
+    color: var(--muted);
+    content: attr(data-label);
+    font-size: 11px;
+    font-weight: 900;
+    line-height: 1.2;
+  }
+
+  .journey-service-row:not(.head) > .journey-service-name,
+  .journey-service-row:not(.head) > .service-progress-cell,
+  .journey-service-row:not(.head) > .journey-service-progress {
+    grid-column: 1 / -1;
+  }
+
+  .schedule-table {
+    overflow-x: visible;
+  }
+
+  .schedule-row {
+    align-items: start;
+    grid-template-columns: 78px minmax(0, 1fr);
+    min-width: 0;
+  }
+
+  .schedule-row-head {
+    display: none;
+  }
+
+  .schedule-row > div:nth-child(n + 3) {
+    grid-column: 1 / -1;
+  }
+
+  .schedule-row-actions {
+    align-items: stretch;
+    display: flex;
+    gap: 8px;
+  }
+
+  .schedule-row-actions form {
+    flex-wrap: wrap;
+  }
+
+  .schedule-row-actions button,
+  .schedule-row-actions select {
+    min-height: 34px;
+  }
+
+  .schedule-row-actions select {
+    max-width: none;
+  }
+
+  .progress-modal-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .progress-modal-actions .booking-readiness {
+    margin-right: 0;
+    max-width: none;
+    order: -1;
+  }
+
+  .progress-modal-header {
+    align-items: flex-start;
+    flex-direction: row;
+  }
+
+  .progress-modal-header .icon-button {
+    flex: 0 0 auto;
+  }
+
+  .service-action-row {
+    flex-direction: column;
+  }
+
+  .service-catalog-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .inventory-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .service-section-tabs,
+  .inventory-section-tabs,
+  .crm-section-tabs,
+  .forms-section-tabs,
+  .learning-section-tabs,
+  .accounting-section-tabs,
+  .service-config-tabs {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .service-modal-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .service-step-edit-form,
+  .service-edit-form,
+  .pharmacy-template-apply-row,
+  .pharmacy-rx-row-head,
+  .pharmacy-rx-row-grid,
+  .pharmacy-prescription-summary,
+  .pharmacy-medication-card-summary,
+  .pharmacy-medication-facts,
+  .pharmacy-detail-grid,
+  .service-step-form,
+  .pharmacy-template-item-head {
+    grid-template-columns: 1fr;
+  }
+
+  .pharmacy-rx-row-grid .clinical-wide {
+    grid-column: auto;
+  }
+
+  .service-step-edit-form span,
+  .pharmacy-template-item-head span {
+    width: 100%;
+  }
+
+  .journey-billing-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .billing-operational-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .journey-selector {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .staff-row form {
+    flex-wrap: wrap;
+  }
+
+  .settings-staff-card-head,
+  .settings-archive-head,
+  .settings-staff-actions form {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .settings-staff-card-head {
+    align-items: flex-start;
+  }
+
+  .settings-staff-card-head .status {
+    align-self: flex-start;
+  }
+
+  .settings-staff-actions select,
+  .settings-staff-actions button,
+  .settings-profile-file-field,
+  .settings-staff-profile-editor button {
+    width: 100%;
+    grid-column: 1;
+  }
+
+  .journey-billing-head,
+  .billing-service-badges {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .journey-billing-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-form .booking-reason,
+  .patient-form .patient-wide,
+  .patient-edit-form .patient-wide,
+  .treatment-form .treatment-wide,
+  .phase-form .phase-wide,
+  .clinical-form .clinical-wide,
+  .community-form .community-body,
+  .community-form .community-tags {
+    grid-column: auto;
+  }
+
+  .schedule-grid {
+    grid-template-columns: 72px repeat(4, minmax(220px, 1fr));
+    overflow-x: auto;
+  }
+
+  .table-row,
+  .clinic-row,
+  .timeline-item,
+  .invoice-row,
+  .bar-row,
+  .report-table-row {
+    grid-template-columns: 1fr;
+  }
+
+  .staff-attendance-row.billing-invoice-row,
+  .staff-attendance-adjust-form.service-step-form {
+    grid-template-columns: 1fr;
+  }
+
+  .clinic-stats {
+    text-align: left;
+  }
+
+}

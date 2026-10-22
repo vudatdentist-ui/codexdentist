@@ -1,4 +1,6 @@
 "use client";
+import { normalizeSearchText } from "@/shared/search";
+
 
 import { OperationalDialog } from "@/components/ui/WorkspaceControls";
 
@@ -22,15 +24,6 @@ import type {
   AccountingSummary,
   AccountingWorkspace,
 } from "@/lib/accounting-types";
-
-function normalizeSearchText(value: string | number | null | undefined) {
-  return String(value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\u0111/g, "d")
-    .replace(/\u0110/g, "D")
-    .toLowerCase();
-}
 
 function accountingPeriodLabel(periodMonth: string, language: Language) {
   const [year, month] = periodMonth.split("-");

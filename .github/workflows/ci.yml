@@ -58,6 +58,8 @@ jobs:
         run: npm audit --audit-level=high
       - name: Audit regression tests
         run: npm run test:audit
+      - name: Maintainability regressions and budgets
+        run: npm run test:maintainability
       - run: npm run encoding:check
       - run: npm run typecheck
       - run: node scripts/agent-module-audit.mjs
@@ -83,6 +85,10 @@ jobs:
           NODE_ENV: test
       - name: Audit database concurrency tests
         run: npm run test:audit-db
+        env:
+          NODE_ENV: test
+      - name: Maintainability database regressions
+        run: npm run test:maintainability-db
         env:
           NODE_ENV: test
       - run: npm run build

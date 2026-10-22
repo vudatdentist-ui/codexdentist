@@ -1,10 +1,11 @@
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import "server-only";
+import type { ProvisioningClient } from "@/lib/provisioning-client";
+import { nextGlobalDocumentNo } from "@/lib/global-document-sequence";
 
 import { Buffer } from "node:buffer";
-import { nextDocumentNo } from "@/lib/document-sequence";
-import { defaultDataSeedEnabled } from "@/lib/env";
 import { patientAccessWhere } from "@/lib/patient-access";
-import { canUseAllClinics, hasAnyRole, type AppRole, type RoleSource } from "@/lib/permissions";
+import { hasAnyRole, type AppRole, type RoleSource } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { assertDemoFallbackAllowed } from "@/lib/runtime-guards";
 import type {
@@ -705,10 +706,6 @@ export async function getPharmacyWorkspace(
   try {
     const clinicIds = allowedClinicIds(session);
 
-    if (defaultDataSeedEnabled()) {
-      await ensurePharmacySeed(session);
-    }
-
     const [patients, medications, templates, prescriptions] = await Promise.all([
       prisma.patient.findMany({
         where: {
@@ -1008,47 +1005,27 @@ export async function getPrintablePrescriptionTemplate(
   };
 }
 
-export async function nextPrescriptionNo(organizationId: string) {
-  return nextDocumentNo({
-    organizationId,
-    type: "RX",
-    seedCurrentValue: () =>
-      prisma.prescription.count({
-        where: {
-          organizationId,
-        },
-      }),
-  });
+export async function nextPrescriptionNo(_organizationId: string) {
+  return nextGlobalDocumentNo("RX");
 }
 
 export function canMutatePharmacy(source: RoleSource) {
   return hasAnyRole(source, mutablePharmacyRoles);
 }
 
-export async function ensurePharmacySeed(session: AppSession) {
+export async function ensurePharmacySeed(session: AppSession, client: ProvisioningClient = prisma) {
   const seedMedications = defaultMedications.map(repairSeedRecord);
   const seedTemplates = defaultTemplates.map(repairSeedRecord);
 
   for (const medication of seedMedications) {
-    await prisma.medicationCatalogItem.upsert({
+    await client.medicationCatalogItem.upsert({
       where: {
         organizationId_code: {
           organizationId: session.organizationId,
           code: medication.code,
         },
       },
-      update: {
-        genericName: medication.genericName,
-        brandName: medication.brandName,
-        strength: medication.strength,
-        form: medication.form,
-        defaultSig: medication.defaultSig,
-        defaultDose: medication.defaultDose,
-        route: medication.route,
-        frequency: medication.frequency,
-        warnings: medication.warnings,
-        active: true,
-      },
+      update: {},
       create: {
         organizationId: session.organizationId,
         ...medication,
@@ -1057,7 +1034,7 @@ export async function ensurePharmacySeed(session: AppSession) {
     });
   }
 
-  const medications = await prisma.medicationCatalogItem.findMany({
+  const medications = await client.medicationCatalogItem.findMany({
     where: {
       organizationId: session.organizationId,
     },
@@ -1074,19 +1051,14 @@ export async function ensurePharmacySeed(session: AppSession) {
   );
 
   for (const template of seedTemplates) {
-    const prescriptionTemplate = await prisma.prescriptionTemplate.upsert({
+    const prescriptionTemplate = await client.prescriptionTemplate.upsert({
       where: {
         organizationId_code: {
           organizationId: session.organizationId,
           code: template.code,
         },
       },
-      update: {
-        active: true,
-        name: template.name,
-        diagnosis: template.diagnosis,
-        instructions: template.instructions,
-      },
+      update: {},
       create: {
         organizationId: session.organizationId,
         createdById: databaseUserId(session.userId),
@@ -1101,21 +1073,15 @@ export async function ensurePharmacySeed(session: AppSession) {
       },
     });
 
-    const itemCount = await prisma.prescriptionTemplateItem.count({
+    const itemCount = await client.prescriptionTemplateItem.count({
       where: {
         templateId: prescriptionTemplate.id,
       },
     });
 
-    if (itemCount > 0) {
-      await prisma.prescriptionTemplateItem.deleteMany({
-        where: {
-          templateId: prescriptionTemplate.id,
-        },
-      });
-    }
+    if (itemCount > 0) continue;
 
-    await prisma.prescriptionTemplateItem.createMany({
+    await client.prescriptionTemplateItem.createMany({
       data: template.items.map((item) => {
         const medication = medicationByCode.get(item.medicationCode);
 
@@ -1320,14 +1286,6 @@ function toPrescriptionSummary(prescription: {
       instructions: item.instructions,
     })),
   };
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 async function fallbackClinic(session: AppSession) {

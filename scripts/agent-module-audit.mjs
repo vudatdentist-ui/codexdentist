@@ -1,3 +1,4 @@
+import ts from "typescript";
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 
@@ -24,6 +25,9 @@ const architectureRoots = [
 ];
 
 const migratedTransportFiles = new Set([
+  "src/app/(app)/settings/actions.ts",
+  "src/app/(app)/staff/actions.ts",
+  "src/app/(app)/inventory/actions.ts",
   "src/app/(app)/billing/actions.ts",
   "src/app/(app)/clinical/actions.ts",
   "src/app/(app)/journey/actions.ts",
@@ -120,7 +124,7 @@ function auditCopy(normalized, text) {
 }
 
 function auditArchitecture(file) {
-  const imports = collectImports(file.text);
+  const imports = collectImports(file.text, file.path);
   auditApplicationBoundary(file, imports);
 
   const sourceLayer = architectureLayer(file.path);
@@ -128,7 +132,8 @@ function auditArchitecture(file) {
 
   for (const item of imports) {
     const target = resolveImportPath(file.path, item.specifier);
-    const violation = boundaryViolation(sourceLayer, target, item.specifier);
+    const violation = boundaryViolation(sourceLayer, target, item.specifier) ||
+      (["features", "domains", "shared", "workspaces"].includes(sourceLayer) ? legacyImplementationViolation(target, new Set()) : null);
     if (violation) {
       findings.push(
         `${file.path}:${item.line}: architecture boundary ${sourceLayer} -> ${target ?? item.specifier}: ${violation}`,
@@ -169,6 +174,20 @@ function auditApplicationBoundary(file, imports) {
       findings.push(`${file.path}: application commands must accept typed inputs, not FormData`);
     }
   }
+}
+
+function legacyImplementationViolation(target, visited) {
+  if (!target || visited.has(target)) return null;
+  visited.add(target);
+  if (["src/lib/prisma", "src/lib/auth", "src/lib/env", "src/lib/patient-file-storage", "src/lib/transaction"].includes(target)) return 'legacy concrete implementation must be accessed through an application port';
+  const dependency = files.find(file => file.path.replace(/\.(ts|tsx|js|jsx)$/, '') === target);
+  if (!dependency) return null;
+  for (const edge of collectImports(dependency.text, dependency.path)) {
+    if (isFrameworkOrPersistenceImport(edge.specifier)) return 'transitive concrete framework/persistence dependency is not an application contract';
+    const violation = legacyImplementationViolation(resolveImportPath(dependency.path, edge.specifier), visited);
+    if (violation) return violation;
+  }
+  return null;
 }
 
 function boundaryViolation(sourceLayer, target, specifier) {
@@ -289,28 +308,24 @@ function normalizedExternalSpecifier(specifier) {
   return specifier.trim();
 }
 
-function collectImports(text) {
-  const patterns = [
-    /(?:import|export)\s+(?:type\s+)?(?:[^"']*?\s+from\s+)?["']([^"']+)["']/g,
-    /import\s*\(\s*["']([^"']+)["']\s*\)/g,
-    /require\s*\(\s*["']([^"']+)["']\s*\)/g,
-  ];
+function collectImports(text, filename) {
+  if (filename.endsWith('.css')) return [];
+  const source = ts.createSourceFile(filename, text, ts.ScriptTarget.Latest, true);
   const items = [];
-  const seen = new Set();
-
-  for (const pattern of patterns) {
-    for (const match of text.matchAll(pattern)) {
-      const key = `${match.index}:${match[1]}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      items.push({
-        specifier: match[1],
-        statement: match[0],
-        line: lineNumberAt(text, match.index ?? 0),
-      });
+  function visit(node) {
+    if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) {
+      const clause = node.importClause;
+      const named = clause?.namedBindings;
+      const onlyTypes = clause?.isTypeOnly || node.isTypeOnly ||
+        (!clause?.name && named && ts.isNamedImports(named) && named.elements.length > 0 && named.elements.every(item => item.isTypeOnly));
+      if (!onlyTypes) items.push({ specifier: node.moduleSpecifier.text, line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1 });
     }
+    if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || node.expression.getText(source) === 'require') && node.arguments[0] && ts.isStringLiteral(node.arguments[0])) {
+      items.push({ specifier: node.arguments[0].text, line: source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1 });
+    }
+    ts.forEachChild(node, visit);
   }
-
+  visit(source);
   return items;
 }
 

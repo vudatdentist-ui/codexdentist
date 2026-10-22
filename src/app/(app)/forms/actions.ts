@@ -1,4 +1,7 @@
 "use server";
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
+
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -12,7 +15,6 @@ import {
   splitList,
 } from "@/lib/form-validation";
 import { canMutateForms, nextPatientFormNo } from "@/lib/forms";
-import { canUseAllClinics } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 
@@ -97,7 +99,8 @@ export async function createFormTemplateAction(formData: FormData) {
       code,
       version,
     });
-  } catch {
+  } catch (error) {
+    reportApplicationError("app/(app)/forms/actions", error);
     redirect("/forms?notice=forms-database");
   }
 
@@ -184,6 +187,7 @@ export async function assignPatientFormAction(formData: FormData) {
       patientId: patient.id,
     });
   } catch (error) {
+    reportApplicationError("app/(app)/forms/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -245,6 +249,7 @@ export async function completePatientFormAction(formData: FormData) {
       formNo: patientForm.formNo,
     });
   } catch (error) {
+    reportApplicationError("app/(app)/forms/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -295,6 +300,7 @@ export async function voidPatientFormAction(formData: FormData) {
       reason: voidReason,
     });
   } catch (error) {
+    reportApplicationError("app/(app)/forms/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -337,14 +343,6 @@ async function scopedPatientForm(session: AppSession, patientFormId: string) {
       },
     },
   });
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 async function writeFormsAuditLog(

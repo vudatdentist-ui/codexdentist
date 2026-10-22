@@ -1,0 +1,702 @@
+.patient-chart-title-picker {
+  justify-self: stretch;
+  width: 100%;
+}
+
+.patient-chart-toolbar-title .chart-search-meta {
+  grid-column: 1 / -1;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.patient-chart-paired-blocks {
+  align-items: stretch;
+  display: grid;
+  gap: 18px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+}
+
+.patient-chart-paired-blocks > .panel {
+  height: 100%;
+  min-width: 0;
+}
+
+.patient-chart-header {
+  grid-template-columns: 1fr;
+  align-content: start;
+  align-items: stretch;
+}
+
+.patient-chart-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.patient-chart-search {
+  width: 100%;
+}
+
+.chart-search-meta {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.patient-chart-search-meta {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.chart-clear-search {
+  min-height: 34px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--teal);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.chart-section-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chart-section-nav a {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f9fbfb;
+  color: var(--ink);
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.chart-section-nav a:hover {
+  background: var(--teal-soft);
+  border-color: #99d8d0;
+  color: var(--teal);
+}
+
+.patient-chart-topline {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 360px);
+  gap: 14px;
+  align-items: center;
+}
+
+.patient-chart-paired-blocks .patient-chart-tools,
+.patient-chart-paired-blocks .patient-chart-topline,
+.patient-chart-paired-blocks .patient-admin-list {
+  grid-template-columns: 1fr;
+}
+
+.patient-chart-paired-blocks .patient-chart-stats {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.patient-chart-identity {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.patient-chart-avatar {
+  flex: 0 0 auto;
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+
+.patient-chart-identity h2 {
+  font-size: 24px;
+}
+
+.patient-chart-meta,
+.patient-safety-strip,
+.chart-actions-panel {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.patient-chart-meta {
+  margin-top: 8px;
+}
+
+.patient-chart-meta span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.code-chip {
+  align-items: center;
+  background: var(--surface-muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  min-height: 26px;
+  overflow-wrap: anywhere;
+  padding: 4px 9px;
+}
+
+.patient-chart-picker {
+  justify-self: end;
+  width: min(100%, 360px);
+}
+
+.patient-chart-stats {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.patient-chart-stats div {
+  min-height: 62px;
+  display: grid;
+  align-content: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f9fbfb;
+  padding: 10px 12px;
+}
+
+.patient-chart-stats span,
+.chart-event-count {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.patient-chart-stats strong {
+  display: block;
+  font-size: 15px;
+}
+
+.patient-safety-strip {
+  grid-column: 1 / -1;
+}
+
+.patient-admin-details {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  grid-column: 1 / -1;
+}
+
+.patient-admin-details summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 52px;
+  padding: 10px 12px;
+}
+
+.patient-admin-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.patient-admin-details summary strong,
+.patient-admin-details summary span {
+  display: block;
+}
+
+.patient-admin-details summary span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.patient-admin-details .patient-admin-list {
+  border-top: 1px solid var(--line);
+  padding: 10px;
+}
+
+.patient-safety-strip span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  border-radius: 999px;
+  background: var(--rose-soft);
+  color: #be123c;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.patient-chart-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(360px, 430px);
+  gap: 18px;
+  align-items: start;
+}
+
+.patient-chart-main,
+.patient-chart-side {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.patient-chart-side {
+  position: sticky;
+  top: 116px;
+  max-height: calc(100vh - 136px);
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.chart-actions-panel {
+  align-items: center;
+}
+
+.chart-action-button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.chart-action-button:hover {
+  background: var(--teal-soft);
+  border-color: #99d8d0;
+  color: var(--teal);
+}
+
+.chart-filter-row {
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 14px;
+  overflow-x: auto;
+}
+
+.chart-filter-row button {
+  white-space: nowrap;
+}
+
+.chart-timeline {
+  gap: 18px;
+}
+
+.timeline-day-group,
+.timeline-day-events {
+  display: grid;
+}
+
+.timeline-day-group {
+  gap: 8px;
+}
+
+.timeline-day-header {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  padding: 0 2px 7px;
+}
+
+.timeline-day-header time {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.timeline-day-header span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.timeline-day-events {
+  gap: 6px;
+}
+
+.journey-timeline .chart-timeline-event {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f9fbfb;
+  color: var(--ink);
+  text-align: left;
+}
+
+.journey-timeline .chart-timeline-event > summary {
+  align-items: start;
+  cursor: pointer;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 54px 12px minmax(0, 1fr) auto;
+  list-style: none;
+  padding: 10px 12px;
+}
+
+.journey-timeline .chart-timeline-event > summary::-webkit-details-marker {
+  display: none;
+}
+
+.journey-timeline .chart-timeline-event:hover,
+.journey-timeline .chart-timeline-event[open] {
+  border-color: #99d8d0;
+  background: #f0fdfa;
+}
+
+.journey-timeline .chart-timeline-event > summary:focus-visible {
+  outline: 3px solid rgba(20, 184, 166, 0.24);
+  outline-offset: 2px;
+}
+
+.journey-timeline .chart-timeline-event > summary > time {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+  padding-top: 2px;
+}
+
+.chart-timeline-event-body {
+  color: var(--ink);
+  min-width: 0;
+  display: grid;
+  justify-items: start;
+  align-content: start;
+}
+
+.journey-timeline .chart-timeline-event strong {
+  color: var(--ink);
+  display: block;
+  margin-top: 2px;
+}
+
+.journey-timeline .chart-timeline-event span,
+.journey-timeline .chart-timeline-event small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.journey-timeline .chart-timeline-event small {
+  display: block;
+  margin-top: 4px;
+  line-height: 1.45;
+}
+
+.timeline-event-detail {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  margin-left: 88px;
+  padding: 10px 12px 12px 0;
+}
+
+.timeline-event-detail p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.chart-event-marker {
+  width: 12px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--muted);
+  box-shadow: 0 0 0 4px #eef4f3;
+  margin-top: 3px;
+}
+
+.chart-event-marker.session {
+  background: var(--teal);
+}
+
+.chart-event-marker.clinical {
+  background: var(--blue);
+}
+
+.chart-event-marker.treatment {
+  background: var(--violet);
+}
+
+.chart-event-marker.billing {
+  background: var(--amber);
+}
+
+.chart-event-marker.files {
+  background: var(--green);
+}
+
+.timeline-unfinished {
+  background: #fffbeb;
+  border: 1px solid #efd28c;
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  margin-bottom: 16px;
+  padding: 12px;
+}
+
+.timeline-unfinished > header {
+  align-items: start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.timeline-unfinished > header div {
+  display: grid;
+  gap: 3px;
+}
+
+.timeline-unfinished > header span,
+.timeline-unfinished article small,
+.timeline-unfinished article time {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.timeline-unfinished-count {
+  align-items: center;
+  background: #f5dfaa;
+  border-radius: 999px;
+  color: #784f08 !important;
+  display: inline-flex;
+  flex: 0 0 26px;
+  font-weight: 900;
+  height: 26px;
+  justify-content: center;
+}
+
+.timeline-unfinished-list {
+  display: grid;
+  gap: 6px;
+}
+
+.timeline-unfinished article {
+  align-items: center;
+  background: var(--surface);
+  border: 1px solid #ead9ad;
+  border-radius: 6px;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 9px 10px;
+}
+
+.timeline-unfinished article > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.timeline-unfinished article strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.timeline-unfinished article .secondary-button {
+  min-height: 34px;
+  white-space: nowrap;
+}
+
+.journey-detail-list.compact {
+  gap: 8px;
+}
+
+.patient-admin-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.patient-chart-side .odontogram-workbench,
+.patient-chart-side .vitals-grid,
+.patient-chart-side .treatment-form {
+  grid-template-columns: 1fr;
+}
+
+.patient-chart-side .odontogram-workbench > div:first-child,
+.patient-chart-side .treatment-form .treatment-wide {
+  grid-column: auto;
+}
+
+.patient-chart-side .treatment-form {
+  margin-top: 14px;
+}
+
+.patient-chart-side textarea {
+  min-height: 92px;
+}
+
+.clinical-intake-form,
+.odontogram-workbench,
+.timeline-comment-form {
+  display: grid;
+  gap: 12px;
+}
+
+.clinical-intake-form {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 0;
+}
+
+.clinical-intake-form .clinical-wide,
+.clinical-intake-form .vitals-grid {
+  grid-column: 1 / -1;
+}
+
+.clinical-intake-form label,
+.odontogram-planner label,
+.timeline-comment-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.clinical-intake-form textarea,
+.clinical-intake-form input,
+.odontogram-planner input,
+.odontogram-planner select,
+.timeline-comment-form input,
+.timeline-comment-form select,
+.timeline-comment-form textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 10px;
+}
+
+.clinical-intake-form textarea,
+.timeline-comment-form textarea {
+  min-height: 88px;
+  resize: vertical;
+}
+
+.clinical-plan-form textarea[name="treatmentGoal"],
+.clinical-plan-form textarea[name="treatmentPlan"] {
+  min-height: 110px;
+}
+
+.clinical-plan-form .primary-button {
+  justify-self: end;
+}
+
+.patient-file-governance-form {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(140px, 1fr) minmax(130px, 0.8fr) auto;
+  margin-top: 10px;
+}
+
+.patient-file-governance-form label {
+  color: var(--muted);
+  display: grid;
+  font-size: 12px;
+  font-weight: 800;
+  gap: 6px;
+}
+
+.patient-file-governance-form input,
+.patient-file-governance-form select {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.vitals-grid,
+.odontogram-workbench {
+  display: grid;
+  gap: 12px;
+}
+
+.vitals-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.odontogram-workbench {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+}
+
+.odontogram-target-toolbar {
+  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  min-width: 0;
+}
+
+.odontogram-target-actions {
+  align-items: end;
+  display: flex;
+  flex: 1 1 610px;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  min-width: 0;
+}
+
+.odontogram-target-actions .eyebrow {
+  flex: 1 0 100%;
+  margin: 0;
+}
+
+.odontogram-planner {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.8fr) minmax(320px, 1.45fr) auto;
+  align-items: end;
+  gap: 10px;
+}
+
+.odontogram-planner .primary-button {
+  min-height: 39px;
+  white-space: nowrap;
+}
+
+.arch-target-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+
+.odontogram-target-toolbar .selected-teeth-row {
+  flex: 0 1 auto;
+  justify-content: flex-end;
+  margin: 0 0 1px auto;
+  min-width: 120px;
+}

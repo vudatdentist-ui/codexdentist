@@ -1,4 +1,7 @@
 "use server";
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
+
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -15,7 +18,6 @@ import {
   displayMedicationName,
   nextPrescriptionNo,
 } from "@/lib/pharmacy";
-import { canUseAllClinics } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 
@@ -70,7 +72,8 @@ export async function createMedicationAction(formData: FormData) {
     });
 
     await writePharmacyAuditLog(session, "medication.upserted", "MedicationCatalogItem", code);
-  } catch {
+  } catch (error) {
+    reportApplicationError("app/(app)/pharmacy/actions", error);
     redirect("/pharmacy?notice=pharmacy-database");
   }
 
@@ -153,7 +156,8 @@ export async function createPrescriptionTemplateAction(formData: FormData) {
         },
       });
     });
-  } catch {
+  } catch (error) {
+    reportApplicationError("app/(app)/pharmacy/actions", error);
     redirect("/pharmacy?notice=pharmacy-database");
   }
 
@@ -281,6 +285,7 @@ export async function createPrescriptionAction(formData: FormData) {
       );
     }
   } catch (error) {
+    reportApplicationError("app/(app)/pharmacy/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -336,6 +341,7 @@ export async function signPrescriptionAction(formData: FormData) {
       },
     );
   } catch (error) {
+    reportApplicationError("app/(app)/pharmacy/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -386,6 +392,7 @@ export async function markPrescriptionPrintedAction(formData: FormData) {
       },
     );
   } catch (error) {
+    reportApplicationError("app/(app)/pharmacy/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -609,14 +616,6 @@ async function scopedPrescription(session: AppSession, prescriptionId: string) {
   });
 }
 
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
-}
-
 async function writePharmacyAuditLog(
   session: AppSession,
   action: string,
@@ -642,16 +641,6 @@ function parseInteger(value: FormDataEntryValue | null) {
   return Number.isFinite(parsed) && parsed >= 0 ? parsed : null;
 }
 
-function mergePrescriptionDirections(sig: string, instructions: string | null) {
-  const cleanSig = sig.trim();
-  const cleanInstructions = instructions?.trim() ?? "";
-
-  if (!cleanInstructions || cleanSig === cleanInstructions) {
-    return cleanSig;
-  }
-
-  return `${cleanSig}\n${cleanInstructions}`;
-}
 
 function composePrescriptionSig({
   dose,

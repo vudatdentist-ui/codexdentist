@@ -1,8 +1,7 @@
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import { requireViewSession } from "@/lib/auth";
 import { csvCell } from "@/lib/csv";
-import { canUseAllClinics } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import type { AppSession } from "@/lib/session";
 
 export async function GET() {
   const session = await requireViewSession("staff");
@@ -66,12 +65,4 @@ export async function GET() {
       "Content-Type": "text/csv; charset=utf-8",
     },
   });
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }

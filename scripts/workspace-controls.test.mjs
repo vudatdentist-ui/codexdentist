@@ -32,7 +32,8 @@ test('operational modals cannot regress to unfocused div backdrops', () => {
 });
 test('font families use checksum-pinned complete self-hosted Vietnamese faces', () => {
   const assets = text('scripts/fetch-font-assets.mjs');
-  const globals = text('src/app/globals.css');
+  const manifest = text('src/app/globals.css');
+  const globals = [...manifest.matchAll(/@import "([^"]+)";/g)].map(([, file]) => readFileSync(new URL(file, new URL('src/app/globals.css', root)), 'utf8')).join('\n');
   const packageJson = JSON.parse(text('package.json'));
   assert.equal([...assets.matchAll(/sha256: "[0-9a-f]{64}"/g)].length, 5);
   assert.equal([...globals.matchAll(/@font-face/g)].length, 5);

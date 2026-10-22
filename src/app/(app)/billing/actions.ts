@@ -1,4 +1,5 @@
 "use server";
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -46,6 +47,7 @@ export async function createInvoiceAction(formData: FormData) {
   try {
     await createInvoiceCommand(session, { patientId, amount, dueDate });
   } catch (error) {
+    reportApplicationError("app/(app)/billing/actions", error);
     redirect(`/billing?notice=${applicationErrorCode(error, "billing-database")}`);
   }
 
@@ -66,6 +68,7 @@ export async function recordPaymentAction(formData: FormData) {
   try {
     await recordInvoicePaymentCommand(session, { invoiceNo, amount, method });
   } catch (error) {
+    reportApplicationError("app/(app)/billing/actions", error);
     redirect(`/billing?notice=${applicationErrorCode(error, "billing-database")}`);
   }
 
@@ -103,6 +106,7 @@ export async function recordPatientReceiptAction(formData: FormData) {
       note,
     });
   } catch (error) {
+    reportApplicationError("app/(app)/billing/actions", error);
     redirect(billingNoticeUrl(applicationErrorCode(error, "billing-database"), patientId));
   }
 
@@ -120,6 +124,7 @@ export async function issueServiceInvoiceAction(formData: FormData) {
     const result = await issueServiceInvoiceCommand(session, treatmentServiceId);
     patientId = result.patientId;
   } catch (error) {
+    reportApplicationError("app/(app)/billing/actions", error);
     redirect(billingNoticeUrl(applicationErrorCode(error, "billing-database"), patientId));
   }
 
@@ -135,6 +140,7 @@ export async function voidInvoiceAction(formData: FormData) {
   try {
     await voidInvoiceCommand(session, invoiceNo);
   } catch (error) {
+    reportApplicationError("app/(app)/billing/actions", error);
     redirect(`/billing?notice=${applicationErrorCode(error, "billing-database")}`);
   }
 
@@ -154,6 +160,7 @@ export async function adjustInvoiceAmountAction(formData: FormData) {
   try {
     await adjustInvoiceAmountCommand(session, { invoiceNo, amount, reason });
   } catch (error) {
+    reportApplicationError("app/(app)/billing/actions", error);
     redirect(`/billing?notice=${applicationErrorCode(error, "billing-database")}`);
   }
 
@@ -174,6 +181,7 @@ export async function recordInvoiceRefundAction(formData: FormData) {
   try {
     await recordInvoiceRefundCommand(session, { invoiceNo, amount, method, reference });
   } catch (error) {
+    reportApplicationError("app/(app)/billing/actions", error);
     redirect(`/billing?notice=${applicationErrorCode(error, "billing-database")}`);
   }
 
@@ -195,6 +203,7 @@ export async function createPaymentPlanReminderAction(formData: FormData) {
   try {
     await createPaymentPlanReminderCommand(session, { patientId, amount, scheduledAt, note });
   } catch (error) {
+    reportApplicationError("app/(app)/billing/actions", error);
     redirect(`/billing?notice=${applicationErrorCode(error, "billing-database")}`);
   }
 
@@ -234,6 +243,7 @@ export async function createPaymentPlanAction(formData: FormData) {
       note,
     });
   } catch (error) {
+    reportApplicationError("app/(app)/billing/actions", error);
     redirect(`/billing?notice=${applicationErrorCode(error, "billing-database")}`);
   }
 
@@ -268,6 +278,7 @@ async function recordServiceCollectionAction(formData: FormData, issueInvoice: b
     patientId = result.patientId;
     createdInvoice = result.createdInvoice;
   } catch (error) {
+    reportApplicationError("app/(app)/billing/actions", error);
     redirect(billingNoticeUrl(applicationErrorCode(error, "billing-database"), patientId));
   }
 

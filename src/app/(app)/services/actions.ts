@@ -1,4 +1,5 @@
 "use server";
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import { accessibleClinicIds } from "@/lib/tenant-scope";
 
@@ -128,6 +129,7 @@ export async function createServiceCatalogItemAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/services/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -248,6 +250,7 @@ export async function updateServiceCatalogItemAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/services/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -341,6 +344,7 @@ export async function deleteServiceCatalogItemAction(formData: FormData) {
       });
     });
   } catch (error) {
+    reportApplicationError("app/(app)/services/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -404,6 +408,7 @@ export async function addServiceStepAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/services/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -477,6 +482,7 @@ export async function updateServiceStepAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/services/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -569,6 +575,7 @@ export async function addServiceMaterialAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/services/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -693,6 +700,7 @@ export async function createCompensationPolicyAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/services/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -790,6 +798,7 @@ export async function deleteCompensationPolicyAction(formData: FormData) {
       });
     });
   } catch (error) {
+    reportApplicationError("app/(app)/services/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }

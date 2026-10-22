@@ -1,7 +1,8 @@
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import "server-only";
+import type { ProvisioningClient } from "@/lib/provisioning-client";
 
-import { defaultDataSeedEnabled } from "@/lib/env";
-import { canUseAllClinics, hasAnyRole, type AppRole, type RoleSource } from "@/lib/permissions";
+import { hasAnyRole, type AppRole, type RoleSource } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { assertDemoFallbackAllowed } from "@/lib/runtime-guards";
 import type {
@@ -58,9 +59,6 @@ export async function getLearningWorkspace(
 ): Promise<LearningWorkspace> {
   try {
     const clinicIds = allowedClinicIds(session);
-    if (defaultDataSeedEnabled()) {
-      await ensureLearningSeed(session);
-    }
 
     const [clinics, users, contents, enrollments] = await Promise.all([
       prisma.clinic.findMany({
@@ -246,23 +244,16 @@ export async function nextLearningContentCode(organizationId: string, type: stri
   return `${prefix}-${String(count + 1).padStart(4, "0")}`;
 }
 
-export async function ensureLearningSeed(session: AppSession) {
+export async function ensureLearningSeed(session: AppSession, client: ProvisioningClient = prisma) {
   for (const content of defaultLearningContent) {
-    await prisma.learningContent.upsert({
+    await client.learningContent.upsert({
       where: {
         organizationId_code: {
           organizationId: session.organizationId,
           code: content.code,
         },
       },
-      update: {
-        type: content.type,
-        title: content.title,
-        summary: content.summary,
-        body: content.body,
-        durationMinutes: content.durationMinutes,
-        active: true,
-      },
+      update: {},
       create: {
         organizationId: session.organizationId,
         authorId: databaseUserId(session.userId),
@@ -410,14 +401,6 @@ function toEnrollmentSummary(enrollment: {
     completedAt: enrollment.completedAt ? vietnamDateTime(enrollment.completedAt) : null,
     score: enrollment.score == null ? null : Number(enrollment.score),
   };
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 function databaseUserId(userId: string) {

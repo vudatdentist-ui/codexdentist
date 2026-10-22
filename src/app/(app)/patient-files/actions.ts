@@ -1,4 +1,5 @@
 "use server";
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import type { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
@@ -144,6 +145,7 @@ export async function createPatientFileAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/patient-files/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -235,6 +237,7 @@ export async function updatePatientFileGovernanceAction(formData: FormData) {
       });
     });
   } catch (error) {
+    reportApplicationError("app/(app)/patient-files/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }

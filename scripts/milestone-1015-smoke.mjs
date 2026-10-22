@@ -1,3 +1,4 @@
+import { readComposedSource } from "./composed-source.mjs";
 import { readFile } from "node:fs/promises";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
@@ -270,7 +271,7 @@ async function assertCsvExport(cookie, path, markers) {
 }
 
 async function assertSource(path, markers) {
-  const source = await readFile(path, "utf8");
+  const source = readComposedSource(path);
 
   for (const marker of markers) {
     if (!source.includes(marker)) {

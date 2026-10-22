@@ -1,4 +1,7 @@
 "use server";
+import { stableNumberFromText, padCodeNumber } from "@/lib/patient-presentation";
+
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import { accessibleClinicIds } from "@/lib/tenant-scope";
 
@@ -113,6 +116,7 @@ export async function createJourneyTreatmentServicesAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/journey/treatment-actions", error);
     if (isNextRedirect(error)) throw error;
     redirect(serviceRedirect("journey-database"));
   }
@@ -176,6 +180,7 @@ export async function updateJourneyTreatmentServiceDiscountAction(formData: Form
       }),
     ]);
   } catch (error) {
+    reportApplicationError("app/(app)/journey/treatment-actions", error);
     if (isNextRedirect(error)) throw error;
     redirect(serviceRedirect("journey-database"));
   }
@@ -245,6 +250,7 @@ export async function deleteJourneyTreatmentServiceAction(formData: FormData) {
       }),
     ]);
   } catch (error) {
+    reportApplicationError("app/(app)/journey/treatment-actions", error);
     if (isNextRedirect(error)) throw error;
     redirect(serviceRedirect("journey-database"));
   }
@@ -438,6 +444,7 @@ export async function recordJourneyServiceProgressAction(formData: FormData) {
       });
     });
   } catch (error) {
+    reportApplicationError("app/(app)/journey/treatment-actions", error);
     if (isNextRedirect(error)) throw error;
     redirect(progressRedirect("journey-database"));
   }
@@ -615,22 +622,10 @@ function parseProgress(value: FormDataEntryValue | null) {
   return Math.round(progress);
 }
 
-function stableNumberFromText(value: string, max: number) {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) % max;
-  }
-  return hash + 1;
-}
-
 function patientCodeFromId(patientId: string) {
   const numericId = patientId.match(/\d+/g)?.join("");
   const sequence = numericId ? Number(numericId.slice(-6)) : stableNumberFromText(patientId, 999999);
   return `PT${padCodeNumber(sequence || 0, 6)}`;
-}
-
-function padCodeNumber(value: number, length: number) {
-  return String(Math.max(Math.round(value), 0)).padStart(length, "0");
 }
 
 function isNextRedirect(error: unknown) {

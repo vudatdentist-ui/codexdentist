@@ -1,3 +1,4 @@
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import "server-only";
 
 import {
@@ -7,7 +8,7 @@ import {
   type Invoice,
 } from "@/lib/data";
 import { patientAccessWhere } from "@/lib/patient-access";
-import { canUseAllClinics, hasAnyRole, type AppRole } from "@/lib/permissions";
+import { hasAnyRole, type AppRole } from "@/lib/permissions";
 import type {
   BillingReceiptSummary,
   BillingStatementLineSummary,
@@ -521,16 +522,6 @@ function demoPrintableInvoice(
           ]
         : [],
   };
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId
-    ? [session.activeClinicId]
-    : session.clinicIds;
 }
 
 function invoiceStatusLabel(status: string, dueDate: Date): Invoice["status"] {

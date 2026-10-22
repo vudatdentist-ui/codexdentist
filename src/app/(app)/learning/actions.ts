@@ -1,4 +1,5 @@
 "use server";
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import { accessibleClinicIds } from "@/lib/tenant-scope";
 
@@ -164,7 +165,8 @@ export async function createLearningContentAction(formData: FormData) {
         } as Prisma.InputJsonValue,
       },
     });
-  } catch {
+  } catch (error) {
+    reportApplicationError("app/(app)/learning/actions", error);
     redirect("/learning?notice=learning-database");
   }
 
@@ -305,6 +307,7 @@ export async function assignLearningContentAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/learning/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -396,6 +399,7 @@ export async function updateLearningEnrollmentStatusAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/learning/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }

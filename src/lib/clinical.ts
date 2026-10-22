@@ -1,6 +1,6 @@
 import "server-only";
 
-import { patients as demoPatients, type Patient } from "@/lib/data";
+import { patients as demoPatients } from "@/lib/data";
 import { hasAnyRole } from "@/lib/permissions";
 import { patientAccessWhere } from "@/lib/patient-access";
 import type { AppRole } from "@/lib/permissions";

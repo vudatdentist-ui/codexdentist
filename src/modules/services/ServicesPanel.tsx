@@ -1,4 +1,6 @@
 "use client";
+import { normalizeSearchText } from "@/shared/search";
+
 
 import { OperationalDialog, WorkspaceTabs } from "@/components/ui/WorkspaceControls";
 
@@ -64,15 +66,6 @@ function StatusPill({ status }: { status: string }) {
   const { language } = useAppLanguage();
 
   return <BaseStatusPill label={displayStatus(status, language)} status={status} />;
-}
-
-function normalizeSearchText(value: string | number | null | undefined) {
-  return String(value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/\u0111/g, "d")
-    .replace(/\u0110/g, "D")
-    .toLowerCase();
 }
 
 const defaultServicePolicyDraftShares = {

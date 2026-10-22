@@ -1,4 +1,7 @@
 "use server";
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
+
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import type { Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
@@ -20,7 +23,6 @@ import {
   storeAccountingUpload,
 } from "@/lib/patient-file-storage";
 import type { AppRole } from "@/lib/permissions";
-import { canUseAllClinics } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 
@@ -141,6 +143,7 @@ export async function createAccountingEntryAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/accounting/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -247,6 +250,7 @@ export async function updateAccountingBudgetTargetAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/accounting/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -444,14 +448,6 @@ function parseOptionalPercent(value: FormDataEntryValue | null) {
   }
 
   return parsePercent(value) ?? false;
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 function canWriteAccounting(session: AppSession) {

@@ -1,3 +1,4 @@
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import "server-only";
 
 import { clinics as demoClinics } from "@/lib/data";
@@ -20,6 +21,7 @@ const mutableSettingsRoles: AppRole[] = ["OWNER", "AREA_MANAGER", "CLINIC_MANAGE
 export async function getSettingsWorkspace(
   session: AppSession,
 ): Promise<SettingsWorkspace> {
+  if (!hasAnyRole(session, mutableSettingsRoles)) throw new Error("Settings read denied.");
   try {
     const canManageSystems = isSuperAdminSession(session);
     const clinicIds = await settingsClinicIds(session);
@@ -567,7 +569,7 @@ function toSettingsChain(
 }
 
 async function archivedClinicSummaries(
-  session: AppSession,
+  _session: AppSession,
   clinics: Array<{
     id: string;
     organizationId: string;
@@ -700,16 +702,6 @@ async function safeArchivedClinicSummaries(
     console.error("Failed to load archived clinic summaries", error);
     return [];
   }
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId
-    ? [session.activeClinicId]
-    : session.clinicIds;
 }
 
 async function settingsClinicIds(session: AppSession) {

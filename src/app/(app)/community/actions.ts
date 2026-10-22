@@ -1,4 +1,5 @@
 "use server";
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import { accessibleClinicIds } from "@/lib/tenant-scope";
 
@@ -89,7 +90,8 @@ export async function createCommunityPostAction(formData: FormData) {
         },
       });
     }
-  } catch {
+  } catch (error) {
+    reportApplicationError("app/(app)/community/actions", error);
     notice = "community-database";
   }
 
@@ -175,7 +177,8 @@ export async function addCommunityCommentAction(formData: FormData) {
         },
       });
     }
-  } catch {
+  } catch (error) {
+    reportApplicationError("app/(app)/community/actions", error);
     notice = "community-database";
   }
 
@@ -249,7 +252,8 @@ export async function deleteCommunityPostAction(formData: FormData) {
         }),
       ]);
     }
-  } catch {
+  } catch (error) {
+    reportApplicationError("app/(app)/community/actions", error);
     notice = "community-database";
   }
 

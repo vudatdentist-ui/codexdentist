@@ -1,12 +1,12 @@
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import "server-only";
+import type { ProvisioningClient } from "@/lib/provisioning-client";
 
-import { defaultDataSeedEnabled } from "@/lib/env";
-import { canUseAllClinics, hasAnyRole, type AppRole } from "@/lib/permissions";
+import { hasAnyRole, type AppRole } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { assertDemoFallbackAllowed } from "@/lib/runtime-guards";
 import {
   serviceCatalog,
-  type DentalServiceCatalogItem,
   type DentalServiceCategory,
   type DentalServiceStepDefinition,
 } from "@/lib/service-catalog";
@@ -129,16 +129,6 @@ export async function getServicesWorkspace(
 ): Promise<ServicesWorkspace> {
   try {
     const clinicIds = allowedClinicIds(session);
-
-    const serviceCount = await prisma.serviceCatalogItem.count({
-      where: {
-        organizationId: session.organizationId,
-      },
-    });
-
-    if (defaultDataSeedEnabled() || serviceCount === 0) {
-      await ensureServiceCatalogSeed(session.organizationId);
-    }
 
     const [categories, policies, inventoryItems, services, treatmentServices] = await Promise.all([
       prisma.serviceCategory.findMany({
@@ -353,16 +343,16 @@ export async function getServicesWorkspace(
   }
 }
 
-export async function ensureServiceCatalogSeed(organizationId: string) {
+export async function ensureServiceCatalogSeed(organizationId: string, client: ProvisioningClient = prisma) {
   const [categoryMap, policyMap] = await Promise.all([
-    ensureServiceCategories(organizationId),
-    ensureCompensationPolicies(organizationId),
+    ensureServiceCategories(organizationId, client),
+    ensureCompensationPolicies(organizationId, client),
   ]);
 
   for (const service of serviceCatalog) {
     const categoryId = categoryMap.get(service.category);
     const policyId = policyIdForCategory(service.category, policyMap);
-    const existingService = await prisma.serviceCatalogItem.findUnique({
+    const existingService = await client.serviceCatalogItem.findUnique({
       where: {
         organizationId_code: {
           organizationId,
@@ -376,7 +366,7 @@ export async function ensureServiceCatalogSeed(organizationId: string) {
     });
 
     if (!existingService) {
-      const createdService = await prisma.serviceCatalogItem.create({
+      const createdService = await client.serviceCatalogItem.create({
         data: {
           organizationId,
           categoryId,
@@ -405,109 +395,31 @@ export async function ensureServiceCatalogSeed(organizationId: string) {
         },
       });
 
-      await syncSeedServiceSteps(createdService.id, organizationId, service.steps, true);
+      await syncSeedServiceSteps(createdService.id, organizationId, service.steps, true, client);
       continue;
     }
 
-    const shouldApplySeedRevision = existingService.version !== serviceCatalogSeedRevision;
+    // Existing catalog entries and prices belong to the clinic.
 
-    if (shouldApplySeedRevision) {
-      await prisma.serviceCatalogItem.update({
-        where: {
-          id: existingService.id,
-        },
-        data: {
-          categoryId,
-          name: service.name,
-          nameEn: service.nameEn,
-          defaultPrice: service.price,
-          defaultDurationMinutes: service.defaultDurationMinutes,
-          defaultCompensationRuleId: policyId,
-          targetMode: service.targetMode ?? targetModeForCategory(service.category),
-          consentRequired: service.consentRequired ?? false,
-          version: serviceCatalogSeedRevision,
-          status: "ACTIVE",
-        },
-      });
-
-      await ensureDefaultServicePrice(organizationId, existingService.id, service);
-      await syncSeedServiceSteps(existingService.id, organizationId, service.steps, true);
-      continue;
-    }
-
-    await ensureDefaultServicePrice(organizationId, existingService.id, service);
   }
 }
 
-async function ensureDefaultServicePrice(
-  organizationId: string,
-  serviceId: string,
-  service: DentalServiceCatalogItem,
-) {
-  const activePrice = await prisma.servicePrice.findFirst({
-    where: {
-      organizationId,
-      serviceId,
-      clinicId: null,
-      active: true,
-    },
-    select: {
-      id: true,
-    },
-  });
-
-  if (activePrice) {
-    return;
-  }
-
-  await prisma.servicePrice.create({
-    data: {
-      organizationId,
-      serviceId,
-      price: service.price,
-      currency: "VND",
-      active: true,
-      note: "Imported baseline price",
-    },
-  });
-}
 
 async function syncSeedServiceSteps(
   serviceId: string,
   organizationId: string,
   steps: DentalServiceStepDefinition[],
-  deleteStepsOutsideSeed: boolean,
+  _deleteStepsOutsideSeed: boolean, client: ProvisioningClient = prisma
 ) {
-  const seedSequences = steps.map((step) => step.sequence);
-
-  if (deleteStepsOutsideSeed) {
-    await prisma.serviceStep.deleteMany({
-      where: {
-        organizationId,
-        serviceId,
-        sequence: {
-          notIn: seedSequences,
-        },
-      },
-    });
-  }
-
   for (const step of steps) {
-    await prisma.serviceStep.upsert({
+    await client.serviceStep.upsert({
       where: {
         serviceId_sequence: {
           serviceId,
           sequence: step.sequence,
         },
       },
-      update: {
-        name: step.name,
-        description: step.description ?? null,
-        defaultProgress: step.defaultProgress,
-        expectedMinutes: step.expectedMinutes,
-        roleHint: step.roleHint ?? null,
-        required: step.required ?? true,
-      },
+      update: {},
       create: {
         organizationId,
         serviceId,
@@ -523,23 +435,18 @@ async function syncSeedServiceSteps(
   }
 }
 
-async function ensureServiceCategories(organizationId: string) {
+async function ensureServiceCategories(organizationId: string, client: ProvisioningClient = prisma) {
   const categoryMap = new Map<DentalServiceCategory, string>();
 
   for (const [index, category] of categoryDefinitions.entries()) {
-    const record = await prisma.serviceCategory.upsert({
+    const record = await client.serviceCategory.upsert({
       where: {
         organizationId_code: {
           organizationId,
           code: category.code,
         },
       },
-      update: {
-        name: category.name,
-        nameEn: category.nameEn,
-        sortOrder: index + 1,
-        active: true,
-      },
+      update: {},
       create: {
         organizationId,
         code: category.code,
@@ -560,11 +467,11 @@ async function ensureServiceCategories(organizationId: string) {
   return categoryMap;
 }
 
-async function ensureCompensationPolicies(organizationId: string) {
+async function ensureCompensationPolicies(organizationId: string, client: ProvisioningClient = prisma) {
   const policyMap = new Map<string, string>();
 
   for (const policy of policyDefinitions) {
-    const record = await prisma.serviceCompensationRule.upsert({
+    const record = await client.serviceCompensationRule.upsert({
       where: {
         organizationId_code_version: {
           organizationId,
@@ -572,10 +479,7 @@ async function ensureCompensationPolicies(organizationId: string) {
           version: "1",
         },
       },
-      update: {
-        name: policy.name,
-        active: true,
-      },
+      update: {},
       create: {
         organizationId,
         code: policy.code,
@@ -641,7 +545,7 @@ async function ensureCompensationPolicies(organizationId: string) {
       ["CONSULTANT", policy.consultantSharePercent, null, false],
       ["OPERATOR", policy.operatorSharePercent, null, true],
       ["CLINICAL_SUPPORT", policy.clinicalSupportSharePercent, "OPERATOR", false],
-    ]);
+    ], client);
     await syncPolicyPool(record.id, "ASSISTANT", policy.assistantPoolPercent, [
       [
         "ASSISTANT_PRIMARY",
@@ -655,7 +559,7 @@ async function ensureCompensationPolicies(organizationId: string) {
         "ASSISTANT_PRIMARY",
         false,
       ],
-    ]);
+    ], client);
 
     policyMap.set(record.code, record.id);
   }
@@ -667,18 +571,16 @@ async function syncPolicyPool(
   ruleId: string,
   pool: CompensationPoolValue,
   percentOfService: number,
-  shares: Array<[CompensationRoleValue, number, CompensationRoleValue | null, boolean]>,
+  shares: Array<[CompensationRoleValue, number, CompensationRoleValue | null, boolean]>, client: ProvisioningClient = prisma
 ) {
-  const poolRule = await prisma.serviceCompensationPoolRule.upsert({
+  const poolRule = await client.serviceCompensationPoolRule.upsert({
     where: {
       ruleId_pool: {
         ruleId,
         pool,
       },
     },
-    update: {
-      percentOfService,
-    },
+    update: {},
     create: {
       ruleId,
       pool,
@@ -690,18 +592,14 @@ async function syncPolicyPool(
   });
 
   for (const [role, sharePercent, fallbackRole, required] of shares) {
-    await prisma.serviceCompensationShare.upsert({
+    await client.serviceCompensationShare.upsert({
       where: {
         poolRuleId_role: {
           poolRuleId: poolRule.id,
           role,
         },
       },
-      update: {
-        sharePercent,
-        fallbackRole,
-        required,
-      },
+      update: {},
       create: {
         poolRuleId: poolRule.id,
         role,
@@ -744,7 +642,7 @@ function targetModeForCategory(category: DentalServiceCategory) {
   return "TOOTH";
 }
 
-function demoServicesWorkspace(session: AppSession): ServicesWorkspace {
+function demoServicesWorkspace(_session: AppSession): ServicesWorkspace {
   const categories = categoryDefinitions.map((category, index) => ({
     id: category.code,
     code: category.code,
@@ -1157,14 +1055,6 @@ function toTreatmentServiceSummary(service: {
 
 function sumAmounts(items: Array<{ amount: unknown }>) {
   return items.reduce((total, item) => total + Number(item.amount), 0);
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 function vietnamDate(date: Date) {

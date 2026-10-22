@@ -1,6 +1,6 @@
 # Codexdentist Canonical Product Context
 
-Last updated: 2026-08-27
+Last updated: 2026-10-22
 Status: ACTIVE / CANONICAL
 
 > This file replaces every previous product direction, refactor queue, migration-route plan, and architecture context. Git history is an archive, not an active instruction source. Do not revive an older plan merely because it appears in a previous commit, chat, issue, or deleted document.
@@ -386,3 +386,12 @@ A phase is complete only when all of the following are true:
 - Re-audit after fixes is green.
 
 Until then, the phase remains open.
+Maintainability boundaries: clinical participant selectors use the scoped staff directory DTO,
+which excludes profiles, salary and contract data. Settings reads require settings roles.
+Workspace queries never provision catalogs. Defaults are created during organization
+bootstrap in the same transaction as the owner/clinic; repeat provisioning preserves
+customized entries. FRM/RX printable numbers use one atomic global counter per type/year
+to match their existing global unique indexes, initialized above existing document numbers.
+Settings, workforce and inventory mutations use typed application commands with their
+own permission/scope validation; Next.js transports parse forms and map notices only.
+Large UI composers delegate to model, view, named sections and pure projections.

@@ -1,7 +1,8 @@
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import "server-only";
+import type { ProvisioningClient } from "@/lib/provisioning-client";
 
-import { defaultDataSeedEnabled } from "@/lib/env";
-import { canUseAllClinics, hasAnyRole, type AppRole } from "@/lib/permissions";
+import { hasAnyRole, type AppRole } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { assertDemoFallbackAllowed } from "@/lib/runtime-guards";
 import type {
@@ -49,9 +50,6 @@ export async function getAccountingWorkspace(
   options: { periodMonth?: string | null } = {},
 ): Promise<AccountingWorkspace> {
   try {
-    if (defaultDataSeedEnabled()) {
-      await ensureAccountingCategories(session.organizationId);
-    }
 
     const clinicIds = allowedClinicIds(session);
     const periodMonth = normalizeAccountingPeriodMonth(options.periodMonth);
@@ -264,7 +262,6 @@ export async function getAccountingWorkspace(
 
     const categorySummaries = categories.map(toCategorySummary);
     const categoryByCode = new Map(categories.map((category) => [category.code, category]));
-    const categoryById = new Map(categories.map((category) => [category.id, category]));
     const derivedEntries: AccountingEntrySummary[] = [
       ...receipts.filter((receipt) => receipt.method !== "credit_balance").map((receipt) =>
         toDerivedEntry({
@@ -357,25 +354,17 @@ export async function getAccountingWorkspace(
   }
 }
 
-export async function ensureAccountingCategories(organizationId: string) {
+export async function ensureAccountingCategories(organizationId: string, client: ProvisioningClient = prisma) {
   await Promise.all(
     categoryDefinitions.map((category) =>
-      prisma.accountingCategory.upsert({
+      client.accountingCategory.upsert({
         where: {
           organizationId_code: {
             organizationId,
             code: category.code,
           },
         },
-        update: {
-          name: category.name,
-          nameEn: category.nameEn,
-          kind: category.kind,
-          targetPercent: category.targetPercent,
-          warningPercent: category.warningPercent,
-          sortOrder: category.sortOrder,
-          active: true,
-        },
+        update: {},
         create: {
           organizationId,
           ...category,
@@ -721,14 +710,6 @@ function percentOf(amount: number, collections: number) {
 
 function normalizeKind(kind: string): AccountingKind {
   return kind === "INCOME" || kind === "TRANSFER" ? kind : "EXPENSE";
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 function currentVietnamMonth() {

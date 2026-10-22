@@ -73,7 +73,9 @@
     "test:workspace": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/workspace-story.test.mjs scripts/workspace-controls.test.mjs",
     "fonts:assets": "node scripts/fetch-font-assets.mjs",
     "test:audit": "node --test scripts/audit-regression.test.cjs",
-    "test:audit-db": "node scripts/audit-concurrency.cjs"
+    "test:audit-db": "node scripts/audit-concurrency.cjs",
+    "test:maintainability": "node --test scripts/maintainability-regression.test.cjs && node scripts/maintainability-check.mjs",
+    "test:maintainability-db": "node scripts/maintainability-database.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1040.0",

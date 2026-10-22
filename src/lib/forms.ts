@@ -1,9 +1,10 @@
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import "server-only";
+import type { ProvisioningClient } from "@/lib/provisioning-client";
+import { nextGlobalDocumentNo } from "@/lib/global-document-sequence";
 
-import { Buffer } from "node:buffer";
 import type { Prisma } from "@prisma/client";
-import { defaultDataSeedEnabled } from "@/lib/env";
-import { canUseAllClinics, hasAnyRole, type AppRole, type RoleSource } from "@/lib/permissions";
+import { hasAnyRole, type AppRole, type RoleSource } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { assertDemoFallbackAllowed } from "@/lib/runtime-guards";
 import type {
@@ -21,36 +22,6 @@ const mutableFormsRoles: AppRole[] = [
   "DENTIST",
   "HYGIENIST",
   "FRONT_DESK",
-];
-
-const defaultFormTemplates = [
-  {
-    type: "CONSENT" as const,
-    code: "CONSENT-TX",
-    name: "Đồng ý điều trị",
-    version: "1.0",
-    body:
-      "Bệnh nhân xác nhận đã hiểu chẩn đoán, điều trị đề xuất, lựa chọn thay thế, rủi ro, chi phí và trách nhiệm tái khám/chăm sóc sau điều trị.",
-    requiresSignature: true,
-  },
-  {
-    type: "MEDICAL_HISTORY" as const,
-    code: "MED-HX",
-    name: "Cập nhật tiền sử y khoa",
-    version: "1.0",
-    body:
-      "Bệnh nhân cập nhật dị ứng, thuốc đang dùng, bệnh toàn thân, tình trạng thai kỳ và tiền sử nha khoa liên quan.",
-    requiresSignature: true,
-  },
-  {
-    type: "FINANCIAL_POLICY" as const,
-    code: "FIN-POL",
-    name: "Xác nhận chính sách tài chính",
-    version: "1.0",
-    body:
-      "Bệnh nhân xác nhận đã hiểu báo giá, tiền cọc, thanh toán từng phần, số dư còn lại, xử lý hoàn tiền và quy định xuất hóa đơn.",
-    requiresSignature: true,
-  },
 ];
 
 const canonicalFormTemplates = [
@@ -89,10 +60,6 @@ export async function getFormsWorkspace(
 ): Promise<FormsWorkspace> {
   try {
     const clinicIds = allowedClinicIds(session);
-
-    if (defaultDataSeedEnabled()) {
-      await ensureFormsSeed(session);
-    }
 
     const [patients, templates, patientForms] = await Promise.all([
       prisma.patient.findMany({
@@ -208,14 +175,8 @@ export async function getFormsWorkspace(
   }
 }
 
-export async function nextPatientFormNo(organizationId: string) {
-  const count = await prisma.patientForm.count({
-    where: {
-      organizationId,
-    },
-  });
-
-  return `FRM-${new Date().getFullYear()}-${String(count + 1).padStart(6, "0")}`;
+export async function nextPatientFormNo(_organizationId: string) {
+  return nextGlobalDocumentNo("FRM");
 }
 
 export function canMutateForms(source: RoleSource) {
@@ -308,11 +269,10 @@ export async function getPrintableFormTemplate(
   };
 }
 
-export async function ensureFormsSeed(session: AppSession) {
-  void defaultFormTemplates;
+export async function ensureFormsSeed(session: AppSession, client: ProvisioningClient = prisma) {
 
   for (const template of canonicalFormTemplates) {
-    await prisma.formTemplate.upsert({
+    await client.formTemplate.upsert({
       where: {
         organizationId_code_version: {
           organizationId: session.organizationId,
@@ -320,13 +280,7 @@ export async function ensureFormsSeed(session: AppSession) {
           version: template.version,
         },
       },
-      update: {
-        type: template.type,
-        name: template.name,
-        body: template.body,
-        requiresSignature: template.requiresSignature,
-        active: true,
-      },
+      update: {},
       create: {
         organizationId: session.organizationId,
         createdById: databaseUserId(session.userId),
@@ -352,31 +306,7 @@ export async function ensureFormsSeed(session: AppSession) {
   }
 }
 
-function repairSeedRecord<T>(value: T): T {
-  if (typeof value === "string") {
-    return repairVietnameseSeedText(value) as T;
-  }
 
-  if (Array.isArray(value)) {
-    return value.map(repairSeedRecord) as T;
-  }
-
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, repairSeedRecord(item)]),
-    ) as T;
-  }
-
-  return value;
-}
-
-function repairVietnameseSeedText(value: string) {
-  if (!/[\u00c3\u00c4\u00c6]|\u00e1[\u00ba\u00bb]/.test(value)) {
-    return value;
-  }
-
-  return Buffer.from(value, "latin1").toString("utf8");
-}
 
 function toFormTemplateSummary(template: {
   id: string;
@@ -476,14 +406,6 @@ function responseText(value: Prisma.JsonValue | null) {
   }
 
   return typeof value === "string" ? value : JSON.stringify(value);
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 function databaseUserId(userId: string) {

@@ -2383,3 +2383,11 @@ model DocumentSequence {
   @@unique([organizationId, scopeKey, type, year])
   @@index([clinicId, type, year])
 }
+
+model GlobalDocumentSequence {
+  type String
+  year Int
+  currentValue Int
+
+  @@id([type, year])
+}
