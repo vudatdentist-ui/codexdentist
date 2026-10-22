@@ -80,6 +80,23 @@ class DeploymentGuards(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, r"^docker failed \(exit 1\)$"):
                 deploy.capture(["docker", "inspect"])
 
+    def test_public_probes_have_identified_agent_and_verify_schema(self):
+        import io
+        import json
+
+        def response(request, **kwargs):
+            self.assertEqual(request.get_header("User-agent"), "codexdentist-production-health")
+            self.assertEqual(request.get_header("Host"), "codexdentist.com")
+            self.assertEqual(kwargs["timeout"], 20)
+            body = json.dumps(dict(status="ok", database="ok", schema="ok")).encode()
+            result = io.BytesIO(body)
+            result.status = 200
+            return result
+
+        with patch.object(deploy.urllib.request, "urlopen", side_effect=response) as request:
+            deploy.health("https://codexdentist.com")
+            self.assertEqual(request.call_count, 7)
+
     def exercise_cutover(self, fail_public):
         import contextlib
         import json

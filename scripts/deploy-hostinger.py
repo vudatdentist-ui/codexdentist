@@ -102,13 +102,14 @@ def check_migrations(source, previous):
 
 
 def health(base):
+    headers = {"Host": "codexdentist.com", "User-Agent": "codexdentist-production-health"}
     for route in ["/api/health", "/", "/signup", "/login", "/features",
                   "/api/odontogram-assets/11-adult-crown.svg"]:
-        request = urllib.request.Request(base + route, headers={"Host": "codexdentist.com"})
+        request = urllib.request.Request(base + route, headers=headers)
         with urllib.request.urlopen(request, timeout=20) as response:
             if response.status != 200 or not response.read(1):
                 raise RuntimeError("Route verification failed")
-    request = urllib.request.Request(base + "/api/health", headers={"Host": "codexdentist.com"})
+    request = urllib.request.Request(base + "/api/health", headers=headers)
     with urllib.request.urlopen(request, timeout=20) as response:
         body = json.load(response)
     if any(body.get(key) != "ok" for key in ["status", "database", "schema"]):
