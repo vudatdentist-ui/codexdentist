@@ -212,10 +212,13 @@ def deploy(sha, main):
             raise RuntimeError("Main changed before migration; defer release")
         run(compose("run", "--rm", "--no-deps", "-T", "--entrypoint", "npx", "codexdentist",
                     "prisma", "migrate", "deploy", override=override))
-        run(compose("run", "-d", "--no-deps", "--name", candidate, "-p", "127.0.0.1:3101:3000",
+        run(compose("run", "-d", "--no-deps", "--name", candidate, "-p", "127.0.0.1::3000",
                     "--entrypoint", "node", "codexdentist", "node_modules/next/dist/bin/next", "start",
                     "-H", "0.0.0.0", "-p", "3000", override=override), stdout=subprocess.DEVNULL)
-        wait_health("http://127.0.0.1:3101")
+        endpoint = capture(["docker", "port", candidate, "3000/tcp"])
+        if not re.fullmatch(r"127\.0\.0\.1:[0-9]+", endpoint):
+            raise RuntimeError("Candidate is not bound exclusively to loopback")
+        wait_health("http://" + endpoint)
         if api("git/ref/heads/main")["object"]["sha"] != main:
             raise RuntimeError("Main changed before cutover; defer release")
         write_atomic(COMPOSE, new_config)

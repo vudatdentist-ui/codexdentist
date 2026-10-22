@@ -97,6 +97,8 @@ class DeploymentGuards(unittest.TestCase):
             def capture(command):
                 if command[:2] == ["docker", "inspect"]:
                     return json.dumps([next(inspections)])
+                if command[:2] == ["docker", "port"]:
+                    return "127.0.0.1:49163"
                 if "rev-parse" in command:
                     return SHA
                 return ""

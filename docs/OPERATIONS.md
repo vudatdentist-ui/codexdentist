@@ -80,8 +80,9 @@ accepts only new CREATE statements; edited migrations and other SQL require an
 operator review even if CI's broader expand/contract checker passes.
 
 Production migration runs with the candidate image and the existing Compose
-environment while the previous application remains available. A candidate on
-loopback port 3101 must pass health/schema and public-route checks before cutover.
+environment while the previous application remains available. A candidate on a
+Docker-allocated loopback port must pass health/schema and public-route checks
+before cutover; it must not claim a fixed port used by another VPS application.
 Only the `codexdentist` image line is changed in the original Compose file; the
 deployer recreates only that service with `--no-deps --pull never`. Verification
 checks loopback port 3100, public HTTPS, and the running image's commit label.
