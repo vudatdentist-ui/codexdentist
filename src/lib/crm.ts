@@ -1,6 +1,7 @@
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import "server-only";
 
-import { canUseAllClinics, hasAnyRole, type AppRole, type RoleSource } from "@/lib/permissions";
+import { hasAnyRole, type AppRole, type RoleSource } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { assertDemoFallbackAllowed } from "@/lib/runtime-guards";
 import type { CrmActivitySummary, CrmLeadSummary, CrmWorkspace } from "@/lib/crm-types";
@@ -195,14 +196,6 @@ function toActivitySummary(activity: {
     createdAt: vietnamDateTime(activity.createdAt),
     createdAtIso: activity.createdAt.toISOString(),
   };
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 function vietnamDateTime(value: Date) {

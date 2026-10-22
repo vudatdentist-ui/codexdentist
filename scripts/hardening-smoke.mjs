@@ -1,3 +1,4 @@
+import { readComposedSource } from "./composed-source.mjs";
 import { readFileSync } from "node:fs";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
@@ -39,8 +40,7 @@ async function main() {
     "nextPaymentPlanNo(session.organizationId",
   ]);
   assertSource("src/lib/pharmacy.ts", [
-    "nextDocumentNo",
-    "type: \"RX\"",
+    'nextGlobalDocumentNo("RX")',
     "patient: patientAccessWhere(session)",
   ]);
   assertSource("scripts/go-live-check.mjs", [
@@ -68,7 +68,7 @@ async function main() {
 }
 
 function assertSource(path, needles) {
-  const source = readFileSync(path, "utf8");
+  const source = readComposedSource(path);
 
   for (const needle of needles) {
     if (!source.includes(needle)) {

@@ -1,4 +1,5 @@
 "use server";
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -69,6 +70,7 @@ export async function createClinicalNoteAction(formData: FormData) {
       updateTreatmentPlan: hasTreatmentFields,
     });
   } catch (error) {
+    reportApplicationError("app/(app)/clinical/actions", error);
     console.error("clinical.note_create_failed", error);
     redirect(`/journey?notice=${applicationErrorCode(error, "clinical-database")}`);
   }
@@ -89,6 +91,7 @@ export async function lockClinicalNoteAction(formData: FormData) {
     const note = await lockClinicalNoteCommand(session, noteId);
     patientId = note.patientId;
   } catch (error) {
+    reportApplicationError("app/(app)/clinical/actions", error);
     redirect(`/journey?notice=${applicationErrorCode(error, "clinical-database")}`);
   }
 

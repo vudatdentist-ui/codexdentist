@@ -1,7 +1,7 @@
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import "server-only";
 
 import { clinics as demoClinics, formatVnd } from "@/lib/data";
-import { canUseAllClinics } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { assertDemoFallbackAllowed } from "@/lib/runtime-guards";
 import type {
@@ -889,14 +889,6 @@ function ensureReportSourceItem(
 
   sources.set(source, current);
   return current;
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 function parseVietnamDateKey(value: string | null | undefined) {

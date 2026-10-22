@@ -143,32 +143,32 @@ export async function createOrganizationWorkspace(input: OrganizationWorkspaceIn
       },
     });
 
+    await bootstrapOrganizationDefaults({
+      organizationId: organization.id,
+      organizationName: organization.name,
+      organizationSlug: organization.slug,
+      organizationDomain: organization.primaryDomain,
+      ownerUserId: owner.id,
+      ownerEmail: owner.email,
+      ownerFullName: owner.fullName,
+    }, tx);
+
+    if (input.seedDemoData) {
+      await seedDemoWorkspace({
+        organizationId: organization.id,
+        clinicId: clinic.id,
+        passwordHash,
+        suffix: suffix,
+      }, tx);
+    }
+
     return {
       organization,
       clinic,
       owner,
       suffix,
     };
-  });
-
-  await bootstrapOrganizationDefaults({
-    organizationId: workspace.organization.id,
-    organizationName: workspace.organization.name,
-    organizationSlug: workspace.organization.slug,
-    organizationDomain: workspace.organization.primaryDomain,
-    ownerUserId: workspace.owner.id,
-    ownerEmail: workspace.owner.email,
-    ownerFullName: workspace.owner.fullName,
-  });
-
-  if (input.seedDemoData) {
-    await seedDemoWorkspace({
-      organizationId: workspace.organization.id,
-      clinicId: workspace.clinic.id,
-      passwordHash,
-      suffix: workspace.suffix,
-    });
-  }
+  }, { timeout: 60_000, maxWait: 10_000 });
 
   return workspace;
 }
@@ -178,11 +178,11 @@ async function seedDemoWorkspace(input: {
   clinicId: string;
   passwordHash: string;
   suffix: string;
-}) {
+}, tx: import("@prisma/client").Prisma.TransactionClient) {
   const now = Date.now();
   const at = (hoursFromNow: number) => new Date(now + hoursFromNow * 60 * 60 * 1000);
 
-  await prisma.$transaction(async (tx) => {
+  {
     const dentist = await tx.user.create({
       data: {
         organizationId: input.organizationId,
@@ -353,5 +353,5 @@ async function seedDemoWorkspace(input: {
         lockedAt: new Date(),
       },
     });
-  });
+  }
 }

@@ -1,11 +1,18 @@
 "use client";
+import { displayMedicationName as pharmacyMedicationDisplayName } from "@/lib/medication-presentation";
+
+import { PatientSearchCombobox } from "@/components/PatientSearchCombobox";
+import { normalizeSearchText } from "@/shared/search";
+
+import { patientCodeFor } from "@/lib/patient-presentation";
+
 
 import { OperationalDialog, WorkspaceTabs } from "@/components/ui/WorkspaceControls";
 
-import { Activity, CheckCircle2, ClipboardList, FileText, Printer, Search, Settings, Trash2, X } from "lucide-react";
+import { Activity, CheckCircle2, ClipboardList, FileText, Printer, Settings, Trash2, X } from "lucide-react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   createMedicationAction,
   createPrescriptionAction,
@@ -20,117 +27,9 @@ import type { Patient } from "@/lib/data";
 import type { PatientWorkspace } from "@/lib/patient-types";
 import type { MedicationCatalogSummary, PharmacyWorkspace } from "@/lib/pharmacy-types";
 
-function normalizeSearchText(value: string | number | null | undefined) {
-  return String(value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLowerCase()
-    .trim();
-}
-
-function patientCodeFor(patient: Pick<Patient, "id"> & Partial<Pick<Patient, "patientCode">> | null | undefined) {
-  if (!patient) return "PT000000";
-  if (patient.patientCode) return patient.patientCode;
-  const digits = patient.id.replace(/\D/g, "").slice(-6).padStart(6, "0");
-  return `PT${digits}`;
-}
-
 type PatientSearchRecord = Pick<Patient, "id" | "name" | "phone"> &
   Partial<Pick<Patient, "email" | "patientCode">>;
 
-function patientSearchDisplayLabel(patient: PatientSearchRecord) {
-  return patientCodeFor(patient) + " - " + patient.name + " - " + patient.phone;
-}
-
-function PatientSearchCombobox({
-  disabled = false,
-  hideIcon = false,
-  query,
-  onQueryChange,
-  matches,
-  selectedPatient,
-  placeholder,
-  selectLabel,
-  noResultsLabel,
-  onSelect,
-}: {
-  disabled?: boolean;
-  hideIcon?: boolean;
-  query: string;
-  onQueryChange: (value: string) => void;
-  matches: PatientSearchRecord[];
-  selectedPatient?: PatientSearchRecord | null;
-  placeholder: string;
-  selectLabel: string;
-  noResultsLabel: string;
-  onSelect: (patient: PatientSearchRecord) => void;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const normalizedQuery = normalizeSearchText(query.trim());
-  const selectedPatientLabel = selectedPatient ? patientSearchDisplayLabel(selectedPatient) : "";
-  const inputValue = query || selectedPatientLabel;
-  const visibleMatches = normalizedQuery
-    ? matches.filter((patient) => patient.id !== selectedPatient?.id).slice(0, 8)
-    : [];
-  const shouldShowResults = isOpen && normalizedQuery.length > 0;
-
-  return (
-    <div className="patient-search-combobox">
-      <label className="search-field topbar-search-field patient-search-input">
-        {!hideIcon && <Search size={16} aria-hidden="true" />}
-        <input
-          ref={inputRef}
-          aria-autocomplete="list"
-          aria-expanded={shouldShowResults}
-          aria-label={selectLabel}
-          disabled={disabled}
-          onBlur={() => setIsOpen(false)}
-          onChange={(event) => {
-            onQueryChange(event.target.value);
-            setIsOpen(true);
-          }}
-          onFocus={() => {
-            setIsOpen(true);
-
-            if (!query && selectedPatientLabel) {
-              requestAnimationFrame(() => inputRef.current?.select());
-            }
-          }}
-          placeholder={placeholder}
-          value={inputValue}
-        />
-      </label>
-      {shouldShowResults ? (
-        <div className="patient-search-results" role="listbox" aria-label={selectLabel}>
-          {visibleMatches.length > 0 ? (
-            visibleMatches.map((patient) => (
-              <button
-                className="patient-search-option"
-                key={patient.id}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => {
-                  onSelect(patient);
-                  setIsOpen(false);
-                }}
-                role="option"
-                type="button"
-              >
-                <strong>{patient.name}</strong>
-                <span>
-                  {patientCodeFor(patient)} - {patient.phone}
-                  {patient.email ? " - " + patient.email : ""}
-                </span>
-              </button>
-            ))
-          ) : (
-            <div className="patient-search-empty">{noResultsLabel}</div>
-          )}
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 
 function workspaceMessageText(message: string | null | undefined, _language: Language) {
@@ -179,26 +78,7 @@ function StatusPill({ status }: { status: string }) {
   const { language } = useAppLanguage();
   return <BaseStatusPill label={displayStatus(status, language)} status={status} />;
 }
-function pharmacyMedicationDisplayName(medication: {
-  genericName: string;
-  brandName: string | null;
-  strength: string | null;
-}) {
-  const strength = medication.strength ? ` ${medication.strength}` : "";
-  const genericName = medication.genericName.trim();
-  const brandName = medication.brandName?.trim();
-  const isCombination = /[+/]|clavulanic|clavulanate|phối hợp/i.test(genericName);
 
-  if (brandName && isCombination) {
-    return `${brandName}${strength}`;
-  }
-
-  if (brandName) {
-    return `${genericName}${strength} (${brandName})`;
-  }
-
-  return `${genericName}${strength}`;
-}
 
 function mergePharmacyDirections(sig: string, instructions: string | null) {
   const cleanSig = sig.trim();

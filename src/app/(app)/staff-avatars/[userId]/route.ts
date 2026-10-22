@@ -1,8 +1,8 @@
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import { requireSession } from "@/lib/auth";
 import { openStoredPatientFileStream } from "@/lib/patient-file-storage";
-import { canAccessView, canUseAllClinics } from "@/lib/permissions";
+import { canAccessView } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import type { AppSession } from "@/lib/session";
 
 export async function GET(
   request: Request,
@@ -87,14 +87,6 @@ export async function GET(
   } catch {
     return new Response("Not found", { status: 404 });
   }
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 function encodeRFC5987(value: string) {

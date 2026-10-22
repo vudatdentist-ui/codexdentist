@@ -1,6 +1,6 @@
 # Operations
 
-Last updated: 2026-09-22
+Last updated: 2026-10-22
 
 ## Local PC
 
@@ -315,3 +315,13 @@ Current mobile path is PWA first:
 - `/employee-app`
 
 Do not package patient data into an offline static app. Native Capacitor wrapper should point to the deployed HTTPS app after PWA flows are stable.
+
+The additive `20261022000000_global_document_sequence` migration creates only the
+FRM/RX global counter table. Apply migrations before deploying the application. Existing
+printable identifiers and unique indexes remain intact; first allocation starts above
+the maximum existing suffix for its type/year. Gaps are allowed after failed writes.
+Organization provisioning now rolls back the entire owner/clinic/default setup on failure
+(transaction timeout 60 seconds). Workspace reads no longer recreate or refresh defaults.
+No operational reseed is required for this release.
+Application failures log an incident UUID, area and an allowlisted database code, without
+raw messages, stack traces or patient payloads. Use timestamp/area/incident to investigate.

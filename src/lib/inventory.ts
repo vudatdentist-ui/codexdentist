@@ -1,7 +1,8 @@
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import "server-only";
+import type { ProvisioningClient } from "@/lib/provisioning-client";
 
-import { defaultDataSeedEnabled } from "@/lib/env";
-import { canUseAllClinics, hasAnyRole, type AppRole, type RoleSource } from "@/lib/permissions";
+import { hasAnyRole, type AppRole, type RoleSource } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { assertDemoFallbackAllowed } from "@/lib/runtime-guards";
 import type {
@@ -254,11 +255,8 @@ export async function getInventoryWorkspace(
   session: AppSession,
 ): Promise<InventoryWorkspace> {
   try {
-    if (defaultDataSeedEnabled()) {
-      await ensureInventorySeed(session);
-    }
 
-    await ensureInventoryTaxonomySeed(session);
+
 
     const clinicIds = allowedClinicIds(session);
 
@@ -567,11 +565,11 @@ export function canMutateInventory(source: RoleSource) {
   return hasAnyRole(source, mutableInventoryRoles);
 }
 
-export async function ensureInventoryTaxonomySeed(session: AppSession) {
+export async function ensureInventoryTaxonomySeed(session: AppSession, client: ProvisioningClient = prisma) {
   await Promise.all([
     Promise.all(
       defaultInventoryGroups.map((group) =>
-        prisma.inventoryItemGroup.upsert({
+        client.inventoryItemGroup.upsert({
           where: {
             organizationId_code: {
               organizationId: session.organizationId,
@@ -589,7 +587,7 @@ export async function ensureInventoryTaxonomySeed(session: AppSession) {
     ),
     Promise.all(
       defaultInventoryTags.map((tag) =>
-        prisma.inventoryTag.upsert({
+        client.inventoryTag.upsert({
           where: {
             organizationId_code: {
               organizationId: session.organizationId,
@@ -608,12 +606,12 @@ export async function ensureInventoryTaxonomySeed(session: AppSession) {
   ]);
 }
 
-export async function ensureInventorySeed(session: AppSession) {
-  await ensureInventoryTaxonomySeed(session);
+export async function ensureInventorySeed(session: AppSession, client: ProvisioningClient = prisma) {
+  await ensureInventoryTaxonomySeed(session, client);
 
   const clinicId = session.activeClinicId ?? session.clinicIds[0] ?? null;
   const [itemGroups, inventoryTags] = await Promise.all([
-    prisma.inventoryItemGroup.findMany({
+    client.inventoryItemGroup.findMany({
       where: {
         organizationId: session.organizationId,
       },
@@ -622,7 +620,7 @@ export async function ensureInventorySeed(session: AppSession) {
         code: true,
       },
     }),
-    prisma.inventoryTag.findMany({
+    client.inventoryTag.findMany({
       where: {
         organizationId: session.organizationId,
       },
@@ -637,16 +635,14 @@ export async function ensureInventorySeed(session: AppSession) {
   for (const item of defaultInventorySeedItems) {
     const { groupCode, tagCodes, ...itemData } = item;
     const groupId = itemGroupByCode.get(groupCode) ?? null;
-    const createdItem = await prisma.inventoryItem.upsert({
+    const createdItem = await client.inventoryItem.upsert({
       where: {
         organizationId_code: {
           organizationId: session.organizationId,
           code: item.code,
         },
       },
-      update: {
-        groupId,
-      },
+      update: {},
       create: {
         organizationId: session.organizationId,
         clinicId,
@@ -665,7 +661,7 @@ export async function ensureInventorySeed(session: AppSession) {
       const tagId = tagByCode.get(tagCode);
 
       if (tagId) {
-        await prisma.inventoryItemTag.upsert({
+        await client.inventoryItemTag.upsert({
           where: {
             itemId_tagId: {
               itemId: createdItem.id,
@@ -683,7 +679,7 @@ export async function ensureInventorySeed(session: AppSession) {
     }
 
     if (item.lotTracked) {
-      await prisma.inventoryLot.upsert({
+      await client.inventoryLot.upsert({
         where: {
           itemId_lotNo: {
             itemId: createdItem.id,
@@ -959,14 +955,6 @@ function normalizeAssetStatus(status: string): EquipmentAssetSummary["status"] {
   }
 
   return "ACTIVE";
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 function vietnamDateTime(value: Date) {

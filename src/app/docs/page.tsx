@@ -8,7 +8,6 @@ import {
   GitBranch,
   HardDrive,
   Laptop,
-  Network,
   PlayCircle,
   Power,
   RefreshCw,

@@ -58,3 +58,9 @@ export function assertTenantResource(
   assertSameOrg(session, resource);
   assertClinicAccess(session, resource);
 }
+
+export function normalizeClinicId(value: unknown, session: AppSession) {
+const parsed = String(value ?? "").trim();
+if (!parsed || parsed === "all") return canUseAllClinics(session) ? "all" : session.activeClinicId ?? "denied";
+return accessibleClinicIds(session).includes(parsed) ? parsed : "denied";
+}

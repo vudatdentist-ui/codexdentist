@@ -1,4 +1,7 @@
 "use server";
+import { accessibleClinicIds as allowedClinicIdsFor } from "@/lib/tenant-scope";
+
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -12,7 +15,6 @@ import {
   requiredString,
 } from "@/lib/form-validation";
 import { ensureStaffProfiles } from "@/lib/payroll";
-import { canUseAllClinics } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 
@@ -72,6 +74,7 @@ export async function clockInCurrentStaffAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/employee-app/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -129,6 +132,7 @@ export async function clockOutCurrentStaffAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/employee-app/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -190,7 +194,8 @@ export async function createCurrentStaffLeaveRequestAction(formData: FormData) {
         } as Prisma.InputJsonValue,
       },
     });
-  } catch {
+  } catch (error) {
+    reportApplicationError("app/(app)/employee-app/actions", error);
     redirect("/employee-app?notice=staff-database");
   }
 
@@ -247,14 +252,6 @@ function preferredClinicId(session: AppSession, profileClinicId: string | null) 
   }
 
   return session.activeClinicId ?? allowedClinicIds[0] ?? null;
-}
-
-function allowedClinicIdsFor(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 function revalidateEmployeeApp() {

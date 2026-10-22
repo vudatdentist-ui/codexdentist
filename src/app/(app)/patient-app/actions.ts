@@ -1,4 +1,5 @@
 "use server";
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -46,6 +47,7 @@ export async function confirmPortalAppointmentAction(formData: FormData) {
       });
     });
   } catch (error) {
+    reportApplicationError("app/(app)/patient-app/actions", error);
     notice =
       error instanceof PortalActionError ? error.notice : "portal-database";
   }
@@ -167,6 +169,7 @@ export async function payPortalInvoiceAction(formData: FormData) {
       });
     });
   } catch (error) {
+    reportApplicationError("app/(app)/patient-app/actions", error);
     notice =
       error instanceof PortalActionError ? error.notice : "portal-database";
   }
@@ -215,6 +218,7 @@ export async function acceptPortalTreatmentAction(formData: FormData) {
       });
     });
   } catch (error) {
+    reportApplicationError("app/(app)/patient-app/actions", error);
     notice =
       error instanceof PortalActionError ? error.notice : "portal-database";
   }
@@ -277,7 +281,8 @@ export async function renewPortalConsentAction(formData: FormData) {
         },
       });
     }
-  } catch {
+  } catch (error) {
+    reportApplicationError("app/(app)/patient-app/actions", error);
     notice = "portal-database";
   }
 

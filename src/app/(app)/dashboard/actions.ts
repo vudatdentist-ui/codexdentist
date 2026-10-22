@@ -1,4 +1,7 @@
 "use server";
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
+
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
@@ -101,6 +104,7 @@ export async function createWorkItemAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/dashboard/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -170,6 +174,7 @@ export async function completeWorkItemAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/dashboard/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -244,6 +249,7 @@ export async function retryFailedNotificationAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/dashboard/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -293,14 +299,6 @@ function normalizePriority(value: FormDataEntryValue | null) {
   return priority === "high" || priority === "medium" || priority === "low"
     ? priority
     : "medium";
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 function isNextRedirect(error: unknown) {

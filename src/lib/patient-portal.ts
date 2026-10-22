@@ -1,3 +1,6 @@
+import { treatmentStatusLabel } from "@/lib/status-presentation";
+import { invoiceStatusLabel } from "@/lib/status-presentation";
+import { appointmentStatusLabel } from "@/lib/status-presentation";
 import "server-only";
 
 import {
@@ -5,9 +8,6 @@ import {
   invoices as demoInvoices,
   patients as demoPatients,
   treatmentPlans as demoPlans,
-  type Appointment,
-  type Invoice,
-  type TreatmentPlan,
 } from "@/lib/data";
 import type { PatientPortalWorkspace } from "@/lib/patient-portal-types";
 import { prisma } from "@/lib/prisma";
@@ -320,49 +320,11 @@ function demoPatientPortalWorkspace(session: AppSession): PatientPortalWorkspace
   };
 }
 
-function appointmentStatusLabel(status: string): Appointment["status"] {
-  const labels: Record<string, Appointment["status"]> = {
-    REQUESTED: "Requested",
-    CONFIRMED: "Confirmed",
-    ARRIVED: "Arrived",
-    IN_CHAIR: "In chair",
-    COMPLETED: "Completed",
-    CANCELLED: "Cancelled",
-    NO_SHOW: "No-show",
-  };
 
-  return labels[status] ?? "Confirmed";
-}
 
-function invoiceStatusLabel(status: string, dueDate: Date): Invoice["status"] {
-  if (status !== "PAID" && status !== "VOID" && dueDate < new Date()) {
-    return "Overdue";
-  }
 
-  const labels: Record<string, Invoice["status"]> = {
-    DRAFT: "Draft",
-    OPEN: "Open",
-    PARTIAL: "Partial",
-    PAID: "Paid",
-    OVERDUE: "Overdue",
-    VOID: "Void",
-  };
 
-  return labels[status] ?? "Open";
-}
 
-function treatmentStatusLabel(status: string): TreatmentPlan["status"] {
-  const labels: Record<string, TreatmentPlan["status"]> = {
-    DRAFT: "Draft",
-    PRESENTED: "Presented",
-    ACCEPTED: "Accepted",
-    IN_PROGRESS: "In progress",
-    COMPLETED: "Completed",
-    DECLINED: "Declined",
-  };
-
-  return labels[status] ?? "Draft";
-}
 
 function treatmentServiceStatusLabel(status: string) {
   const labels: Record<string, string> = {

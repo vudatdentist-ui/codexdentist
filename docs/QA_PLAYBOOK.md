@@ -1,6 +1,6 @@
 # Codexdentist QA Playbook
 
-Last updated: 2026-08-27
+Last updated: 2026-10-22
 Status: ACTIVE
 
 This playbook implements the closed-loop quality process defined in `docs/PROJECT_CONTEXT.md`:
@@ -299,3 +299,17 @@ Git history/PR discussion is the change record. The active docs remain concise s
 The font gate uses Chromium's actual glyph-to-font report for composed and decomposed Vietnamese accents; a CSS family name alone is not proof. Body text uses self-hosted Be Vietnam Pro and editorial headings use self-hosted Noto Serif through `next/font`. Do not restore machine-dependent font loading or browser font-CDN requests. Review fresh desktop/mobile captures after typography or responsive changes.
 
 Operational modal surfaces must use `OperationalDialog`/`WorkspaceDialog`, not a div with `aria-modal`. `WorkspaceTabs` preserves each module's existing selection handlers while supplying roving focus and arrow/Home/End navigation. The associated source guards and keyboard unit checks run with `test:workspace`; real-browser checks remain the interaction evidence. Keep section numbers distinct from clinical stages and preserve the independent odontogram snapshots.
+
+Run `npm run test:maintainability` after query, parser, provisioning, command or UI
+composition changes. This covers private staff DTOs, read-only getters, bootstrap
+rollback, money/calendar validation, scope memoization, negative architecture fixtures,
+all 44 command permission denials and sanitized diagnostics. It also enforces bounded
+composers/models/commands and canonical shared helpers. TypeScript rejects unused locals
+and parameters. Positive source guards follow actual composition imports; negative
+transport guards inspect transport files alone.
+Run `NODE_ENV=test npm run test:maintainability-db` against migrated disposable
+PostgreSQL on loopback. It races native global sequence initialization, verifies private
+profile fields stay out of clinical payloads, proves bootstrap rollback, and checks
+repeat provisioning preserves customized inactive forms. CI also runs full runtime and
+browser suites. Ordered legacy CSS imports retain the original cascade (hash regression);
+new styles belong in the owning workspace stylesheet.

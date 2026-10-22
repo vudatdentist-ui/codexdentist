@@ -1,0 +1,625 @@
+.schedule-command-bar span {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.schedule-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(130px, 1fr));
+  gap: 10px;
+  min-width: min(100%, 320px);
+}
+
+.schedule-filters {
+  display: grid;
+  grid-template-columns:
+    minmax(180px, 1.15fr)
+    minmax(140px, 0.85fr)
+    minmax(140px, 0.85fr)
+    minmax(170px, 1fr)
+    minmax(160px, 0.95fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.schedule-filters label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.schedule-filters input,
+.schedule-filters select {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 10px;
+}
+
+.schedule-range-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  grid-column: 1 / -1;
+}
+
+.schedule-range-presets button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 850;
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.schedule-range-presets button.active {
+  background: #0f766e;
+  border-color: #0f766e;
+  color: #fff;
+}
+
+.schedule-dispatch-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(270px, 330px);
+  gap: 14px;
+  align-items: start;
+}
+
+.schedule-grid-dispatch {
+  overflow-x: auto;
+}
+
+.schedule-metrics.three {
+  grid-template-columns: repeat(3, minmax(110px, 1fr));
+}
+
+.schedule-ops-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 14px;
+  align-items: start;
+}
+
+.schedule-table-panel {
+  overflow: hidden;
+}
+
+.schedule-table {
+  display: grid;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.schedule-row {
+  display: grid;
+  grid-template-columns:
+    64px
+    minmax(150px, 1.35fr)
+    minmax(110px, 0.85fr)
+    minmax(80px, 0.65fr)
+    108px
+    minmax(160px, 0.95fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 760px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 10px;
+}
+
+.schedule-row-head {
+  min-height: 40px;
+  border-left-color: var(--line);
+  background: #f8fafc;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.schedule-row strong,
+.schedule-row span,
+.schedule-row small {
+  display: block;
+}
+
+.schedule-row span,
+.schedule-row small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.schedule-row-actions {
+  align-items: center;
+  justify-content: flex-start;
+  position: relative;
+}
+
+.schedule-row-actions form {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.schedule-row-actions select {
+  min-height: 28px;
+  max-width: 120px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.appointment-status-control select {
+  min-height: 34px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.appointment-quick-links {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.appointment-quick-links a {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  display: inline-flex;
+  min-height: 30px;
+  padding: 0 9px;
+  text-decoration: none;
+}
+
+.appointment-quick-links a:hover {
+  background: #f8fafc;
+}
+
+.appointment-chair-modal {
+  max-width: 420px;
+}
+
+.appointment-chair-grid {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  padding-top: 6px;
+}
+
+.appointment-chair-grid button {
+  justify-content: center;
+  min-height: 40px;
+}
+
+.schedule-empty-row {
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 18px;
+  color: var(--muted);
+  text-align: center;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.schedule-side-stack {
+  display: grid;
+  gap: 14px;
+  position: sticky;
+  top: 14px;
+}
+
+.schedule-availability-details {
+  padding: 0;
+}
+
+.schedule-availability-details summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 70px;
+  padding: 14px;
+}
+
+.schedule-availability-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.schedule-availability-details summary > span {
+  align-items: flex-start;
+  display: grid;
+  gap: 3px;
+  grid-template-columns: auto minmax(0, 1fr);
+  min-width: 0;
+}
+
+.schedule-availability-details summary svg {
+  color: var(--teal);
+  margin-top: 2px;
+}
+
+.schedule-availability-details summary strong,
+.schedule-availability-details summary small {
+  display: block;
+  min-width: 0;
+}
+
+.schedule-availability-details summary small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  grid-column: 2;
+  line-height: 1.35;
+}
+
+.schedule-availability-details summary b {
+  background: var(--teal-soft);
+  border-radius: 999px;
+  color: var(--teal);
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 900;
+  padding: 6px 9px;
+  text-align: right;
+}
+
+.schedule-availability-body {
+  border-top: 1px solid var(--line);
+  padding: 12px;
+}
+
+.schedule-resource-groups {
+  display: grid;
+  gap: 12px;
+}
+
+.schedule-resource-group {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+}
+
+.schedule-resource-group-header {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  padding-bottom: 8px;
+}
+
+.schedule-resource-group-header strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.schedule-resource-group-header span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.chair-status-grid,
+.provider-status-list {
+  display: grid;
+  gap: 8px;
+}
+
+.chair-status-card,
+.provider-status-card {
+  display: grid;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--teal);
+  border-radius: 8px;
+  padding: 10px;
+}
+
+.chair-status-card.busy,
+.provider-status-card.busy {
+  border-color: #f1c27a;
+  border-left-color: #d97706;
+  background: #fff3d6;
+}
+
+.chair-status-card.ready,
+.provider-status-card.ready {
+  border-color: #a7e3c2;
+  border-left-color: var(--green);
+  background: #eaf8f1;
+}
+
+.chair-status-card > div:not(.status-toggle-actions),
+.provider-status-card > div:not(.status-toggle-actions) {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: center;
+}
+
+.chair-status-card strong,
+.chair-status-card span,
+.chair-status-card small,
+.provider-status-card strong,
+.provider-status-card span,
+.provider-status-card small {
+  display: block;
+}
+
+.chair-status-card span,
+.chair-status-card small,
+.provider-status-card span,
+.provider-status-card small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.chair-status-card > div:not(.status-toggle-actions) span,
+.provider-status-card > div:not(.status-toggle-actions) span {
+  border-radius: 999px;
+  padding: 4px 8px;
+}
+
+.chair-status-card.busy > div:not(.status-toggle-actions) span,
+.provider-status-card.busy > div:not(.status-toggle-actions) span {
+  background: #fed7aa;
+  color: #9a3412;
+}
+
+.chair-status-card.ready > div:not(.status-toggle-actions) span,
+.provider-status-card.ready > div:not(.status-toggle-actions) span {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.status-toggle-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.status-toggle-actions form {
+  display: flex;
+}
+
+.chair-status-card button,
+.provider-status-card button {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  min-height: 30px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.credential-box {
+  border: 1px solid var(--line);
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.credential-box strong,
+.credential-box span,
+.credential-box small {
+  display: block;
+}
+
+.credential-box span,
+.credential-box small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.credential-box input {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  padding: 0 10px;
+  color: var(--ink);
+}
+
+.booking-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.booking-form label,
+.booking-form .booking-patient-search,
+.patient-form label,
+.patient-edit-form label,
+.treatment-form label,
+.phase-form label,
+.billing-form label,
+.clinical-form label,
+.community-form label,
+.staff-form label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.booking-form .booking-patient-search {
+  min-width: 0;
+}
+
+.booking-form .booking-patient-search > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.booking-form .booking-patient-search .patient-search-combobox {
+  min-width: 0;
+  width: 100%;
+}
+
+.patient-detail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.patient-secondary-details {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfd;
+  margin-top: 14px;
+}
+
+.patient-secondary-details summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 54px;
+  padding: 12px;
+}
+
+.patient-secondary-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.patient-secondary-details summary strong,
+.patient-secondary-details summary span {
+  display: block;
+}
+
+.patient-secondary-details summary span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  text-align: right;
+}
+
+.patient-secondary-details .consent-actions,
+.patient-secondary-details .patient-consent-history {
+  border-top: 1px solid var(--line);
+  padding: 12px;
+}
+
+.patient-profile-modal {
+  max-height: min(88vh, 820px);
+  overflow: auto;
+  width: min(860px, calc(100vw - 28px));
+}
+
+.patient-profile-modal .patient-source-form {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin-bottom: 12px;
+  padding: 12px;
+}
+
+.field-helper,
+.booking-readiness {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.field-helper.warning,
+.booking-readiness {
+  color: #92400e;
+}
+
+.field-label {
+  color: var(--muted);
+  display: block;
+  font-size: 12px;
+  font-weight: 900;
+  margin-bottom: 6px;
+}
+
+.primary-button.danger {
+  background: #b42318;
+  border-color: #b42318;
+}
+
+.form-template-preview {
+  background: #f9fbfb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+}
+
+.form-template-preview small,
+.form-template-preview p {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.booking-form select,
+.booking-form input,
+.patient-form select,
+.patient-form input,
+.patient-edit-form select,
+.patient-edit-form input,
+.patient-edit-form textarea,
+.treatment-form select,
+.treatment-form input,
+.phase-form input,
+.billing-form select,
+.billing-form input,
+.clinical-form select,
+.clinical-form textarea,
+.community-form select,
+.community-form input,
+.community-form textarea,
+.staff-form select,
+.staff-form input,
+.staff-form textarea,
+.staff-row select {
+  min-height: 40px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 10px;
+}

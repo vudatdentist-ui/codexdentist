@@ -23,8 +23,8 @@
     "start:selfhost:windows": "powershell -ExecutionPolicy Bypass -File scripts/windows-self-host-start.ps1",
     "stop:selfhost:windows": "powershell -ExecutionPolicy Bypass -File scripts/windows-self-host-stop.ps1",
     "test:integration": "node scripts/integration-actions.mjs",
-    "test:integration-substrate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types scripts/integration-substrate-smoke.mjs",
-    "test:file-lifecycle": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types scripts/patient-file-lifecycle-smoke.mjs",
+    "test:integration-substrate": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/integration-substrate-smoke.mjs",
+    "test:file-lifecycle": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/patient-file-lifecycle-smoke.mjs",
     "test:journey-file-command": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/journey-file-command-smoke.mjs",
     "test:phase2": "npm run test:integration-substrate && npm run test:journey-file-command && npm run test:file-lifecycle",
     "test:billing": "node scripts/billing-edge-smoke.mjs",
@@ -73,7 +73,9 @@
     "test:workspace": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --test scripts/workspace-story.test.mjs scripts/workspace-controls.test.mjs",
     "fonts:assets": "node scripts/fetch-font-assets.mjs",
     "test:audit": "node --test scripts/audit-regression.test.cjs",
-    "test:audit-db": "node scripts/audit-concurrency.cjs"
+    "test:audit-db": "node scripts/audit-concurrency.cjs",
+    "test:maintainability": "node --test scripts/maintainability-regression.test.cjs && node scripts/maintainability-check.mjs",
+    "test:maintainability-db": "node scripts/maintainability-database.cjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1040.0",

@@ -1,8 +1,7 @@
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import { requireViewSession } from "@/lib/auth";
 import { csvCell } from "@/lib/csv";
-import { canUseAllClinics } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
-import type { AppSession } from "@/lib/session";
 
 export async function GET(request: Request) {
   const session = await requireViewSession("staff");
@@ -117,14 +116,6 @@ function payrollMetric(metrics: unknown, key: string) {
   const value = (metrics as Record<string, unknown>)[key];
 
   return typeof value === "number" || typeof value === "string" ? value : "";
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 function vietnamDate(date: Date) {

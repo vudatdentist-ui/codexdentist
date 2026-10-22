@@ -1,4 +1,5 @@
 "use server";
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import { accessibleClinicIds } from "@/lib/tenant-scope";
 
@@ -118,6 +119,7 @@ export async function createInAppNotificationAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/notifications/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }

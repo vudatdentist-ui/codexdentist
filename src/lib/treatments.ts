@@ -1,3 +1,4 @@
+import { treatmentStatusLabel } from "@/lib/status-presentation";
 import "server-only";
 
 import {
@@ -154,15 +155,4 @@ function toTreatmentPlan(plan: {
   };
 }
 
-function treatmentStatusLabel(status: string): TreatmentPlan["status"] {
-  const labels: Record<string, TreatmentPlan["status"]> = {
-    DRAFT: "Draft",
-    PRESENTED: "Presented",
-    ACCEPTED: "Accepted",
-    IN_PROGRESS: "In progress",
-    COMPLETED: "Completed",
-    DECLINED: "Declined",
-  };
 
-  return labels[status] ?? "Draft";
-}

@@ -1,4 +1,7 @@
 "use server";
+import { normalizeClinicId } from "@/lib/tenant-scope";
+
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import { accessibleClinicIds } from "@/lib/tenant-scope";
 
@@ -109,6 +112,7 @@ export async function createCrmLeadAction(formData: FormData) {
       source,
     });
   } catch (error) {
+    reportApplicationError("app/(app)/crm/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -181,6 +185,7 @@ export async function addCrmActivityAction(formData: FormData) {
 
     await writeCrmAuditLog(session, "crm_activity.created", "CrmActivity", activity.id);
   } catch (error) {
+    reportApplicationError("app/(app)/crm/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -228,6 +233,7 @@ export async function updateCrmLeadStatusAction(formData: FormData) {
       status,
     });
   } catch (error) {
+    reportApplicationError("app/(app)/crm/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -357,6 +363,7 @@ export async function convertCrmLeadToPatientAction(formData: FormData) {
       reusedExistingPatient: Boolean(existingPatient),
     });
   } catch (error) {
+    reportApplicationError("app/(app)/crm/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -383,6 +390,7 @@ export async function generateCrmRecallTasksAction() {
       actorId: session.userId,
     });
   } catch (error) {
+    reportApplicationError("app/(app)/crm/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -638,15 +646,7 @@ function normalizeChannel(value: FormDataEntryValue | null) {
   return channels.find((channel) => channel === parsed) ?? null;
 }
 
-function normalizeClinicId(value: FormDataEntryValue | null, session: AppSession) {
-  const parsed = requiredString(value);
 
-  if (!parsed || parsed === "all") {
-    return canUseAllClinics(session) ? "all" : session.activeClinicId ?? "denied";
-  }
-
-  return accessibleClinicIds(session).includes(parsed) ? parsed : "denied";
-}
 
 function allowedClinicIds(session: AppSession) {
   if (canUseAllClinics(session)) {

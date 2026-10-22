@@ -1,4 +1,5 @@
 "use server";
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -67,6 +68,7 @@ export async function createAppointmentAction(formData: FormData) {
       reason,
     });
   } catch (error) {
+    reportApplicationError("app/(app)/schedule/actions", error);
     redirect(scheduleRedirect(applicationErrorCode(error, "database-unavailable"), patientId, { clinicId, date }));
   }
 
@@ -94,6 +96,7 @@ export async function updateAppointmentStatusAction(formData: FormData) {
       releaseChair: requiredString(formData.get("releaseChair")) === "1",
     });
   } catch (error) {
+    reportApplicationError("app/(app)/schedule/actions", error);
     redirect(scheduleRedirect(applicationErrorCode(error, "database-unavailable"), postedPatientId, redirectContext));
   }
 
@@ -114,6 +117,7 @@ export async function cancelAppointmentAction(formData: FormData) {
   try {
     result = await cancelAppointmentCommand(session, appointmentId);
   } catch (error) {
+    reportApplicationError("app/(app)/schedule/actions", error);
     redirect(scheduleRedirect(applicationErrorCode(error, "database-unavailable"), postedPatientId, redirectContext));
   }
 
@@ -138,6 +142,7 @@ export async function updateChairOperationalStatusAction(formData: FormData) {
       appointmentId: requiredString(formData.get("appointmentId")) || null,
     });
   } catch (error) {
+    reportApplicationError("app/(app)/schedule/actions", error);
     redirect(scheduleRedirect(applicationErrorCode(error, "database-unavailable"), postedPatientId, redirectContext));
   }
 
@@ -156,6 +161,7 @@ export async function updateProviderOperationalStatusAction(formData: FormData) 
   try {
     await updateProviderOperationalStatusCommand(session, { providerId, status });
   } catch (error) {
+    reportApplicationError("app/(app)/schedule/actions", error);
     redirect(scheduleRedirect(applicationErrorCode(error, "database-unavailable"), postedPatientId, redirectContext));
   }
 

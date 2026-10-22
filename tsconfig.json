@@ -28,7 +28,9 @@
       {
         "name": "next"
       }
-    ]
+    ],
+    "noUnusedLocals": true,
+    "noUnusedParameters": true
   },
   "include": [
     "next-env.d.ts",
@@ -42,6 +44,7 @@
     "output",
     "selfhost-notes",
     "storage",
-    "backups"
+    "backups",
+    "work"
   ]
 }

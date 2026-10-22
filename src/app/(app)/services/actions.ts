@@ -1,4 +1,7 @@
 "use server";
+import { writeDomainAuditLog as writeServicesAuditLog } from "@/lib/audit-log";
+
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import { accessibleClinicIds } from "@/lib/tenant-scope";
 
@@ -128,6 +131,7 @@ export async function createServiceCatalogItemAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/services/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -248,6 +252,7 @@ export async function updateServiceCatalogItemAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/services/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -341,6 +346,7 @@ export async function deleteServiceCatalogItemAction(formData: FormData) {
       });
     });
   } catch (error) {
+    reportApplicationError("app/(app)/services/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -404,6 +410,7 @@ export async function addServiceStepAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/services/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -477,6 +484,7 @@ export async function updateServiceStepAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/services/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -569,6 +577,7 @@ export async function addServiceMaterialAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/services/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -693,6 +702,7 @@ export async function createCompensationPolicyAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/services/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -790,6 +800,7 @@ export async function deleteCompensationPolicyAction(formData: FormData) {
       });
     });
   } catch (error) {
+    reportApplicationError("app/(app)/services/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -929,22 +940,4 @@ function isNextRedirect(error: unknown) {
   );
 }
 
-async function writeServicesAuditLog(input: {
-  organizationId: string;
-  actorId: string | null;
-  action: string;
-  entityType: string;
-  entityId: string;
-  metadata?: Record<string, unknown>;
-}) {
-  await prisma.auditLog.create({
-    data: {
-      organizationId: input.organizationId,
-      actorId: input.actorId,
-      action: input.action,
-      entityType: input.entityType,
-      entityId: input.entityId,
-      metadata: input.metadata as Prisma.InputJsonValue | undefined,
-    },
-  });
-}
+

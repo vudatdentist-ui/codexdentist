@@ -1,3 +1,4 @@
+import { readComposedSource } from "./composed-source.mjs";
 import { readFileSync } from "node:fs";
 
 const packageJson = JSON.parse(readFileSync("package.json", "utf8"));
@@ -103,7 +104,7 @@ function assertEqual(actual, expected, label) {
 }
 
 function assertSource(path, needles) {
-  const source = readFileSync(path, "utf8");
+  const source = readComposedSource(path);
 
   for (const needle of needles) {
     if (!source.includes(needle)) {

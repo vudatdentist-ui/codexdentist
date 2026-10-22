@@ -255,9 +255,6 @@ export async function getDashboardWorkspace(
     ]);
 
     const chairCount = chairs.length;
-    const completedAppointments = appointments.filter(
-      (appointment) => appointment.status === "COMPLETED",
-    ).length;
     const activeAppointments = appointments.filter((appointment) =>
       ["ARRIVED", "IN_CHAIR"].includes(appointment.status),
     ).length;

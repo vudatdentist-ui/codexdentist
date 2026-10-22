@@ -1,3 +1,4 @@
+import { safeErrorCode as safeUnknownErrorCode } from "@/shared/error-codes";
 import { randomUUID } from "node:crypto";
 import type { Prisma, PrismaClient } from "@prisma/client";
 
@@ -302,10 +303,4 @@ function safeErrorCode(value: string) {
   return /^[a-z0-9_.:-]{1,120}$/i.test(value) ? value : "patient-file-stage-error";
 }
 
-function safeUnknownErrorCode(error: unknown, fallback: string) {
-  const candidate =
-    error && typeof error === "object" && "code" in error
-      ? String((error as { code?: unknown }).code ?? "")
-      : "";
-  return /^[a-z0-9_.:-]{1,120}$/i.test(candidate) ? candidate : fallback;
-}
+

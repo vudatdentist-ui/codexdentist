@@ -1,0 +1,777 @@
+.booking-form select:disabled,
+.booking-form input:disabled,
+.patient-form select:disabled,
+.patient-form input:disabled,
+.patient-edit-form select:disabled,
+.patient-edit-form input:disabled,
+.patient-edit-form textarea:disabled,
+.treatment-form select:disabled,
+.treatment-form input:disabled,
+.phase-form input:disabled,
+.billing-form select:disabled,
+.billing-form input:disabled,
+.clinical-form select:disabled,
+.clinical-form textarea:disabled,
+.community-form select:disabled,
+.community-form input:disabled,
+.community-form textarea:disabled,
+.staff-form select:disabled,
+.staff-form input:disabled,
+.staff-form textarea:disabled,
+.staff-row select:disabled {
+  color: var(--muted);
+  background: #eef2f4;
+}
+
+.staff-form textarea {
+  min-height: 88px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.staff-form .form-check-row {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+  min-height: 40px;
+}
+
+.staff-form .form-check-row input {
+  min-height: 0;
+  width: auto;
+}
+
+.pharmacy-inline-forms {
+  display: none;
+}
+
+.pharmacy-group-list {
+  display: grid;
+  gap: 14px;
+}
+
+.pharmacy-group {
+  display: grid;
+  gap: 8px;
+}
+
+.pharmacy-group-title {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.pharmacy-group-title strong {
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.pharmacy-group-title span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.pharmacy-edit-tile {
+  gap: 7px;
+  padding-right: 48px;
+  position: relative;
+}
+
+.pharmacy-template-card {
+  padding-right: 86px;
+}
+
+.pharmacy-card-edit,
+.pharmacy-card-print {
+  position: absolute;
+  top: 10px;
+}
+
+.pharmacy-card-edit {
+  right: 10px;
+}
+
+.pharmacy-card-print {
+  right: 50px;
+}
+
+.pharmacy-template-modal {
+  width: min(920px, 96vw);
+}
+
+.pharmacy-prescription-modal {
+  width: min(1040px, 96vw);
+}
+
+.pharmacy-prescription-builder {
+  display: grid;
+  gap: 14px;
+}
+
+.pharmacy-prescription-step {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.pharmacy-prescription-step-header {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.pharmacy-prescription-step-header span {
+  align-items: center;
+  background: var(--ink);
+  border-radius: 999px;
+  color: white;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}
+
+.pharmacy-template-apply-row {
+  align-items: end;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(220px, 1fr) auto;
+}
+
+.pharmacy-template-apply-row label,
+.pharmacy-rx-row label {
+  color: var(--muted);
+  display: grid;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 6px;
+}
+
+.pharmacy-template-apply-row select,
+.pharmacy-rx-row input,
+.pharmacy-rx-row textarea {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font: inherit;
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.pharmacy-rx-row textarea {
+  min-height: 74px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.pharmacy-template-preview {
+  background: #f9fbfb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+}
+
+.pharmacy-template-preview small,
+.pharmacy-template-preview span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pharmacy-template-preview div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pharmacy-template-preview span {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 4px 8px;
+}
+
+.pharmacy-rx-row-list {
+  display: grid;
+  gap: 12px;
+}
+
+.pharmacy-rx-row {
+  background: #f9fbfb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.pharmacy-rx-row-head {
+  align-items: start;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 30px minmax(0, 1fr) minmax(110px, 150px) 36px;
+}
+
+.pharmacy-rx-row-head > span {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
+}
+
+.pharmacy-rx-row-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr;
+}
+
+.pharmacy-rx-row-grid .clinical-wide {
+  grid-column: auto;
+}
+
+.pharmacy-medication-results {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.12);
+  display: grid;
+  margin-top: 4px;
+  max-height: 220px;
+  overflow: auto;
+  padding: 6px;
+  position: absolute;
+  width: min(520px, calc(100vw - 64px));
+  z-index: 20;
+}
+
+.pharmacy-medication-results button,
+.pharmacy-medication-results div {
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--ink);
+  display: grid;
+  gap: 2px;
+  padding: 8px;
+  text-align: left;
+}
+
+.pharmacy-medication-results button:hover {
+  background: #eef6f5;
+}
+
+.pharmacy-medication-results span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pharmacy-detail-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.pharmacy-detail-grid div,
+.pharmacy-detail-note {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+}
+
+.pharmacy-detail-grid span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.pharmacy-detail-note p {
+  margin: 0;
+}
+
+.pharmacy-detail-items {
+  display: grid;
+  gap: 10px;
+}
+
+.pharmacy-template-items {
+  display: grid;
+  gap: 12px;
+}
+
+.pharmacy-template-item {
+  background: #f9fbfb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.pharmacy-template-item-head {
+  align-items: center;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: 36px minmax(260px, 1fr) 120px;
+}
+
+.pharmacy-template-item-head span {
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  height: 30px;
+  justify-content: center;
+  width: 30px;
+}
+
+.pharmacy-template-item label {
+  color: var(--muted);
+  display: grid;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 6px;
+}
+
+.pharmacy-template-item select,
+.pharmacy-template-item input,
+.pharmacy-template-item textarea {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--ink);
+  min-height: 38px;
+  padding: 0 10px;
+}
+
+.pharmacy-template-item textarea {
+  min-height: 76px;
+  padding: 10px;
+  resize: vertical;
+}
+
+.pharmacy-prescription-items {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.pharmacy-prescription-item {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.pharmacy-prescription-item strong {
+  color: var(--ink);
+}
+
+.pharmacy-prescription-card {
+  background: #f9fbfb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.pharmacy-prescription-summary {
+  align-items: center;
+  cursor: pointer;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  list-style: none;
+  min-height: 76px;
+  padding: 12px;
+}
+
+.pharmacy-prescription-summary::-webkit-details-marker {
+  display: none;
+}
+
+.pharmacy-prescription-summary span,
+.pharmacy-prescription-summary small {
+  color: var(--muted);
+  display: block;
+  font-size: 13px;
+}
+
+.pharmacy-prescription-card-body {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.pharmacy-prescription-actions {
+  justify-content: flex-start;
+}
+
+.pharmacy-medication-card-list {
+  display: grid;
+  gap: 12px;
+}
+
+.pharmacy-medication-card {
+  background: #f9fbfb;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 0;
+  position: relative;
+}
+
+.pharmacy-medication-card-summary {
+  cursor: pointer;
+  display: grid;
+  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, auto) auto;
+  list-style: none;
+  min-height: 70px;
+  padding: 12px 52px 12px 12px;
+}
+
+.pharmacy-medication-card-summary::-webkit-details-marker {
+  display: none;
+}
+
+.pharmacy-medication-card-body {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.pharmacy-medication-card:not([open]) .pharmacy-card-edit {
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.pharmacy-medication-card[open] .pharmacy-card-edit {
+  transform: none;
+}
+
+.pharmacy-medication-card-summary h3 {
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 1.25;
+  margin: 2px 0;
+}
+
+.pharmacy-medication-card-summary span,
+.pharmacy-medication-card-summary small,
+.pharmacy-medication-indication span,
+.pharmacy-medication-strength span,
+.pharmacy-medication-facts span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.pharmacy-medication-card-summary p {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0;
+}
+
+.pharmacy-medication-card-form {
+  align-self: start;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  text-align: right;
+}
+
+.pharmacy-medication-card-toggle {
+  align-self: center;
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  border-radius: 999px;
+  color: #047857 !important;
+  justify-self: end;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+
+.pharmacy-medication-card[open] .pharmacy-medication-card-toggle {
+  background: #eef6f5;
+  border-color: var(--line);
+}
+
+.pharmacy-medication-indication,
+.pharmacy-medication-directions,
+.pharmacy-medication-warning,
+.pharmacy-medication-notes,
+.pharmacy-medication-more {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+}
+
+.pharmacy-medication-indication {
+  background: #eef6f5;
+}
+
+.pharmacy-medication-strength {
+  align-items: center;
+  background: #e3f3f1;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px;
+}
+
+.pharmacy-medication-strength strong {
+  font-size: 18px;
+}
+
+.pharmacy-medication-facts {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.pharmacy-medication-facts div {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: grid;
+  gap: 4px;
+  padding: 9px;
+}
+
+.pharmacy-medication-directions p,
+.pharmacy-medication-more p {
+  margin: 0;
+}
+
+.pharmacy-medication-warning {
+  background: #fff1f2;
+  border-color: #fecdd3;
+}
+
+.pharmacy-medication-warning strong {
+  color: #be123c;
+}
+
+.pharmacy-medication-warning ul,
+.pharmacy-medication-notes ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.pharmacy-medication-warning li,
+.pharmacy-medication-notes li {
+  margin-top: 3px;
+}
+
+.pharmacy-medication-more {
+  background: var(--surface);
+}
+
+.pharmacy-medication-more summary {
+  color: var(--ink);
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.pharmacy-action-note {
+  color: var(--muted);
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 800;
+  max-width: 180px;
+}
+
+.forms-row-details {
+  display: grid;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.booking-form .booking-reason {
+  grid-column: span 2;
+}
+
+.patient-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(160px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.treatment-form {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(140px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.treatment-form .treatment-wide {
+  grid-column: span 2;
+}
+
+.treatment-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding-top: 4px;
+}
+
+.treatment-actions button {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  min-height: 30px;
+  background: var(--surface);
+  color: var(--ink);
+  padding: 0 9px;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.phase-form {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) 120px minmax(160px, 1.4fr) auto;
+  gap: 8px;
+  align-items: end;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.billing-form {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(140px, 0.8fr) minmax(150px, 0.8fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.clinical-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.clinical-form .clinical-wide {
+  grid-column: 1 / -1;
+}
+
+.clinical-form textarea {
+  min-height: 96px;
+  padding: 10px;
+}
+
+.community-form {
+  display: grid;
+  grid-template-columns: minmax(140px, 0.8fr) minmax(180px, 1fr) minmax(220px, 1.4fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.community-form .community-body,
+.community-form .community-tags {
+  grid-column: span 2;
+}
+
+.community-form textarea {
+  min-height: 88px;
+  padding: 10px;
+}
+
+.staff-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(170px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.staff-form label small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.inventory-check-card {
+  align-items: flex-start;
+  background: color-mix(in srgb, var(--soft) 72%, #ffffff);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  display: flex !important;
+  flex-direction: row !important;
+  gap: 10px !important;
+  min-height: 64px;
+  padding: 12px;
+}
+
+.inventory-check-card input[type="checkbox"] {
+  accent-color: var(--teal);
+  flex: 0 0 auto;
+  height: 18px;
+  margin-top: 2px;
+  width: 18px;
+}
+
+.inventory-check-card span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.inventory-check-card strong {
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.25;
+}
+
+.inventory-check-card small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.staff-filter-bar {
+  align-items: end;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.staff-filter-bar label {
+  color: var(--muted);
+  display: grid;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 6px;
+  min-width: min(320px, 100%);
+}
+
+.staff-filter-bar select {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  min-height: 42px;
+  padding: 0 12px;
+}

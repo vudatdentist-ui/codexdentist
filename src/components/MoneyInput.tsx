@@ -1,5 +1,6 @@
 "use client";
 
+import { parseMoneyText } from "@/shared/money";
 import { useEffect, useMemo, useState } from "react";
 
 type MoneyInputProps = {
@@ -77,40 +78,6 @@ function toCanonicalMoney(value: number | string | null | undefined) {
   const parsed = parseMoneyText(String(value ?? ""));
 
   return parsed == null ? "" : String(parsed);
-}
-
-function parseMoneyText(value: string) {
-  const cleaned = value
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .replace(/₫|vnd|đ/g, "");
-
-  if (!cleaned) return null;
-
-  const suffixMatch = cleaned.match(/^(.*?)(k|nghin|ngan|ngàn|m|tr|trieu|triệu|ty|tỷ)$/u);
-
-  if (suffixMatch) {
-    const numericPart = suffixMatch[1].replace(/,/g, ".");
-    const numericValue = Number(numericPart.replace(/[^0-9.]/g, ""));
-
-    if (!Number.isFinite(numericValue)) return null;
-
-    const suffix = suffixMatch[2];
-    const multiplier =
-      suffix === "k" || suffix === "nghin" || suffix === "ngan" || suffix === "ngàn"
-        ? 1_000
-        : suffix === "ty" || suffix === "tỷ"
-          ? 1_000_000_000
-          : 1_000_000;
-
-    return Math.round(numericValue * multiplier);
-  }
-
-  const digits = cleaned.replace(/\D/g, "");
-  const amount = Number(digits);
-
-  return digits && Number.isFinite(amount) ? amount : null;
 }
 
 function isPartialSuffixInput(value: string) {

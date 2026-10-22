@@ -1,8 +1,10 @@
 "use server";
+import { writeDomainAuditLog as writeCommunityAuditLog } from "@/lib/audit-log";
+
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import { accessibleClinicIds } from "@/lib/tenant-scope";
 
-import type { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireViewSession } from "@/lib/auth";
@@ -89,7 +91,8 @@ export async function createCommunityPostAction(formData: FormData) {
         },
       });
     }
-  } catch {
+  } catch (error) {
+    reportApplicationError("app/(app)/community/actions", error);
     notice = "community-database";
   }
 
@@ -175,7 +178,8 @@ export async function addCommunityCommentAction(formData: FormData) {
         },
       });
     }
-  } catch {
+  } catch (error) {
+    reportApplicationError("app/(app)/community/actions", error);
     notice = "community-database";
   }
 
@@ -249,7 +253,8 @@ export async function deleteCommunityPostAction(formData: FormData) {
         }),
       ]);
     }
-  } catch {
+  } catch (error) {
+    reportApplicationError("app/(app)/community/actions", error);
     notice = "community-database";
   }
 
@@ -294,22 +299,4 @@ function parsePostType(value: FormDataEntryValue | null) {
   return allowed.find((type) => type === parsed) ?? null;
 }
 
-async function writeCommunityAuditLog(input: {
-  organizationId: string;
-  actorId: string | null;
-  action: string;
-  entityType: string;
-  entityId: string;
-  metadata?: Record<string, unknown>;
-}) {
-  await prisma.auditLog.create({
-    data: {
-      organizationId: input.organizationId,
-      actorId: input.actorId,
-      action: input.action,
-      entityType: input.entityType,
-      entityId: input.entityId,
-      metadata: input.metadata as Prisma.InputJsonValue | undefined,
-    },
-  });
-}
+

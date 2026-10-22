@@ -1,3 +1,4 @@
+import { reportApplicationError } from "@/lib/error-reporting";
 import "server-only";
 
 import { prisma } from "@/lib/prisma";
@@ -35,7 +36,8 @@ export async function getModuleAiRuns(
       error: run.error,
       totalTokens: run.totalTokens,
     }));
-  } catch {
+  } catch (error) {
+    reportApplicationError("lib/ai-runs", error);
     return [];
   }
 }

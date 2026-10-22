@@ -1,3 +1,5 @@
+import { readComposedSource } from "./composed-source.mjs";
+import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const baseUrl = process.env.ACTION_SMOKE_BASE_URL ?? "http://127.0.0.1:3000";
@@ -163,15 +165,13 @@ async function assertGuardMarkers() {
     '@/lib/prisma',
   ]);
 
-  await assertSource("src/app/(app)/treatment/actions.ts", [
-    "createTreatmentPlanAction",
-    'canPerformAction(session, "treatment.plan.create")',
-    'canPerformAction(session, status === "ACCEPTED" ? "treatment.plan.accept" : "treatment.plan.create")',
-  ]);
+  // The legacy treatment mutation surface must stay retired. Live clinical and
+  // Journey commands above retain their server-side authorization assertions.
+  await assert.rejects(readFile("src/app/(app)/treatment/actions.ts", "utf8"), { code: "ENOENT" });
 }
 
 async function assertSource(path, markers) {
-  const source = await readFile(path, "utf8");
+  const source = readComposedSource(path);
 
   for (const marker of markers) {
     if (!source.includes(marker)) {

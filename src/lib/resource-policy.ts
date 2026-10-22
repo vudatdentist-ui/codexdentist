@@ -1,6 +1,6 @@
 import "server-only";
 
-import { hasAnyRole, canAccessView, canUseAllClinics, type AppRole, type ViewKey } from "@/lib/permissions";
+import { hasAnyRole, canAccessView, type AppRole, type ViewKey } from "@/lib/permissions";
 import { patientAccessWhere } from "@/lib/patient-access";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
@@ -101,10 +101,4 @@ export function canServePatientFile(
   return hasAnyRole(session, fileAdminRoles);
 }
 
-export function allowedClinicIdsForResource(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
-}
+export { accessibleClinicIds as allowedClinicIdsForResource } from "@/lib/tenant-scope";

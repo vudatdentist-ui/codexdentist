@@ -1,3 +1,4 @@
+import { readComposedSource } from "./composed-source.mjs";
 import { readFile } from "node:fs/promises";
 
 const baseUrl = process.env.M789_BASE_URL ?? "http://127.0.0.1:3000";
@@ -13,7 +14,7 @@ async function main() {
   await assertPage(cookie, "/journey", ["Hành trình", "journey"]);
 
   await assertSource("prisma/schema.prisma", [
-    "retentionUntil DateTime?",
+    /retentionUntil\s+DateTime\?/,
     "@@index([organizationId, retentionUntil])",
   ]);
   await assertSource("src/app/(app)/staff/actions.ts", [
@@ -115,10 +116,10 @@ async function assertPage(cookie, path, markers) {
 }
 
 async function assertSource(path, markers) {
-  const source = await readFile(path, "utf8");
+  const source = readComposedSource(path);
 
   for (const marker of markers) {
-    if (!source.includes(marker)) {
+    if (!(typeof marker === "string" ? source.includes(marker) : marker.test(source))) {
       throw new Error(`${path} missing marker "${marker}".`);
     }
   }

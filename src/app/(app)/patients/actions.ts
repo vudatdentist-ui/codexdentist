@@ -1,4 +1,5 @@
 "use server";
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -63,6 +64,7 @@ export async function createPatientAction(formData: FormData) {
     });
     patientId = patient.id;
   } catch (error) {
+    reportApplicationError("app/(app)/patients/actions", error);
     redirect(`/patients?notice=${applicationErrorCode(error, "patient-database")}`);
   }
 
@@ -97,6 +99,7 @@ export async function updatePatientAction(formData: FormData) {
       medicalAlerts: splitList(formData.get("medicalAlerts")),
     });
   } catch (error) {
+    reportApplicationError("app/(app)/patients/actions", error);
     redirect(patientRedirect(applicationErrorCode(error, "patient-database"), patientId));
   }
 
@@ -117,6 +120,7 @@ export async function updatePatientConsentAction(formData: FormData) {
   try {
     await updatePatientConsentCommand(session, patientId, status);
   } catch (error) {
+    reportApplicationError("app/(app)/patients/actions", error);
     redirect(patientRedirect(applicationErrorCode(error, "patient-database"), patientId));
   }
 
@@ -137,6 +141,7 @@ export async function updatePatientLeadSourceAction(formData: FormData) {
   try {
     await updatePatientLeadSourceCommand(session, patientId, leadSource, reason);
   } catch (error) {
+    reportApplicationError("app/(app)/patients/actions", error);
     redirect(patientRedirect(applicationErrorCode(error, "patient-database"), patientId));
   }
 

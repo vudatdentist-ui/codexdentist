@@ -20,7 +20,6 @@ import {
   MetricCard,
   PanelHeader,
   RecordTile,
-  StatusPill as BaseStatusPill,
 } from "@/components/suite-primitives";
 import { formatVnd, type Clinic } from "@/lib/data";
 import type { ReportsWorkspace } from "@/lib/reports-types";
@@ -773,11 +772,6 @@ function workspaceMessageText(message: string | null | undefined, language: Lang
   return viMessages[message] ?? message;
 }
 
-function StatusPill({ status }: { status: string }) {
-  const { language } = useAppLanguage();
-
-  return <BaseStatusPill label={displayStatus(status, language)} status={status} />;
-}
 
 function displayStatus(status: string, language: Language) {
   return reportStatusText[language][status] ?? status;

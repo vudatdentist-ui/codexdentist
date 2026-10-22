@@ -1,4 +1,5 @@
 import "server-only";
+import { parseMoneyText } from "@/shared/money";
 
 export type ParsedDate = Date | "invalid" | null;
 
@@ -23,40 +24,7 @@ export function splitList(
 }
 
 export function parseMoney(value: FormDataEntryValue | null) {
-  const cleaned = String(value ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "")
-    .replace(/₫|vnd|đ/g, "");
-
-  if (!cleaned) {
-    return null;
-  }
-
-  const suffixMatch = cleaned.match(/^(.*?)(k|nghin|ngan|ngàn|m|tr|trieu|triệu|ty|tỷ)$/u);
-
-  if (suffixMatch) {
-    const numericValue = Number(suffixMatch[1].replace(/,/g, ".").replace(/[^0-9.]/g, ""));
-
-    if (!Number.isFinite(numericValue)) {
-      return null;
-    }
-
-    const suffix = suffixMatch[2];
-    const multiplier =
-      suffix === "k" || suffix === "nghin" || suffix === "ngan" || suffix === "ngàn"
-        ? 1_000
-        : suffix === "ty" || suffix === "tỷ"
-          ? 1_000_000_000
-          : 1_000_000;
-
-    return Math.round(numericValue * multiplier);
-  }
-
-  const normalized = cleaned.replace(/\D/g, "");
-  const amount = Number(normalized);
-
-  return normalized && Number.isFinite(amount) ? amount : null;
+  return parseMoneyText(String(value ?? ""));
 }
 
 export function parseDateInVietnam(value: FormDataEntryValue | null): ParsedDate {
@@ -68,7 +36,7 @@ export function parseDateInVietnam(value: FormDataEntryValue | null): ParsedDate
 
   const date = new Date(`${parsed}T00:00:00+07:00`);
 
-  return Number.isNaN(date.getTime()) ? "invalid" : date;
+  return validCalendarDate(parsed) && !Number.isNaN(date.getTime()) ? date : "invalid";
 }
 
 export function parseEndOfDateInVietnam(
@@ -83,13 +51,13 @@ export function parseEndOfDateInVietnam(
 
   const date = new Date(`${parsed}T23:59:00+07:00`);
 
-  return Number.isNaN(date.getTime()) ? "invalid" : date;
+  return validCalendarDate(parsed) && !Number.isNaN(date.getTime()) ? date : "invalid";
 }
 
 export function parseDateTimeInVietnam(date: string, time: string) {
   const parsed = new Date(`${date}T${time}:00+07:00`);
 
-  return Number.isNaN(parsed.getTime()) ? "invalid" : parsed;
+  return validCalendarDate(date) && /^([01]\d|2[0-3]):[0-5]\d$/.test(time) && !Number.isNaN(parsed.getTime()) ? parsed : "invalid";
 }
 
 export function parseLowercaseTags(value: FormDataEntryValue | null, limit = 6) {
@@ -105,4 +73,10 @@ export function parseLowercaseTags(value: FormDataEntryValue | null, limit = 6) 
 
 export function databaseActorId(userId: string) {
   return userId.startsWith("demo-") ? null : userId;
+}
+
+function validCalendarDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(value + "T00:00:00Z");
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 }

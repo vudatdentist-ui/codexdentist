@@ -1,6 +1,7 @@
+import { ageFromDate } from "@/lib/patient-presentation";
 import "server-only";
 
-import { patients as demoPatients, type Patient } from "@/lib/data";
+import { patients as demoPatients } from "@/lib/data";
 import { hasAnyRole } from "@/lib/permissions";
 import { patientAccessWhere } from "@/lib/patient-access";
 import type { AppRole } from "@/lib/permissions";
@@ -153,17 +154,7 @@ function demoClinicalWorkspace(session: AppSession): ClinicalWorkspace {
   };
 }
 
-function ageFromDate(date: Date) {
-  const today = new Date();
-  let age = today.getFullYear() - date.getFullYear();
-  const monthDelta = today.getMonth() - date.getMonth();
 
-  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < date.getDate())) {
-    age -= 1;
-  }
-
-  return Math.max(age, 0);
-}
 
 function vietnamDate(date: Date) {
   return new Intl.DateTimeFormat("en-CA", {

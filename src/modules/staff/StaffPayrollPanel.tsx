@@ -1,4 +1,6 @@
 "use client";
+import { padCodeNumber } from "@/lib/patient-presentation";
+
 
 import { OperationalDialog, WorkspaceTabs } from "@/components/ui/WorkspaceControls";
 
@@ -176,10 +178,6 @@ function vietnamInputDateTime(value: string | null) {
   const dateKey = vietnamDateKey(date);
   const time = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Asia/Ho_Chi_Minh" }).format(date);
   return { date: dateKey, time };
-}
-
-function padCodeNumber(value: number, digits: number) {
-  return String(Math.max(Math.trunc(value), 0)).padStart(digits, "0");
 }
 
 function formatServiceInstanceCode(serviceCode: string) {
@@ -676,7 +674,6 @@ export function StaffPayrollPanel({
     };
   };
   const selectedStaffDay = getStaffCalendarDay(selectedStaffCalendarDate);
-  const todayStaffDay = getStaffCalendarDay(today);
   const staffDayModalDay = staffDayModalDate
     ? getStaffCalendarDay(staffDayModalDate)
     : null;

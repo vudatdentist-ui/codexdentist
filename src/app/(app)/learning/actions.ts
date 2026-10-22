@@ -1,4 +1,7 @@
 "use server";
+import { normalizeClinicId } from "@/lib/tenant-scope";
+
+import { reportApplicationError } from "@/lib/error-reporting";
 
 import { accessibleClinicIds } from "@/lib/tenant-scope";
 
@@ -164,7 +167,8 @@ export async function createLearningContentAction(formData: FormData) {
         } as Prisma.InputJsonValue,
       },
     });
-  } catch {
+  } catch (error) {
+    reportApplicationError("app/(app)/learning/actions", error);
     redirect("/learning?notice=learning-database");
   }
 
@@ -305,6 +309,7 @@ export async function assignLearningContentAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/learning/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -396,6 +401,7 @@ export async function updateLearningEnrollmentStatusAction(formData: FormData) {
       },
     });
   } catch (error) {
+    reportApplicationError("app/(app)/learning/actions", error);
     if (isNextRedirect(error)) {
       throw error;
     }
@@ -450,15 +456,7 @@ function normalizeEnrollmentStatus(value: FormDataEntryValue | null) {
   return enrollmentStatuses.find((status) => status === parsed) ?? null;
 }
 
-function normalizeClinicId(value: FormDataEntryValue | null, session: AppSession) {
-  const parsed = requiredString(value);
 
-  if (!parsed || parsed === "all") {
-    return canUseAllClinics(session) ? "all" : session.activeClinicId ?? "denied";
-  }
-
-  return accessibleClinicIds(session).includes(parsed) ? parsed : "denied";
-}
 
 function allowedClinicIds(session: AppSession) {
   if (canUseAllClinics(session)) {

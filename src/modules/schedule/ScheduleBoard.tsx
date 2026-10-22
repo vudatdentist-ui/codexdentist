@@ -1,4 +1,8 @@
 "use client";
+import { normalizeSearchText } from "@/shared/search";
+
+import { patientCodeFor } from "@/lib/patient-presentation";
+
 
 import { OperationalDialog } from "@/components/ui/WorkspaceControls";
 
@@ -103,36 +107,6 @@ function workspaceMessageText(message: string | null | undefined, _language: Lan
 
 function clinicIsActive(clinic: Pick<Clinic, "active">) {
   return clinic.active !== false;
-}
-
-function normalizeSearchText(value: string | number | null | undefined) {
-  return String(value ?? "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/đ/g, "d")
-    .replace(/Đ/g, "D")
-    .toLowerCase()
-    .trim();
-}
-
-function padCodeNumber(value: number, digits: number) {
-  return String(Math.max(Math.trunc(value), 0)).padStart(digits, "0");
-}
-
-function stableNumberFromText(value: string, max: number) {
-  let hash = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    hash = (hash * 31 + value.charCodeAt(index)) % max;
-  }
-  return hash + 1;
-}
-
-function patientCodeFor(patient: Pick<Patient, "id" | "patientCode"> | null | undefined) {
-  if (!patient) return "PT000000";
-  if (patient.patientCode) return patient.patientCode;
-  const numericId = patient.id.match(/\d+/g)?.join("");
-  const sequence = numericId ? Number(numericId.slice(-6)) : stableNumberFromText(patient.id, 999999);
-  return `PT${padCodeNumber(sequence || 0, 6)}`;
 }
 
 type PatientSearchRecord = Pick<Patient, "id" | "name" | "phone"> & Partial<Pick<Patient, "address" | "age" | "city" | "consent" | "email" | "flags" | "gender" | "guardianName" | "leadSource" | "nationalId" | "patientCode" | "visitReason">>;

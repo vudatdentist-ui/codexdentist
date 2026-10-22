@@ -1,6 +1,7 @@
+import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import "server-only";
 
-import { hasAnyRole, canUseAllClinics, type AppRole } from "@/lib/permissions";
+import { hasAnyRole, type AppRole } from "@/lib/permissions";
 import { credentialNotificationTemplateKeys } from "@/lib/notification-templates";
 import { prisma } from "@/lib/prisma";
 import { assertDemoFallbackAllowed } from "@/lib/runtime-guards";
@@ -632,14 +633,6 @@ function metadataPriority(metadata: unknown): TaskInboxItemSummary["priority"] {
 
   const value = (metadata as { priority?: unknown }).priority;
   return value === "high" || value === "medium" || value === "low" ? value : "low";
-}
-
-function allowedClinicIds(session: AppSession) {
-  if (canUseAllClinics(session)) {
-    return session.clinicIds;
-  }
-
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 function priorityRank(priority: string) {

@@ -1,3 +1,4 @@
+import { getStaffDirectory } from "@/lib/staff-directory";
 import { DentalSuite } from "@/components/DentalSuite";
 import { requireViewSession } from "@/lib/auth";
 import { getAccountingWorkspace } from "@/lib/accounting";
@@ -104,7 +105,7 @@ export async function AppViewPage({
   const patientPortalWorkspacePromise =
     view === "patient-app" ? getPatientPortalWorkspace(session) : Promise.resolve(null);
   const settingsWorkspacePromise =
-    view === "settings" || usesPatientJourney || view === "staff" || view === "employee-app"
+    view === "settings" || view === "staff"
       ? getSettingsWorkspace(session)
       : Promise.resolve(null);
   const servicesWorkspacePromise =
@@ -138,6 +139,7 @@ export async function AppViewPage({
     view === "forms" || (usesPatientJourney && canAccessView(session, "forms"))
       ? getFormsWorkspace(session, usesPatientJourney ? journeyScope : undefined)
       : Promise.resolve(null);
+  const staffDirectory = usesPatientJourney ? await getStaffDirectory(session) : [];
   const moduleAiRunsPromise = getModuleAiRuns(session, view);
 
   const [
@@ -232,6 +234,7 @@ export async function AppViewPage({
   return (
     <DentalSuite
       activeView={view}
+      staffDirectory={staffDirectory}
       accountingWorkspace={accountingWorkspace}
       billingWorkspace={scopedBillingWorkspace}
       clinicalWorkspace={scopedClinicalWorkspace}
