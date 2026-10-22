@@ -14,7 +14,7 @@ async function main() {
   await assertPage(cookie, "/journey", ["Hành trình", "journey"]);
 
   await assertSource("prisma/schema.prisma", [
-    "retentionUntil DateTime?",
+    /retentionUntil\s+DateTime\?/,
     "@@index([organizationId, retentionUntil])",
   ]);
   await assertSource("src/app/(app)/staff/actions.ts", [
@@ -119,7 +119,7 @@ async function assertSource(path, markers) {
   const source = readComposedSource(path);
 
   for (const marker of markers) {
-    if (!source.includes(marker)) {
+    if (!(typeof marker === "string" ? source.includes(marker) : marker.test(source))) {
       throw new Error(`${path} missing marker "${marker}".`);
     }
   }

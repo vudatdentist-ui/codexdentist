@@ -40,8 +40,7 @@ async function main() {
     "nextPaymentPlanNo(session.organizationId",
   ]);
   assertSource("src/lib/pharmacy.ts", [
-    "nextDocumentNo",
-    "type: \"RX\"",
+    'nextGlobalDocumentNo("RX")',
     "patient: patientAccessWhere(session)",
   ]);
   assertSource("scripts/go-live-check.mjs", [
