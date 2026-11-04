@@ -63,6 +63,41 @@ class DeploymentGuards(unittest.TestCase):
                 deploy.deploy(SHA, SHA)
             docker.assert_not_called()
 
+    def test_manual_migration_review_is_exact_and_does_not_change_unattended_policy(self):
+        import hashlib
+        import json
+        with tempfile.TemporaryDirectory() as root:
+            source = Path(root)
+            relative = "prisma/migrations/reviewed/migration.sql"
+            sql = source / relative
+            sql.parent.mkdir(parents=True)
+            sql.write_text('ALTER TABLE x ADD CONSTRAINT scope CHECK (id IS NOT NULL);')
+            review = source / "review.json"
+            previous = "b" * 40
+            document = dict(sha=SHA, previous=previous, migrations={relative: hashlib.sha256(sql.read_bytes()).hexdigest()})
+            review.write_text(json.dumps(document))
+            review.chmod(0o600)
+            def git(args):
+                return SHA if "rev-parse" in args else "A\t" + relative
+            # The deployer runs on Linux; model its reviewed-file mode on Windows.
+            from types import SimpleNamespace
+            original_stat = Path.stat
+            def reviewed_stat(target, *args, **kwargs):
+                return SimpleNamespace(st_uid=0, st_mode=0o100600) if target == review else original_stat(target, *args, **kwargs)
+            with patch.object(deploy, "capture", side_effect=git), patch.object(Path, "stat", reviewed_stat):
+                with self.assertRaises(RuntimeError):
+                    deploy.check_migrations(source, previous)
+                deploy.check_migrations(source, previous, review)
+                for changed in [dict(document, sha="c" * 40), dict(document, previous="c" * 40),
+                                dict(document, migrations={}), dict(document, migrations={relative: "0" * 64})]:
+                    review.write_text(json.dumps(changed))
+                    with self.assertRaises(RuntimeError):
+                        deploy.check_migrations(source, previous, review)
+                review.write_text(json.dumps(document))
+                sql.write_text("ALTER TABLE different;")
+                with self.assertRaises(RuntimeError):
+                    deploy.check_migrations(source, previous, review)
+
     def test_already_deployed_checks_health_without_build_or_backup(self):
         import json
         current = [{"Config": {"Labels": {deploy.REVISION: SHA}}}]
