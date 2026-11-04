@@ -53,3 +53,23 @@ test("readiness requires job authorization even outside production", async () =>
   assert.match(response.headers.get("cache-control"), /no-store/);
   assert.equal(queried, false);
 });
+
+test("readiness refuses missing, unexpected and checksum-drifted migration history", async () => {
+  const { createHash } = require("node:crypto");
+  const checksum = createHash("sha256").update("CREATE TABLE fixture(id TEXT);").digest("hex");
+  for (const applied of [[], [{ migration_name: "migration", checksum: "drift" }],
+    [{ migration_name: "unexpected", checksum }], [{ migration_name: "migration", checksum }]]) {
+    const { GET } = load("src/app/api/readiness/route.ts", {
+      "next/server": { NextResponse: Response },
+      "node:fs": { readdirSync: () => [{ name: "20260101_fixture", isDirectory: () => true }],
+        readFileSync: () => Buffer.from("CREATE TABLE fixture(id TEXT);") },
+      "@/lib/job-auth": { verifyJobRequest: () => true },
+      "@/lib/env": { patientFileStorageDriver: () => "local", notificationDeliveryMode: () => "disabled",
+        resendEmailConfig: () => null, codexMedAiConfig: () => ({ enabled: false }) },
+      "@/lib/prisma": { prisma: { $queryRaw: async parts => parts.join("").includes("_prisma_migrations")
+        ? applied.map(row => ({ ...row, migration_name: row.migration_name === "migration" ? "20260101_fixture" : row.migration_name })) : [] } },
+    });
+    const response = await GET(new Request("http://localhost/api/readiness"));
+    assert.equal(response.status, applied[0]?.checksum === checksum && applied[0]?.migration_name === "migration" ? 200 : 503);
+  }
+});
