@@ -194,14 +194,13 @@ export function PatientsPanel({
 
     if (requestedPatientId !== appliedPatientUrlId) {
       setAppliedPatientUrlId(requestedPatientId);
-
-      if (
-        requestedPatientId &&
+      setSelectedPatientId(
         operationalPatients.some((patient) => patient.id === requestedPatientId)
-      ) {
-        setSelectedPatientId(requestedPatientId);
-        return;
-      }
+          ? requestedPatientId
+          : "",
+      );
+      setEditPatientModalOpen(false);
+      return;
     }
 
     if (

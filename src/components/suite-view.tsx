@@ -65,6 +65,7 @@ export function DentalSuiteView(model: Pick<DentalSuiteModel, "language" | "t" |
                 {(patientLookupSearch || patientFilterId !== "all") && (<button className="chart-clear-search topbar-clear-search" type="button" onClick={() => {
                         setPatientLookupSearch("");
                         setPatientFilterId("all");
+                        if (activeView === "patients") openPatientRoute("patients", "");
                     }}>
                     {t.clearSearch}
                   </button>)}

@@ -78,10 +78,24 @@ try {
     await settle();
     assert.equal(await page.locator('.patient-dossier-heading h2').innerText(), name);
     const id = new URL(page.url()).searchParams.get('patientId');
+    await page.goBack(); await settle();
+    assert.equal(new URL(page.url()).searchParams.get('patientId'), null);
+    assert.equal(await page.locator('.patient-dossier-heading').count(), 0, 'Back must clear the open dossier');
+    assert.equal(await input.inputValue(), '', 'Back must clear the topbar selection');
+    await page.goForward(); await settle();
+    assert.equal(new URL(page.url()).searchParams.get('patientId'), id);
+    assert.equal(await page.locator('.patient-dossier-heading h2').innerText(), name);
     await page.reload(); await settle();
     assert.equal(new URL(page.url()).searchParams.get('patientId'), id);
     assert.equal(await page.locator('.patient-dossier-heading h2').innerText(), name);
     await page.screenshot({ path: `${output}/directory-record-reopened.png` });
+    await page.locator('.topbar-clear-search').click(); await settle();
+    assert.equal(new URL(page.url()).searchParams.get('patientId'), null, 'Clear must remove persistent patient selection');
+    assert.equal(await page.locator('.patient-dossier-heading').count(), 0);
+    await page.reload(); await settle();
+    assert.equal(await page.locator('.patient-dossier-heading').count(), 0, 'Reload must not reopen the cleared record');
+    assert.equal(await input.inputValue(), '');
+    await page.screenshot({ path: `${output}/directory-selection-cleared.png` });
   });
 
   await check('Patient drawer is a native modal with keyboard containment and focus return', async () => {

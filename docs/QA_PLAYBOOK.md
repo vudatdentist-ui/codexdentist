@@ -310,7 +310,8 @@ Operational modal surfaces must use `OperationalDialog`/`WorkspaceDialog`, not a
 `test:workspace` also covers patient matching, composition/modifier keyboard handling,
 and denied/quota-limited browser storage. `browser:qa` runs
 `scripts/workspace-interaction-qa.mjs` only against a disposable loopback test app:
-verify Arrow/Enter/Escape lookup behavior, persistent patient-directory selection,
+verify Arrow/Enter/Escape lookup behavior, persistent patient-directory selection
+through reload/Back/Forward and clearing selection before reload,
 native patient-menu modality/focus return, mobile empty-directory scrolling at
 320/390/820px, and usable workspace/forms when storage property access throws.
 The form-storage check never submits patient data. Reports and fresh screenshots

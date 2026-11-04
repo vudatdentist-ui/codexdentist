@@ -240,7 +240,7 @@ export function useDentalSuiteModel({ activeView, staffDirectory = [], accountin
     };
     const openPatientRoute = (view: "patients" | "billing", patientId: string) => {
         setJourneyPatientMenuOpen(false);
-        router.push(`/${view}?patientId=${encodeURIComponent(patientId)}`);
+        router.push(patientId ? `/${view}?patientId=${encodeURIComponent(patientId)}` : `/${view}`);
     };
     const billingPatientSearchMatches = patientSearchMatches(visiblePatients, billingTopbarSearchQuery);
     const billingSelectedPatient = patientFilterId === "all"
@@ -317,10 +317,9 @@ export function useDentalSuiteModel({ activeView, staffDirectory = [], accountin
     ]);
     useEffect(() => {
         if (usesSharedPatientFilter &&
-            requestedPatientRouteKey !== appliedRoutePatientId &&
-            visiblePatients.some((patient) => patient.id === requestedPatientId)) {
+            requestedPatientRouteKey !== appliedRoutePatientId) {
             setAppliedRoutePatientId(requestedPatientRouteKey);
-            setPatientFilterId(requestedPatientId);
+            setPatientFilterId(visiblePatients.some((patient) => patient.id === requestedPatientId) ? requestedPatientId : "all");
             setBillingSearch("");
             setPatientLookupSearch("");
             return;
