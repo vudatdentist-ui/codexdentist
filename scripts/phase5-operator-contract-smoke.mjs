@@ -65,4 +65,71 @@ catch (error) { assert.equal(sharedResponses.commandErrorCode(error, "fallback")
 assert.equal(responses.noStoreJson({}, { headers: { "cache-control": "public" } }).headers.get("cache-control"), "no-store");
 assert.equal(responses.commandErrorCode({ code: "P2002", message: "private data" }, "fallback"), "operation-unique-conflict");
 assert.equal(domain.labNextStatuses("DELIVERED").length, 0);
-console.log("ok phase5 operator contracts: scoped lookup, 9 command denials, busy instruments, retry timestamps, calendar validation, domain errors, no-store responses");
+
+// getSession deliberately leaves global owners without an active clinic.
+const globalOwner = {
+  ...session, role: "OWNER", roles: ["OWNER"], activeClinicId: null,
+  roleAssignments: [{ organizationId: session.organizationId, clinicId: null, role: "OWNER" }],
+};
+const scopedStaff = {
+  ...session, role: "HYGIENIST", roles: ["HYGIENIST"],
+  roleAssignments: [{ organizationId: session.organizationId, clinicId: "clinic-a", role: "HYGIENIST" }],
+};
+let transactions = 0;
+const creations = [];
+const clinicInstruments = [
+  { id: "instrument-a", organizationId: session.organizationId, clinicId: "clinic-a" },
+  { id: "instrument-b", organizationId: session.organizationId, clinicId: "clinic-b" },
+];
+const creationDb = {
+  $transaction: async command => { transactions++; return command(creationDb); },
+  $executeRaw: async () => 1,
+  sterilizationInstrument: {
+    create: async ({ data }) => { creations.push(data); return data; },
+    findMany: async ({ where }) => clinicInstruments.filter(item => where.id.in.includes(item.id) && item.organizationId === where.organizationId && item.clinicId === where.clinicId),
+  },
+  sterilizationCycleInstrument: { findFirst: async () => null },
+  sterilizationCycle: { create: async ({ data }) => { creations.push(data); return data; } },
+  auditLog: { create: async () => ({}) },
+};
+const clinicCommands = load("src/lib/application/sterilization/commands.ts", { ...mocks, "@/lib/prisma": { prisma: creationDb } });
+const instrumentInput = { code: "QA", name: "Synthetic fixture", category: "QA" };
+const cycleInput = { method: "Steam", instrumentIds: ["instrument-b"] };
+const ownerInstrument = await clinicCommands.createSterilizationInstrumentCommand(globalOwner, { ...instrumentInput, clinicId: " clinic-b " });
+assert.equal(ownerInstrument.clinicId, "clinic-b");
+assert.equal(ownerInstrument.organizationId, session.organizationId);
+const ownerCycle = await clinicCommands.createSterilizationCycleCommand(globalOwner, { ...cycleInput, clinicId: "clinic-b" });
+assert.equal(ownerCycle.clinicId, "clinic-b");
+assert.equal(ownerCycle.instruments.create[0].instrument.connect.id_organizationId_clinicId.clinicId, "clinic-b");
+assert.equal(ownerCycle.instruments.create[0].clinic.connect.id_organizationId.organizationId, session.organizationId);
+assert.equal((await clinicCommands.createSterilizationInstrumentCommand(scopedStaff, instrumentInput)).clinicId, "clinic-a");
+assert.equal((await clinicCommands.createSterilizationCycleCommand(scopedStaff, { ...cycleInput, instrumentIds: ["instrument-a"] })).clinicId, "clinic-a");
+assert.equal((await clinicCommands.createSterilizationInstrumentCommand({ ...globalOwner, clinicIds: ["clinic-a"] }, instrumentInput)).clinicId, "clinic-a");
+const beforeDenials = transactions;
+for (const [name, input] of [["createSterilizationInstrumentCommand", instrumentInput], ["createSterilizationCycleCommand", cycleInput]]) {
+  await assert.rejects(clinicCommands[name](globalOwner, input), error => error.code === "sterilization-clinic-required");
+  await assert.rejects(clinicCommands[name](globalOwner, { ...input, clinicId: "other-tenant-clinic" }), error => error.code === "sterilization-clinic-denied");
+  await assert.rejects(clinicCommands[name](scopedStaff, { ...input, clinicId: "clinic-b" }), error => error.code === "sterilization-clinic-denied");
+}
+assert.equal(transactions, beforeDenials, "invalid or missing clinic selection must fail before persistence");
+const beforeMixedLoad = creations.length;
+await assert.rejects(clinicCommands.createSterilizationCycleCommand(globalOwner, { ...cycleInput, clinicId: "clinic-b", instrumentIds: ["instrument-a", "instrument-b"] }), error => error.code === "sterilization-instrument-scope-invalid");
+assert.equal(creations.length, beforeMixedLoad, "an owner cannot mix instruments from two accessible clinics in one cycle");
+for (const [route, input] of [["instruments", instrumentInput], ["cycles", cycleInput]]) {
+  const api = load(`src/app/api/sterilization/${route}/route.ts`, {
+    "@/lib/application/sterilization/commands": clinicCommands,
+    "@/lib/auth": { getSession: async () => globalOwner },
+    "@/lib/request-security": { hasSameOrigin: () => true },
+    "@/app/api/imaging/responses": {
+      noStoreJson: (body, init) => Response.json(body, init),
+      apiError: (code, status) => Response.json({ error: code }, { status }),
+      commandErrorCode: (cause, fallback) => cause?.code ?? fallback,
+    },
+  });
+  const post = clinicId => api.POST(new Request(`http://127.0.0.1/api/sterilization/${route}`, { method: "POST", body: JSON.stringify({ ...input, clinicId }) }));
+  assert.equal((await post("clinic-b")).status, 201);
+  assert.equal((await post("other-tenant-clinic")).status, 403);
+  assert.equal((await post(undefined)).status, 400);
+  assert.equal((await post({ id: "clinic-b" })).status, 400);
+}
+console.log("ok phase5 operator contracts: scoped lookup, command denials, retry timestamps, validation, global-owner clinic selection, scoped-staff compatibility, cross-clinic denials and API forwarding");

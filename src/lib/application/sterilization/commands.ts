@@ -16,12 +16,12 @@ export {
   type SterilizationStatus,
 } from "@/domains/operations/sterilization";
 
-export async function createSterilizationInstrumentCommand(session: AppSession, input: { code: string; name: string; category: string }) {
+export async function createSterilizationInstrumentCommand(session: AppSession, input: { code: string; name: string; category: string; clinicId?: string | null }) {
   requireAction(session, "sterilization.create", "sterilization-create-denied");
   const code = required(input.code, "sterilization-code-invalid");
   const name = required(input.name, "sterilization-name-invalid");
   const category = required(input.category, "sterilization-category-invalid");
-  const clinicId = requireClinic(session);
+  const clinicId = requireClinic(session, input.clinicId);
   return prisma.$transaction(async (tx) => {
     const instrument = await tx.sterilizationInstrument.create({
       data: { id: randomUUID(), organizationId: session.organizationId, clinicId, code, name, category },
@@ -32,9 +32,9 @@ export async function createSterilizationInstrumentCommand(session: AppSession, 
   });
 }
 
-export async function createSterilizationCycleCommand(session: AppSession, input: { instrumentIds: string[]; method: string; machineName?: string | null; notes?: string | null }) {
+export async function createSterilizationCycleCommand(session: AppSession, input: { instrumentIds: string[]; method: string; machineName?: string | null; notes?: string | null; clinicId?: string | null }) {
   requireAction(session, "sterilization.create", "sterilization-create-denied");
-  const clinicId = requireClinic(session);
+  const clinicId = requireClinic(session, input.clinicId);
   if (input.instrumentIds.length > 100) throw new ApplicationCommandError("sterilization-instruments-invalid");
   const instrumentIds = [...new Set(input.instrumentIds)].filter(Boolean).slice(0, 100);
   if (instrumentIds.length === 0) throw new ApplicationCommandError("sterilization-instruments-required");
@@ -120,7 +120,13 @@ const instrumentSelect = { id: true, clinicId: true, code: true, name: true, cat
 const cycleSelect = { id: true, clinicId: true, cycleNo: true, status: true, method: true, machineName: true, startedAt: true, completedAt: true, releasedAt: true, notes: true, createdAt: true, updatedAt: true, instruments: { select: { instrumentId: true, instrument: { select: { code: true, name: true } } } } } as const;
 
 function requireAction(session: AppSession, action: Parameters<typeof canPerformAction>[1], code: string) { if (!canPerformAction(session, action)) throw new ApplicationCommandError(code); }
-function requireClinic(session: AppSession) { if (!session.activeClinicId || !session.clinicIds.includes(session.activeClinicId)) throw new ApplicationCommandError("sterilization-clinic-required"); return session.activeClinicId; }
+function requireClinic(session: AppSession, requestedClinicId?: string | null) {
+  const clinicIds = allowedClinicIds(session);
+  const clinicId = requestedClinicId?.trim() || session.activeClinicId || (clinicIds.length === 1 ? clinicIds[0] : null);
+  if (!clinicId) throw new ApplicationCommandError("sterilization-clinic-required");
+  if (!clinicIds.includes(clinicId)) throw new ApplicationCommandError("sterilization-clinic-denied");
+  return clinicId;
+}
 function required(value: string, code: string) { const result = value.trim().slice(0, 200); if (!result) throw new ApplicationCommandError(code); return result; }
 function clean(value: string | null | undefined, max: number) { const result = value?.trim(); return result ? result.slice(0, max) : null; }
 async function audit(db: Prisma.TransactionClient, session: AppSession, action: string, entityType: string, entityId: string, metadata: Record<string, unknown>) { await db.auditLog.create({ data: { organizationId: session.organizationId, actorId: databaseActorId(session.userId), action, entityType, entityId, metadata: metadata as Prisma.InputJsonValue } }); }

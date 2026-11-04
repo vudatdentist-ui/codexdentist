@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { canPerformAction } from "@/lib/actions/permissions";
 import { listSterilizationCyclesCommand, listSterilizationInstrumentsCommand } from "@/lib/application/sterilization/commands";
 import { requireSession } from "@/lib/auth";
+import { allowedClinicIds } from "@/lib/patient-access";
 import { OperationsWorkspaceFrame } from "@/app/(app)/OperationsWorkspaceFrame";
 import { SterilizationCreateForms, SterilizationStatusForm } from "./sterilization-forms";
 import { sterilizationStatusLabels } from "./labels";
@@ -15,7 +16,9 @@ export default async function SterilizationPage() {
     listSterilizationCyclesCommand(session),
     canCreate ? listSterilizationInstrumentsCommand(session) : Promise.resolve([]),
   ]);
-  const hasClinic = Boolean(session.activeClinicId && session.clinicIds.includes(session.activeClinicId));
+  const clinicIds = allowedClinicIds(session);
+  const clinics = session.clinics.filter(clinic => clinicIds.includes(clinic.id)).map(({ id, name }) => ({ id, name }));
+  const activeClinicId = session.activeClinicId && clinicIds.includes(session.activeClinicId) ? session.activeClinicId : null;
   return <OperationsWorkspaceFrame view="sterilization" session={session}><div className={styles.page}>
     <header className={styles.header}>
       <div>
@@ -25,7 +28,7 @@ export default async function SterilizationPage() {
       </div>
       <a className={styles.backLink} href="/inventory">Về kho</a>
     </header>
-    {canCreate && <SterilizationCreateForms instruments={instruments.filter(item => item.clinicId === session.activeClinicId)} hasClinic={hasClinic} />}
+    {canCreate && <SterilizationCreateForms instruments={instruments.filter(item => clinicIds.includes(item.clinicId))} clinics={clinics} activeClinicId={activeClinicId} />}
     {cycles.length === 0 ? <section className={styles.empty}><h2>Chưa có chu kỳ</h2><p>Lịch sử xử lý và kết quả kiểm tra dụng cụ sẽ xuất hiện tại đây.</p></section>
       : <section className={styles.grid} aria-label="Danh sách chu kỳ vô trùng">{cycles.map(cycle =>
         <article className={styles.card} key={cycle.id}>

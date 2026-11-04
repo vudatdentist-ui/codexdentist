@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Input, Select } from "@/shared/ui";
 import { Textarea } from "@/components/ui/Textarea";
 import { sterilizationNextStatuses } from "@/domains/operations/sterilization";
@@ -7,14 +8,28 @@ import { sterilizationStatusLabels } from "./labels";
 import { OperationForm } from "../imaging/operation-form";
 import styles from "../imaging/operations.module.css";
 
-type Instrument = { id: string; code: string; name: string; busy: boolean };
+type Instrument = { id: string; clinicId: string; code: string; name: string; busy: boolean };
+type Clinic = { id: string; name: string };
 
-export function SterilizationCreateForms({ instruments, hasClinic }: { instruments: Instrument[]; hasClinic: boolean }) {
-  const available = instruments.filter(item => !item.busy);
+export function SterilizationCreateForms({ instruments, clinics, activeClinicId }: { instruments: Instrument[]; clinics: Clinic[]; activeClinicId: string | null }) {
+  const [selectedClinicId, setSelectedClinicId] = useState("");
+  const chosenClinicId = activeClinicId ?? selectedClinicId;
+  const clinicId = clinics.some(clinic => clinic.id === chosenClinicId) ? chosenClinicId : "";
+  const hasClinic = Boolean(clinicId);
+  const clinicInstruments = instruments.filter(item => item.clinicId === clinicId);
+  const available = clinicInstruments.filter(item => !item.busy);
   return <>
-    {!hasClinic && <p className={styles.section}>Chọn một phòng khám để quản lý dụng cụ và tạo chu kỳ.</p>}
+    <div className={styles.section}>
+      {activeClinicId ? <p>Phòng khám: {clinics.find(clinic => clinic.id === clinicId)?.name}</p>
+        : <label>Phòng khám<Select name="clinicId" value={clinicId} onChange={event => setSelectedClinicId(event.target.value)} required disabled={!clinics.length}>
+          <option value="">Chọn phòng khám</option>
+          {clinics.map(clinic => <option key={clinic.id} value={clinic.id}>{clinic.name}</option>)}
+        </Select></label>}
+      {!hasClinic && <p className={styles.hint}>Chọn một phòng khám để quản lý dụng cụ và tạo chu kỳ.</p>}
+    </div>
     <details className={styles.section}><summary>Thêm dụng cụ</summary>
       <OperationForm endpoint="/api/sterilization/instruments" submitLabel="Thêm dụng cụ" successMessage="Đã thêm dụng cụ." disabled={!hasClinic}>
+        <input type="hidden" name="clinicId" value={clinicId} />
         <label>Mã dụng cụ<Input name="code" required maxLength={200} /></label>
         <label>Tên dụng cụ<Input name="name" required maxLength={200} /></label>
         <label>Nhóm dụng cụ<Input name="category" required maxLength={200} /></label>
@@ -22,10 +37,11 @@ export function SterilizationCreateForms({ instruments, hasClinic }: { instrumen
     </details>
     <details className={styles.section}><summary>Tạo chu kỳ vô trùng</summary>
       <OperationForm endpoint="/api/sterilization/cycles" arrayFields={["instrumentIds"]} submitLabel="Tạo chu kỳ" successMessage="Đã tạo chu kỳ vô trùng." disabled={!hasClinic || !available.length}>
+        <input type="hidden" name="clinicId" value={clinicId} />
         <label>Phương pháp<Input name="method" required maxLength={200} placeholder="Ví dụ: Hấp hơi nước" /></label>
         <label>Máy thực hiện<Input name="machineName" maxLength={160} /></label>
-        <fieldset className={styles.instruments}><legend>Dụng cụ trong chu kỳ</legend>
-          {instruments.map(item => <label key={item.id}><input type="checkbox" name="instrumentIds" value={item.id} disabled={item.busy} />{item.code} · {item.name}{item.busy ? " · Đang trong chu kỳ khác" : ""}</label>)}
+        <fieldset key={clinicId} className={styles.instruments}><legend>Dụng cụ trong chu kỳ</legend>
+          {clinicInstruments.map(item => <label key={item.id}><input type="checkbox" name="instrumentIds" value={item.id} disabled={item.busy} />{item.code} · {item.name}{item.busy ? " · Đang trong chu kỳ khác" : ""}</label>)}
         </fieldset>
         <label>Ghi chú<Textarea name="notes" maxLength={4000} /></label>
       </OperationForm>

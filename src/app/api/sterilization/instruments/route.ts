@@ -17,8 +17,10 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return json({ error: "unauthorized" }, { status: 401 });
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
+  if (body?.clinicId != null && typeof body.clinicId !== "string") return error("sterilization-clinic-invalid", 400);
   try {
     const instrument = await createSterilizationInstrumentCommand(session, {
+      clinicId: typeof body?.clinicId === "string" ? body.clinicId : undefined,
       code: typeof body?.code === "string" ? body.code : "",
       name: typeof body?.name === "string" ? body.name : "",
       category: typeof body?.category === "string" ? body.category : "",
