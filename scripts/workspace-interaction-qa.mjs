@@ -89,7 +89,12 @@ try {
     assert.equal(new URL(page.url()).searchParams.get('patientId'), id);
     assert.equal(await page.locator('.patient-dossier-heading h2').innerText(), name);
     await page.screenshot({ path: `${output}/directory-record-reopened.png` });
-    await page.locator('.topbar-clear-search').click(); await settle();
+    await Promise.all([
+      page.waitForURL(url => url.pathname === '/patients' && !url.searchParams.has('patientId')),
+      page.locator('.topbar-clear-search').click(),
+    ]);
+    await page.locator('.patient-dossier-heading').waitFor({ state: 'detached' });
+    await settle();
     assert.equal(new URL(page.url()).searchParams.get('patientId'), null, 'Clear must remove persistent patient selection');
     assert.equal(await page.locator('.patient-dossier-heading').count(), 0);
     await page.reload(); await settle();

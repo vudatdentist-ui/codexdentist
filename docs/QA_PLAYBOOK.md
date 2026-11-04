@@ -316,6 +316,8 @@ native patient-menu modality/focus return, mobile empty-directory scrolling at
 320/390/820px, and usable workspace/forms when storage property access throws.
 The form-storage check never submits patient data. Reports and fresh screenshots
 are under `output/workspace-qa/interaction-audit` in the browser CI artifact.
+For client-side navigation, await the intended URL and visible destination before
+asserting state; `networkidle` alone can describe the previous route.
 
 Run `npm run test:maintainability` after query, parser, provisioning, command or UI
 composition changes. This covers private staff DTOs, read-only getters, bootstrap
