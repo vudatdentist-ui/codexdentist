@@ -26,7 +26,7 @@ export function OrganizationSettingsSection(model: Pick<SettingsPanelModel, "acc
                   <div className="settings-archive-head">
                     <div>
                       <strong>{organization.name}</strong>
-                      <span>{organization.primaryDomain ?? "-"}</span>
+                      <Link href="/login">{language === "vi" ? "Đăng nhập chung" : "Shared sign-in"}</Link>
                     </div>
                     <StatusPill status={organization.slug ? "ACTIVE" : "PENDING"}/>
                   </div>

@@ -13,7 +13,7 @@ import {
   type AppRole,
   type ViewKey,
 } from "@/lib/permissions";
-import { appRootDomain, authSecret, demoAuthEnabled, sessionCookieSecure } from "@/lib/env";
+import { authSecret, demoAuthEnabled, sessionCookieSecure } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 import { superAdminEmails } from "@/lib/super-admin";
@@ -21,11 +21,13 @@ import {
   currentHostname,
   findTenantOrganization,
   isNeutralAppHostname,
+  isSharedAppHostname,
   systemSubdomainFromHostname,
   tenantSlugFromHostname,
 } from "@/lib/tenant";
 
-const SESSION_COOKIE = "nhavista_session";
+// A new host-only cookie avoids duplicate legacy parent-domain cookies.
+const SESSION_COOKIE = "codexdentist_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 8;
 const PASSWORD_ITERATIONS = 310000;
 
@@ -226,6 +228,7 @@ export async function signIn(
     if (
       !tenant &&
       isNeutralAppHostname(hostname) &&
+      !isSharedAppHostname(hostname) &&
       !isSuperAdminEmail(normalizedEmail) &&
       !isAllowedNeutralDemo &&
       options?.allowNeutralUser !== true
@@ -404,22 +407,7 @@ export async function signOut() {
   }
 
   const cookieStore = await cookies();
-  const hostname = await currentHostname();
-  const sharedDomain = sessionCookieDomain(hostname);
-
-  // Clear both the legacy host-only cookie and the hosted parent-domain cookie.
   cookieStore.delete(SESSION_COOKIE);
-
-  if (sharedDomain) {
-    cookieStore.set(SESSION_COOKIE, "", {
-      domain: sharedDomain,
-      httpOnly: true,
-      maxAge: 0,
-      path: "/",
-      sameSite: "lax",
-      secure: sessionCookieSecure(),
-    });
-  }
 }
 
 export async function getSession(): Promise<AppSession | null> {
@@ -451,13 +439,14 @@ export async function getSession(): Promise<AppSession | null> {
   if (
     !tenantSlug &&
     (isNeutralAppHostname(hostname) || systemSubdomain !== null) &&
+    !isSharedAppHostname(hostname) &&
     !isSuperAdminEmail(session.email) &&
     !session.isDemo
   ) {
     return null;
   }
 
-  if (session.isDemo && systemSubdomain && systemSubdomain !== "demo") {
+  if (session.isDemo && systemSubdomain && systemSubdomain !== "demo" && !isSharedAppHostname(hostname)) {
     return null;
   }
 
@@ -710,25 +699,13 @@ function rolesFromAssignments(
 async function setSessionCookie(session: AppSession) {
   const cookieStore = await cookies();
   const maxAge = Math.max(60, Math.floor((session.expiresAt - Date.now()) / 1000));
-  const hostname = await currentHostname();
-  const sharedDomain = sessionCookieDomain(hostname);
-
   cookieStore.set(SESSION_COOKIE, signPayload(session), {
-    ...(sharedDomain ? { domain: sharedDomain } : {}),
     httpOnly: true,
     maxAge,
     path: "/",
     sameSite: "lax",
     secure: sessionCookieSecure(),
   });
-}
-
-function sessionCookieDomain(hostname: string) {
-  const rootDomain = appRootDomain();
-
-  return hostname === rootDomain || hostname.endsWith(`.${rootDomain}`)
-    ? `.${rootDomain}`
-    : undefined;
 }
 
 function signPayload(session: AppSession) {

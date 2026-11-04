@@ -36,6 +36,33 @@ async function main() {
   const tenantAHost = `${tenants[0].slug}.${rootDomain}`;
   const tenantBHost = `${tenants[1].slug}.${rootDomain}`;
 
+  for (const tenant of tenants) {
+    const result = await login(rootDomain, tenant.email);
+    if (!result.cookie || !result.location?.endsWith("/dashboard") || result.location.includes(tenant.slug)) {
+      throw new Error("Shared login must establish a session and stay on /dashboard.");
+    }
+    if (result.setCookie.toLowerCase().includes("domain=")) throw new Error("Session must be host-only.");
+    const dashboard = await fetch(`${baseUrl}/dashboard`, {
+      headers: { ...tenantHeaders(rootDomain), cookie: result.cookie }, redirect: "manual",
+    });
+    if (dashboard.status !== 200) throw new Error(`Root session failed: ${dashboard.status}`);
+    const patients = await fetch(`${baseUrl}/patients?organizationId=untrusted`, {
+      headers: { ...tenantHeaders(rootDomain), cookie: result.cookie }, redirect: "manual",
+    });
+    const html = await patients.text();
+    const other = tenants.find(candidate => candidate !== tenant);
+    if (patients.status !== 200 || !html.includes(`${tenant.slug}-patient`) || html.includes(`${other.slug}-patient`)) {
+      throw new Error("Shared-host patients must follow authenticated organization scope.");
+    }
+    console.log(`ok shared-host login, session and patient isolation ${tenant.slug}`);
+  }
+  const legacy = await fetch(`${baseUrl}/reset-password?token=synthetic`, {
+    headers: tenantHeaders(tenantAHost), redirect: "manual",
+  });
+  if (legacy.status !== 307 || legacy.headers.get("location") !== `https://${rootDomain}/reset-password?token=synthetic`) {
+    throw new Error("Legacy host must preserve password reset path and token on shared host.");
+  }
+
   await assertLoginAllowed(tenantAHost, tenants[0].email, "tenant A owner on tenant A host");
   await assertLoginAllowed(tenantBHost, tenants[1].email, "tenant B owner on tenant B host");
   await assertLoginDenied(tenantBHost, tenants[0].email, "tenant A owner on tenant B host");
@@ -118,6 +145,11 @@ async function seedTenants() {
         clinicId: clinic.id,
       },
     });
+    await prisma.patient.upsert({
+      where: { organizationId_phone: { organizationId: organization.id, phone: "0999888777" } },
+      update: { fullName: `${tenant.slug}-patient` },
+      create: { organizationId: organization.id, clinicId: clinic.id, phone: "0999888777", fullName: `${tenant.slug}-patient`, dateOfBirth: new Date("1990-01-01") },
+    });
   }
 }
 
@@ -151,7 +183,7 @@ async function assertLoginDenied(host, email, label) {
 }
 
 async function login(host, email) {
-  const html = await fetchText("/login", host);
+  const html = await fetchText("/login", rootDomain);
   const action = html.match(/name="(\$ACTION_ID_[^"]+)"/)?.[1];
 
   if (!action) {
@@ -173,6 +205,8 @@ async function login(host, email) {
   return {
     status: response.status,
     cookie: cookieHeader(response),
+    location: response.headers.get("location"),
+    setCookie: response.headers.get("set-cookie") ?? "",
   };
 }
 

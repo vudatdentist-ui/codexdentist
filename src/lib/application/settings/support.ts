@@ -12,7 +12,6 @@ import { prisma } from "@/lib/prisma";
 import { accessibleClinicIds } from "@/lib/tenant-scope";
 import type { AppSession } from "@/lib/session";
 import { isSuperAdminSession } from "@/lib/super-admin";
-import { tenantDomainForSlug, } from "@/lib/tenant";
 import { failCommand } from "@/lib/application/command-failure";
 export function roleAssignmentData(organizationId: string, userId: string, role: Exclude<(typeof userRoles)[number], "PATIENT">, clinicId: string | null) {
     const scopedClinicId = isOrganizationScopedRole(role) ? null : clinicId;
@@ -73,19 +72,7 @@ export async function createPasswordSetupArtifactsTx(tx: Prisma.TransactionClien
             expiresAt,
         },
     });
-    let organizationDomain = input.organizationDomain ?? null;
-    let organizationSlug = input.organizationSlug ?? null;
-    if (!organizationDomain && !organizationSlug) {
-        const organization = await tx.organization.findUnique({
-            where: { id: input.organizationId },
-            select: { primaryDomain: true, slug: true },
-        });
-        organizationDomain = organization?.primaryDomain ?? null;
-        organizationSlug = organization?.slug ?? null;
-    }
-    const domain = organizationDomain?.trim() ||
-        (organizationSlug ? tenantDomainForSlug(organizationSlug) : "");
-    const baseUrl = passwordSetupBaseUrl(domain);
+    const baseUrl = appBaseUrl();
     const setupUrl = baseUrl + "/reset-password?token=" + encodeURIComponent(token);
     const rendered = renderNotificationTemplate("STAFF_PASSWORD_SETUP", {
         fullName: input.fullName,
@@ -119,17 +106,6 @@ export type PasswordSetupArtifacts = {
     notificationId: string;
     deliveryContent: ReturnType<typeof renderNotificationTemplate>;
 };
-export function passwordSetupBaseUrl(domain: string) {
-    if (!domain) {
-        return appBaseUrl();
-    }
-    const trimmedDomain = domain.trim().replace(/\/+$/, "");
-    if (/^https?:\/\//i.test(trimmedDomain)) {
-        return new URL(trimmedDomain).toString().replace(/\/+$/, "");
-    }
-    const protocol = new URL(appBaseUrl()).protocol;
-    return protocol + "//" + trimmedDomain;
-}
 export function canWriteSettings(session: AppSession) {
     return canPerformAction(session, "settings.manage");
 }

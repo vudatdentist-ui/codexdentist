@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { mkdir } from "node:fs/promises";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { chromium } from "playwright";
@@ -9,6 +10,9 @@ const base = new URL(process.env.TRIAL_QA_BASE_URL ?? "http://127.0.0.1:3000");
 if (!["127.0.0.1", "localhost", "[::1]"].includes(base.hostname)) {
   throw new Error("Trial signup smoke must target a disposable loopback server.");
 }
+// Resolve the actual shared host exclusively to the disposable loopback app.
+const sharedHost = process.env.APP_ROOT_DOMAIN ?? "codexdentist.com";
+base.hostname = sharedHost;
 
 const connectionString =
   process.env.DATABASE_URL ??
@@ -18,6 +22,7 @@ const prisma = new PrismaClient({
 });
 const browser = await chromium.launch({
   headless: true,
+  args: [`--host-resolver-rules=MAP ${sharedHost} 127.0.0.1`, "--no-proxy-server"],
   ...(process.env.PLAYWRIGHT_EXECUTABLE_PATH
     ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH }
     : {}),
@@ -51,6 +56,25 @@ try {
     page.getByRole("button", { name: "Tạo tài khoản dùng thử" }).click(),
   ]);
   await page.getByLabel("Trạng thái dùng thử").getByText(/Còn 30 ngày/).waitFor();
+  assert.equal(new URL(page.url()).hostname, sharedHost, "Signup stays on the shared host");
+  await context.clearCookies();
+  await page.goto(new URL("/login", base).href, { waitUntil: "networkidle" });
+  await page.getByLabel("Email", { exact: true }).fill(email);
+  await page.getByLabel("Mật khẩu").fill(password);
+  await mkdir("output/workspace-qa/shared-login", { recursive: true });
+  await page.screenshot({ path: "output/workspace-qa/shared-login/login-desktop.png", fullPage: true });
+  await Promise.all([
+    page.waitForURL(url => url.pathname === "/dashboard", { timeout: 30_000 }),
+    page.getByRole("button", { name: "Đăng nhập", exact: true }).click(),
+  ]);
+  assert.equal(new URL(page.url()).hostname, sharedHost);
+  await page.getByLabel("Trạng thái dùng thử").waitFor();
+  await page.screenshot({ path: "output/workspace-qa/shared-login/dashboard-desktop.png", fullPage: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.screenshot({ path: "output/workspace-qa/shared-login/dashboard-mobile.png", fullPage: true });
+  await context.clearCookies();
+  await page.goto(new URL("/login", base).href, { waitUntil: "networkidle" });
+  await page.screenshot({ path: "output/workspace-qa/shared-login/login-mobile.png", fullPage: true });
 
   const user = await prisma.user.findUnique({
     where: { email },

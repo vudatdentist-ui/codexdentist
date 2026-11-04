@@ -163,6 +163,14 @@ jobs:
           retention-days: 7
       - name: Hosted trial signup and expiry QA
         run: npm run browser:trial-signup
+      - name: Upload shared login evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: shared-login-qa-${{ github.sha }}
+          path: output/workspace-qa/shared-login
+          if-no-files-found: warn
+          retention-days: 7
       - run: docker build -t codexdentist:ci .
       - name: Stop verification server
         shell: bash

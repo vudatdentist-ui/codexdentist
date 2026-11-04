@@ -4,7 +4,6 @@ import { createHash, randomBytes } from "crypto";
 import { hashPassword } from "@/lib/auth";
 import { appBaseUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
-import { tenantDomainForSlug } from "@/lib/tenant";
 import { runSerializableTransaction } from "@/lib/transaction";
 
 const TOKEN_TTL_MS =
@@ -168,8 +167,8 @@ export async function resetPasswordWithToken(input: {
 
 class PasswordResetClaimError extends Error {}
 
-export async function passwordSetupUrl(token: string, organizationId: string) {
-  const baseUrl = await organizationBaseUrl(organizationId);
+export async function passwordSetupUrl(token: string, _organizationId: string) {
+  const baseUrl = appBaseUrl();
 
   return `${baseUrl}/reset-password?token=${encodeURIComponent(token)}`;
 }
@@ -181,33 +180,4 @@ export function passwordRequirementsText(language: "vi" | "en" = "vi") {
 }
 function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
-}
-
-async function organizationBaseUrl(organizationId: string) {
-  const organization = await prisma.organization.findUnique({
-    where: {
-      id: organizationId,
-    },
-    select: {
-      primaryDomain: true,
-      slug: true,
-    },
-  });
-  const domain =
-    organization?.primaryDomain?.trim() ||
-    (organization?.slug ? tenantDomainForSlug(organization.slug) : "");
-
-  return domain ? absoluteBaseUrlForDomain(domain) : appBaseUrl();
-}
-
-function absoluteBaseUrlForDomain(domain: string) {
-  const trimmedDomain = domain.trim().replace(/\/+$/, "");
-
-  if (/^https?:\/\//i.test(trimmedDomain)) {
-    return new URL(trimmedDomain).toString().replace(/\/+$/, "");
-  }
-
-  const protocol = new URL(appBaseUrl()).protocol;
-
-  return `${protocol}//${trimmedDomain}`;
 }

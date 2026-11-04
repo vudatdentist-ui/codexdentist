@@ -10,8 +10,6 @@ import { prisma } from "@/lib/prisma";
 import {
   currentHostname,
   findTenantOrganization,
-  isNeutralAppHostname,
-  tenantDomainForSlug,
   tenantSlugFromHostname,
 } from "@/lib/tenant";
 import {
@@ -38,12 +36,6 @@ export async function loginAction(formData: FormData) {
   }
 
   await Promise.all(keys.map((key) => clearLoginAttempts(key)));
-
-  const hostname = await currentHostname();
-
-  if (result.organizationSlug && isNeutralAppHostname(hostname)) {
-    redirect(`https://${tenantDomainForSlug(result.organizationSlug)}/dashboard`);
-  }
 
   redirect("/dashboard");
 }

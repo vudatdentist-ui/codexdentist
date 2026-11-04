@@ -1,6 +1,6 @@
 # Codexdentist QA Playbook
 
-Last updated: 2026-10-22
+Last updated: 2026-11-04
 Status: ACTIVE
 
 This playbook implements the closed-loop quality process defined in `docs/PROJECT_CONTEXT.md`:
@@ -10,6 +10,8 @@ baseline -> implement -> audit -> classify -> fix -> re-audit -> repeat -> phase
 ```
 
 A passing build alone is not enough. Every changed high-risk boundary must pass its focused negative/regression tests before a phase can close.
+
+Shared sign-in changes require `test:audit`, `test:tenant` and `browser:trial-signup`: verify root-host login/session, patient isolation between two organizations on the same host, ignored client-supplied organization scope, host-only cookies, shared recovery/setup links, legacy deep-link redirects, signup, re-login and expired-trial rejection. The trial browser maps the shared hostname to disposable loopback and captures desktop/mobile login and dashboard evidence under `output/workspace-qa/shared-login`.
 
 For clinic permissions, signup/recovery, scheduling, notification delivery, or mobile
 dependency changes, run `npm run test:audit` and `npm audit --audit-level=high`.
