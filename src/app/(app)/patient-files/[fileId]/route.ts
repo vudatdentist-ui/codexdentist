@@ -2,6 +2,7 @@ import { requireSession } from "@/lib/auth";
 import { writeAuditLog } from "@/lib/audit";
 import { openStoredPatientFileStream } from "@/lib/patient-file-storage";
 import { getAuthorizedPatientFile } from "@/lib/resource-policy";
+import { prisma } from "@/lib/prisma";
 
 export async function GET(
   request: Request,
@@ -17,8 +18,17 @@ export async function GET(
   const variant = new URL(request.url).searchParams.get("variant");
   const file = await getAuthorizedPatientFile(session, fileId);
 
-  if (!file?.sourceId) {
-    return new Response("Not found", { status: 404 });
+  if (!file || (!file.sourceId && !file.storageKey)) {
+    return new Response("Not found", { status: 404, headers: { "Cache-Control": "private, no-store" } });
+  }
+
+  // The shared authorization DTO predates retention and legacy provider metadata.
+  const metadata = await prisma.patientFile.findFirst({
+    where: { id: file.id, organizationId: file.organizationId, patientId: file.patientId },
+    select: { sourceType: true, retentionUntil: true },
+  });
+  if (!metadata || (metadata.retentionUntil && metadata.retentionUntil <= new Date())) {
+    return new Response("Not found", { status: 404, headers: { "Cache-Control": "private, no-store" } });
   }
 
   if (file.blocked) {
@@ -36,7 +46,7 @@ export async function GET(
       },
     });
 
-    return new Response("File is not cleared for access.", { status: 423 });
+    return new Response("File is not cleared for access.", { status: 423, headers: { "Cache-Control": "private, no-store" } });
   }
 
   try {
@@ -56,6 +66,7 @@ export async function GET(
       storageProvider: file.storageProvider,
       storageKey: variantStorageKey ?? file.storageKey,
       sourceId: variantStorageKey ?? file.sourceId,
+      sourceType: metadata.sourceType,
     });
     await writeAuditLog({
       session,
@@ -72,7 +83,7 @@ export async function GET(
     });
 
     const headers = new Headers({
-      "Cache-Control": "private, max-age=300",
+      "Cache-Control": "private, no-store",
       "Content-Disposition": `${contentDispositionFor(
         variantMimeType ?? file.mimeType,
       )}; filename*=UTF-8''${encodeRFC5987(file.fileName ?? file.title)}`,
@@ -86,7 +97,7 @@ export async function GET(
 
     return new Response(stored.body, { headers });
   } catch {
-    return new Response("Not found", { status: 404 });
+    return new Response("Not found", { status: 404, headers: { "Cache-Control": "private, no-store" } });
   }
 }
 

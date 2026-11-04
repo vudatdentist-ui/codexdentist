@@ -5,10 +5,11 @@ import { ApplicationCommandError } from "@/lib/application/errors";
 import { databaseActorId } from "@/lib/form-validation";
 import {
   currentPatientFileStorageProvider,
+  deletePatientFileStageObjects,
   patientFileStageStoragePrefix,
 } from "@/infrastructure/patient-files/object-gc";
 import {
-  createPatientFileStage,
+  createPatientFileStageInTransaction,
   markPatientFileStageCommitted,
   markPatientFileStageGcPending,
   markPatientFileStageStored,
@@ -128,7 +129,7 @@ export async function createJourneyCommentCommand(
   if (plannedAttachments.length > 0) {
     await prisma.$transaction(async (tx) => {
       for (const attachment of plannedAttachments) {
-        await createPatientFileStage(tx, {
+        await createPatientFileStageInTransaction(tx, {
           id: attachment.stageId,
           organizationId: session.organizationId,
           clinicId: patient.clinicId,
@@ -179,6 +180,13 @@ export async function createJourneyCommentCommand(
     }
   } catch (error) {
     await markStagesForGc(plannedAttachments, "patient-file-object-write-failed");
+    // The durable prefix already exists; best-effort immediate cleanup reduces PHI lifetime.
+    await Promise.allSettled(plannedAttachments.map((attachment) => deletePatientFileStageObjects({
+      storageProvider,
+      storageKey: attachment.storagePrefix,
+      previewStorageKey: null,
+      thumbnailStorageKey: null,
+    })));
     throw error;
   }
 
