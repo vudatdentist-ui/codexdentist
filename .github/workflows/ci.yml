@@ -40,6 +40,9 @@ jobs:
       SESSION_COOKIE_SECURE: "false"
       TRUSTED_PROXY_PROVIDER: reverse-proxy
       TRIAL_SIGNUP_ENABLED: "true"
+      PAYOS_CI_CLIENT_ID: phase3-ci-client
+      PAYOS_CI_API_KEY: phase3-ci-api-key
+      PAYOS_CI_CHECKSUM_KEY: ci-phase3-payos-checksum-secret
 
     steps:
       - uses: actions/checkout@v7
@@ -78,6 +81,7 @@ jobs:
         run: node scripts/check-migration-safety.mjs
         env:
           MIGRATION_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      - run: node scripts/phase3-architecture-check.mjs
       - run: npx prisma migrate deploy
       - run: npx prisma db seed
         env:
@@ -128,6 +132,7 @@ jobs:
           npm run test:hardening
           npm run test:integration-substrate
           npm run test:journey-file-command
+          npm run test:phase3
           npm run test:patient-files
           npm run test:file-lifecycle
           npm run test:data-integrity
