@@ -307,6 +307,18 @@ The font gate uses Chromium's actual glyph-to-font report for composed and decom
 
 Operational modal surfaces must use `OperationalDialog`/`WorkspaceDialog`, not a div with `aria-modal`. `WorkspaceTabs` preserves each module's existing selection handlers while supplying roving focus and arrow/Home/End navigation. The associated source guards and keyboard unit checks run with `test:workspace`; real-browser checks remain the interaction evidence. Keep section numbers distinct from clinical stages and preserve the independent odontogram snapshots.
 
+`test:workspace` also covers patient matching, composition/modifier keyboard handling,
+and denied/quota-limited browser storage. `browser:qa` runs
+`scripts/workspace-interaction-qa.mjs` only against a disposable loopback test app:
+verify Arrow/Enter/Escape lookup behavior, persistent patient-directory selection
+through reload/Back/Forward and clearing selection before reload,
+native patient-menu modality/focus return, mobile empty-directory scrolling at
+320/390/820px, and usable workspace/forms when storage property access throws.
+The form-storage check never submits patient data. Reports and fresh screenshots
+are under `output/workspace-qa/interaction-audit` in the browser CI artifact.
+For client-side navigation, await the intended URL and visible destination before
+asserting state; `networkidle` alone can describe the previous route.
+
 Run `npm run test:maintainability` after query, parser, provisioning, command or UI
 composition changes. This covers private staff DTOs, read-only getters, bootstrap
 rollback, money/calendar validation, scope memoization, negative architecture fixtures,

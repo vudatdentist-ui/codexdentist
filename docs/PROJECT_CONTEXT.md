@@ -398,3 +398,11 @@ to match their existing global unique indexes, initialized above existing docume
 Settings, workforce and inventory mutations use typed application commands with their
 own permission/scope validation; Next.js transports parse forms and map notices only.
 Large UI composers delegate to model, view, named sections and pure projections.
+Patient lookup components and pure matching live in `src/workspaces/patients`;
+legacy composition imports forward to that owner. Keep canonical patient-code and
+search-normalization helpers shared. Lookup selection in the patient directory
+opens a persistent patient URL; Back/Forward and clearing selection keep the
+topbar and dossier aligned with that URL. Journey lookup keeps keyboard focus in its
+combobox and the patient menu uses the shared native modal. Browser preferences
+and action-scroll storage are optional: denied storage access must not prevent
+opening a workspace or editing a form.

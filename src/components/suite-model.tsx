@@ -1,6 +1,7 @@
 "use client";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { readBrowserStorage, writeBrowserStorage } from "@/shared/browser/storage";
 import { type Language } from "@/components/AppLanguage";
 import { accessibleViews, type ViewKey } from "@/lib/permissions";
 import type { PatientWorkspace } from "@/lib/patient-types";
@@ -117,22 +118,22 @@ export function useDentalSuiteModel({ activeView, staffDirectory = [], accountin
         });
     }, [pathname, routeSearchParams, routeSearchParamString, router]);
     useEffect(() => {
-        const storedLanguage = window.localStorage.getItem(languageStorageKey) === "en" ? "en" : "vi";
+        const storedLanguage = readBrowserStorage("local", languageStorageKey) === "en" ? "en" : "vi";
         setLanguage(storedLanguage);
-        setChainScopeId(window.localStorage.getItem(chainScopeStorageKey) || "all");
+        setChainScopeId(readBrowserStorage("local", chainScopeStorageKey) || "all");
         setLanguageLoaded(true);
     }, []);
     useEffect(() => {
         if (!languageLoaded) {
             return;
         }
-        window.localStorage.setItem(languageStorageKey, language);
+        writeBrowserStorage("local", languageStorageKey, language);
     }, [language, languageLoaded]);
     useEffect(() => {
         if (!languageLoaded) {
             return;
         }
-        window.localStorage.setItem(chainScopeStorageKey, chainScopeId);
+        writeBrowserStorage("local", chainScopeStorageKey, chainScopeId);
     }, [chainScopeId, languageLoaded]);
     useEffect(() => {
         if (showModuleAiResult) {
@@ -239,7 +240,7 @@ export function useDentalSuiteModel({ activeView, staffDirectory = [], accountin
     };
     const openPatientRoute = (view: "patients" | "billing", patientId: string) => {
         setJourneyPatientMenuOpen(false);
-        router.push(`/${view}?patientId=${encodeURIComponent(patientId)}`);
+        router.push(patientId ? `/${view}?patientId=${encodeURIComponent(patientId)}` : `/${view}`);
     };
     const billingPatientSearchMatches = patientSearchMatches(visiblePatients, billingTopbarSearchQuery);
     const billingSelectedPatient = patientFilterId === "all"
@@ -316,10 +317,9 @@ export function useDentalSuiteModel({ activeView, staffDirectory = [], accountin
     ]);
     useEffect(() => {
         if (usesSharedPatientFilter &&
-            requestedPatientRouteKey !== appliedRoutePatientId &&
-            visiblePatients.some((patient) => patient.id === requestedPatientId)) {
+            requestedPatientRouteKey !== appliedRoutePatientId) {
             setAppliedRoutePatientId(requestedPatientRouteKey);
-            setPatientFilterId(requestedPatientId);
+            setPatientFilterId(visiblePatients.some((patient) => patient.id === requestedPatientId) ? requestedPatientId : "all");
             setBillingSearch("");
             setPatientLookupSearch("");
             return;
