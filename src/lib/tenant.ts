@@ -101,6 +101,12 @@ export function isNeutralAppHostname(hostname: string) {
   return host === rootDomain || host === `app.${rootDomain}` || host === `admin.${rootDomain}`;
 }
 
+export function isSharedAppHostname(hostname: string) {
+  const host = normalizeHostname(hostname);
+  const root = appRootDomain();
+  return host === root || host === `www.${root}` || host === `app.${root}`;
+}
+
 export function systemSubdomainFromHostname(hostname: string) {
   const host = normalizeHostname(hostname);
   const rootDomain = appRootDomain();

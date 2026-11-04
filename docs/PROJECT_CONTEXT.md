@@ -1,6 +1,6 @@
 # Codexdentist Canonical Product Context
 
-Last updated: 2026-10-22
+Last updated: 2026-11-04
 Status: ACTIVE / CANONICAL
 
 > This file replaces every previous product direction, refactor queue, migration-route plan, and architecture context. Git history is an archive, not an active instruction source. Do not revive an older plan merely because it appears in a previous commit, chat, issue, or deleted document.
@@ -39,6 +39,9 @@ These rules survive every refactor and integration.
 
 ### Tenant and authorization
 
+- Hosted staff sign in at `https://codexdentist.com/login` and remain on that host. Organization and clinic scope comes from the authenticated account and stored session; subdomains are not required for workspaces.
+- Signup, password recovery and staff setup use the shared application origin. Legacy workspace page links redirect to the shared host with their path/query preserved; dedicated demo/docs/odontogram/platform hosts retain their routing.
+- Sessions use a host-only `codexdentist_session` cookie. Legacy shared-domain sessions require a fresh login after this rollout.
 - `Organization` is the canonical tenant boundary.
 - Business data is scoped by `organizationId` server-side.
 - Clinic-owned data must additionally respect the actor's accessible clinic IDs.

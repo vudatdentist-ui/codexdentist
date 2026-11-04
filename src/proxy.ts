@@ -25,6 +25,27 @@ export function proxy(request: NextRequest) {
     return new NextResponse("Misdirected Request", { status: 421 });
   }
 
+  const rootDomain = process.env.APP_ROOT_DOMAIN?.trim().toLowerCase() || "codexdentist.com";
+  const effectiveHost = process.env.TRUSTED_PROXY_PROVIDER && process.env.TRUSTED_PROXY_PROVIDER !== "none"
+    ? forwardedHost ?? host
+    : host;
+  const subdomain = effectiveHost.endsWith(`.${rootDomain}`)
+    ? effectiveHost.slice(0, -(rootDomain.length + 1))
+    : null;
+  const dedicatedHosts = new Set(["admin", "api", "assets", "billing", "demo", "docs", "mail", "odontogram", "status", "static", "support"]);
+  const pathname = request.nextUrl.pathname;
+  if (
+    (request.method === "GET" || request.method === "HEAD") &&
+    subdomain && !subdomain.includes(".") && !dedicatedHosts.has(subdomain) &&
+    !pathname.startsWith("/api/") && pathname !== "/api" &&
+    !pathname.startsWith("/_next/") && !/\.[a-z0-9]+$/i.test(pathname)
+  ) {
+    const destination = new URL(`https://${rootDomain}`);
+    destination.pathname = pathname === "/" ? "/login" : pathname;
+    destination.search = request.nextUrl.search;
+    return NextResponse.redirect(destination, 307);
+  }
+
   return NextResponse.next();
 }
 

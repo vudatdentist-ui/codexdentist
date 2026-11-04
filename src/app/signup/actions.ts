@@ -7,11 +7,6 @@ import { trialSignupEnabled } from "@/lib/env";
 import { consumeTrialSignupAttempt } from "@/lib/rate-limit";
 import { clientIpFromHeaders } from "@/lib/request-ip";
 import {
-  currentHostname,
-  isLocalHostname,
-  tenantDomainForSlug,
-} from "@/lib/tenant";
-import {
   createTrialWorkspace,
   TrialAccountAlreadyExistsError,
 } from "@/lib/trial-workspaces";
@@ -52,7 +47,6 @@ export async function createTrialAccountAction(formData: FormData) {
     redirect("/signup?error=rate-limited");
   }
 
-  const hostname = await currentHostname();
   let workspaceSlug = "";
   let signedIn = false;
 
@@ -83,16 +77,7 @@ export async function createTrialAccountAction(formData: FormData) {
     redirect("/signup?error=unavailable");
   }
 
-  if (isLocalHostname(hostname)) {
-    redirect(signedIn ? "/dashboard" : "/login?signup=created");
-  }
-
-  const workspaceUrl = `https://${tenantDomainForSlug(workspaceSlug)}`;
-  redirect(
-    signedIn
-      ? `${workspaceUrl}/dashboard`
-      : `${workspaceUrl}/login?signup=created`,
-  );
+  redirect(signedIn ? "/dashboard" : "/login?signup=created");
 }
 
 function requiredString(value: FormDataEntryValue | null) {

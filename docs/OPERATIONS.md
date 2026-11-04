@@ -1,6 +1,6 @@
 # Operations
 
-Last updated: 2026-10-22
+Last updated: 2026-11-04
 
 ## Local PC
 
@@ -209,12 +209,13 @@ Production `/api/readiness` requires `x-job-secret: <JOB_SECRET>` or a Bearer to
 
 Public host routing:
 
+- All staff accounts use `https://codexdentist.com/login`; set `APP_BASE_URL=https://codexdentist.com` for recovery and invitation links. Organization scope remains server-enforced. The host-only `codexdentist_session` cookie replaces the legacy shared-domain cookie and requires users to sign in again once after deployment.
 - root/`www`: product site, hosted trial signup at `/signup`, feature guide at `/features`, and compatibility demo entry at `/demo`;
 - `demo`: 24-hour demo entry directly at `/`;
 - `docs`: redirects to `/docs`;
 - `odontogram`: rewrites `/` internally to the standalone odontogram entry;
 - `app`/`admin`: neutral application entry;
-- other supported subdomains: tenant application.
+- legacy workspace subdomains and `app`/`www` page links redirect to the root application with the path/query preserved (the subdomain root opens `/login`). API/webhook POST requests retain their scoped routing; dedicated service hosts remain separate.
 
 Production availability is checked hourly by `.github/workflows/production-health.yml`. It verifies the product page, hosted signup page, feature guide, demo entry, application health, and database health. A failed run is an operational alert and must be investigated before release or onboarding.
 
