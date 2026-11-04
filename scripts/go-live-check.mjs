@@ -3,6 +3,7 @@ import { createHash, pbkdf2Sync, timingSafeEqual } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { notificationConfigurationErrors } from "./lib/notification-readiness.mjs";
+import { migrationChecksumMatches } from "../src/infrastructure/migrations/checksums.ts";
 
 loadDotEnv();
 
@@ -146,6 +147,7 @@ async function checkDatabase() {
     .filter((entry) => entry.isDirectory() && /^\d+_/.test(entry.name))
     .map((entry) => ({
       name: entry.name,
+      bytes: readFileSync(`prisma/migrations/${entry.name}/migration.sql`),
       checksum: createHash("sha256")
         .update(readFileSync(`prisma/migrations/${entry.name}/migration.sql`))
         .digest("hex"),
@@ -165,7 +167,7 @@ async function checkDatabase() {
     errors.push(`Database contains migrations missing from this release: ${unexpectedMigrations.join(", ")}`);
   }
   const checksumDrift = requiredMigrations
-    .filter((migration) => appliedByName.get(migration.name) && appliedByName.get(migration.name) !== migration.checksum)
+    .filter((migration) => appliedByName.get(migration.name) && !migrationChecksumMatches(migration.name, migration.bytes, appliedByName.get(migration.name)))
     .map((migration) => migration.name);
   if (checksumDrift.length > 0) {
     errors.push(`Migration checksum drift detected: ${checksumDrift.join(", ")}`);

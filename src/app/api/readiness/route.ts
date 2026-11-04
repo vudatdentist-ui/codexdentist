@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { migrationChecksumMatches } from "@/infrastructure/migrations/checksums";
 import { readdirSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { NextResponse } from "next/server";
@@ -53,9 +53,7 @@ export async function GET(request: Request) {
         .filter((entry) => entry.isDirectory() && /^\d+_/.test(entry.name))
         .map((entry) => [
           entry.name,
-          createHash("sha256")
-            .update(readFileSync(path.join(process.cwd(), "prisma", "migrations", entry.name, "migration.sql")))
-            .digest("hex"),
+          readFileSync(path.join(process.cwd(), "prisma", "migrations", entry.name, "migration.sql")),
         ]),
     );
     const migrations = await prisma.$queryRaw<Array<{ migration_name: string; checksum: string }>>`
@@ -65,7 +63,7 @@ export async function GET(request: Request) {
     const missing = [...expected.keys()].filter((name) => !applied.has(name));
     const unexpected = [...applied.keys()].filter((name) => !expected.has(name));
     const drift = [...expected.entries()]
-      .filter(([name, checksum]) => applied.get(name) && applied.get(name) !== checksum)
+      .filter(([name, bytes]) => applied.get(name) && !migrationChecksumMatches(name, bytes, applied.get(name)!))
       .map(([name]) => name);
     const valid = missing.length === 0 && unexpected.length === 0 && drift.length === 0;
     checks.push({

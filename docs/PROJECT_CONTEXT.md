@@ -238,13 +238,14 @@ tests pass locally. Lab and sterilization operator workflows pass real-browser
 create/transition/reload/audit checks at 1440/390/320px; unconfigured imaging fails
 safely without losing input. Final CI and production upgrade gates remain open.
 Current executable milestone: finish Phase 7 integrated CI and reviewed upgrade.
-Production upgrade blocker: migration `20260516090000_source_commission` has
+Recovered migration history: `20260516090000_source_commission` has
 ledger checksum `578975509b6eede77797d42ece4d3f93ee5635c8b218abb4894b7191537efae7`
 but release SQL checksum `d31229374b52e7a29228b90fe34afbb9d664a9acdee31c530a3a3288f068ba9b`.
-All three available Git history versions and retained VPS release copies have the
-release checksum; the original applied SQL has not been recovered. Reconcile the
-schema/history on a restored production backup before enabling this release.
-Do not rewrite the migration ledger or suppress drift validation to deploy.
+The original local checkout has the exact applied bytes: 51 LF lines and one CRLF
+line. Normalizing line endings makes it byte-equivalent to Git's SQL. Readiness
+and go-live use the archived original bytes to verify this one historical variant;
+any SQL edit, unrelated name or unknown checksum still fails. The production ledger
+and historical migration files remain unchanged. See issue #69.
 Live payOS/Documenso/PACS acceptance remains pending operator-owned credentials.
 Preserve all November shared-login and patient
 audit fixes and October security/maintainability gates. Reuse completed work;

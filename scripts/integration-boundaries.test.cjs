@@ -74,3 +74,15 @@ test("readiness refuses missing, unexpected and checksum-drifted migration histo
     assert.equal(response.status, applied[0]?.checksum === checksum && applied[0]?.migration_name === "migration" ? 200 : 503);
   }
 });
+
+test("only the recovered applied migration bytes permit a verified newline-only checksum difference", () => {
+  const fs = require("node:fs");
+  const { migrationChecksumMatches } = load("src/infrastructure/migrations/checksums.ts");
+  const name = "20260516090000_source_commission";
+  const bytes = fs.readFileSync(`prisma/migrations/${name}/migration.sql`);
+  const applied = "578975509b6eede77797d42ece4d3f93ee5635c8b218abb4894b7191537efae7";
+  assert.equal(migrationChecksumMatches(name, bytes, applied), true);
+  assert.equal(migrationChecksumMatches(name, Buffer.from(bytes.toString().replace("CREATE TABLE", "CREATE UNLOGGED TABLE")), applied), false);
+  assert.equal(migrationChecksumMatches("another_migration", bytes, applied), false);
+  assert.equal(migrationChecksumMatches(name, bytes, "0".repeat(64)), false);
+});
