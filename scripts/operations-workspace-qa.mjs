@@ -83,6 +83,8 @@ try {
   });
   await check("Sterilization instrument and cycle can be created, completed and released with traceability", async () => {
     await visit("sterilization");
+    const clinic = page.locator('select[name="clinicId"]');
+    if (await clinic.count()) await clinic.selectOption(await clinic.locator("option").nth(1).getAttribute("value"));
     await page.locator("summary").filter({ hasText: /^Thêm dụng cụ$/ }).click();
     const code = `QA-${suffix}`;
     await page.getByLabel("Mã dụng cụ", { exact: true }).fill(code);
