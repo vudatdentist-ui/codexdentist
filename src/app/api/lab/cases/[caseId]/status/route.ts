@@ -22,4 +22,3 @@ export async function POST(
     return json({ error: code }, { status: httpStatus });
   }
 }
-

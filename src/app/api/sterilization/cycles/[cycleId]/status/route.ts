@@ -17,4 +17,3 @@ export async function POST(request: Request, context: { params: Promise<{ cycleI
     return json({ error: code }, { status: code.includes("denied") ? 403 : code.includes("not-found") ? 404 : code.includes("invalid") || code.includes("required") ? 400 : code.includes("busy") || code.includes("conflict") ? 409 : 503 });
   }
 }
-

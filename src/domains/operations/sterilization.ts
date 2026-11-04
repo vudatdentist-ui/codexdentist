@@ -11,6 +11,10 @@ const transitions: Record<SterilizationStatus, SterilizationStatus[]> = {
   RELEASED: [],
 };
 
+export function sterilizationNextStatuses(status: string): readonly SterilizationStatus[] {
+  return sterilizationStatuses.includes(status as SterilizationStatus) ? transitions[status as SterilizationStatus] : [];
+}
+
 export function assertSterilizationTransition(from: string, to: string) {
   if (!sterilizationStatuses.includes(from as SterilizationStatus) || !sterilizationStatuses.includes(to as SterilizationStatus)) {
     throw new DomainRuleError("sterilization-status-invalid");

@@ -61,5 +61,3 @@ function mapError(cause: unknown) {
       : 503;
   return error(code, status);
 }
-
-

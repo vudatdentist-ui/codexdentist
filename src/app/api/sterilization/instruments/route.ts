@@ -1,8 +1,16 @@
 import { noStoreJson as json, apiError as error } from "@/app/api/imaging/responses";
-import { createSterilizationInstrumentCommand } from "@/lib/application/sterilization/commands";
+import { createSterilizationInstrumentCommand, listSterilizationInstrumentsCommand } from "@/lib/application/sterilization/commands";
 import { commandErrorCode as applicationErrorCode } from "@/app/api/imaging/responses";
 import { getSession } from "@/lib/auth";
 import { hasSameOrigin } from "@/lib/request-security";
+
+export async function GET() {
+  const session = await getSession();
+  if (!session) return error("unauthorized", 401);
+  try {
+    return json({ instruments: await listSterilizationInstrumentsCommand(session) });
+  } catch (cause) { return mapError(cause); }
+}
 
 export async function POST(request: Request) {
   if (!hasSameOrigin(request)) return error("csrf-origin-invalid", 403);

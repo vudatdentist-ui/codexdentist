@@ -1,0 +1,18 @@
+.section { max-width: 1120px; margin: 0 auto 24px; padding: 20px; background: #fff; border: 1px solid #deded8; border-radius: 14px; }
+.section summary { cursor: pointer; font-weight: 700; }
+.section h2 { margin: 0 0 12px; font-size: 20px; }
+.form { margin-top: 16px; }
+.form fieldset { display: grid; gap: 14px; min-width: 0; border: 0; margin: 0; padding: 0; }
+.form label { display: grid; gap: 6px; min-width: 0; font-size: 14px; font-weight: 600; }
+.form input, .form select, .form textarea { width: 100%; min-width: 0; max-width: 100%; box-sizing: border-box; }
+.form textarea { min-height: 80px; padding: 10px; border: 1px solid #c8cbc7; border-radius: 8px; font: inherit; }
+.form button { justify-self: start; }
+.patientLookup { display: grid; gap: 10px; }
+.hint { margin: 0; color: #59665f; font-size: 13px; line-height: 1.5; }
+.error, .success { overflow-wrap: anywhere; line-height: 1.5; font-size: 14px; }
+.error { color: #a22525; }
+.success { color: #246245; }
+.form .instruments { display: flex; flex-direction: column; gap: 8px; max-height: 240px; overflow-y: auto; margin: 0; padding: 8px; border: 1px solid #deded8; border-radius: 8px; }
+.instruments label { display: flex; align-items: center; gap: 8px; font-weight: 400; overflow-wrap: anywhere; }
+.instruments input { flex: 0 0 auto; width: 18px; height: 18px; }
+@media (min-width: 720px) { .form fieldset { grid-template-columns: repeat(2, minmax(0, 1fr)); } .form fieldset > :last-child, .patientLookup, .instruments { grid-column: 1 / -1; } }

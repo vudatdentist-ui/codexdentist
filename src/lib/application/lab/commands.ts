@@ -4,13 +4,28 @@ import { randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { canPerformAction } from "@/lib/actions/permissions";
 import { ApplicationCommandError } from "@/lib/application/errors";
-import { databaseActorId } from "@/lib/form-validation";
+import { databaseActorId, parseDateInVietnam } from "@/lib/form-validation";
 import { allowedClinicIds } from "@/lib/patient-access";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 import { assertLabTransition } from "@/domains/operations/lab";
 
 export { assertLabTransition, labStatuses, type LabStatus } from "@/domains/operations/lab";
+
+export async function searchOperationPatientsCommand(session: AppSession, input: { purpose: "lab" | "imaging"; query: string }) {
+  requireAction(session, input.purpose === "imaging" ? "imaging.study.link" : "lab.case.create", "patient-lookup-denied");
+  const query = input.query.trim().slice(0, 120);
+  return prisma.patient.findMany({
+    where: {
+      organizationId: session.organizationId,
+      clinicId: { in: allowedClinicIds(session) },
+      ...(query ? { OR: [{ fullName: { contains: query, mode: "insensitive" as const } }, { phone: { contains: query } }] } : {}),
+    },
+    select: { id: true, fullName: true, phone: true, clinic: { select: { name: true } } },
+    orderBy: [{ fullName: "asc" }, { id: "asc" }],
+    take: 50,
+  });
+}
 
 export async function createLabCaseCommand(session: AppSession, input: {
   patientId: string;
@@ -157,6 +172,11 @@ function cleanOptional(value: string | null | undefined, max: number) {
 
 function parseDueAt(value: string | null | undefined) {
   if (!value?.trim()) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    const date = parseDateInVietnam(value);
+    if (date === "invalid") throw new ApplicationCommandError("lab-due-date-invalid");
+    return date;
+  }
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) throw new ApplicationCommandError("lab-due-date-invalid");
   return date;

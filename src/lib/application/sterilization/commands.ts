@@ -35,6 +35,7 @@ export async function createSterilizationInstrumentCommand(session: AppSession, 
 export async function createSterilizationCycleCommand(session: AppSession, input: { instrumentIds: string[]; method: string; machineName?: string | null; notes?: string | null }) {
   requireAction(session, "sterilization.create", "sterilization-create-denied");
   const clinicId = requireClinic(session);
+  if (input.instrumentIds.length > 100) throw new ApplicationCommandError("sterilization-instruments-invalid");
   const instrumentIds = [...new Set(input.instrumentIds)].filter(Boolean).slice(0, 100);
   if (instrumentIds.length === 0) throw new ApplicationCommandError("sterilization-instruments-required");
   const method = required(input.method, "sterilization-method-invalid");
@@ -81,6 +82,16 @@ export async function createSterilizationCycleCommand(session: AppSession, input
 export async function listSterilizationCyclesCommand(session: AppSession) {
   requireAction(session, "sterilization.view", "sterilization-view-denied");
   return prisma.sterilizationCycle.findMany({ where: { organizationId: session.organizationId, clinicId: { in: allowedClinicIds(session) } }, orderBy: { createdAt: "desc" }, take: 200, select: cycleSelect });
+}
+
+export async function listSterilizationInstrumentsCommand(session: AppSession) {
+  requireAction(session, "sterilization.view", "sterilization-view-denied");
+  const instruments = await prisma.sterilizationInstrument.findMany({
+    where: { organizationId: session.organizationId, clinicId: { in: allowedClinicIds(session) }, status: "ACTIVE" },
+    select: { ...instrumentSelect, cycles: { where: { cycle: { status: { in: ["PREPARING", "RUNNING", "PASSED"] } } }, select: { cycleId: true }, take: 1 } },
+    orderBy: [{ code: "asc" }, { id: "asc" }],
+  });
+  return instruments.map(({ cycles, ...instrument }) => ({ ...instrument, busy: cycles.length > 0 }));
 }
 
 export async function transitionSterilizationCycleCommand(session: AppSession, input: { id: string; status: string }) {

@@ -12,6 +12,10 @@ const transitions: Record<LabStatus, LabStatus[]> = {
   CANCELLED: [],
 };
 
+export function labNextStatuses(status: string): readonly LabStatus[] {
+  return labStatuses.includes(status as LabStatus) ? transitions[status as LabStatus] : [];
+}
+
 export function assertLabTransition(from: string, to: string): asserts to is LabStatus {
   if (!labStatuses.includes(from as LabStatus) || !labStatuses.includes(to as LabStatus)) {
     throw new DomainRuleError("lab-status-invalid");

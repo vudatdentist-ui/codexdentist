@@ -3,6 +3,8 @@ import { getImagingViewerCommand, listImagingStudiesCommand } from "@/lib/applic
 import { applicationErrorCode } from "@/lib/application/errors";
 import { canPerformAction } from "@/lib/actions/permissions";
 import { requireSession } from "@/lib/auth";
+import { OperationsWorkspaceFrame } from "@/app/(app)/OperationsWorkspaceFrame";
+import { ImagingLinkForm } from "./imaging-link-form";
 import styles from "./imaging.module.css";
 
 export default async function ImagingPage() {
@@ -19,41 +21,42 @@ export default async function ImagingPage() {
   });
 
   return (
-    <main className={styles.page}>
+    <OperationsWorkspaceFrame view="imaging" session={session}><div className={styles.page}>
       <header className={styles.header}>
         <div>
-          <p className={styles.eyebrow}>Codexdentist · Chẩn đoán hình ảnh</p>
-          <h1>Hình ảnh học</h1>
+          <p className={styles.eyebrow}>{session.clinics.find(clinic => clinic.id === session.activeClinicId)?.name ?? "Các phòng khám được phép"}</p>
+          <h2>Phim chụp theo bệnh nhân</h2>
           <p className={styles.lede}>
-            Các study được liên kết theo bệnh nhân và phòng khám. Dữ liệu DICOM vẫn nằm trong PACS; Codexdentist chỉ giữ tham chiếu được cấp quyền.
+            Liên kết và mở phim chụp theo đúng bệnh nhân, trong phạm vi phòng khám được phép.
           </p>
         </div>
         <a className={styles.backLink} href="/journey">Về Journey</a>
       </header>
+      {canPerformAction(session, "imaging.study.link") && <ImagingLinkForm />}
 
       {cards.length === 0 ? (
         <section className={styles.empty}>
-          <h2>Chưa có study được liên kết</h2>
-          <p>Khi PACS được cấu hình, liên kết study qua API imaging để xuất hiện tại đây.</p>
+          <h2>Chưa có phim chụp được liên kết</h2>
+          <p>Phim đã liên kết với bệnh nhân sẽ xuất hiện tại đây.</p>
         </section>
       ) : (
-        <section className={styles.grid} aria-label="Danh sách study hình ảnh">
+        <section className={styles.grid} aria-label="Danh sách phim chụp">
           {cards.map(({ study, viewerUrl, viewerError }) => (
             <article className={styles.card} key={study.id}>
               <div className={styles.cardTopline}>
-                <span className={styles.badge}>{study.modalities.join(" · ") || "Imaging"}</span>
+                <span className={styles.badge}>{study.modalities.join(" · ") || "Phim chụp"}</span>
                 <span>{viewerError || study.availability !== "AVAILABLE" ? "Không khả dụng" : "Sẵn sàng"}</span>
               </div>
-              <h2>{study.description || "Study không có mô tả"}</h2>
+              <h2>{study.description || "Phim chụp chưa có mô tả"}</h2>
               <dl>
                 <div><dt>Bệnh nhân</dt><dd>{study.patient.fullName}</dd></div>
                 <div><dt>Phòng khám</dt><dd>{study.clinic.name}</dd></div>
                 <div><dt>Ngày chụp</dt><dd>{formatDate(study.studyDate)}</dd></div>
-                <div><dt>Mã study</dt><dd>{study.externalStudyId}</dd></div>
+                <div><dt>Mã phim</dt><dd>{study.externalStudyId}</dd></div>
               </dl>
               {viewerUrl ? (
                 <a className={styles.openButton} href={viewerUrl} target="_blank" rel="noreferrer">
-                  Mở OHIF Viewer
+                  Mở phim chụp
                 </a>
               ) : (
                 <p className={styles.unavailable}>{viewerMessage(viewerError)}</p>
@@ -62,7 +65,7 @@ export default async function ImagingPage() {
           ))}
         </section>
       )}
-    </main>
+    </div></OperationsWorkspaceFrame>
   );
 }
 
@@ -74,21 +77,21 @@ function formatDate(value: Date | null) {
 
 function viewerMessage(error: string | null) {
   if (error === "orthanc-study-not-found") {
-    return "Study không còn tồn tại trong PACS; tham chiếu Codexdentist vẫn được giữ để đối soát.";
+    return "Không tìm thấy phim tại nơi lưu trữ. Liên kết vẫn được giữ để kiểm tra lại.";
   }
   if (error === "orthanc-study-identity-mismatch") {
-    return "PACS trả về định danh không khớp; viewer đã bị khóa để bảo vệ dữ liệu bệnh nhân.";
+    return "Thông tin phim không khớp với bệnh nhân. Việc mở phim đã bị khóa để bảo vệ hồ sơ.";
   }
   if (error?.startsWith("orthanc-")) {
-    return "PACS hiện không khả dụng; tham chiếu study vẫn được giữ an toàn.";
+    return "Nơi lưu phim tạm thời không khả dụng. Liên kết phim vẫn được giữ an toàn.";
   }
   if (error === "imaging-viewer-access-not-configured") {
-    return "OHIF đang bị tắt vì chưa cấu hình private viewer access.";
+    return "Chưa thể mở phim an toàn. Liên hệ người quản lý để kiểm tra quyền truy cập.";
   }
   if (error === "imaging-connection-unavailable") {
-    return "Kết nối PACS hiện không hoạt động; hãy kiểm tra cấu hình tích hợp.";
+    return "Kết nối đến nơi lưu phim hiện không hoạt động. Vui lòng thử lại sau.";
   }
-  return "OHIF chưa được cấu hình cho kết nối này.";
+  return "Chưa thể mở phim này. Liên hệ người quản lý phòng khám để được hỗ trợ.";
 }
 
 async function mapWithConcurrency<T, R>(items: T[], concurrency: number, mapper: (item: T) => Promise<R>) {

@@ -13,5 +13,6 @@ export function apiError(code: string, status: number) {
 }
 
 export function commandErrorCode(cause: unknown, fallback: string) {
+  if (cause && typeof cause === "object" && "code" in cause && cause.code === "P2002") return "operation-unique-conflict";
   return cause instanceof DomainRuleError ? cause.code : applicationErrorCode(cause, fallback);
 }

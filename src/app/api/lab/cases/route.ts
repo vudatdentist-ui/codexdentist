@@ -46,5 +46,3 @@ function mapError(cause: unknown) {
         code.includes("conflict") ? 409 : 503;
   return error(code, status);
 }
-
-
