@@ -21,8 +21,12 @@ const {
   markPatientFileStageGcPending,
   markPatientFileStageStored,
   reconcilePatientFileStages,
+  stageExpiredPatientFiles,
 } = await import("../src/infrastructure/patient-files/staging.ts");
-const { enqueueIntegrationOutbox, dispatchIntegrationOutbox } = await import(
+const {
+  enqueueIntegrationOutbox, dispatchIntegrationOutbox, acceptIntegrationInbox,
+  processIntegrationInbox, upsertIntegrationConnection, createExternalReference,
+} = await import(
   "../src/infrastructure/integrations/substrate.ts"
 );
 const { reconcileStagedPatientFiles } = await import(
@@ -32,7 +36,10 @@ const { reconcileStagedPatientFiles } = await import(
 const connectionString =
   process.env.DATABASE_URL ??
   "postgresql://postgres:postgres@localhost:5432/vietnam_dental_suite?schema=public";
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
+const nonUtc = process.argv.includes("--non-utc");
+const prisma = new PrismaClient({ adapter: new PrismaPg({
+  connectionString, ...(nonUtc ? { options: "-c timezone=Asia/Bangkok" } : {}),
+}) });
 const createdPaths = [];
 const stageIds = [];
 const patientFileIds = [];
@@ -49,6 +56,7 @@ try {
   const patient = await prisma.patient.create({
     data: { organizationId, clinicId: clinic.id, fullName: "Synthetic patient", phone: "0000000000" },
   });
+  if (nonUtc) await nonUtcTimestampRegression(prisma, { organizationId, clinicId: clinic.id, patientId: patient.id });
 
   const orphanStageId = randomUUID();
   const orphanFileId = randomUUID();
@@ -114,7 +122,7 @@ try {
     gcAfter: new Date(0),
   });
   await prisma.$executeRawUnsafe(
-    `UPDATE "PatientFileObjectStage" SET "storageProvider" = 'unsupported', "state" = 'GC_PENDING', "gcAfter" = CURRENT_TIMESTAMP WHERE "id" = $1`,
+    `UPDATE "PatientFileObjectStage" SET "storageProvider" = 'unsupported', "state" = 'GC_PENDING', "gcAfter" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') WHERE "id" = $1`,
     retryStageId,
   );
   const failedGc = await runGc(patient.organizationId);
@@ -136,7 +144,7 @@ try {
   await mkdir(path.dirname(retryPath), { recursive: true });
   await writeFile(retryPath, Buffer.from("%PDF-retry-stage\n"), { flag: "wx" });
   await prisma.$executeRawUnsafe(
-    `UPDATE "PatientFileObjectStage" SET "storageProvider" = 'local', "gcAfter" = CURRENT_TIMESTAMP WHERE "id" = $1`,
+    `UPDATE "PatientFileObjectStage" SET "storageProvider" = 'local', "gcAfter" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') WHERE "id" = $1`,
     retryStageId,
   );
   const retriedGc = await runGc(patient.organizationId);
@@ -381,6 +389,112 @@ async function exists(filePath) {
 function assert(condition, label) {
   if (!condition) throw new Error(`Phase2 file lifecycle smoke failed: ${label}`);
   console.log(`ok ${label}`);
+}
+
+async function nonUtcTimestampRegression(db, scope) {
+  const recent = (row, fields) => {
+    for (const field of fields) assert(row[field] instanceof Date && Math.abs(Date.now() - row[field].getTime()) < 10_000, `${field} uses UTC naive timestamps`);
+  };
+  const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  const clock = await db.$queryRawUnsafe(`SELECT current_setting('TimeZone') AS zone,
+    (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') AS utc, CURRENT_TIMESTAMP::timestamp AS local`);
+  assert(clock[0].zone === "Asia/Bangkok" && clock[0].local - clock[0].utc === 7 * 60 * 60_000, "actual PostgreSQL regression session stays Asia/Bangkok (UTC+7)");
+
+  const connection = await upsertIntegrationConnection(db, { ...scope, provider: outboxTopic });
+  const reference = await createExternalReference(db, {
+    ...scope, connectionId: connection.id, provider: outboxTopic,
+    entityType: "QA", internalId: randomUUID(), externalId: randomUUID(),
+  });
+  recent(connection, ["createdAt", "updatedAt"]);
+  recent(reference, ["createdAt", "updatedAt"]);
+  const inbox = await acceptIntegrationInbox(db, {
+    ...scope, connectionId: connection.id, provider: outboxTopic, externalEventId: randomUUID(), eventType: "qa.clock",
+  });
+  recent(inbox.event, ["availableAt", "createdAt", "updatedAt"]);
+  let failed = false;
+  try {
+    await processIntegrationInbox(db, inbox.event.id, async () => { throw new Error("qa-clock-retry"); }, { retryDelayMs: 1 });
+  } catch { failed = true; }
+  assert(failed, "new inbox is immediately due on a non-UTC server");
+  await pause(20);
+  const processed = await processIntegrationInbox(db, inbox.event.id, async () => "ok");
+  assert(processed.status === "processed", "inbox retry runs without resetting the session timezone");
+  const processedRows = await db.$queryRawUnsafe(`SELECT * FROM "IntegrationInbox" WHERE "id" = $1`, inbox.event.id);
+  recent(processedRows[0], ["availableAt", "processedAt", "updatedAt"]);
+
+  const topic = `${outboxTopic}-utc`;
+  const event = await enqueueIntegrationOutbox(db, { ...scope, topic, eventType: "qa.clock" });
+  recent(event.event, ["availableAt", "createdAt", "updatedAt"]);
+  const retried = await dispatchIntegrationOutbox(db, async () => { throw new Error("qa-clock-retry"); }, { topic, retryDelayMs: 1 });
+  assert(retried.retried === 1, "outbox retry retains its live lease on a non-UTC server");
+  await pause(20);
+  assert((await dispatchIntegrationOutbox(db, async () => {}, { topic })).sent === 1, "outbox retry is due at its UTC deadline");
+  const sent = await db.$queryRawUnsafe(`SELECT * FROM "IntegrationOutbox" WHERE "id" = $1`, event.event.id);
+  recent(sent[0], ["dispatchedAt", "updatedAt"]);
+  await enqueueIntegrationOutbox(db, { ...scope, topic, eventType: "qa.future", availableAt: new Date(Date.now() + 60 * 60_000) });
+  assert((await dispatchIntegrationOutbox(db, async () => { throw new Error("future event dispatched early"); }, { topic })).claimed === 0, "future outbox event stays pending despite the UTC+7 session");
+
+  const stageInput = () => ({
+    ...scope, id: randomUUID(), targetPatientFileId: randomUUID(), fileName: "clock.pdf", mimeType: "application/pdf",
+    sizeBytes: 10, storageProvider: "local", storageKey: `patient-files/${scope.organizationId}/${scope.patientId}/${randomUUID()}-`, gcAfter: new Date(0),
+  });
+  const stage = await createPatientFileStage(db, stageInput());
+  stageIds.push(stage.id);
+  recent(stage, ["createdAt", "updatedAt"]);
+  const stored = await markPatientFileStageStored(db, { stageId: stage.id, storageKey: stage.storageKey, checksumSha256: "0".repeat(64) });
+  recent(stored, ["storedAt", "updatedAt"]);
+  await markPatientFileStageGcPending(db, stage.id, "qa-clock-gc");
+
+  async function raceGc(run, objectId, deadlineField, table) {
+    let entered;
+    let release;
+    const enteredGate = new Promise((resolve) => { entered = resolve; });
+    const releaseGate = new Promise((resolve) => { release = resolve; });
+    const first = run(async (row) => {
+      const deadline = row[deadlineField].getTime() - Date.now();
+      assert(deadline > 0 && deadline <= 500, "GC claim deadline uses UTC rather than session wall time");
+      entered();
+      await releaseGate;
+    });
+    await Promise.race([enteredGate, first.then(() => { throw new Error("GC never entered its callback"); })]);
+    let competitor;
+    try {
+      await pause(450);
+      competitor = await run(async () => { throw new Error("duplicate GC callback"); });
+    } finally { release(); }
+    const result = await first;
+    assert(competitor.claimed === 0 && result.deleted === 1, "non-UTC GC heartbeat renews a 150ms lease beyond 450ms");
+    const deleted = await db.$queryRawUnsafe(`SELECT * FROM "${table}" WHERE "id" = $1`, objectId);
+    recent(deleted[0], ["deletedAt", "updatedAt"]);
+  }
+  await raceGc((remove) => reconcilePatientFileStages(db, remove, { organizationId: scope.organizationId, leaseMs: 150 }), stage.id, "gcAfter", "PatientFileObjectStage");
+
+  const { createPatientFilePurgeManifests, reconcilePatientFilePurgeManifests } = await import("../src/infrastructure/patient-files/purge-manifest.ts");
+  const manifestIds = await createPatientFilePurgeManifests(db, [{
+    organizationId: scope.organizationId, storageProvider: "local", storageKey: stage.storageKey, previewStorageKey: null, thumbnailStorageKey: null,
+  }]);
+  const manifests = await db.$queryRawUnsafe(`SELECT * FROM "PatientFilePurgeManifest" WHERE "id" = $1`, manifestIds[0]);
+  recent(manifests[0], ["availableAt", "createdAt", "updatedAt"]);
+  await raceGc((remove) => reconcilePatientFilePurgeManifests(db, remove, { ids: manifestIds, leaseMs: 150 }), manifestIds[0], "availableAt", "PatientFilePurgeManifest");
+
+  // A UTC+7 comparison against local CURRENT_TIMESTAMP would expire the future file too.
+  const retentionIds = [];
+  for (const offset of [-1, 1]) {
+    const id = randomUUID(); retentionIds.push(id); patientFileIds.push(id);
+    await db.patientFile.create({ data: {
+      ...scope, id, title: "Synthetic clock", fileName: "clock.pdf", mimeType: "application/pdf",
+      url: `/patient-files/${id}`, storageProvider: "local", storageKey: `${stage.storageKey}${id}.pdf`,
+      retentionUntil: new Date(Date.now() + offset * 60 * 60_000),
+    } });
+  }
+  const expired = await stageExpiredPatientFiles(db, { organizationId: scope.organizationId });
+  assert(expired.claimed === 1 && Boolean(await db.patientFile.findUnique({ where: { id: retentionIds[1] } })), "retention expires only the UTC-due file on a UTC+7 server");
+  const retainedStages = await db.$queryRawUnsafe(`SELECT * FROM "PatientFileObjectStage" WHERE "targetPatientFileId" = $1`, retentionIds[0]);
+  stageIds.push(retainedStages[0].id);
+  recent(retainedStages[0], ["gcAfter", "createdAt", "updatedAt"]);
+  await reconcilePatientFileStages(db, async () => {}, { organizationId: scope.organizationId });
+  assert((await db.$queryRawUnsafe(`SELECT current_setting('TimeZone') AS zone`))[0].zone === "Asia/Bangkok", "regression never changes the non-UTC session timezone");
+  console.log("ok non-UTC inbox/outbox clocks, GC deadlines/heartbeats, manifest clocks and retention boundaries");
 }
 
 async function integrityRegressions() {

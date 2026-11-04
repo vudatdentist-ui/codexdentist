@@ -21,10 +21,10 @@ export function startObjectGcLease(
       try {
         const rows = await db.$queryRawUnsafe<Array<{ id: string }>>(
           `UPDATE "${table}"
-           SET "${deadline}" = CURRENT_TIMESTAMP + ($3 * INTERVAL '1 millisecond'),
-               "updatedAt" = CURRENT_TIMESTAMP
+           SET "${deadline}" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') + ($3 * INTERVAL '1 millisecond'),
+               "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
            WHERE "id" = ANY($1::text[]) AND "lastErrorCode" = $2
-             AND "state" = '${state}' AND "${deadline}" > CURRENT_TIMESTAMP
+             AND "state" = '${state}' AND "${deadline}" > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
            RETURNING "id"`,
           remaining, token, leaseMs,
         );

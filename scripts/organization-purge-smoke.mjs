@@ -202,7 +202,7 @@ try {
   committedObjectPaths.push(latePath);
   await mkdir(path.dirname(latePath), { recursive: true });
   await writeFile(latePath, Buffer.from("%PDF-late-upload\n"), { flag: "wx" });
-  await prisma.$executeRawUnsafe(`UPDATE "PatientFilePurgeManifest" SET "availableAt" = CURRENT_TIMESTAMP WHERE "id" = $1`, lateManifest.id);
+  await prisma.$executeRawUnsafe(`UPDATE "PatientFilePurgeManifest" SET "availableAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') WHERE "id" = $1`, lateManifest.id);
   const lateGc = await reconcilePatientFilePurgeManifests(prisma, deletePatientFileStageObjects, { ids: [lateManifest.id] });
   assert(lateGc.deleted === 1 && !(await exists(latePath)), "late-upload PHI is cleaned after its organization no longer exists");
 
@@ -226,7 +226,7 @@ try {
   const untouched = await reconcilePatientFilePurgeManifests(prisma, async () => { throw new Error("must not execute"); }, { ids: [] });
   assert(untouched.claimed === 0, "empty manifest IDs never drain unrelated organizations");
   await prisma.$executeRawUnsafe(
-    `UPDATE "PatientFilePurgeManifest" SET "availableAt" = CURRENT_TIMESTAMP WHERE "id" = $1`,
+    `UPDATE "PatientFilePurgeManifest" SET "availableAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') WHERE "id" = $1`,
     retryManifestIds[0],
   );
   const successfulRetry = await reconcilePatientFilePurgeManifests(

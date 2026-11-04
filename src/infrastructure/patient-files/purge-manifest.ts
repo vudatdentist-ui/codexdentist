@@ -48,8 +48,9 @@ export async function createPatientFilePurgeManifests(
     const id = randomUUID();
     await db.$executeRawUnsafe(
       `INSERT INTO "PatientFilePurgeManifest"
-        ("id", "organizationId", "storageProvider", "storageKey", "previewStorageKey", "thumbnailStorageKey", "availableAt")
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        ("id", "organizationId", "storageProvider", "storageKey", "previewStorageKey", "thumbnailStorageKey", "availableAt", "createdAt", "updatedAt")
+       VALUES ($1, $2, $3, $4, $5, $6, $7,
+               (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'), (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))`,
       id,
       object.organizationId,
       object.storageProvider,
@@ -91,7 +92,7 @@ export async function reconcilePatientFilePurgeManifests(
        SELECT "id"
        FROM "PatientFilePurgeManifest"
        WHERE "state" IN ('PENDING', 'PROCESSING')
-         AND "availableAt" <= CURRENT_TIMESTAMP
+         AND "availableAt" <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
          AND ($4::text IS NULL OR "organizationId" = $4)
          AND ($5::text[] IS NULL OR "id" = ANY($5::text[]))
        ORDER BY "createdAt"
@@ -100,9 +101,9 @@ export async function reconcilePatientFilePurgeManifests(
      )
      UPDATE "PatientFilePurgeManifest" AS manifest
      SET "state" = 'PROCESSING',
-         "availableAt" = CURRENT_TIMESTAMP + ($2 * INTERVAL '1 millisecond'),
+         "availableAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') + ($2 * INTERVAL '1 millisecond'),
          "lastErrorCode" = $3,
-         "updatedAt" = CURRENT_TIMESTAMP
+         "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
      FROM picked
      WHERE manifest."id" = picked."id"
      RETURNING manifest.*`,
@@ -128,11 +129,11 @@ export async function reconcilePatientFilePurgeManifests(
           const finalized = await tx.$executeRawUnsafe(
             `UPDATE "PatientFilePurgeManifest"
              SET "state" = 'DELETED',
-                 "deletedAt" = CURRENT_TIMESTAMP,
+                 "deletedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
                  "lastErrorCode" = NULL,
-                 "updatedAt" = CURRENT_TIMESTAMP
+                 "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
              WHERE "id" = $1 AND "state" = 'PROCESSING' AND "lastErrorCode" = $2
-               AND "availableAt" > CURRENT_TIMESTAMP`,
+               AND "availableAt" > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')`,
             manifest.id,
             leaseToken,
           );
@@ -146,7 +147,7 @@ export async function reconcilePatientFilePurgeManifests(
                 `INSERT INTO "AuditLog"
                   ("id", "organizationId", "actorId", "action", "entityType", "entityId", "metadata", "createdAt")
                  VALUES ($1, $2, NULL, 'patient_file.purge_object_deleted',
-                         'PatientFilePurgeManifest', $3, $4::jsonb, CURRENT_TIMESTAMP)`,
+                         'PatientFilePurgeManifest', $3, $4::jsonb, (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))`,
                 randomUUID(),
                 manifest.organizationId,
                 manifest.id,
@@ -168,9 +169,9 @@ export async function reconcilePatientFilePurgeManifests(
            SET "state" = 'PENDING',
                "availableAt" = $2,
                "lastErrorCode" = $3,
-               "updatedAt" = CURRENT_TIMESTAMP
+               "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
            WHERE "id" = $1 AND "state" = 'PROCESSING' AND "lastErrorCode" = $4
-             AND "availableAt" > CURRENT_TIMESTAMP`,
+             AND "availableAt" > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')`,
           manifest.id,
           new Date(Date.now() + retryDelayMs),
           errorCode,

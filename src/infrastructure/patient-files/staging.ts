@@ -86,8 +86,9 @@ export async function createPatientFileStageInTransaction(
     `INSERT INTO "PatientFileObjectStage"
       ("id", "organizationId", "clinicId", "patientId", "uploadedById", "targetPatientFileId",
        "fileName", "mimeType", "sizeBytes", "storageProvider", "storageKey",
-       "previewStorageKey", "thumbnailStorageKey", "gcAfter")
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+       "previewStorageKey", "thumbnailStorageKey", "gcAfter", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14,
+             (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'), (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))
      RETURNING *`,
     input.id,
     input.organizationId,
@@ -123,9 +124,9 @@ export async function markPatientFileStageStored(
          "storageKey" = $3,
          "previewStorageKey" = $4,
          "thumbnailStorageKey" = $5,
-         "storedAt" = CURRENT_TIMESTAMP,
+         "storedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
          "lastErrorCode" = NULL,
-         "updatedAt" = CURRENT_TIMESTAMP
+         "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
      WHERE "id" = $1 AND "state" = 'STAGED'
      RETURNING *`,
     input.stageId,
@@ -147,9 +148,9 @@ export async function markPatientFileStageCommitted(
     `UPDATE "PatientFileObjectStage" AS stage
      SET "state" = 'COMMITTED',
          "committedPatientFileId" = $2,
-         "committedAt" = CURRENT_TIMESTAMP,
+         "committedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
          "lastErrorCode" = NULL,
-         "updatedAt" = CURRENT_TIMESTAMP
+         "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
      WHERE stage."id" = $1
        AND stage."state" = 'STAGED'
        AND stage."targetPatientFileId" = $2
@@ -177,9 +178,9 @@ export async function markPatientFileStageGcPending(
   const rows = await db.$queryRawUnsafe<PatientFileStageRow[]>(
     `UPDATE "PatientFileObjectStage"
      SET "state" = 'GC_PENDING',
-         "gcAfter" = CURRENT_TIMESTAMP,
+         "gcAfter" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
          "lastErrorCode" = $2,
-         "updatedAt" = CURRENT_TIMESTAMP
+         "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
      WHERE "id" = $1 AND ("state" = 'STAGED'
        OR ("state" = 'GC_PENDING' AND "lastErrorCode" NOT LIKE 'gc-lease:%'))
      RETURNING *`,
@@ -203,7 +204,7 @@ export async function reconcilePatientFileStages(
        SELECT "id"
        FROM "PatientFileObjectStage"
        WHERE "state" IN ('STAGED', 'GC_PENDING')
-         AND "gcAfter" <= CURRENT_TIMESTAMP
+         AND "gcAfter" <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
          AND ($4::text IS NULL OR "organizationId" = $4)
        ORDER BY "createdAt"
        FOR UPDATE SKIP LOCKED
@@ -211,9 +212,9 @@ export async function reconcilePatientFileStages(
      )
      UPDATE "PatientFileObjectStage" AS stage
      SET "state" = 'GC_PENDING',
-         "gcAfter" = CURRENT_TIMESTAMP + ($2 * INTERVAL '1 millisecond'),
+         "gcAfter" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') + ($2 * INTERVAL '1 millisecond'),
          "lastErrorCode" = $3,
-         "updatedAt" = CURRENT_TIMESTAMP
+         "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
      FROM picked
      WHERE stage."id" = picked."id" AND stage."state" <> 'COMMITTED'
      RETURNING stage.*`,
@@ -238,11 +239,11 @@ export async function reconcilePatientFileStages(
           const updated = await tx.$executeRawUnsafe(
             `UPDATE "PatientFileObjectStage"
              SET "state" = 'DELETED',
-                 "deletedAt" = CURRENT_TIMESTAMP,
+                 "deletedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
                  "lastErrorCode" = NULL,
-                 "updatedAt" = CURRENT_TIMESTAMP
+                 "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
              WHERE "id" = $1 AND "state" = 'GC_PENDING' AND "lastErrorCode" = $2
-               AND "gcAfter" > CURRENT_TIMESTAMP`,
+               AND "gcAfter" > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')`,
             stage.id,
             leaseToken,
           );
@@ -262,9 +263,9 @@ export async function reconcilePatientFileStages(
           `UPDATE "PatientFileObjectStage"
            SET "gcAfter" = $2,
                "lastErrorCode" = $3,
-               "updatedAt" = CURRENT_TIMESTAMP
+               "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
            WHERE "id" = $1 AND "state" = 'GC_PENDING' AND "lastErrorCode" = $4
-             AND "gcAfter" > CURRENT_TIMESTAMP`,
+             AND "gcAfter" > (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')`,
           stage.id,
           new Date(Date.now() + retryDelayMs),
           errorCode,
@@ -305,7 +306,7 @@ export async function stageExpiredPatientFiles(
        LEFT JOIN "PatientFileObjectStage" AS stage
          ON stage."targetPatientFileId" = file."id"
        WHERE file."retentionUntil" IS NOT NULL
-         AND file."retentionUntil" <= CURRENT_TIMESTAMP
+         AND file."retentionUntil" <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
          AND ($2::text IS NULL OR file."organizationId" = $2)
        ORDER BY file."retentionUntil", file."createdAt"
        FOR UPDATE OF file SKIP LOCKED
@@ -330,9 +331,10 @@ export async function stageExpiredPatientFiles(
              "targetPatientFileId", "fileName", "mimeType", "sizeBytes",
              "storageProvider", "storageKey", "previewStorageKey",
              "thumbnailStorageKey", "checksumSha256", "state", "storedAt",
-             "gcAfter", "lastErrorCode")
+             "gcAfter", "lastErrorCode", "createdAt", "updatedAt")
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13,
-                   $14, 'GC_PENDING', $15, CURRENT_TIMESTAMP, $16)`,
+                   $14, 'GC_PENDING', $15, (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'), $16,
+                   (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'), (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))`,
           stageId,
           file.organizationId,
           file.clinicId,
@@ -359,9 +361,9 @@ export async function stageExpiredPatientFiles(
         await tx.$executeRawUnsafe(
           `UPDATE "PatientFileObjectStage"
            SET "state" = 'GC_PENDING',
-               "gcAfter" = CURRENT_TIMESTAMP,
+               "gcAfter" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
                "lastErrorCode" = $2,
-               "updatedAt" = CURRENT_TIMESTAMP
+               "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
            WHERE "id" = $1 AND "state" <> 'DELETED'`,
           file.stageId,
           "patient-file-retention-expired",
@@ -486,7 +488,7 @@ async function writeStageAudit(
   await db.$executeRawUnsafe(
     `INSERT INTO "AuditLog"
       ("id", "organizationId", "actorId", "action", "entityType", "entityId", "metadata", "createdAt")
-     VALUES ($1, $2, NULL, $3, 'PatientFileObjectStage', $4, $5::jsonb, CURRENT_TIMESTAMP)`,
+     VALUES ($1, $2, NULL, $3, 'PatientFileObjectStage', $4, $5::jsonb, (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))`,
     randomUUID(),
     stage.organizationId,
     action,
