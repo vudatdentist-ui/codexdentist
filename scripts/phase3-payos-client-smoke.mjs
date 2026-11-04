@@ -19,19 +19,17 @@ try {
     assert(init.headers["x-client-id"] === secrets.clientId, "payOS sends client id header");
     assert(init.headers["x-api-key"] === secrets.apiKey, "payOS sends API key header");
     capturedBody = JSON.parse(String(init.body));
-    return new Response(
-      JSON.stringify({
-        code: "00",
-        desc: "success",
-        data: {
+    const data = {
           orderCode: capturedBody.orderCode,
           amount: capturedBody.amount,
+          currency: "VND",
           paymentLinkId: "plink-phase3",
           checkoutUrl: "https://pay.payos.vn/web/plink-phase3",
           qrCode: "000201phase3",
           status: "PENDING",
-        },
-      }),
+    };
+    return new Response(
+      JSON.stringify({ code: "00", desc: "success", data, signature: signPayOSData(data, secrets.checksumKey) }),
       { status: 200, headers: { "content-type": "application/json" } },
     );
   };

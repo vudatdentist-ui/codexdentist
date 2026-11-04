@@ -91,12 +91,18 @@ export async function createPayOSPaymentLink(
     );
   }
   const data = asRecord(body.data);
+  if (!safeHexEqual(String(body.signature ?? ""), signPayOSData(data, secrets.checksumKey))) {
+    throw new PayOSProviderError("payos-payment-link-signature-invalid", 502, "Invalid payment-link response signature");
+  }
+  if (Number(data.orderCode) !== input.orderCode || Number(data.amount) !== input.amount || data.currency !== "VND") {
+    throw new PayOSProviderError("payos-payment-link-identity-mismatch", 502, "Payment-link response does not match the requested payment");
+  }
   const paymentLinkId = requiredString(data.paymentLinkId, "payos-payment-link-id-missing");
   const checkoutUrl = requiredHttpsOrHttpUrl(data.checkoutUrl, "payos-checkout-url-invalid");
 
   return {
-    orderCode: Number(data.orderCode ?? input.orderCode),
-    amount: Number(data.amount ?? input.amount),
+    orderCode: Number(data.orderCode),
+    amount: Number(data.amount),
     paymentLinkId,
     checkoutUrl,
     qrCode: typeof data.qrCode === "string" ? data.qrCode : null,

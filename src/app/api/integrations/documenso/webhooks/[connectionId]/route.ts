@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
+import { inboxRetryResponse } from "@/app/api/integrations/inbox-response";
+import { reportApplicationError } from "@/lib/error-reporting";
 import { prisma } from "@/lib/prisma";
 import { storePatientUpload } from "@/lib/patient-file-storage";
 import {
@@ -199,9 +201,8 @@ export async function POST(
         },
         { maxAttempts: 5, retryDelayMs: 5_000 },
       );
-      if (result.status === "failed") {
-        return error("documenso-inbox-failed", 503);
-      }
+      const retry = inboxRetryResponse("documenso", result.status);
+      if (retry) return retry;
       return json({
         ok: true,
         duplicate: accepted.duplicate,
@@ -221,9 +222,8 @@ export async function POST(
         async () => ({ status: "already_signed" as const }),
         { maxAttempts: 5, retryDelayMs: 5_000 },
       );
-      if (result.status === "failed") {
-        return error("documenso-inbox-failed", 503);
-      }
+      const retry = inboxRetryResponse("documenso", result.status);
+      if (retry) return retry;
       return json({
         ok: true,
         duplicate: accepted.duplicate,
@@ -270,9 +270,8 @@ export async function POST(
   });
 
   try {
-    let storedUpload: Awaited<ReturnType<typeof storePatientUpload>> | null = null;
-    await prisma.$transaction(async (tx) => {
-      await createPatientFileStage(tx, {
+    // Commit the discovery record before any PHI is written to object storage.
+    await createPatientFileStage(prisma, {
       id: stageId,
       organizationId: connection.organizationId,
       clinicId: scopedClinicId,
@@ -285,23 +284,19 @@ export async function POST(
       storageProvider,
       storageKey: storagePrefix,
     });
-      const stored = await storePatientUpload({
-        file,
-        organizationId: connection.organizationId,
-        patientId: patientForm.patientId,
-        patientFileId,
-      });
-      storedUpload = stored;
-      await markPatientFileStageStored(tx, {
+    const uploaded = await storePatientUpload({
+      file,
+      organizationId: connection.organizationId,
+      patientId: patientForm.patientId,
+      patientFileId,
+    });
+    await markPatientFileStageStored(prisma, {
       stageId,
-      checksumSha256: stored.checksumSha256,
-      storageKey: stored.storageKey,
-      previewStorageKey: stored.preview?.storageKey ?? null,
-      thumbnailStorageKey: stored.thumbnail?.storageKey ?? null,
-      });
-    }, { maxWait: 30_000, timeout: 120_000 });
-    if (!storedUpload) throw coded("documenso-signed-file-storage-missing");
-    const uploaded = storedUpload;
+      checksumSha256: uploaded.checksumSha256,
+      storageKey: uploaded.storageKey,
+      previewStorageKey: uploaded.preview?.storageKey ?? null,
+      thumbnailStorageKey: uploaded.thumbnail?.storageKey ?? null,
+    });
 
     const result = await processIntegrationInbox(
       prisma,
@@ -372,9 +367,8 @@ export async function POST(
         "documenso-duplicate-signed-object",
       );
     }
-    if (result.status === "failed") {
-      return error("documenso-inbox-failed", 503);
-    }
+    const retry = inboxRetryResponse("documenso", result.status);
+    if (retry) return retry;
     return json({
       ok: true,
       duplicate: accepted.duplicate,
@@ -387,12 +381,12 @@ export async function POST(
       storageKey: storagePrefix,
       previewStorageKey: null,
       thumbnailStorageKey: null,
-    }).catch(() => {});
+    }).catch(error => reportApplicationError("documenso.failed_object_cleanup", error));
     await markPatientFileStageGcPending(
       prisma,
       stageId,
       errorCode(cause, "documenso-signed-file-reconcile-failed"),
-    ).catch(() => {});
+    ).catch(error => reportApplicationError("documenso.failed_stage_cleanup", error));
     return error(errorCode(cause, "documenso-processing-failed"), 500);
   }
 }

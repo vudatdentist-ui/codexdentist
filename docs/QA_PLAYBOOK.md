@@ -198,6 +198,13 @@ Verify:
 - no provider adapter imports Prisma/core billing repository implementation directly;
 - billing reconciliation and concurrency suites remain green.
 
+`test:audit` includes real handler regressions for retryable webhook responses and
+durable signed-file staging, plus authenticated payment-link response matching.
+`test:phase3` also races two provider settlements against one invoice in disposable
+PostgreSQL and reconciles invoice allocations, receipt totals and excess credit.
+Never acknowledge an inbox backoff as successful processing. Commit the file stage
+before object I/O so interruption cannot erase its discovery record.
+
 ### Documenso
 
 Verify:

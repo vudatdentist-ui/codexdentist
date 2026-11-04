@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { inboxRetryResponse } from "@/app/api/integrations/inbox-response";
 import { prisma } from "@/lib/prisma";
 import {
   acceptIntegrationInbox,
@@ -173,9 +174,8 @@ export async function POST(
       },
       { maxAttempts: 5, retryDelayMs: 5_000 },
     );
-    if (processed.status === "failed") {
-      return error("payos-inbox-failed", 503);
-    }
+    const retry = inboxRetryResponse("payos", processed.status);
+    if (retry) return retry;
     return json({
       ok: true,
       duplicate: accepted.duplicate,

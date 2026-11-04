@@ -174,6 +174,9 @@ try {
   );
   assert(mismatchInbox[0]?.status === "RETRY", "failed payOS processing remains retryable");
   assert(mismatchInbox[0]?.lastErrorCode === "payos-amount-mismatch", "retry records stable error code");
+  const earlyRedelivery = await postWebhook(connection.id, wrongAmount);
+  assert(earlyRedelivery.status === 503, "redelivery during retry backoff must not acknowledge an unapplied payment");
+  assert(earlyRedelivery.headers.get("retry-after") === "5", "retry response supplies provider backoff");
 
   const expectedCredit = originalCredit + first.amount + second.amount;
   const finalCredit = await prisma.patientCreditBalance.findUnique({

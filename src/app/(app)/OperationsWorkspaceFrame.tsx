@@ -2,7 +2,7 @@ import "server-only";
 import type { ReactNode } from "react";
 import type { AppSession } from "@/lib/session";
 import { accessibleViews, effectiveRoles, roleLabels } from "@/lib/permissions";
-import { OperationsWorkspaceShell } from "@/workspaces/operations/OperationsWorkspaceShell";
+import { OperationsWorkspaceShell } from "./OperationsWorkspaceShell";
 
 export function OperationsWorkspaceFrame({ view, session, children }: {
   view: "imaging" | "lab" | "sterilization";
