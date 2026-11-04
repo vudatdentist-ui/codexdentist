@@ -8,14 +8,14 @@ import { prisma } from "@/lib/prisma";
 import { createExternalReference } from "@/infrastructure/integrations/substrate";
 import {
   findActiveIntegrationConnection,
-  claimExternalReferenceForRetry,
-  getExternalReferenceByInternalId,
+  type ExternalReferenceRecord,
   referenceMetadata,
   updateExternalReferenceMetadataWithRetry,
 } from "@/infrastructure/integrations/phase3-store";
 import { resolveDocumensoConnectionSecrets } from "@/integrations/config";
 import {
   createDocumensoSigningEnvelope,
+  resumeDocumensoSigningEnvelope,
   DocumensoProviderError,
   type DocumensoSigningEnvelope,
 } from "@/integrations/documenso/client";
@@ -24,6 +24,7 @@ import { allowedClinicIds } from "@/lib/patient-access";
 import { canServePatientFile } from "@/lib/resource-policy";
 
 const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9_.:-]{8,120}$/;
+const DISTRIBUTION_LEASE_MS = 120_000;
 
 export async function POST(request: Request) {
   if (!hasSameOrigin(request)) return error("csrf-origin-invalid", 403);
@@ -103,121 +104,130 @@ export async function POST(request: Request) {
   });
   if (!connection) return error("documenso-connection-not-configured", 503);
 
-  // A PatientForm owns exactly one managed Documenso signing ceremony. Caller
-  // idempotency keys are recorded only as request metadata and cannot create a
-  // second envelope for the same form.
-  const existingRequest = await getExternalReferenceByInternalId(prisma, {
-    organizationId: session.organizationId,
-    connectionId: connection.id,
-    provider: "documenso",
-    entityType: "DOCUMENSO_REQUEST",
-    internalId: patientForm.id,
-  });
-  if (existingRequest) {
-    const metadata = referenceMetadata(existingRequest);
-    if (metadata.sourcePatientFileId !== sourceFile.id) {
-      return error("documenso-source-pdf-conflict", 409);
+  // Serialize ownership on the form, not the replaceable provider connection.
+  // Commit the reservation before provider I/O so a callback can recover it.
+  const reserved = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`
+      SELECT id FROM "PatientForm"
+      WHERE id = ${patientForm.id} AND "organizationId" = ${session.organizationId}
+        AND "clinicId" = ${patientForm.clinicId} AND "patientId" = ${patientForm.patientId}
+      FOR UPDATE
+    `;
+    const current = await tx.patientForm.findFirst({
+      where: { id: patientForm.id, organizationId: session.organizationId,
+        clinicId: patientForm.clinicId, patientId: patientForm.patientId },
+      select: { status: true, attachments: true },
+    });
+    if (!current || !["DRAFT", "SENT"].includes(current.status)) {
+      return { error: "documenso-form-not-open" } as const;
     }
-    if (
-      requestedIdempotencyKey &&
-      typeof metadata.idempotencyKey === "string" &&
-      metadata.idempotencyKey !== requestedIdempotencyKey
-    ) {
-      return error("documenso-idempotency-key-conflict", 409);
+    if (!current.attachments.includes(`/patient-files/${sourceFile.id}`)) {
+      return { error: "documenso-source-pdf-not-attached-to-form" } as const;
     }
-    if (typeof metadata.envelopeId === "string") {
-      return json({
-        envelopeId: metadata.envelopeId,
-        signingUrl: typeof metadata.signingUrl === "string" ? metadata.signingUrl : null,
-        status: metadata.status ?? "PENDING",
-        duplicate: true,
-      });
+    const owners = await tx.$queryRaw<ExternalReferenceRecord[]>`
+      SELECT * FROM "ExternalReference"
+      WHERE "organizationId" = ${session.organizationId} AND "provider" = 'documenso'
+        AND "entityType" = 'DOCUMENSO_REQUEST' AND "internalId" = ${patientForm.id}
+      ORDER BY "createdAt", "id"
+    `;
+    const existing = owners[0];
+    if (owners.length > 1 || (existing &&
+        (existing.connectionId !== connection.id || existing.clinicId !== patientForm.clinicId))) {
+      return { error: "documenso-ceremony-ownership-conflict" } as const;
     }
-    if (referenceMetadata(existingRequest).status !== "ERROR") {
-      return error("documenso-signing-request-pending-recovery", 409);
-    }
-  }
-
-  const requestReference = existingRequest ?? await createExternalReference(prisma, {
-    organizationId: session.organizationId,
-    clinicId: patientForm.clinicId,
-    connectionId: connection.id,
-    provider: "documenso",
-    entityType: "DOCUMENSO_REQUEST",
-    internalId: patientForm.id,
-    externalId: randomUUID(),
-    metadata: {
-      patientFormId: patientForm.id,
-      sourcePatientFileId: sourceFile.id,
-      idempotencyKey: requestedIdempotencyKey || null,
-      status: "CREATING",
-    },
-  });
-  if (!existingRequest && !("created" in requestReference && requestReference.created)) {
-    const metadata = referenceMetadata(requestReference);
-    if (typeof metadata.envelopeId === "string") {
-      return json({
-        envelopeId: metadata.envelopeId,
-        signingUrl: typeof metadata.signingUrl === "string" ? metadata.signingUrl : null,
-        status: metadata.status ?? "PENDING",
-        duplicate: true,
-      });
-    }
-    return error("documenso-signing-request-pending-recovery", 409);
-  }
-  if (existingRequest) {
-    const claimed = await claimExternalReferenceForRetry(prisma, requestReference.id);
-    if (!claimed) {
-      const current = await getExternalReferenceByInternalId(prisma, {
-        organizationId: session.organizationId,
-        connectionId: connection.id,
-        provider: "documenso",
-        entityType: "DOCUMENSO_REQUEST",
-        internalId: patientForm.id,
-      });
-      const metadata = referenceMetadata(current);
-      if (current && typeof metadata.envelopeId === "string") {
-        return json({ envelopeId: metadata.envelopeId, signingUrl: typeof metadata.signingUrl === "string" ? metadata.signingUrl : null, status: metadata.status ?? "PENDING", duplicate: true });
+    const metadata = referenceMetadata(existing ?? null);
+    if (existing) {
+      if (metadata.sourcePatientFileId !== sourceFile.id) {
+        return { error: "documenso-source-pdf-conflict" } as const;
       }
-      return error("documenso-signing-request-pending-recovery", 409);
+      if (requestedIdempotencyKey && typeof metadata.idempotencyKey === "string" &&
+          metadata.idempotencyKey !== requestedIdempotencyKey) {
+        return { error: "documenso-idempotency-key-conflict" } as const;
+      }
+      if (typeof metadata.envelopeId === "string" &&
+          (metadata.status === "SIGNED" || metadata.distributionStatus === "SENT" ||
+            (metadata.status === "PENDING" && !metadata.errorCode && metadata.distributionStatus !== "PENDING"))) {
+        return { reference: existing, duplicate: true } as const;
+      }
+      const leaseExpired = typeof metadata.attemptStartedAt === "string" &&
+        Date.parse(metadata.attemptStartedAt) <= Date.now() - DISTRIBUTION_LEASE_MS;
+      if (metadata.status === "CREATING" ||
+          (metadata.status === "DISTRIBUTING" && (!metadata.envelopeId || !leaseExpired))) {
+        return { error: "documenso-signing-request-pending-recovery" } as const;
+      }
+      if (!metadata.envelopeId && metadata.status !== "ERROR") {
+        return { error: "documenso-signing-request-pending-recovery" } as const;
+      }
     }
+    const reference = existing
+      ? await updateExternalReferenceMetadataWithRetry(tx, existing.id, {
+          ...metadata, status: metadata.envelopeId ? "DISTRIBUTING" : "CREATING",
+          attemptStartedAt: new Date().toISOString(),
+        })
+      : await createExternalReference(tx, {
+          organizationId: session.organizationId,
+          clinicId: patientForm.clinicId,
+          connectionId: connection.id,
+          provider: "documenso",
+          entityType: "DOCUMENSO_REQUEST",
+          internalId: patientForm.id,
+          externalId: randomUUID(),
+          metadata: { patientFormId: patientForm.id, sourcePatientFileId: sourceFile.id,
+            idempotencyKey: requestedIdempotencyKey || null, status: "CREATING",
+            attemptStartedAt: new Date().toISOString() },
+        });
+    return { reference, duplicate: false } as const;
+  });
+  if (reserved.error) return error(reserved.error, 409);
+  const requestReference = reserved.reference;
+  const requestMetadata = referenceMetadata(requestReference);
+  if (reserved.duplicate) {
+    return json({ envelopeId: requestMetadata.envelopeId,
+      signingUrl: requestMetadata.signingUrl ?? null, status: requestMetadata.status ?? "PENDING", duplicate: true });
   }
 
   let createdEnvelope: DocumensoSigningEnvelope | null = null;
-  try {
-    const sourceBytes = await readStoredPatientFile(sourceFile);
-    const secrets = resolveDocumensoConnectionSecrets(connection.secretRef);
-    createdEnvelope = await createDocumensoSigningEnvelope(secrets, {
-      externalId: patientForm.id,
-      title: patientForm.template.name || `Form ${patientForm.formNo}`,
-      pdfBytes: sourceBytes,
-      fileName: `form-${patientForm.formNo}.pdf`,
-      recipientEmail: patientForm.patient.email,
-      recipientName: patientForm.patient.fullName,
-      redirectUrl: `${appBaseUrl()}/forms?documenso=returned`,
+  let knownEnvelopeId = typeof requestMetadata.envelopeId === "string" ? requestMetadata.envelopeId : null;
+  const persistEnvelope = async (envelopeId: string) => {
+    knownEnvelopeId = envelopeId;
+    await prisma.$transaction(async (tx) => {
+      await createExternalReference(tx, {
+        organizationId: session.organizationId, clinicId: patientForm.clinicId,
+        connectionId: connection.id, provider: "documenso", entityType: "DOCUMENSO_ENVELOPE",
+        internalId: patientForm.id, externalId: envelopeId,
+        metadata: { patientFormId: patientForm.id, patientId: patientForm.patientId,
+          sourcePatientFileId: sourceFile.id, status: "PENDING" },
+      });
+      await updateExternalReferenceMetadataWithRetry(tx, requestReference.id, {
+        ...requestMetadata, status: "DISTRIBUTING", distributionStatus: "PENDING", envelopeId,
+      });
     });
+  };
+  try {
+    const secrets = resolveDocumensoConnectionSecrets(connection.secretRef);
+    if (knownEnvelopeId) {
+      await persistEnvelope(knownEnvelopeId);
+      createdEnvelope = await resumeDocumensoSigningEnvelope(secrets, knownEnvelopeId);
+    } else {
+      const sourceBytes = await readStoredPatientFile(sourceFile);
+      createdEnvelope = await createDocumensoSigningEnvelope(secrets, {
+        externalId: patientForm.id,
+        title: patientForm.template.name || `Form ${patientForm.formNo}`,
+        pdfBytes: sourceBytes,
+        fileName: `form-${patientForm.formNo}.pdf`,
+        recipientEmail: patientForm.patient.email,
+        recipientName: patientForm.patient.fullName,
+        redirectUrl: `${appBaseUrl()}/forms?documenso=returned`,
+      }, persistEnvelope);
+    }
 
     const envelope = createdEnvelope;
-    await createExternalReference(prisma, {
-      organizationId: session.organizationId,
-      clinicId: patientForm.clinicId,
-      connectionId: connection.id,
-      provider: "documenso",
-      entityType: "DOCUMENSO_ENVELOPE",
-      internalId: patientForm.id,
-      externalId: envelope.envelopeId,
-      metadata: {
-        patientFormId: patientForm.id,
-        patientId: patientForm.patientId,
-        sourcePatientFileId: sourceFile.id,
-        status: "PENDING",
-      },
-    });
     await updateExternalReferenceMetadataWithRetry(prisma, requestReference.id, {
       patientFormId: patientForm.id,
       sourcePatientFileId: sourceFile.id,
-      idempotencyKey: requestedIdempotencyKey || null,
+      idempotencyKey: requestMetadata.idempotencyKey ?? (requestedIdempotencyKey || null),
       status: "PENDING",
+      distributionStatus: "SENT",
       envelopeId: envelope.envelopeId,
       signingUrl: envelope.signingUrl,
     });
@@ -245,13 +255,14 @@ export async function POST(request: Request) {
     const previousMetadata = referenceMetadata(requestReference);
     const providerEnvelopeId =
       createdEnvelope?.envelopeId ??
-      (cause instanceof DocumensoProviderError ? cause.envelopeId : undefined);
+      (cause instanceof DocumensoProviderError ? cause.envelopeId : undefined) ?? knownEnvelopeId;
     await updateExternalReferenceMetadataWithRetry(prisma, requestReference.id, {
       ...previousMetadata,
       patientFormId: patientForm.id,
       sourcePatientFileId: sourceFile.id,
-      idempotencyKey: requestedIdempotencyKey || null,
-      status: providerEnvelopeId ? "PENDING" : "ERROR",
+      idempotencyKey: requestMetadata.idempotencyKey ?? (requestedIdempotencyKey || null),
+      status: createdEnvelope ? "PENDING" : "ERROR",
+      distributionStatus: createdEnvelope ? "SENT" : "PENDING",
       ...(providerEnvelopeId
         ? {
             envelopeId: providerEnvelopeId,

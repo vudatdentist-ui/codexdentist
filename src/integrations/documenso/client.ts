@@ -32,6 +32,7 @@ export type DocumensoWebhookPayload = {
 export async function createDocumensoSigningEnvelope(
   secrets: DocumensoSecrets,
   input: DocumensoSigningRequest,
+  onCreated?: (envelopeId: string) => Promise<void>,
 ): Promise<DocumensoSigningEnvelope> {
   if (!input.pdfBytes.subarray(0, 5).equals(Buffer.from("%PDF-"))) {
     throw new DocumensoProviderError(
@@ -105,32 +106,90 @@ export async function createDocumensoSigningEnvelope(
     "documenso-envelope-id-missing",
   );
 
-  const distributeResponse = await fetch(`${secrets.baseUrl}/envelope/distribute`, {
-    method: "POST",
-    headers: {
-      Authorization: secrets.apiToken,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ envelopeId }),
-    cache: "no-store",
-  });
-  const distributed = await safeJson(distributeResponse);
-  if (!distributeResponse.ok) {
+  try {
+    await onCreated?.(envelopeId);
+  } catch {
     throw new DocumensoProviderError(
-      "documenso-envelope-distribute-failed",
-      distributeResponse.status,
-      String(distributed.message ?? distributed.error ?? distributed.errorCode ?? "documenso-envelope-distribute-failed"),
-      envelopeId,
+      "documenso-envelope-persist-failed", 502,
+      "Unable to persist the created envelope", envelopeId,
     );
   }
-  const recipients = Array.isArray(distributed.recipients)
-    ? distributed.recipients
+  return distributeDocumensoSigningEnvelope(secrets, envelopeId);
+}
+
+export async function resumeDocumensoSigningEnvelope(
+  secrets: DocumensoSecrets,
+  envelopeId: string,
+): Promise<DocumensoSigningEnvelope> {
+  try {
+    const response = await fetch(`${secrets.baseUrl}/envelope/${encodeURIComponent(envelopeId)}`, {
+      headers: { Authorization: secrets.apiToken },
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
+    const envelope = await safeJson(response);
+    if (!response.ok) {
+      throw new DocumensoProviderError("documenso-envelope-fetch-failed", response.status,
+        "Unable to retrieve the existing envelope", envelopeId);
+    }
+    if (envelope.id !== envelopeId) {
+      throw new DocumensoProviderError("documenso-envelope-id-mismatch", 502,
+        "Unexpected envelope returned by provider", envelopeId);
+    }
+    const status = String(envelope.status ?? "").toUpperCase();
+    if (status === "DRAFT") return await distributeDocumensoSigningEnvelope(secrets, envelopeId);
+    if (status !== "PENDING" && status !== "COMPLETED") {
+      throw new DocumensoProviderError("documenso-envelope-not-open", 409,
+        "Existing envelope cannot be distributed", envelopeId);
+    }
+    // A lost distribution response must not send another ceremony/email.
+    return { envelopeId, signingUrl: envelopeSigningUrl(envelope) };
+  } catch (cause) {
+    if (cause instanceof DocumensoProviderError) throw cause;
+    throw new DocumensoProviderError("documenso-envelope-fetch-failed", 502,
+      "Unable to retrieve the existing envelope", envelopeId);
+  }
+}
+
+async function distributeDocumensoSigningEnvelope(
+  secrets: DocumensoSecrets,
+  envelopeId: string,
+): Promise<DocumensoSigningEnvelope> {
+  try {
+    const distributeResponse = await fetch(`${secrets.baseUrl}/envelope/distribute`, {
+      method: "POST",
+      headers: {
+        Authorization: secrets.apiToken,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ envelopeId }),
+      cache: "no-store",
+      signal: AbortSignal.timeout(15_000),
+    });
+    const distributed = await safeJson(distributeResponse);
+    if (!distributeResponse.ok) {
+      throw new DocumensoProviderError(
+        "documenso-envelope-distribute-failed",
+        distributeResponse.status,
+        String(distributed.message ?? distributed.error ?? distributed.errorCode ?? "documenso-envelope-distribute-failed"),
+        envelopeId,
+      );
+    }
+    return { envelopeId, signingUrl: envelopeSigningUrl(distributed) };
+  } catch (cause) {
+    if (cause instanceof DocumensoProviderError) throw cause;
+    throw new DocumensoProviderError("documenso-envelope-distribute-failed", 502,
+      "Unable to distribute the existing envelope", envelopeId);
+  }
+}
+
+function envelopeSigningUrl(envelope: Record<string, unknown>) {
+  const recipients = Array.isArray(envelope.recipients)
+    ? envelope.recipients
     : [];
-  const signingUrl = recipients
+  return recipients
     .map((recipient) => asRecord(recipient).signingUrl)
     .find((value): value is string => typeof value === "string" && value.length > 0) ?? null;
-
-  return { envelopeId, signingUrl };
 }
 
 export function verifyDocumensoWebhook(

@@ -238,6 +238,16 @@ try {
   assert(replayHandlerCalls === 0, "duplicate Documenso event skips domain handler");
 
   const failedForm = await createPatientForm(owner, clinic, patient, template, "rollback");
+  await createExternalReference(prisma, {
+    organizationId: owner.organizationId,
+    clinicId: clinic.id,
+    connectionId: connection.id,
+    provider: "documenso",
+    entityType: "DOCUMENSO_REQUEST",
+    internalId: failedForm.id,
+    externalId: `request-${suffix}-rollback`,
+    metadata: { status: "PENDING", envelopeId: `env-${suffix}-rollback` },
+  });
   const failedStored = await createStoredStage({
     organizationId: owner.organizationId,
     clinicId: clinic.id,

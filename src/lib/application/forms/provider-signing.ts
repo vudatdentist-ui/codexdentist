@@ -3,6 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { enqueueIntegrationOutbox } from "@/infrastructure/integrations/substrate";
 import { markPatientFileStageCommitted } from "@/infrastructure/patient-files/staging";
 import type { StoredPatientUpload } from "@/lib/patient-file-storage";
+import { referenceMetadata, type ExternalReferenceRecord } from "@/infrastructure/integrations/phase3-store";
 
 export async function reconcileSignedPatientFormCommand(
   tx: Prisma.TransactionClient,
@@ -19,6 +20,13 @@ export async function reconcileSignedPatientFormCommand(
     completedAt?: Date | null;
   },
 ) {
+  // Different envelope locks do not serialize writes to the same consent form.
+  await tx.$executeRaw`
+    SELECT id FROM "PatientForm"
+    WHERE id = ${input.patientFormId} AND "organizationId" = ${input.organizationId}
+      AND "clinicId" = ${input.clinicId} AND "patientId" = ${input.patientId}
+    FOR UPDATE
+  `;
   const patientForm = await tx.patientForm.findFirst({
     where: {
       id: input.patientFormId,
@@ -43,9 +51,24 @@ export async function reconcileSignedPatientFormCommand(
     throw new SignedFormReconciliationError("signed-form-void");
   }
 
+  const owners = await tx.$queryRaw<ExternalReferenceRecord[]>`
+    SELECT * FROM "ExternalReference"
+    WHERE "organizationId" = ${input.organizationId} AND "provider" = ${input.provider}
+      AND "entityType" = 'DOCUMENSO_REQUEST' AND "internalId" = ${input.patientFormId}
+    ORDER BY "createdAt", "id"
+  `;
+  const owner = owners[0];
+  if (owners.length !== 1 || owner.clinicId !== input.clinicId ||
+      referenceMetadata(owner).envelopeId !== input.externalEnvelopeId) {
+    throw new SignedFormReconciliationError("signed-form-ceremony-ownership-conflict");
+  }
+
   const fileUrl = `/patient-files/${input.patientFileId}`;
-  if (patientForm.signatureUrl === fileUrl) {
+  if (patientForm.status === "COMPLETED" && patientForm.signatureUrl === fileUrl) {
     return { status: "already_reconciled" as const, patientFileId: input.patientFileId };
+  }
+  if (!["DRAFT", "SENT"].includes(patientForm.status) || patientForm.signatureUrl) {
+    throw new SignedFormReconciliationError("signed-form-already-completed");
   }
 
   await tx.patientFile.create({
@@ -86,8 +109,10 @@ export async function reconcileSignedPatientFormCommand(
   const attachments = Array.from(
     new Set([...patientForm.attachments, fileUrl]),
   );
-  await tx.patientForm.update({
-    where: { id: patientForm.id },
+  const completed = await tx.patientForm.updateMany({
+    where: { id: patientForm.id, organizationId: input.organizationId,
+      clinicId: input.clinicId, patientId: input.patientId,
+      status: { in: ["DRAFT", "SENT"] }, signatureUrl: null },
     data: {
       status: "COMPLETED",
       completedAt: input.completedAt ?? new Date(),
@@ -95,6 +120,9 @@ export async function reconcileSignedPatientFormCommand(
       attachments,
     },
   });
+  if (completed.count !== 1) {
+    throw new SignedFormReconciliationError("signed-form-completion-conflict");
+  }
 
   const comment = await tx.journeyComment.create({
     data: {
