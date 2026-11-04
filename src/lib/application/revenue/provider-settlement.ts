@@ -28,6 +28,17 @@ export async function recordProviderSettlementCommand(
   });
   if (!patient) throw new ProviderSettlementError("provider-settlement-patient-not-found");
 
+  if (input.invoiceNo) {
+    await tx.$executeRaw`
+      SELECT id FROM "Invoice"
+      WHERE "invoiceNo" = ${input.invoiceNo}
+        AND "organizationId" = ${input.organizationId}
+        AND "clinicId" = ${input.clinicId}
+        AND "patientId" = ${input.patientId}
+        AND "status" <> 'VOID'
+      FOR UPDATE
+    `;
+  }
   const invoice = input.invoiceNo
     ? await tx.invoice.findFirst({
         where: {

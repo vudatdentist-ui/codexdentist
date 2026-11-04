@@ -15,7 +15,7 @@ const connectionString =
   "postgresql://postgres:postgres@localhost:5432/vietnam_dental_suite?schema=public";
 const baseUrl = process.env.PHASE3_APP_URL ?? "http://127.0.0.1:3000";
 const checksumKey =
-  process.env.PAYOS_CI_CHECKSUM_KEY ?? "ci-phase3-payos-checksum-secret";
+  process.env.PAYOS_DEFAULT_CHECKSUM_KEY ?? "ci-phase3-payos-checksum-secret";
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString }) });
 const suffix = randomUUID().replaceAll("-", "");
 let connectionId = null;
@@ -50,7 +50,7 @@ try {
     clinicId: clinic.id,
     provider: "payos",
     capabilities: { paymentLinks: true, webhooks: true },
-    secretRef: "env:PAYOS_CI",
+    secretRef: "env:PAYOS_DEFAULT",
     metadata: { mode: "phase3-smoke" },
   });
   connectionId = connection.id;
@@ -83,7 +83,12 @@ try {
     transactionCode: "00",
   });
   const successResponse = await postWebhook(connection.id, successPayload);
-  assert(successResponse.ok, "verified payOS success webhook is accepted");
+  if (!successResponse.ok) {
+    throw new Error(
+      `Phase3 payOS success webhook returned HTTP ${successResponse.status}: ${await successResponse.text()}`,
+    );
+  }
+  assert(true, "verified payOS success webhook is accepted");
   const firstRef = await orderReference(owner.organizationId, connection.id, first.orderCode);
   const firstMetadata = referenceMetadata(firstRef);
   assert(firstMetadata.status === "SETTLED", "payOS success settles order");

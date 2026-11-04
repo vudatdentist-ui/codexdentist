@@ -91,7 +91,7 @@ try {
     clinicId: clinic.id,
     provider: "documenso",
     capabilities: { signing: true, webhooks: true },
-    secretRef: "env:DOCUMENSO_CI",
+    secretRef: "env:DOCUMENSO_DEFAULT",
     metadata: { mode: "phase3-smoke" },
   });
   connectionId = connection.id;

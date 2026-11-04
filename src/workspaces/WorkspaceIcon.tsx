@@ -1,7 +1,7 @@
 import { BookOpen, CalendarDays, UsersRound, Route, Stethoscope, ClipboardList,
   Receipt, WalletCards, HeartHandshake, Package, Pill, FileCheck2, Building2,
   UserRound, GraduationCap, MessagesSquare, SlidersHorizontal, Sun, BarChart3,
-  Smartphone, type LucideIcon } from "lucide-react";
+  Smartphone, ScanLine, FlaskConical, ShieldCheck, type LucideIcon } from "lucide-react";
 import type { ViewKey } from "@/lib/permissions";
 const icons: Record<ViewKey, LucideIcon> = {
   dashboard: Sun, schedule: CalendarDays, patients: BookOpen, journey: Route,
@@ -10,6 +10,7 @@ const icons: Record<ViewKey, LucideIcon> = {
   forms: FileCheck2, staff: UsersRound, services: Building2, "employee-app": UserRound,
   learning: GraduationCap, community: MessagesSquare, settings: SlidersHorizontal,
   reports: BarChart3, "patient-app": Smartphone,
+  imaging: ScanLine, lab: FlaskConical, sterilization: ShieldCheck,
 };
 export function WorkspaceIcon({ view, size = 20 }: { view: ViewKey; size?: number }) {
   const Icon = icons[view];

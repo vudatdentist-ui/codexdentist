@@ -11,7 +11,8 @@ try {
   });
   const body = await response.json().catch(() => null);
 
-  if (!response.ok || !body || body.status === "fail") {
+  const strict = process.env.STRICT_READINESS === "true";
+  if (!response.ok || !body || body.status === "fail" || (strict && body.status !== "ok")) {
     console.error(`${target} -> HTTP ${response.status}: ${JSON.stringify(body)}`);
     process.exitCode = 1;
   } else {

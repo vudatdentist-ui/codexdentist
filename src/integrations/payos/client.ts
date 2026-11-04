@@ -229,6 +229,9 @@ function requiredString(value: unknown, code: string) {
 function requiredHttpsOrHttpUrl(value: unknown, code: string) {
   const normalized = requiredString(value, code);
   const url = new URL(normalized);
+  if (process.env.NODE_ENV === "production" && url.protocol !== "https:") {
+    throw new PayOSProviderError(code, 502, code);
+  }
   if (!["https:", "http:"].includes(url.protocol)) {
     throw new PayOSProviderError(code, 502, code);
   }

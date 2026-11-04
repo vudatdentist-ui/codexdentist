@@ -6,17 +6,22 @@ import { appBaseUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { createExternalReference } from "@/infrastructure/integrations/substrate";
 import {
+  type ExternalReferenceRecord,
   findActiveIntegrationConnection,
+  claimExternalReferenceForRetry,
   getExternalReferenceByInternalId,
   referenceMetadata,
-  updateExternalReferenceMetadata,
+  updateExternalReferenceMetadataWithRetry,
 } from "@/infrastructure/integrations/phase3-store";
 import { resolvePayOSConnectionSecrets } from "@/integrations/config";
-import { createPayOSPaymentLink } from "@/integrations/payos/client";
+import { createPayOSPaymentLink, type PayOSPaymentLink } from "@/integrations/payos/client";
+import { hasSameOrigin } from "@/lib/request-security";
+import { allowedClinicIds } from "@/lib/patient-access";
 
 const IDEMPOTENCY_PATTERN = /^[A-Za-z0-9_.:-]{8,120}$/;
 
 export async function POST(request: Request) {
+  if (!hasSameOrigin(request)) return error("csrf-origin-invalid", 403);
   const session = await getSession();
   if (!session) return error("unauthorized", 401);
   if (!canPerformAction(session, "billing.receipt.record")) return error("forbidden", 403);
@@ -37,7 +42,7 @@ export async function POST(request: Request) {
     where: {
       id: patientId,
       organizationId: session.organizationId,
-      clinicId: { in: session.clinicIds },
+      clinicId: { in: allowedClinicIds(session) },
     },
     select: { id: true, clinicId: true },
   });
@@ -67,6 +72,7 @@ export async function POST(request: Request) {
   if (!connection) return error("payos-connection-not-configured", 503);
 
   const internalId = requestedIdempotencyKey || `payos_${randomUUID()}`;
+  let retryIntent: ExternalReferenceRecord | null = null;
   if (requestedIdempotencyKey) {
     const existing = await getExternalReferenceByInternalId(prisma, {
       organizationId: session.organizationId,
@@ -82,7 +88,7 @@ export async function POST(request: Request) {
         return error("payos-idempotency-key-conflict", 409);
       }
       if (typeof metadata.checkoutUrl === "string") {
-        return NextResponse.json({
+        return json({
           orderCode: Number(existing.externalId),
           paymentLinkId: metadata.paymentLinkId ?? null,
           checkoutUrl: metadata.checkoutUrl,
@@ -91,12 +97,15 @@ export async function POST(request: Request) {
           duplicate: true,
         });
       }
-      return error("payos-payment-link-pending-recovery", 409);
+      if (metadata.status !== "ERROR") {
+        return error("payos-payment-link-pending-recovery", 409);
+      }
+      retryIntent = existing;
     }
   }
 
-  const orderCode = nextOrderCode();
-  const intent = await createExternalReference(prisma, {
+  const orderCode = retryIntent ? Number(retryIntent.externalId) : nextOrderCode();
+  const intent = retryIntent ?? await createExternalReference(prisma, {
     organizationId: session.organizationId,
     clinicId: patient.clinicId,
     connectionId: connection.id,
@@ -113,11 +122,43 @@ export async function POST(request: Request) {
       status: "CREATING",
     },
   });
+  if (!retryIntent && !("created" in intent && intent.created)) {
+    const metadata = referenceMetadata(intent);
+    if (typeof metadata.checkoutUrl === "string") {
+      return json({
+        orderCode: Number(intent.externalId),
+        paymentLinkId: metadata.paymentLinkId ?? null,
+        checkoutUrl: metadata.checkoutUrl,
+        qrCode: metadata.qrCode ?? null,
+        status: metadata.status ?? "PENDING",
+        duplicate: true,
+      });
+    }
+    return error("payos-payment-link-pending-recovery", 409);
+  }
+  if (retryIntent) {
+    const claimed = await claimExternalReferenceForRetry(prisma, intent.id);
+    if (!claimed) {
+      const current = await getExternalReferenceByInternalId(prisma, {
+        organizationId: session.organizationId,
+        connectionId: connection.id,
+        provider: "payos",
+        entityType: "PAYOS_ORDER",
+        internalId,
+      });
+      const metadata = referenceMetadata(current);
+      if (current && typeof metadata.checkoutUrl === "string") {
+        return json({ orderCode: Number(current.externalId), paymentLinkId: metadata.paymentLinkId ?? null, checkoutUrl: metadata.checkoutUrl, qrCode: metadata.qrCode ?? null, status: metadata.status ?? "PENDING", duplicate: true });
+      }
+      return error("payos-payment-link-pending-recovery", 409);
+    }
+  }
 
+  let createdPaymentLink: PayOSPaymentLink | null = null;
   try {
     const secrets = resolvePayOSConnectionSecrets(connection.secretRef);
     const base = appBaseUrl();
-    const paymentLink = await createPayOSPaymentLink(secrets, {
+    createdPaymentLink = await createPayOSPaymentLink(secrets, {
       orderCode,
       amount,
       description: `CDX ${String(orderCode).slice(-12)}`,
@@ -125,7 +166,8 @@ export async function POST(request: Request) {
       returnUrl: `${base}/billing?payos=returned`,
       expiredAt: Math.floor(Date.now() / 1000) + 24 * 60 * 60,
     });
-    await updateExternalReferenceMetadata(prisma, intent.id, {
+    const paymentLink = createdPaymentLink;
+    await updateExternalReferenceMetadataWithRetry(prisma, intent.id, {
       patientId: patient.id,
       clinicId: patient.clinicId,
       amount,
@@ -154,7 +196,7 @@ export async function POST(request: Request) {
         },
       },
     });
-    return NextResponse.json({
+    return json({
       orderCode,
       paymentLinkId: paymentLink.paymentLinkId,
       checkoutUrl: paymentLink.checkoutUrl,
@@ -163,13 +205,23 @@ export async function POST(request: Request) {
       duplicate: false,
     });
   } catch (cause) {
-    await updateExternalReferenceMetadata(prisma, intent.id, {
+    const previousMetadata = referenceMetadata(intent);
+    await updateExternalReferenceMetadataWithRetry(prisma, intent.id, {
+      ...previousMetadata,
       patientId: patient.id,
       clinicId: patient.clinicId,
       amount,
       invoiceNo,
       currency: "VND",
-      status: "ERROR",
+      status: createdPaymentLink ? "PENDING" : "ERROR",
+      ...(createdPaymentLink
+        ? {
+            paymentLinkId: createdPaymentLink.paymentLinkId,
+            checkoutUrl: createdPaymentLink.checkoutUrl,
+            qrCode: createdPaymentLink.qrCode,
+            providerStatus: createdPaymentLink.status,
+          }
+        : {}),
       errorCode: errorCode(cause, "payos-payment-link-create-failed"),
     }).catch(() => {});
     return error(errorCode(cause, "payos-payment-link-create-failed"), 502);
@@ -191,5 +243,12 @@ function errorCode(cause: unknown, fallback: string) {
 }
 
 function error(code: string, status: number) {
-  return NextResponse.json({ error: code }, { status });
+  return json({ error: code }, { status });
+}
+
+function json(body: unknown, init?: ResponseInit) {
+  return NextResponse.json(body, {
+    ...init,
+    headers: { "cache-control": "no-store", ...(init?.headers ?? {}) },
+  });
 }

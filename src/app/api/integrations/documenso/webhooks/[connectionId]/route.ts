@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { storePatientUpload } from "@/lib/patient-file-storage";
 import {
   currentPatientFileStorageProvider,
+  deletePatientFileStageObjects,
   patientFileStageStoragePrefix,
 } from "@/infrastructure/patient-files/object-gc";
 import {
@@ -140,13 +141,14 @@ export async function POST(
   if (!envelopeRef || !envelopeRef.clinicId) {
     return error("documenso-envelope-not-found", 404);
   }
+  const scopedClinicId = envelopeRef.clinicId;
 
   const eventId = documensoWebhookEventId(verified);
   let accepted;
   try {
     accepted = await acceptIntegrationInbox(prisma, {
       organizationId: connection.organizationId,
-      clinicId: envelopeRef.clinicId,
+      clinicId: scopedClinicId,
       connectionId: connection.id,
       provider: "documenso",
       externalEventId: eventId,
@@ -162,7 +164,7 @@ export async function POST(
     accepted.event.id,
   );
   if (accepted.duplicate && existingInbox[0]?.status === "PROCESSED") {
-    return NextResponse.json({
+    return json({
       ok: true,
       duplicate: true,
       inboxStatus: "already_processed",
@@ -197,7 +199,10 @@ export async function POST(
         },
         { maxAttempts: 5, retryDelayMs: 5_000 },
       );
-      return NextResponse.json({
+      if (result.status === "failed") {
+        return error("documenso-inbox-failed", 503);
+      }
+      return json({
         ok: true,
         duplicate: accepted.duplicate,
         inboxStatus: result.status,
@@ -216,7 +221,10 @@ export async function POST(
         async () => ({ status: "already_signed" as const }),
         { maxAttempts: 5, retryDelayMs: 5_000 },
       );
-      return NextResponse.json({
+      if (result.status === "failed") {
+        return error("documenso-inbox-failed", 503);
+      }
+      return json({
         ok: true,
         duplicate: accepted.duplicate,
         inboxStatus: result.status,
@@ -231,7 +239,7 @@ export async function POST(
     where: {
       id: envelopeRef.internalId,
       organizationId: connection.organizationId,
-      clinicId: envelopeRef.clinicId,
+      clinicId: scopedClinicId,
     },
     select: { id: true, patientId: true, formNo: true },
   });
@@ -262,10 +270,12 @@ export async function POST(
   });
 
   try {
-    await createPatientFileStage(prisma, {
+    let storedUpload: Awaited<ReturnType<typeof storePatientUpload>> | null = null;
+    await prisma.$transaction(async (tx) => {
+      await createPatientFileStage(tx, {
       id: stageId,
       organizationId: connection.organizationId,
-      clinicId: envelopeRef.clinicId,
+      clinicId: scopedClinicId,
       patientId: patientForm.patientId,
       uploadedById: null,
       targetPatientFileId: patientFileId,
@@ -275,21 +285,24 @@ export async function POST(
       storageProvider,
       storageKey: storagePrefix,
     });
-    const storedUpload = await storePatientUpload({
-      file,
-      organizationId: connection.organizationId,
-      patientId: patientForm.patientId,
-      patientFileId,
-    });
-    await markPatientFileStageStored(prisma, {
+      const stored = await storePatientUpload({
+        file,
+        organizationId: connection.organizationId,
+        patientId: patientForm.patientId,
+        patientFileId,
+      });
+      storedUpload = stored;
+      await markPatientFileStageStored(tx, {
       stageId,
-      checksumSha256: storedUpload.checksumSha256,
-      storageKey: storedUpload.storageKey,
-      previewStorageKey: storedUpload.preview?.storageKey ?? null,
-      thumbnailStorageKey: storedUpload.thumbnail?.storageKey ?? null,
-    });
+      checksumSha256: stored.checksumSha256,
+      storageKey: stored.storageKey,
+      previewStorageKey: stored.preview?.storageKey ?? null,
+      thumbnailStorageKey: stored.thumbnail?.storageKey ?? null,
+      });
+    }, { maxWait: 30_000, timeout: 120_000 });
+    if (!storedUpload) throw coded("documenso-signed-file-storage-missing");
+    const uploaded = storedUpload;
 
-    const scopedClinicId = envelopeRef.clinicId;
     const result = await processIntegrationInbox(
       prisma,
       accepted.event.id,
@@ -317,7 +330,7 @@ export async function POST(
           patientFormId: patientForm.id,
           stageId,
           patientFileId,
-          storedUpload,
+          storedUpload: uploaded,
           provider: "documenso",
           externalEnvelopeId: envelopeId,
           completedAt: validDate(minimal.completedAt),
@@ -359,13 +372,22 @@ export async function POST(
         "documenso-duplicate-signed-object",
       );
     }
-    return NextResponse.json({
+    if (result.status === "failed") {
+      return error("documenso-inbox-failed", 503);
+    }
+    return json({
       ok: true,
       duplicate: accepted.duplicate,
       inboxStatus: result.status,
       result: result.result,
     });
   } catch (cause) {
+    await deletePatientFileStageObjects({
+      storageProvider,
+      storageKey: storagePrefix,
+      previewStorageKey: null,
+      thumbnailStorageKey: null,
+    }).catch(() => {});
     await markPatientFileStageGcPending(
       prisma,
       stageId,
@@ -398,5 +420,9 @@ function statusCode(cause: unknown, fallback: number) {
 }
 
 function error(code: string, status: number) {
-  return NextResponse.json({ error: code }, { status });
+  return json({ error: code }, { status });
+}
+
+function json(body: unknown, init?: ResponseInit) {
+  return NextResponse.json(body, { ...init, headers: { "cache-control": "no-store", ...(init?.headers ?? {}) } });
 }

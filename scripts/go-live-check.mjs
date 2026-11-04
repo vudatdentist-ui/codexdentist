@@ -1,5 +1,5 @@
-import { existsSync, readFileSync } from "node:fs";
-import { pbkdf2Sync, timingSafeEqual } from "node:crypto";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { createHash, pbkdf2Sync, timingSafeEqual } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
@@ -157,6 +157,35 @@ async function checkDatabase() {
   } catch (error) {
     errors.push(`Database is not reachable: ${error.message}`);
     return;
+  }
+
+  const requiredMigrations = readdirSync("prisma/migrations", { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && /^\d+_/.test(entry.name))
+    .map((entry) => ({
+      name: entry.name,
+      checksum: createHash("sha256")
+        .update(readFileSync(`prisma/migrations/${entry.name}/migration.sql`))
+        .digest("hex"),
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+  const appliedMigrations = await prisma.$queryRaw`SELECT migration_name, checksum FROM "_prisma_migrations" WHERE finished_at IS NOT NULL`;
+  const appliedByName = new Map(appliedMigrations.map((row) => [row.migration_name, row.checksum]));
+  const requiredByName = new Map(requiredMigrations.map((migration) => [migration.name, migration.checksum]));
+  const missingMigrations = requiredMigrations
+    .filter((migration) => !appliedByName.has(migration.name))
+    .map((migration) => migration.name);
+  if (missingMigrations.length > 0) {
+    errors.push(`Database migrations are incomplete (${missingMigrations.length} missing): ${missingMigrations.join(", ")}`);
+  }
+  const unexpectedMigrations = [...appliedByName.keys()].filter((name) => !requiredByName.has(name));
+  if (unexpectedMigrations.length > 0) {
+    errors.push(`Database contains migrations missing from this release: ${unexpectedMigrations.join(", ")}`);
+  }
+  const checksumDrift = requiredMigrations
+    .filter((migration) => appliedByName.get(migration.name) && appliedByName.get(migration.name) !== migration.checksum)
+    .map((migration) => migration.name);
+  if (checksumDrift.length > 0) {
+    errors.push(`Migration checksum drift detected: ${checksumDrift.join(", ")}`);
   }
 
   const [demoPasswordUsers, activeOwners, failedNotifications, pendingNotifications] =
