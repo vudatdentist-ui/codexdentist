@@ -44,6 +44,7 @@ async function capture(route) {
   for (const width of [1440, 390, 320]) {
     await page.setViewportSize({ width, height: width < 600 ? 844 : 1000 });
     await page.evaluate(() => document.fonts.ready);
+    await page.evaluate(() => { window.scrollTo(0, 0); });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2), `${route} overflow at ${width}px`);
     assert.equal(await page.locator('h1').count(), 1, "Shared shell supplies one page title");
     await page.screenshot({ path: `${output}/${route}-${width}.png`, fullPage: true });
@@ -65,7 +66,7 @@ try {
     await card.waitFor();
     const row = await prisma.labCase.findFirstOrThrow({ where: { title: `Browser lab ${suffix}` } });
     assert.equal(row.status, "DRAFT");
-    for (const [status, label] of [["SENT", "Đã gửi labo"], ["IN_PROGRESS", "Đang thực hiện"], ["READY", "Đã hoàn tất"], ["DELIVERED", "Đã nhận"]]) {
+    for (const [status, label] of [["SENT", "Đã gửi labo"], ["IN_PROGRESS", "Đang thực hiện"], ["READY", "Sẵn sàng giao"], ["DELIVERED", "Đã nhận"]]) {
       await card.locator('select[name="status"]').selectOption(status);
       await card.getByRole("button", { name: "Cập nhật ca labo", exact: true }).click();
       await card.getByText(label, { exact: true }).waitFor();

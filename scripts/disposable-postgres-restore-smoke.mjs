@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { unlink } from "node:fs/promises";
+import { mkdtemp, rmdir, unlink } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -14,7 +14,10 @@ if (process.env.NODE_ENV !== "test" || process.env.RESTORE_TARGET_MARKER !== "CO
 if (source.database === target.database || !/(^|[_-])(restore|test|qa|sandbox)([_-]|$)/i.test(target.database)) {
   throw new Error("Restore requires a distinct, explicitly disposable database name.");
 }
-const dumpPath = path.join(os.tmpdir(), `codexdentist-restore-${randomUUID()}.dump`);
+const toolImage = process.env.POSTGRES_TOOL_IMAGE;
+if (toolImage && !/^postgres:\d+(?:-alpine)?$/.test(toolImage)) throw new Error("Use a pinned official PostgreSQL tool image.");
+const toolDirectory = await mkdtemp(path.join(os.tmpdir(), "codexdentist-restore-"));
+const dumpPath = path.join(toolDirectory, `database-${randomUUID()}.dump`);
 let created = false;
 try {
   const before = counts(source);
@@ -29,6 +32,7 @@ try {
 } finally {
   await unlink(dumpPath).catch((error) => { if (error.code !== "ENOENT") throw error; });
   if (created) run("dropdb", ["--if-exists", target.database], { ...target, database: "postgres" });
+  await rmdir(toolDirectory);
 }
 
 function connection(value) {
@@ -46,7 +50,11 @@ function connection(value) {
 }
 
 function run(command, args, config) {
-  const result = spawnSync(command, args, {
+  const invocation = toolImage ? ["docker", ["run", "--rm", "--network", "host",
+    "--mount", `type=bind,source=${toolDirectory},target=/restore`,
+    ...Object.keys(config.env).flatMap(key => ["--env", key]), "--env", "PGDATABASE", "--env", "PGCONNECT_TIMEOUT",
+    toolImage, command, ...args.map(value => value === dumpPath ? `/restore/${path.basename(dumpPath)}` : value)]] : [command, args];
+  const result = spawnSync(invocation[0], invocation[1], {
     encoding: "utf8", windowsHide: true,
     env: { ...process.env, ...config.env, PGDATABASE: config.database, PGCONNECT_TIMEOUT: "5" },
   });

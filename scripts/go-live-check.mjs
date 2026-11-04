@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { createHash, pbkdf2Sync, timingSafeEqual } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
+import { notificationConfigurationErrors } from "./lib/notification-readiness.mjs";
 
 loadDotEnv();
 
@@ -21,7 +22,6 @@ const requiredR2Env = [
   "R2_ACCESS_KEY_ID",
   "R2_SECRET_ACCESS_KEY",
 ];
-const notificationChannels = ["EMAIL", "SMS", "ZALO"];
 const errors = [];
 const warnings = [];
 const connectionString = env("DATABASE_URL") || developmentDatabaseUrl;
@@ -103,24 +103,7 @@ function checkEnvironment() {
     errors.push("R2_ENDPOINT must be HTTPS.");
   }
 
-  if (env("NOTIFICATION_DELIVERY_MODE") !== "webhook") {
-    errors.push("Set NOTIFICATION_DELIVERY_MODE=webhook.");
-  }
-
-  const fallbackWebhook = env("NOTIFICATION_WEBHOOK_URL");
-  const fallbackSecret = env("NOTIFICATION_WEBHOOK_SECRET");
-  for (const channel of notificationChannels) {
-    const channelUrl = env(`NOTIFICATION_${channel}_WEBHOOK_URL`) || fallbackWebhook;
-    const channelSecret = env(`NOTIFICATION_${channel}_WEBHOOK_SECRET`) || fallbackSecret;
-
-    if (!channelUrl || !isHttps(channelUrl)) {
-      errors.push(`Set HTTPS notification webhook URL for ${channel}.`);
-    }
-
-    if (!channelSecret || channelSecret.length < 24) {
-      errors.push(`Set notification webhook secret for ${channel}.`);
-    }
-  }
+  errors.push(...notificationConfigurationErrors(process.env));
 }
 
 function checkSecretHygiene() {

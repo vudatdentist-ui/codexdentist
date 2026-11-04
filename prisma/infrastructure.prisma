@@ -67,6 +67,24 @@ model IntegrationOutbox {
   updatedAt     DateTime @default(now())
 }
 
+model PatientFilePurgeManifest {
+  id                  String   @id
+  organizationId      String
+  storageProvider     String
+  storageKey          String
+  previewStorageKey   String?
+  thumbnailStorageKey String?
+  state               String   @default("PENDING")
+  availableAt         DateTime @default(now())
+  lastErrorCode       String?
+  deletedAt           DateTime?
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @default(now())
+
+  @@index([state, availableAt])
+  @@index([organizationId])
+}
+
 model PatientFileObjectStage {
   id                     String   @id
   organizationId         String
