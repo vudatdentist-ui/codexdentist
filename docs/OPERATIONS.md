@@ -313,6 +313,13 @@ tenant/clinic constraints. Review the exact migration range and run a production
 backup through isolated restore/migrate before cutover. The unattended Hostinger
 CREATE-only policy must continue to reject this constraint batch until reviewed;
 do not delete a deployment marker or change migration checksums to force a retry.
+For an explicitly reviewed manual batch, pass `--reviewed-migrations <path>` to
+the installed deployer. The root-owned, non-writable-to-others JSON records
+`sha`, `previous`, and `migrations` (each changed migration path mapped to its
+SHA-256). It must match the entire exact release range and SQL bytes; modified
+existing migrations remain forbidden. The timer does not pass this option.
+All CI eligibility, backup/isolated restore, candidate and rollback checks still
+apply. Review and install deployer changes explicitly outside the release checkout.
 Optional payOS, Documenso and Orthanc/OHIF stay disabled without real configuration.
 Private OHIF/PACS access must enforce study authorization independently of knowing
 a viewer URL; desktop/mobile integration evidence must be collected before enabling it.
