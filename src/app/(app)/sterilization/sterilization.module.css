@@ -1,0 +1,15 @@
+.page { min-height: 100vh; padding: clamp(24px, 5vw, 64px); background: #f3faf7; color: #1e312b; }
+.header { max-width: 1120px; margin: 0 auto 28px; display: flex; justify-content: space-between; gap: 24px; }
+.eyebrow { margin: 0 0 8px; color: #267a62; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.header h1 { margin: 0; font-size: clamp(28px, 4vw, 48px); letter-spacing: -.04em; }
+.lede { max-width: 680px; color: #58766b; line-height: 1.6; }
+.backLink { color: #267a62; font-weight: 700; text-decoration: none; }
+.grid { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.card, .empty { border: 1px solid #d8ebe3; border-radius: 18px; background: #fff; box-shadow: 0 12px 30px rgba(35, 95, 75, .06); }
+.card { padding: 20px; }
+.empty { max-width: 1120px; margin: 0 auto; padding: 32px; }
+.topline { display: flex; justify-content: space-between; gap: 12px; color: #267a62; font-size: 12px; }
+.card h2 { margin: 20px 0 8px; font-size: 20px; }
+.meta, .date { color: #58766b; }
+.instruments { line-height: 1.6; overflow-wrap: anywhere; }
+@media (max-width: 560px) { .page { padding: 20px 14px; } .header { display: block; } }

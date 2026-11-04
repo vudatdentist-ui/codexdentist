@@ -10,6 +10,7 @@ model IntegrationConnection {
   lastVerifiedAt DateTime?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @default(now())
+  imagingStudies ImagingStudy[]
 }
 
 model ExternalReference {
