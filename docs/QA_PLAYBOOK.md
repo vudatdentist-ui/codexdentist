@@ -231,6 +231,14 @@ Verify:
 
 ## 10. Phase 5 Gate — Native Dental Operations
 
+`operations-workspace-qa.mjs` runs under `browser:qa` on a disposable loopback
+app/database. It creates a lab case through delivery, creates an instrument and
+cycle through release, checks tenant/clinic membership and audit counts, and
+captures 1440/390/320px states. Global operators explicitly choose an authorized
+clinic for sterilization; server commands validate that scope independently.
+Lifecycle tests also exercise a non-UTC PostgreSQL session: naive timestamps
+and leases use UTC expressions without changing historical migration checksums.
+
 For Lab/Sterilization or other native dental capabilities:
 
 - use canonical Organization/Clinic/Patient/Staff references rather than creating parallel identities;

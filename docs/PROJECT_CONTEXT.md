@@ -231,8 +231,15 @@ Delivery proceeds on one integration branch in dependency order:
 | Phase 6 | Integrate optional standards adapters with the existing notification boundary. | Disabled providers preserve core workflows; mapping, authorization, PHI minimization and tenant tests pass. |
 | Phase 7 | Release the integrated product with current Hostinger operations. | Full regression/build/container gates, clean install/upgrade, backup plus isolated restore, candidate checks, deployed revision and public health verification. |
 
-Current executable milestone: Phase 3 integration, followed immediately by
-Phases 4–6 and release hardening. Preserve all November shared-login and patient
+Current evidence: the integrated implementation is in PR #68. Native PostgreSQL
+clean install applies all 57 migrations; provider signatures/retries/consent,
+concurrent invoice settlements, tenant isolation, file lifecycle/purge and restore
+tests pass locally. Lab and sterilization operator workflows pass real-browser
+create/transition/reload/audit checks at 1440/390/320px; unconfigured imaging fails
+safely without losing input. Final CI and production upgrade gates remain open.
+Current executable milestone: finish Phase 7 integrated CI and reviewed upgrade.
+Live payOS/Documenso/PACS acceptance remains pending operator-owned credentials.
+Preserve all November shared-login and patient
 audit fixes and October security/maintainability gates. Reuse completed work;
 do not rebuild equivalent modules or revive Namecheap deployment. Optional
 providers remain disabled until explicitly configured; sandbox verification and
