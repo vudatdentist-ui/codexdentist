@@ -64,11 +64,12 @@ test("readiness refuses missing, unexpected and checksum-drifted migration histo
       "node:fs": { readdirSync: () => [{ name: "20260101_fixture", isDirectory: () => true }],
         readFileSync: () => Buffer.from("CREATE TABLE fixture(id TEXT);") },
       "@/lib/job-auth": { verifyJobRequest: () => true },
+      "@/lib/error-reporting": { reportApplicationError: (_area, cause) => { throw cause; } },
       "@/lib/env": { patientFileStorageDriver: () => "local", notificationDeliveryMode: () => "disabled",
         resendEmailConfig: () => null, codexMedAiConfig: () => ({ enabled: false }) },
       "@/lib/prisma": { prisma: { $queryRaw: async parts => parts.join("").includes("_prisma_migrations")
         ? applied.map(row => ({ ...row, migration_name: row.migration_name === "migration" ? "20260101_fixture" : row.migration_name })) : [] } },
-    });
+    }, { process: { env: {}, cwd: () => process.cwd() } });
     const response = await GET(new Request("http://localhost/api/readiness"));
     assert.equal(response.status, applied[0]?.checksum === checksum && applied[0]?.migration_name === "migration" ? 200 : 503);
   }
