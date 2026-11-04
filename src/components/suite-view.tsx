@@ -20,7 +20,7 @@ export function DentalSuiteView(model: Pick<DentalSuiteModel, "language" | "t" |
         }} onLanguageChange={setLanguage} organizationName={session.organizationName} roleLabel={t.roles[session.role]} signOutLabel={t.signOut} title={titleFor(activeView, language)} userName={session.fullName}>
           {hasTopbarControls && (<div className="topbar-controls">
             {usesJourneyControls ? (<>
-                <button className="secondary-button journey-patient-menu-trigger" type="button" onClick={() => setJourneyPatientMenuOpen(true)}>
+                <button className="secondary-button journey-patient-menu-trigger" type="button" aria-haspopup="dialog" aria-expanded={journeyPatientMenuOpen} onClick={() => setJourneyPatientMenuOpen(true)}>
                   <PanelRightOpen size={16} aria-hidden="true"/>
                   {journeyTopbarText[language].patientMenu}
                 </button>
@@ -60,6 +60,7 @@ export function DentalSuiteView(model: Pick<DentalSuiteModel, "language" | "t" |
                 }} matches={patientLookupSearchMatches} selectedPatient={selectedSharedPatient} placeholder={t.patientSearchPlaceholder} selectLabel={t.selectPatient} noResultsLabel={language === "vi" ? "Không có bệnh nhân phù hợp" : "No matching patients"} onSelect={(patient) => {
                     setPatientFilterId(patient.id);
                     setPatientLookupSearch("");
+                    if (activeView === "patients") openPatientRoute("patients", patient.id);
                 }}/>
                 {(patientLookupSearch || patientFilterId !== "all") && (<button className="chart-clear-search topbar-clear-search" type="button" onClick={() => {
                         setPatientLookupSearch("");

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useAppLanguage, type Language } from "@/components/AppLanguage";
 import { type ViewKey } from "@/lib/permissions";
 import { StatusPill as BaseStatusPill } from "@/components/suite-primitives";
+import { readBrowserStorage, writeBrowserStorage, removeBrowserStorage } from "@/shared/browser/storage";
 export const Dashboard = dynamic(() => import("@/modules/dashboard/Dashboard").then((module) => module.Dashboard));
 export const ScheduleBoard = dynamic(() => import("@/modules/schedule/ScheduleBoard").then((module) => module.ScheduleBoard));
 export const PatientsPanel = dynamic(() => import("@/modules/patients/PatientsPanel").then((module) => module.PatientsPanel));
@@ -41,7 +42,7 @@ export function initialLanguage(): Language {
 }
 export function saveActionScrollState(pathname: string) {
     const workspace = document.querySelector<HTMLElement>(".workspace");
-    window.sessionStorage.setItem(actionScrollStorageKey, JSON.stringify({
+    writeBrowserStorage("session", actionScrollStorageKey, JSON.stringify({
         pathname,
         time: Date.now(),
         windowX: window.scrollX,
@@ -50,7 +51,7 @@ export function saveActionScrollState(pathname: string) {
     }));
 }
 export function restoreActionScrollState(pathname: string) {
-    const raw = window.sessionStorage.getItem(actionScrollStorageKey);
+    const raw = readBrowserStorage("session", actionScrollStorageKey);
     if (!raw) {
         return;
     }
@@ -74,7 +75,7 @@ export function restoreActionScrollState(pathname: string) {
         }
     }
     catch {
-        window.sessionStorage.removeItem(actionScrollStorageKey);
+        removeBrowserStorage("session", actionScrollStorageKey);
     }
 }
 export function shouldKeepActionNotice(notice: string) {

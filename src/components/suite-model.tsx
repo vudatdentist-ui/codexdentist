@@ -1,6 +1,7 @@
 "use client";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { readBrowserStorage, writeBrowserStorage } from "@/shared/browser/storage";
 import { type Language } from "@/components/AppLanguage";
 import { accessibleViews, type ViewKey } from "@/lib/permissions";
 import type { PatientWorkspace } from "@/lib/patient-types";
@@ -117,22 +118,22 @@ export function useDentalSuiteModel({ activeView, staffDirectory = [], accountin
         });
     }, [pathname, routeSearchParams, routeSearchParamString, router]);
     useEffect(() => {
-        const storedLanguage = window.localStorage.getItem(languageStorageKey) === "en" ? "en" : "vi";
+        const storedLanguage = readBrowserStorage("local", languageStorageKey) === "en" ? "en" : "vi";
         setLanguage(storedLanguage);
-        setChainScopeId(window.localStorage.getItem(chainScopeStorageKey) || "all");
+        setChainScopeId(readBrowserStorage("local", chainScopeStorageKey) || "all");
         setLanguageLoaded(true);
     }, []);
     useEffect(() => {
         if (!languageLoaded) {
             return;
         }
-        window.localStorage.setItem(languageStorageKey, language);
+        writeBrowserStorage("local", languageStorageKey, language);
     }, [language, languageLoaded]);
     useEffect(() => {
         if (!languageLoaded) {
             return;
         }
-        window.localStorage.setItem(chainScopeStorageKey, chainScopeId);
+        writeBrowserStorage("local", chainScopeStorageKey, chainScopeId);
     }, [chainScopeId, languageLoaded]);
     useEffect(() => {
         if (showModuleAiResult) {
