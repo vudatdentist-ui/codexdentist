@@ -4,7 +4,7 @@ import { dirname } from 'node:path';
 
 // The server-rendered form can be replaced during hydration. Fill only after
 // the initial document, scripts and fonts have settled, and verify both fields.
-export async function loginForBrowserAudit(page, { baseUrl, email, password, evidencePath }) {
+export async function loginForBrowserAudit(page, { baseUrl, email, password, evidencePath, navigationTimeout = 15000 }) {
   try {
     const response = await page.goto(`${baseUrl}/login`, { waitUntil: 'networkidle' });
     assert.equal(response?.status(), 200, 'The login page must load successfully');
@@ -19,7 +19,7 @@ export async function loginForBrowserAudit(page, { baseUrl, email, password, evi
     assert.equal(await emailInput.inputValue(), email, 'Email must survive hydration');
     assert.ok(await passwordInput.inputValue() === password, 'Password must survive hydration');
     await Promise.all([
-      page.waitForURL(url => !url.pathname.endsWith('/login'), { timeout: 15000 }),
+      page.waitForURL(url => !url.pathname.endsWith('/login'), { timeout: navigationTimeout }),
       form.locator('button[type=submit]').click(),
     ]);
     await page.waitForLoadState('networkidle');
