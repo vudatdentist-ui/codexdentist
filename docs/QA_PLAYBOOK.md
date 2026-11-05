@@ -1,6 +1,6 @@
 # Codexdentist QA Playbook
 
-Last updated: 2026-11-04
+Last updated: 2026-11-05
 Status: ACTIVE
 
 This playbook implements the closed-loop quality process defined in `docs/PROJECT_CONTEXT.md`:
@@ -21,6 +21,13 @@ functions, races provider/chair bookings and batch/immediate notification worker
 and verifies credential emails cannot be sent from redacted persisted bodies.
 The database tests create and clean up only their own randomly identified workspace.
 CI runs both suites; a mock-only race test is insufficient for these database boundaries.
+
+Run `NODE_ENV=test npm run test:seed-ledger-db` on disposable loopback PostgreSQL
+after seed changes. Synthetic paid invoices must have matching payments, receipt
+totals and allocations; repeat seed bookkeeping must be idempotent and refuse
+non-fixture payment history. `prisma/seed.js` refuses production, missing explicit
+database configuration and remote database hosts. Never run it to repair live
+opening balances: historical fixtures require a separate provenance review.
 
 After demo lifecycle or organization-purge changes, run `NODE_ENV=test npm run
 test:demo-cleanup-db` against disposable loopback PostgreSQL. It creates an expired

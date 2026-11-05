@@ -70,6 +70,7 @@ async function assertInvoiceBalances() {
       invoiceNo: true,
       amount: true,
       paidAmount: true,
+      payments: { select: { amount: true } },
     },
     take: 1000,
   });
@@ -82,6 +83,10 @@ async function assertInvoiceBalances() {
       `Invoice ${badInvoice.invoiceNo} has paidAmount ${badInvoice.paidAmount} > amount ${badInvoice.amount}.`,
     );
   }
+  const unmatched = invoices.find(invoice =>
+    Math.abs(Number(invoice.paidAmount) - sum(invoice.payments.map(payment => Number(payment.amount)))) > 0.01,
+  );
+  if (unmatched) throw new Error("Invoice paid amount does not match its payment ledger.");
 }
 
 async function assertNoOrphanReceiptAllocations() {

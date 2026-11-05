@@ -1,6 +1,12 @@
 const { PrismaPg } = require("@prisma/adapter-pg");
 const { PrismaClient } = require("@prisma/client");
 const { pbkdf2Sync, randomBytes } = require("crypto");
+const { seedInvoiceLedger } = require("./seed-invoice-ledger.cjs");
+
+if (process.env.NODE_ENV === "production" || !process.env.DATABASE_URL ||
+    !["localhost", "127.0.0.1", "[::1]"].includes(new URL(process.env.DATABASE_URL).hostname)) {
+  throw new Error("Synthetic seed requires an explicit loopback development/test database.");
+}
 
 const connectionString =
   process.env.DATABASE_URL ??
@@ -647,6 +653,7 @@ async function main() {
 
   const seededInvoices = await prisma.invoice.findMany({
     where: {
+      organizationId,
       invoiceNo: {
         in: ["INV-2304", "INV-2297", "INV-2288", "INV-2275"],
       },
@@ -666,6 +673,7 @@ async function main() {
   });
 
   for (const invoice of seededInvoices) {
+    await seedInvoiceLedger(prisma, invoice);
     if (invoice.items.length > 0) {
       continue;
     }

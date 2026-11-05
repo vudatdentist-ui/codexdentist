@@ -1,6 +1,6 @@
 # Codexdentist Canonical Product Context
 
-Last updated: 2026-11-04
+Last updated: 2026-11-05
 Status: ACTIVE / CANONICAL
 
 > This file replaces every previous product direction, refactor queue, migration-route plan, and architecture context. Git history is an archive, not an active instruction source. Do not revive an older plan merely because it appears in a previous commit, chat, issue, or deleted document.
@@ -214,13 +214,14 @@ If a test exposes an existing baseline defect unrelated to the change, document 
 
 ## 10. Phased Plan And Exit Criteria
 
-### Current delivery plan — 2026-11-04
+### Current delivery plan — 2026-11-05
 
-The release baseline is `969259a` on `main`, deployed and verified on Hostinger.
-Phases 0–2 are in that baseline. Phase 3 has implementation and historical CI in
-draft PR #34; Phase 4–6 implementation and additional hardening are in draft PR
-#41. Those branches are not released product state. Their older dependency,
-authentication, UI-composition and hosting changes must be reconciled with main.
+The deployed baseline is `969259a`, verified on Hostinger. Phases 0–2 are in
+that baseline. PR #68 integrated and re-audited the useful Phase 3–7 work from
+historical draft PRs #34/#41 on current main, preserving current dependencies,
+shared-host login, UI architecture and VPS deployment. It merged as `7263438`;
+PR #70 preserves local in-app notifications and merged as `97320d3`. Neither
+revision is yet the production release.
 
 Delivery proceeds on one integration branch in dependency order:
 
@@ -231,13 +232,19 @@ Delivery proceeds on one integration branch in dependency order:
 | Phase 6 | Integrate optional standards adapters with the existing notification boundary. | Disabled providers preserve core workflows; mapping, authorization, PHI minimization and tenant tests pass. |
 | Phase 7 | Release the integrated product with current Hostinger operations. | Full regression/build/container gates, clean install/upgrade, backup plus isolated restore, candidate checks, deployed revision and public health verification. |
 
-Current evidence: the integrated implementation is in PR #68. Native PostgreSQL
+Current evidence: the integrated implementation is merged through PR #68. Native PostgreSQL
 clean install applies all 57 migrations; provider signatures/retries/consent,
 concurrent invoice settlements, tenant isolation, file lifecycle/purge and restore
 tests pass locally. Lab and sterilization operator workflows pass real-browser
 create/transition/reload/audit checks at 1440/390/320px; unconfigured imaging fails
-safely without losing input. Final CI and production upgrade gates remain open.
-Current executable milestone: finish Phase 7 integrated CI and reviewed upgrade.
+safely without losing input. Exact-head PR CI and the integrated main push CI
+passed. The six new migrations also applied successfully to an isolated restore
+of a fresh production backup on the VPS. Phase 7 remains open pending financial
+audit fixes, their final CI, and verified production cutover.
+Current executable milestone: reconcile refund/void/adjustment and commission
+invariants, then deploy the exact verified main revision with the reviewed
+migration manifest. Never release the known financial defects merely because
+the broader regression suite passed.
 Recovered migration history: `20260516090000_source_commission` has
 ledger checksum `578975509b6eede77797d42ece4d3f93ee5635c8b218abb4894b7191537efae7`
 but release SQL checksum `d31229374b52e7a29228b90fe34afbb9d664a9acdee31c530a3a3288f068ba9b`.
@@ -247,6 +254,13 @@ and go-live use the archived original bytes to verify this one historical varian
 any SQL edit, unrelated name or unknown checksum still fails. The production ledger
 and historical migration files remain unchanged. See issue #69.
 Live payOS/Documenso/PACS acceptance remains pending operator-owned credentials.
+The production read-only ledger audit found no receipt conservation/allocation
+or void-allocation mismatch. Two invoice/payment mismatches match the exact
+historical seed fixtures: paid headers were created without payments or receipts.
+New synthetic seeds create balanced, repeat-safe collection records and refuse
+production/remote targets. Do not run seed or invent cash transactions to repair
+those legacy live records; their historical opening balances need a separately
+reviewed correction before treating that fixture workspace as reconciled.
 Preserve all November shared-login and patient
 audit fixes and October security/maintainability gates. Reuse completed work;
 do not rebuild equivalent modules or revive Namecheap deployment. Optional

@@ -80,6 +80,7 @@
     "test:maintainability": "node --test scripts/maintainability-regression.test.cjs && node scripts/maintainability-check.mjs",
     "test:maintainability-db": "node scripts/maintainability-database.cjs",
     "test:demo-cleanup-db": "node scripts/demo-cleanup-database.cjs",
+    "test:seed-ledger-db": "node scripts/seed-ledger-database.cjs",
     "test:organization-purge": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/organization-purge-smoke.mjs",
     "test:phase4": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/phase4-orthanc-smoke.mjs",
     "test:phase4:scope": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/phase4-imaging-scope-smoke.mjs",
