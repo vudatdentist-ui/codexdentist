@@ -6,13 +6,15 @@ type RefundPayment = { id: string; invoiceId: string; amount: unknown };
 type RefundAudit = { entityId: string | null; metadata: unknown };
 
 export function moneyCents(value: unknown) {
-  const number = Number(value);
-  const cents = Math.round(number * 100);
-  if (!Number.isFinite(number) || !Number.isSafeInteger(cents) ||
-      Math.abs(number * 100 - cents) > 0.00001) {
+  const match = value !== null && !Array.isArray(value)
+    ? String(value).match(/^(-?)(\d+)(?:\.(\d+))?$/) : null;
+  const fraction = match?.[3] ?? "";
+  if (!match || /[1-9]/.test(fraction.slice(2))) {
     throw new ApplicationCommandError("billing-money-invalid");
   }
-  return cents;
+  const magnitude = BigInt(match[2]!) * BigInt(100) + BigInt(fraction.slice(0, 2).padEnd(2, "0"));
+  if (magnitude > BigInt(Number.MAX_SAFE_INTEGER)) throw new ApplicationCommandError("billing-money-invalid");
+  return Number(match[1] ? -magnitude : magnitude);
 }
 
 /** Fixed commission remains earned while some eligible collection is retained. */

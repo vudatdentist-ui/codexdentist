@@ -416,7 +416,8 @@ export async function voidInvoiceCommand(session: AppSession, invoiceNo: string)
           invoiceVoidLedgerVersion: 1,
           voidReversalPaymentId,
           directReceiptReleases: [...new Set(directAllocations.map(row => row.receiptId))].map(receiptId => ({
-            receiptId, amount: sumMoney(directAllocations.filter(row => row.receiptId === receiptId)),
+            receiptId, amount: directAllocations.filter(row => row.receiptId === receiptId)
+              .reduce((sum, row) => sum + moneyCents(row.amount), 0) / 100,
           })),
         } as Prisma.InputJsonValue,
       },

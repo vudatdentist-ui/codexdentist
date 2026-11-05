@@ -338,6 +338,13 @@ async function main() {
     assert.equal(Number(payment.amount), -100000);
   }
   {
+    const f = await fixture({ amount: 1234567890.12 });
+    await revenue.recordInvoicePaymentCommand(session, { invoiceNo: f.invoice.invoiceNo, amount: 1234567890.12, method: "cash" });
+    await refund(f, 0.12);
+    assert.equal((await snapshot(f)).invoice.paidAmount.toString(), "1234567890");
+    console.log("ok large two-decimal collection and refund preserve exact cents");
+  }
+  {
     const f = await fixture({ source: `TIMESTAMP-${serial}` }); await policy(f.patient.leadSource);
     await settle(f); await generate();
     const row = await prisma.sourceCommissionAccrual.findFirstOrThrow({ where: { patientId: f.patient.id } });

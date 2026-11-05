@@ -4,6 +4,18 @@ const { load } = require("./audit-source-loader.cjs");
 const ledger = load("src/lib/application/revenue/refund-ledger.ts");
 const voidLedger = load("src/lib/application/revenue/void-ledger.ts");
 
+test("decimal money conversion preserves large valid amounts without binary rounding rejection", () => {
+  const { Prisma } = require("@prisma/client");
+  for (const input of [1234567890.12, "1234567890.12", new Prisma.Decimal("1234567890.12")]) {
+    assert.equal(ledger.moneyCents(input), 123456789012);
+  }
+  assert.equal(ledger.moneyCents("-0.29"), -29);
+  assert.equal(ledger.moneyCents("1.2300"), 123);
+  for (const input of [null, [], {}, NaN, Infinity, "1.001", "90071992547410"]) {
+    assert.throws(() => ledger.moneyCents(input), error => error.code === "billing-money-invalid");
+  }
+});
+
 test("retained commission basis requires receipt-specific reversal evidence, not timestamps", () => {
   const payment = { id: "V", invoiceId: "I", amount: -100, method: "void_reversal" };
   const audit = { entityId: "I", createdAt: new Date(), metadata: {
