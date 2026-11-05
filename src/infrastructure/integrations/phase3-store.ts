@@ -164,6 +164,9 @@ export async function updateExternalReferenceMetadata(
        WHEN "metadata"->>'status' IN ('SETTLED', 'SIGNED')
         AND COALESCE(($2::jsonb)->>'status', '') NOT IN ('SETTLED', 'SIGNED')
        THEN "metadata"
+       WHEN "provider"='payos' AND "entityType"='PAYOS_ORDER' AND "metadata"->>'status'='CANCELLED'
+        AND COALESCE(($2::jsonb)->>'status', '') <> 'SETTLED'
+       THEN "metadata"
        ELSE $2::jsonb
      END,
          "updatedAt" = CURRENT_TIMESTAMP

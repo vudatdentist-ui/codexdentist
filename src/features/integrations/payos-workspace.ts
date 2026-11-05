@@ -10,6 +10,7 @@ export type PayOSOrderSummary = {
   id: string; orderCode: number; amount: number; invoiceNo: string | null;
   status: string; checkoutUrl: string | null; qrCode: string | null;
   createdAt: string; updatedAt: string; receiptNo: string | null;
+  providerStatus?: string | null; providerAmountPaid?: number | null; providerCheckedAt?: string | null;
 };
 export type PayOSInvoiceWorkspace = {
   configured: boolean; verified: boolean; connectionId: string | null; orders: PayOSOrderSummary[];

@@ -1,6 +1,6 @@
 // Full app QA uses a loopback development server and a synthetic merchant.
 // Production's HTTPS provider requirement remains in force, without TLS overrides.
-import { spawn } from 'node:child_process';
+import { spawn, execFileSync } from 'node:child_process';
 import { mkdirSync, openSync, closeSync } from 'node:fs';
 import { setTimeout as delay } from 'node:timers/promises';
 
@@ -28,6 +28,7 @@ async function ready(url, child) {
   throw new Error(`QA process did not become ready: ${url}`);
 }
 try {
+  execFileSync(process.execPath, ['scripts/fetch-font-assets.mjs'], { env, stdio: 'inherit', windowsHide: true });
   // Refuse to reuse an unrelated server on either test port.
   for (const url of [app, merchant]) {
     let occupied = false;

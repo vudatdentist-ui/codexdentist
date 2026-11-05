@@ -230,6 +230,16 @@ Run affected schema/data integrity and protected-file suites after every fix.
 
 Run `test:payos` for merchant binding, encrypted envelope handling, permissions,
 retry uncertainty, invoice revalidation and legacy-configuration refusal.
+The same gate includes signed status recovery: full identity/signature checks,
+unpaid terminal retirement, paid/partial refusal, tenant/clinic/patient/demo/CSRF
+denials, concurrent SETTLED preservation, and late creation responses that cannot
+restore a retired QR. Full app QA checks paid observations across reload without
+fabricating a receipt, then confirms unpaid expiry alone permits key repair.
+`NODE_ENV=test npm run test:payos-reconcile-db` creates and migrates a fresh
+loopback database, then checks actual row locks, encrypted key replacement,
+canonical settlement racing status recovery, late writes and reversed paid/zero
+observation completion order. Its provider boundary is synthetic; signature
+validation is exercised independently by handler and full-app tests.
 `NODE_ENV=test npm run test:integration-vault-db` explicitly runs the native
 loopback PostgreSQL gate: fresh migrations, tenant FK/AAD isolation, UTC,
 rotation races, rollback and cascade. Unit-only runs may skip that native case;

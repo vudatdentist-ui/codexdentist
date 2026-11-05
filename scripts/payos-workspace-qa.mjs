@@ -183,6 +183,22 @@ try {
   assert.equal(cannotDisable.status(), 409);
   results.push(productionUI ? 'production QR/history/refresh/reload; pending order blocks replacement/disable'
     : 'real QR; lost response/retry creates one intent; reload retains order; pending order blocks replacement/disable');
+  if (!productionUI) {
+    await fetch(`${provider}/__test/order-status`, { method: 'POST', body: JSON.stringify({ orderCode: order.orderCode, status: 'PAID', amountPaid: 100000 }) });
+    await dialog.getByRole('button', { name: 'Kiểm tra với payOS', exact: true }).click();
+    await dialog.getByText(/payOS báo đã nhận tiền/).waitFor();
+    assert.equal(await qr.count(), 0);
+    assert.equal(await prisma.receipt.count({ where: { organizationId: a.organization.id } }), 0, 'A status query cannot fabricate collection');
+    assert.equal((await page.request.post('/api/integrations/payos/settings', { headers: { origin: base }, data: { action: 'disable', clinicId: null } })).status(), 409);
+    await page.reload({ waitUntil: 'networkidle' });
+    await page.getByRole('tab', { name: /Hóa đơn/ }).click();
+    await page.locator('.billing-invoice-row').filter({ hasText: invoice.invoiceNo }).getByRole('button', { name: 'Thanh toán payOS', exact: true }).click();
+    await dialog.getByText(/payOS báo đã nhận tiền/).waitFor();
+    assert.equal(await qr.count(), 0);
+    assert.equal(await dialog.getByRole('button', { name: 'Tạo mã thanh toán', exact: true }).isEnabled(), false);
+    await page.screenshot({ path: `${output}/paid-awaiting-receipt-320.png` });
+    results.push('signed PAID observation persists and hides QR while receipt and credential guards await the webhook');
+  }
   assert.equal(await prisma.receipt.count({ where: { organizationId: a.organization.id } }), 0);
   async function settle(reference, signed = true) {
     if (!productionUI) return (await fetch(`${provider}/__test/settle`, { method: 'POST', body: JSON.stringify({ orderCode: order.orderCode, reference, signed }) })).json();
@@ -208,6 +224,27 @@ try {
   await dialog.getByText('Đã ghi nhận thanh toán', { exact: true }).waitFor();
   await page.screenshot({ path: `${output}/qr-settled-320.png` });
   results.push('bad signature rejected; repeated and reordered provider callbacks create exactly one reconciled receipt/payment');
+  if (!productionUI) {
+    const expiring = await prisma.invoice.create({ data: { organizationId: a.organization.id, clinicId: a.clinic.id,
+      patientId: patient.id, invoiceNo: `EXPIRE-${token}`, amount: 40000, paidAmount: 0, status: 'OPEN', dueDate: new Date(),
+      items: { create: { organizationId: a.organization.id, clinicId: a.clinic.id, patientId: patient.id,
+        description: 'Synthetic unpaid expiry', quantity: 1, unitPrice: 40000, amount: 40000 } } } });
+    await dialog.getByRole('button', { name: 'Đóng', exact: true }).click();
+    await page.reload({ waitUntil: 'networkidle' }); await page.getByRole('tab', { name: /Hóa đơn/ }).click();
+    await page.locator('.billing-invoice-row').filter({ hasText: expiring.invoiceNo }).getByRole('button', { name: 'Thanh toán payOS', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Tạo mã thanh toán', exact: true }).click();
+    await qr.waitFor();
+    const history = await (await page.request.get(`/api/integrations/payos/payment-links?patientId=${patient.id}&invoiceNo=${expiring.invoiceNo}`)).json();
+    await fetch(`${provider}/__test/order-status`, { method: 'POST', body: JSON.stringify({ orderCode: history.orders[0].orderCode, status: 'EXPIRED', amountPaid: 0 }) });
+    await dialog.getByRole('button', { name: 'Kiểm tra với payOS', exact: true }).click();
+    await dialog.getByText('Đã hết hạn', { exact: true }).waitFor();
+    assert.equal(await qr.count(), 0);
+    assert.equal(await prisma.receipt.count({ where: { organizationId: a.organization.id } }), 1);
+    await page.screenshot({ path: `${output}/expired-unpaid-320.png` });
+    const repair = await page.request.post('/api/integrations/payos/settings', { headers: { origin: base }, data: { action: 'save', clinicId: null, credentials } });
+    assert.equal(repair.status(), 200, 'A verified unpaid terminal order may release the credential lock');
+    results.push('signed unpaid expiry removes old QR and unblocks credential repair without creating a receipt');
+  }
   assert.deepEqual(errors, []);
 } catch (cause) {
   results.push({ failed: String(cause) });
