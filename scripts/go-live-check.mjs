@@ -1,7 +1,9 @@
-import { existsSync, readFileSync } from "node:fs";
-import { pbkdf2Sync, timingSafeEqual } from "node:crypto";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { createHash, pbkdf2Sync, timingSafeEqual } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
+import { notificationConfigurationErrors } from "./lib/notification-readiness.mjs";
+import { migrationChecksumMatches } from "../src/infrastructure/migrations/checksums.ts";
 
 loadDotEnv();
 
@@ -21,7 +23,6 @@ const requiredR2Env = [
   "R2_ACCESS_KEY_ID",
   "R2_SECRET_ACCESS_KEY",
 ];
-const notificationChannels = ["EMAIL", "SMS", "ZALO"];
 const errors = [];
 const warnings = [];
 const connectionString = env("DATABASE_URL") || developmentDatabaseUrl;
@@ -103,24 +104,7 @@ function checkEnvironment() {
     errors.push("R2_ENDPOINT must be HTTPS.");
   }
 
-  if (env("NOTIFICATION_DELIVERY_MODE") !== "webhook") {
-    errors.push("Set NOTIFICATION_DELIVERY_MODE=webhook.");
-  }
-
-  const fallbackWebhook = env("NOTIFICATION_WEBHOOK_URL");
-  const fallbackSecret = env("NOTIFICATION_WEBHOOK_SECRET");
-  for (const channel of notificationChannels) {
-    const channelUrl = env(`NOTIFICATION_${channel}_WEBHOOK_URL`) || fallbackWebhook;
-    const channelSecret = env(`NOTIFICATION_${channel}_WEBHOOK_SECRET`) || fallbackSecret;
-
-    if (!channelUrl || !isHttps(channelUrl)) {
-      errors.push(`Set HTTPS notification webhook URL for ${channel}.`);
-    }
-
-    if (!channelSecret || channelSecret.length < 24) {
-      errors.push(`Set notification webhook secret for ${channel}.`);
-    }
-  }
+  errors.push(...notificationConfigurationErrors(process.env));
 }
 
 function checkSecretHygiene() {
@@ -157,6 +141,36 @@ async function checkDatabase() {
   } catch (error) {
     errors.push(`Database is not reachable: ${error.message}`);
     return;
+  }
+
+  const requiredMigrations = readdirSync("prisma/migrations", { withFileTypes: true })
+    .filter((entry) => entry.isDirectory() && /^\d+_/.test(entry.name))
+    .map((entry) => ({
+      name: entry.name,
+      bytes: readFileSync(`prisma/migrations/${entry.name}/migration.sql`),
+      checksum: createHash("sha256")
+        .update(readFileSync(`prisma/migrations/${entry.name}/migration.sql`))
+        .digest("hex"),
+    }))
+    .sort((left, right) => left.name.localeCompare(right.name));
+  const appliedMigrations = await prisma.$queryRaw`SELECT migration_name, checksum FROM "_prisma_migrations" WHERE finished_at IS NOT NULL`;
+  const appliedByName = new Map(appliedMigrations.map((row) => [row.migration_name, row.checksum]));
+  const requiredByName = new Map(requiredMigrations.map((migration) => [migration.name, migration.checksum]));
+  const missingMigrations = requiredMigrations
+    .filter((migration) => !appliedByName.has(migration.name))
+    .map((migration) => migration.name);
+  if (missingMigrations.length > 0) {
+    errors.push(`Database migrations are incomplete (${missingMigrations.length} missing): ${missingMigrations.join(", ")}`);
+  }
+  const unexpectedMigrations = [...appliedByName.keys()].filter((name) => !requiredByName.has(name));
+  if (unexpectedMigrations.length > 0) {
+    errors.push(`Database contains migrations missing from this release: ${unexpectedMigrations.join(", ")}`);
+  }
+  const checksumDrift = requiredMigrations
+    .filter((migration) => appliedByName.get(migration.name) && !migrationChecksumMatches(migration.name, migration.bytes, appliedByName.get(migration.name)))
+    .map((migration) => migration.name);
+  if (checksumDrift.length > 0) {
+    errors.push(`Migration checksum drift detected: ${checksumDrift.join(", ")}`);
   }
 
   const [demoPasswordUsers, activeOwners, failedNotifications, pendingNotifications] =

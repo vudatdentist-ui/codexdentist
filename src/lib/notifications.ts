@@ -244,16 +244,12 @@ async function deliverNotification(
     }
 
     if (mode === "log") {
-      console.info(
-        `[notification:${notification.channel}] ${notification.recipient} ${notification.subject ?? ""}`,
-      );
+      console.info("notification.simulated", { id: notification.id, channel: notification.channel });
     } else if (mode === "resend") {
       if (notification.channel === "EMAIL") {
         await deliverToResend(notification);
       } else {
-        console.info(
-          `[notification:${notification.channel}] ${notification.recipient} ${notification.subject ?? ""}`,
-        );
+        throw new Error("notification-channel-not-configured");
       }
     } else {
       await deliverToWebhook(notification);

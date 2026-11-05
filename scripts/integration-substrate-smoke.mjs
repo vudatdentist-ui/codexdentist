@@ -173,7 +173,7 @@ try {
   assert(rolledBackOutbox.length === 0, "failed inbox outbox rolled back atomically");
 
   await prisma.$executeRawUnsafe(
-    `UPDATE "IntegrationInbox" SET "availableAt" = CURRENT_TIMESTAMP WHERE "id" = $1`,
+    `UPDATE "IntegrationInbox" SET "availableAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') WHERE "id" = $1`,
     accepted.event.id,
   );
   const processed = await processIntegrationInbox(prisma, accepted.event.id, async (tx) => {
@@ -280,7 +280,7 @@ try {
   assert(Boolean(retryAudit), "outbox retry is auditable");
 
   await prisma.$executeRawUnsafe(
-    `UPDATE "IntegrationOutbox" SET "availableAt" = CURRENT_TIMESTAMP WHERE "id" = $1`,
+    `UPDATE "IntegrationOutbox" SET "availableAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') WHERE "id" = $1`,
     outboxRows[0].id,
   );
   const deliveredIds = [];

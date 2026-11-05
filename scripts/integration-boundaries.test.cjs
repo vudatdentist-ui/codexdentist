@@ -1,0 +1,88 @@
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const { load } = require("./audit-source-loader.cjs");
+
+test("integration mutations accept only the request origin under the configured proxy policy", () => {
+  for (const proxy of ["none", "reverse-proxy"]) {
+    const { hasSameOrigin } = load("src/lib/request-security.ts", {
+      "@/lib/env": { trustedProxyProvider: () => proxy },
+    });
+    const request = headers => new Request("http://127.0.0.1:3000/api/integrations/connections", { headers });
+    assert.equal(hasSameOrigin(request({ host: "127.0.0.1:3000", origin: "http://127.0.0.1:3000" })), true);
+    for (const origin of ["https://attacker.test", "null", "file://localhost", "http://127.0.0.1:9999"]) {
+      assert.equal(hasSameOrigin(request({ host: "127.0.0.1:3000", origin })), false);
+    }
+    assert.equal(hasSameOrigin(request({ host: "127.0.0.1:3000" })), false);
+    const forwarded = request({ host: "127.0.0.1:3000", origin: "https://codexdentist.com",
+      "x-forwarded-host": "codexdentist.com", "x-forwarded-proto": "https" });
+    assert.equal(hasSameOrigin(forwarded), proxy !== "none");
+    assert.equal(hasSameOrigin(request({ host: "127.0.0.1:3000", origin: "https://codexdentist.com",
+      "x-forwarded-host": "codexdentist.com", "x-forwarded-proto": "ftp" })), false);
+  }
+});
+
+test("provider configuration cannot read arbitrary environment credential prefixes", () => {
+  const env = { NODE_ENV: "production", DEPLOYMENT_MODE: "hosted",
+    PAYOS_DEFAULT_CLIENT_ID: "client", PAYOS_DEFAULT_API_KEY: "key", PAYOS_DEFAULT_CHECKSUM_KEY: "checksum",
+    DOCUMENSO_DEFAULT_API_TOKEN: "token", DOCUMENSO_DEFAULT_WEBHOOK_SECRET: "secret",
+    OTHER_TENANT_API_KEY: "private" };
+  const config = load("src/integrations/config.ts", {}, { process: { env } });
+  for (const resolver of [config.resolvePayOSConnectionSecrets, config.resolveDocumensoConnectionSecrets, config.resolveOrthancConnectionSecrets]) {
+    for (const reference of [null, "OTHER_TENANT", "env:OTHER_TENANT", "env:AUTH_SECRET", "env:PAYOS_DEFAULT\n"]) {
+      assert.throws(() => resolver(reference));
+    }
+  }
+  assert.equal(config.resolvePayOSConnectionSecrets("env:PAYOS_DEFAULT").clientId, "client");
+  assert.equal(config.resolveDocumensoConnectionSecrets("env:DOCUMENSO_DEFAULT").apiToken, "token");
+  env.PAYOS_DEFAULT_BASE_URL = "http://merchant.test";
+  assert.throws(() => config.resolvePayOSConnectionSecrets("env:PAYOS_DEFAULT"));
+  env.DEPLOYMENT_MODE = "self-hosted";
+  env.ORTHANC_DEFAULT_BASE_URL = "ftp://pacs.test";
+  assert.throws(() => config.resolveOrthancConnectionSecrets("env:ORTHANC_DEFAULT"));
+});
+
+test("readiness requires job authorization even outside production", async () => {
+  let queried = false;
+  const { GET } = load("src/app/api/readiness/route.ts", {
+    "next/server": { NextResponse: Response },
+    "@/lib/job-auth": { verifyJobRequest: () => false },
+    "@/lib/prisma": { prisma: { $queryRaw: async () => { queried = true; } } },
+  }, { process: { env: { NODE_ENV: "test" } } });
+  const response = await GET(new Request("http://localhost/api/readiness"));
+  assert.equal(response.status, 401);
+  assert.match(response.headers.get("cache-control"), /no-store/);
+  assert.equal(queried, false);
+});
+
+test("readiness refuses missing, unexpected and checksum-drifted migration history", async () => {
+  const { createHash } = require("node:crypto");
+  const checksum = createHash("sha256").update("CREATE TABLE fixture(id TEXT);").digest("hex");
+  for (const applied of [[], [{ migration_name: "migration", checksum: "drift" }],
+    [{ migration_name: "unexpected", checksum }], [{ migration_name: "migration", checksum }]]) {
+    const { GET } = load("src/app/api/readiness/route.ts", {
+      "next/server": { NextResponse: Response },
+      "node:fs": { readdirSync: () => [{ name: "20260101_fixture", isDirectory: () => true }],
+        readFileSync: () => Buffer.from("CREATE TABLE fixture(id TEXT);") },
+      "@/lib/job-auth": { verifyJobRequest: () => true },
+      "@/lib/error-reporting": { reportApplicationError: (_area, cause) => { throw cause; } },
+      "@/lib/env": { patientFileStorageDriver: () => "local", notificationDeliveryMode: () => "disabled",
+        resendEmailConfig: () => null, codexMedAiConfig: () => ({ enabled: false }) },
+      "@/lib/prisma": { prisma: { $queryRaw: async parts => parts.join("").includes("_prisma_migrations")
+        ? applied.map(row => ({ ...row, migration_name: row.migration_name === "migration" ? "20260101_fixture" : row.migration_name })) : [] } },
+    }, { process: { env: {}, cwd: () => process.cwd() } });
+    const response = await GET(new Request("http://localhost/api/readiness"));
+    assert.equal(response.status, applied[0]?.checksum === checksum && applied[0]?.migration_name === "migration" ? 200 : 503);
+  }
+});
+
+test("only the recovered applied migration bytes permit a verified newline-only checksum difference", () => {
+  const fs = require("node:fs");
+  const { migrationChecksumMatches } = load("src/infrastructure/migrations/checksums.ts");
+  const name = "20260516090000_source_commission";
+  const bytes = fs.readFileSync(`prisma/migrations/${name}/migration.sql`);
+  const applied = "578975509b6eede77797d42ece4d3f93ee5635c8b218abb4894b7191537efae7";
+  assert.equal(migrationChecksumMatches(name, bytes, applied), true);
+  assert.equal(migrationChecksumMatches(name, Buffer.from(bytes.toString().replace("CREATE TABLE", "CREATE UNLOGGED TABLE")), applied), false);
+  assert.equal(migrationChecksumMatches("another_migration", bytes, applied), false);
+  assert.equal(migrationChecksumMatches(name, bytes, "0".repeat(64)), false);
+});

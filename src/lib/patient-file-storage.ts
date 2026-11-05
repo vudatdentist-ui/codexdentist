@@ -1,6 +1,6 @@
 import "server-only";
 
-import { GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { createHash, randomUUID } from "node:crypto";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -10,6 +10,7 @@ import {
   r2StorageConfig,
 } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
+import { createStorageObjectPurgeManifests } from "@/infrastructure/patient-files/purge-manifest";
 
 const MB = 1024 * 1024;
 
@@ -128,7 +129,7 @@ export function patientFileValidationError(file: File) {
     return "files-unsupported" as const;
   }
 
-  if (file.size > patientFileSizeLimitBytes(file)) {
+  if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > patientFileSizeLimitBytes(file)) {
     return "files-too-large" as const;
   }
 
@@ -269,7 +270,8 @@ async function storeUpload({
     select: { isDemo: true },
   });
 
-  if (organization?.isDemo) {
+  if (!organization) throw new Error("patient-file-organization-not-found");
+  if (organization.isDemo) {
     throw new Error("File uploads are disabled in demo workspaces.");
   }
 
@@ -285,14 +287,12 @@ async function storeUpload({
     throw new Error("Unsupported file type");
   }
 
-  if (file.size > PATIENT_FILE_SIZE_LIMITS[fileKind]) {
+  if (!Number.isSafeInteger(file.size) || file.size <= 0 || file.size > PATIENT_FILE_SIZE_LIMITS[fileKind]) {
     throw new Error("File exceeds the allowed size");
   }
 
   const shouldBuffer = fileKind === "image";
-  const validationBytes = Buffer.from(
-    await (shouldBuffer ? file : file.slice(0, Math.min(file.size, 512))).arrayBuffer(),
-  );
+  const validationBytes = await bufferUpload(shouldBuffer ? file : file.slice(0, Math.min(file.size, 512)));
   validateUploadContent({
     bytes: validationBytes,
     fileKind,
@@ -313,35 +313,43 @@ async function storeUpload({
   const checksumSha256 = shouldBuffer
     ? createHash("sha256").update(validationBytes).digest("hex")
     : await checksumFile(file);
-  const variants = shouldBuffer
-    ? await createImageVariants({
-        bytes: validationBytes,
-        mimeType,
-        fileId: storageFileId,
-        storageNamespace,
-        safeOrganizationId,
-        safeOwnerId,
-        storageProvider,
-      })
-    : {};
+  let variants: Awaited<ReturnType<typeof createImageVariants>> = {};
+  try {
+    variants = shouldBuffer
+      ? await createImageVariants({
+          bytes: validationBytes,
+          mimeType,
+          fileId: storageFileId,
+          storageNamespace,
+          safeOrganizationId,
+          organizationId,
+          safeOwnerId,
+          storageProvider,
+        })
+      : {};
 
-  if (storageProvider === "r2") {
-    if (shouldBuffer) {
-      await storeR2Object({
-        key: storageKey,
-        bytes: validationBytes,
-        mimeType,
-        fileName: originalName,
-        checksumSha256,
-      });
+    if (storageProvider === "r2") {
+      if (shouldBuffer) {
+        await storeR2Object({
+          key: storageKey,
+          bytes: validationBytes,
+          mimeType,
+          fileName: originalName,
+          checksumSha256,
+        });
+      } else {
+        await storeR2File({
+          key: storageKey,
+          file,
+          mimeType,
+          fileName: originalName,
+          checksumSha256,
+        });
+      }
+    } else if (shouldBuffer) {
+      await storeLocalObject(storageKey, validationBytes);
     } else {
-      await storeR2File({
-        key: storageKey,
-        file,
-        mimeType,
-        fileName: originalName,
-        checksumSha256,
-      });
+      await storeLocalFile(storageKey, file, checksumSha256);
     }
 
     return {
@@ -356,34 +364,22 @@ async function storeUpload({
       thumbnail: variants.thumbnail,
       checksumSha256,
     };
+  } catch (error) {
+    await cleanupUploadObjects(organizationId, storageProvider, [
+      storageKey, variants.preview?.storageKey, variants.thumbnail?.storageKey,
+    ]);
+    throw error;
   }
-
-  if (shouldBuffer) {
-    await storeLocalObject(storageKey, validationBytes);
-  } else {
-    await storeLocalFile(storageKey, file);
-  }
-
-  return {
-    fileName: originalName,
-    fileKind,
-    mimeType,
-    preview: variants.preview,
-    relativePath: storageKey,
-    sizeBytes: file.size,
-    storageProvider,
-    storageKey,
-    thumbnail: variants.thumbnail,
-    checksumSha256,
-  };
 }
 
 export async function readStoredPatientFile(input: {
   storageProvider?: string | null;
+  sourceType?: string | null;
   storageKey?: string | null;
   sourceId?: string | null;
 }) {
-  const provider = input.storageProvider ?? "local";
+  const provider = input.storageProvider ??
+    (input.sourceType === "R2_UPLOAD" ? "r2" : "local");
   const key = input.storageKey ?? input.sourceId;
 
   if (!key) {
@@ -403,10 +399,12 @@ export async function readStoredPatientFile(input: {
 
 export async function openStoredPatientFileStream(input: {
   storageProvider?: string | null;
+  sourceType?: string | null;
   storageKey?: string | null;
   sourceId?: string | null;
 }): Promise<StoredPatientFileStream> {
-  const provider = input.storageProvider ?? "local";
+  const provider = input.storageProvider ??
+    (input.sourceType === "R2_UPLOAD" ? "r2" : "local");
   const key = input.storageKey ?? input.sourceId;
 
   if (!key) {
@@ -611,19 +609,45 @@ function objectKey(...segments: string[]) {
 
 async function checksumFile(file: File) {
   const hash = createHash("sha256");
-  const reader = file.stream().getReader();
+  for await (const chunk of boundedUploadChunks(file)) hash.update(chunk);
+  return hash.digest("hex");
+}
 
+async function bufferUpload(file: Pick<Blob, "size" | "stream">) {
+  const chunks: Buffer[] = [];
+  for await (const chunk of boundedUploadChunks(file)) chunks.push(chunk);
+  return Buffer.concat(chunks);
+}
+
+async function* boundedUploadChunks(file: Pick<Blob, "size" | "stream">, expectedChecksum?: string) {
+  const reader = file.stream().getReader();
+  const hash = expectedChecksum ? createHash("sha256") : null;
+  let bytes = 0;
+  let timedOut = false;
+  const timeout = setTimeout(() => {
+    timedOut = true;
+    void reader.cancel().catch(() => {});
+  }, 5 * 60_000);
   try {
     while (true) {
       const { done, value } = await reader.read();
+      if (timedOut) throw new Error("patient-file-upload-timeout");
       if (done) break;
-      hash.update(Buffer.from(value));
+      bytes += value.byteLength;
+      if (bytes > file.size || bytes > MAX_PATIENT_FILE_BYTES) throw new Error("patient-file-upload-size-mismatch");
+      const chunk = Buffer.from(value);
+      hash?.update(chunk);
+      yield chunk;
     }
+    if (bytes !== file.size) throw new Error("patient-file-upload-size-mismatch");
+    if (hash && hash.digest("hex") !== expectedChecksum) throw new Error("patient-file-upload-checksum-mismatch");
+  } catch (error) {
+    void reader.cancel().catch(() => {});
+    throw error;
   } finally {
+    clearTimeout(timeout);
     reader.releaseLock();
   }
-
-  return hash.digest("hex");
 }
 
 async function storeLocalObject(storageKey: string, bytes: Buffer) {
@@ -643,7 +667,40 @@ async function storeLocalObject(storageKey: string, bytes: Buffer) {
   });
 }
 
-async function storeLocalFile(storageKey: string, file: File) {
+async function deleteStoredObject(storageProvider: "local" | "r2", storageKey: string) {
+  if (storageProvider === "r2") {
+    const config = requiredR2Config();
+    await getR2Client().send(
+      new DeleteObjectCommand({
+        Bucket: config.bucket,
+        Key: storageKey,
+      }),
+    );
+    return;
+  }
+
+  const { unlink } = await import("node:fs/promises");
+  try {
+    await unlink(await resolveStoredPatientFilePath(storageKey));
+  } catch (error) {
+    if (!(error && typeof error === "object" && "code" in error && error.code === "ENOENT")) {
+      throw error;
+    }
+  }
+}
+
+async function cleanupUploadObjects(organizationId: string, storageProvider: "local" | "r2", keys: Array<string | undefined>) {
+  const exactKeys = [...new Set(keys.filter((key): key is string => Boolean(key)))];
+  const results = await Promise.allSettled(exactKeys.map((key) => deleteStoredObject(storageProvider, key)));
+  const failedKeys = exactKeys.filter((_, index) => results[index].status === "rejected");
+  if (failedKeys.length) {
+    await createStorageObjectPurgeManifests(prisma, failedKeys.map((storageKey) => ({
+      organizationId, storageProvider, storageKey, previewStorageKey: null, thumbnailStorageKey: null,
+    })));
+  }
+}
+
+async function storeLocalFile(storageKey: string, file: File, checksumSha256: string) {
   const path = await import("node:path");
   const { createWriteStream } = await import("node:fs");
   const { mkdir } = await import("node:fs/promises");
@@ -657,7 +714,7 @@ async function storeLocalFile(storageKey: string, file: File) {
 
   await mkdir(path.dirname(absolutePath), { recursive: true });
   await pipeline(
-    Readable.fromWeb(file.stream() as any),
+    Readable.from(boundedUploadChunks(file, checksumSha256)),
     createWriteStream(absolutePath, { flags: "wx" }),
   );
 }
@@ -668,6 +725,7 @@ async function createImageVariants(input: {
   fileId: string;
   storageNamespace: "patient-files" | "learning-assets" | "staff-profile" | "accounting-attachments";
   safeOrganizationId: string;
+  organizationId: string;
   safeOwnerId: string;
   storageProvider: "local" | "r2";
 }) {
@@ -735,28 +793,30 @@ async function createImageVariants(input: {
     `${input.fileId}-${randomUUID()}-thumbnail.webp`,
   );
 
-  if (input.storageProvider === "r2") {
-    await Promise.all([
-      storeR2Object({
+  try {
+    if (input.storageProvider === "r2") {
+      await storeR2Object({
         key: previewKey,
         bytes: previewBytes,
         mimeType: "image/webp",
         fileName: `${input.fileId}-preview.webp`,
         checksumSha256: createHash("sha256").update(previewBytes).digest("hex"),
-      }),
-      storeR2Object({
+      });
+      await storeR2Object({
         key: thumbnailKey,
         bytes: thumbnailBytes,
         mimeType: "image/webp",
         fileName: `${input.fileId}-thumbnail.webp`,
         checksumSha256: createHash("sha256").update(thumbnailBytes).digest("hex"),
-      }),
-    ]);
-  } else {
-    await Promise.all([
-      storeLocalObject(previewKey, previewBytes),
-      storeLocalObject(thumbnailKey, thumbnailBytes),
-    ]);
+      });
+    } else {
+      await storeLocalObject(previewKey, previewBytes);
+      await storeLocalObject(thumbnailKey, thumbnailBytes);
+    }
+  } catch (error) {
+    // The failed write itself may have left a partial object.
+    await cleanupUploadObjects(input.organizationId, input.storageProvider, [previewKey, thumbnailKey]);
+    throw error;
   }
 
   return {
@@ -840,7 +900,7 @@ async function storeR2File(input: {
     new PutObjectCommand({
       Bucket: config.bucket,
       Key: input.key,
-      Body: Readable.fromWeb(input.file.stream() as any),
+      Body: Readable.from(boundedUploadChunks(input.file, input.checksumSha256)),
       ContentType: input.mimeType,
       ContentLength: input.file.size,
       Metadata: {

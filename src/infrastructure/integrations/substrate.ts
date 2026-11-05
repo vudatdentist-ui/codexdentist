@@ -13,6 +13,8 @@ type SqlExecutor = Pick<
   "$executeRawUnsafe" | "$queryRawUnsafe"
 > | Prisma.TransactionClient;
 
+// Prisma reads TIMESTAMP without timezone as UTC. Never use session-local defaults.
+
 type ConnectionRow = {
   id: string;
   organizationId: string;
@@ -98,7 +100,7 @@ export async function upsertIntegrationConnection(
            "secretRef" = $4,
            "metadata" = $5::jsonb,
            "lastVerifiedAt" = $6,
-           "updatedAt" = CURRENT_TIMESTAMP
+           "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
        WHERE "id" = $1
        RETURNING *`,
       existing[0].id,
@@ -115,8 +117,9 @@ export async function upsertIntegrationConnection(
 
   const rows = await db.$queryRawUnsafe<ConnectionRow[]>(
     `INSERT INTO "IntegrationConnection"
-      ("id", "organizationId", "clinicId", "provider", "status", "capabilities", "secretRef", "metadata", "lastVerifiedAt")
-     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb, $9)
+      ("id", "organizationId", "clinicId", "provider", "status", "capabilities", "secretRef", "metadata", "lastVerifiedAt", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7, $8::jsonb, $9,
+             (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'), (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))
      RETURNING *`,
     randomUUID(),
     input.organizationId,
@@ -195,8 +198,9 @@ export async function createExternalReference(
 
   const rows = await db.$queryRawUnsafe<ExternalReferenceRow[]>(
     `INSERT INTO "ExternalReference"
-      ("id", "organizationId", "clinicId", "connectionId", "provider", "entityType", "internalId", "externalId", "metadata")
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+      ("id", "organizationId", "clinicId", "connectionId", "provider", "entityType", "internalId", "externalId", "metadata", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb,
+             (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'), (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))
      RETURNING *`,
     randomUUID(),
     input.organizationId,
@@ -240,8 +244,9 @@ export async function acceptIntegrationInbox(
   const payloadHash = createHash("sha256").update(payloadJson).digest("hex");
   const inserted = await db.$queryRawUnsafe<InboxRow[]>(
     `INSERT INTO "IntegrationInbox"
-      ("id", "organizationId", "clinicId", "connectionId", "provider", "externalEventId", "eventType", "payload", "payloadHash")
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9)
+      ("id", "organizationId", "clinicId", "connectionId", "provider", "externalEventId", "eventType", "payload", "payloadHash", "availableAt", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9,
+             (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'), (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'), (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))
      ON CONFLICT DO NOTHING
      RETURNING *`,
     randomUUID(),
@@ -305,7 +310,7 @@ export async function processIntegrationInbox<T>(
 
       await tx.$executeRawUnsafe(
         `UPDATE "IntegrationInbox"
-         SET "status" = 'PROCESSING', "updatedAt" = CURRENT_TIMESTAMP
+         SET "status" = 'PROCESSING', "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
          WHERE "id" = $1`,
         inboxId,
       );
@@ -315,9 +320,9 @@ export async function processIntegrationInbox<T>(
         `UPDATE "IntegrationInbox"
          SET "status" = 'PROCESSED',
              "attempts" = "attempts" + 1,
-             "processedAt" = CURRENT_TIMESTAMP,
+             "processedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
              "lastErrorCode" = NULL,
-             "updatedAt" = CURRENT_TIMESTAMP
+             "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
          WHERE "id" = $1`,
         inboxId,
       );
@@ -334,7 +339,7 @@ export async function processIntegrationInbox<T>(
            "status" = CASE WHEN "attempts" + 1 >= $2 THEN 'FAILED' ELSE 'RETRY' END,
            "availableAt" = CASE WHEN "attempts" + 1 >= $2 THEN "availableAt" ELSE $3 END,
            "lastErrorCode" = $4,
-           "updatedAt" = CURRENT_TIMESTAMP
+           "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
        WHERE "id" = $1 AND "status" <> 'PROCESSED'
        RETURNING "id", "organizationId", "attempts", "status"`,
       inboxId,
@@ -384,8 +389,9 @@ export async function enqueueIntegrationOutbox(
 
   const inserted = await db.$queryRawUnsafe<OutboxRow[]>(
     `INSERT INTO "IntegrationOutbox"
-      ("id", "organizationId", "clinicId", "topic", "eventType", "aggregateType", "aggregateId", "payload", "dedupeKey", "availableAt")
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)
+      ("id", "organizationId", "clinicId", "topic", "eventType", "aggregateType", "aggregateId", "payload", "dedupeKey", "availableAt", "createdAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10,
+             (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'), (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))
      ON CONFLICT DO NOTHING
      RETURNING *`,
     randomUUID(),
@@ -431,7 +437,7 @@ export async function dispatchIntegrationOutbox(
   const limit = Math.max(1, Math.min(options.limit ?? 20, 100));
   const maxAttempts = options.maxAttempts ?? 5;
   const retryDelayMs = options.retryDelayMs ?? 1_000;
-  const staleLockMs = options.staleLockMs ?? 5 * 60_000;
+  const staleLockMs = Math.max(30, options.staleLockMs ?? 5 * 60_000);
   const lockToken = randomUUID();
   const staleBefore = new Date(Date.now() - staleLockMs);
   const claimed = await db.$queryRawUnsafe<OutboxRow[]>(
@@ -440,7 +446,7 @@ export async function dispatchIntegrationOutbox(
        FROM "IntegrationOutbox"
        WHERE "topic" = $4
          AND ($5::text IS NULL OR "organizationId" = $5)
-         AND (("status" IN ('PENDING', 'RETRY') AND "availableAt" <= CURRENT_TIMESTAMP)
+         AND (("status" IN ('PENDING', 'RETRY') AND "availableAt" <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))
           OR ("status" = 'PROCESSING' AND "lockedAt" < $3))
        ORDER BY "createdAt"
        FOR UPDATE SKIP LOCKED
@@ -450,8 +456,8 @@ export async function dispatchIntegrationOutbox(
      SET "status" = 'PROCESSING',
          "attempts" = outbox."attempts" + 1,
          "lockToken" = $2,
-         "lockedAt" = CURRENT_TIMESTAMP,
-         "updatedAt" = CURRENT_TIMESTAMP
+         "lockedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+         "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
      FROM picked
      WHERE outbox."id" = picked."id"
      RETURNING outbox.*`,
@@ -467,60 +473,128 @@ export async function dispatchIntegrationOutbox(
     sent: 0,
     retried: 0,
     failed: 0,
+    lostLease: 0,
   };
 
-  for (const event of claimed) {
-    try {
-      await transport(event);
-      await db.$executeRawUnsafe(
-        `UPDATE "IntegrationOutbox"
-         SET "status" = 'SENT',
-             "dispatchedAt" = CURRENT_TIMESTAMP,
-             "lockToken" = NULL,
-             "lockedAt" = NULL,
-             "lastErrorCode" = NULL,
-             "updatedAt" = CURRENT_TIMESTAMP
-         WHERE "id" = $1 AND "lockToken" = $2 AND "status" = 'PROCESSING'`,
-        event.id,
-        lockToken,
-      );
-      result.sent += 1;
-    } catch (error) {
-      const terminal = event.attempts >= maxAttempts;
-      const errorCode = safeErrorCode(error, "integration-dispatch-failed");
-      await db.$executeRawUnsafe(
-        `UPDATE "IntegrationOutbox"
-         SET "status" = $3,
-             "availableAt" = $4,
-             "lockToken" = NULL,
-             "lockedAt" = NULL,
-             "lastErrorCode" = $5,
-             "updatedAt" = CURRENT_TIMESTAMP
-         WHERE "id" = $1 AND "lockToken" = $2 AND "status" = 'PROCESSING'`,
-        event.id,
-        lockToken,
-        terminal ? "FAILED" : "RETRY",
-        terminal ? event.availableAt : new Date(Date.now() + retryDelayMs),
-        errorCode,
-      );
-      await writeSystemAudit(db, {
-        organizationId: event.organizationId,
-        action: terminal
-          ? "integration.outbox_failed"
-          : "integration.outbox_retry_scheduled",
-        entityType: "IntegrationOutbox",
-        entityId: event.id,
-        metadata: {
-          topic: event.topic,
-          eventType: event.eventType,
-          attempts: event.attempts,
-          status: terminal ? "FAILED" : "RETRY",
+  // Renew the whole batch: queued events also own a lease while a slow provider runs.
+  const activeIds = new Set(claimed.map((event) => event.id));
+  const lostIds = new Set<string>();
+  let renewal: Promise<void> | null = null;
+  const renew = (): Promise<void> => {
+    if (renewal) return renewal;
+    const ids = [...activeIds].filter((id) => !lostIds.has(id));
+    if (!ids.length) return Promise.resolve();
+    renewal = (async () => {
+      try {
+        const owned = await db.$queryRawUnsafe<Array<{ id: string }>>(
+          `UPDATE "IntegrationOutbox"
+           SET "lockedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'), "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+           WHERE "id" = ANY($1::text[]) AND "lockToken" = $2 AND "status" = 'PROCESSING'
+             AND "lockedAt" >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - ($3 * INTERVAL '1 millisecond')
+           RETURNING "id"`,
+          ids, lockToken, staleLockMs,
+        );
+        const ownedIds = new Set(owned.map((row) => row.id));
+        for (const id of ids) if (!ownedIds.has(id)) lostIds.add(id);
+      } catch {
+        // An uncertain lease must never authorize another side effect or finalization.
+        for (const id of ids) lostIds.add(id);
+      } finally {
+        renewal = null;
+      }
+    })();
+    return renewal;
+  };
+  const heartbeat = setInterval(() => { void renew(); }, Math.max(10, Math.floor(staleLockMs / 3)));
+  heartbeat.unref();
+  try {
+    for (const event of claimed) {
+      await renew();
+      if (lostIds.has(event.id)) {
+        activeIds.delete(event.id);
+        result.lostLease += 1;
+        continue;
+      }
+      try {
+        await transport(event);
+        await renew();
+        if (lostIds.has(event.id)) {
+          result.lostLease += 1;
+          continue;
+        }
+        const finalized = await db.$executeRawUnsafe(
+          `UPDATE "IntegrationOutbox"
+           SET "status" = 'SENT',
+               "dispatchedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
+               "lockToken" = NULL,
+               "lockedAt" = NULL,
+               "lastErrorCode" = NULL,
+               "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+           WHERE "id" = $1 AND "lockToken" = $2 AND "status" = 'PROCESSING'
+             AND "lockedAt" >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - ($3 * INTERVAL '1 millisecond')`,
+          event.id,
+          lockToken,
+          staleLockMs,
+        );
+        if (finalized === 1) result.sent += 1;
+        else result.lostLease += 1;
+      } catch (error) {
+        await renew();
+        if (lostIds.has(event.id)) {
+          result.lostLease += 1;
+          continue;
+        }
+        const terminal = event.attempts >= maxAttempts;
+        const errorCode = safeErrorCode(error, "integration-dispatch-failed");
+        const finalized = await db.$transaction(async (tx) => {
+         const updated = await tx.$executeRawUnsafe(
+          `UPDATE "IntegrationOutbox"
+           SET "status" = $3,
+               "availableAt" = $4,
+               "lockToken" = NULL,
+               "lockedAt" = NULL,
+               "lastErrorCode" = $5,
+               "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+           WHERE "id" = $1 AND "lockToken" = $2 AND "status" = 'PROCESSING'
+             AND "lockedAt" >= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC') - ($6 * INTERVAL '1 millisecond')`,
+          event.id,
+          lockToken,
+          terminal ? "FAILED" : "RETRY",
+          terminal ? event.availableAt : new Date(Date.now() + retryDelayMs),
           errorCode,
-        },
-      });
-      if (terminal) result.failed += 1;
-      else result.retried += 1;
+          staleLockMs,
+        );
+         if (updated !== 1) return updated;
+         await writeSystemAudit(tx, {
+          organizationId: event.organizationId,
+          action: terminal
+            ? "integration.outbox_failed"
+            : "integration.outbox_retry_scheduled",
+          entityType: "IntegrationOutbox",
+          entityId: event.id,
+          metadata: {
+            topic: event.topic,
+            eventType: event.eventType,
+            attempts: event.attempts,
+            status: terminal ? "FAILED" : "RETRY",
+            errorCode,
+          },
+        });
+         return updated;
+        });
+        if (finalized !== 1) {
+          result.lostLease += 1;
+          continue;
+        }
+        if (terminal) result.failed += 1;
+        else result.retried += 1;
+      } finally {
+        activeIds.delete(event.id);
+      }
     }
+  } finally {
+    clearInterval(heartbeat);
+    if (renewal) await renewal;
   }
 
   return result;
@@ -587,7 +661,7 @@ async function writeSystemAudit(
   await db.$executeRawUnsafe(
     `INSERT INTO "AuditLog"
       ("id", "organizationId", "actorId", "action", "entityType", "entityId", "metadata", "createdAt")
-     VALUES ($1, $2, NULL, $3, $4, $5, $6::jsonb, CURRENT_TIMESTAMP)`,
+     VALUES ($1, $2, NULL, $3, $4, $5, $6::jsonb, (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))`,
     randomUUID(),
     input.organizationId,
     input.action,

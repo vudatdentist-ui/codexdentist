@@ -1,0 +1,51 @@
+.page {
+  padding: 0;
+  background: transparent;
+  color: var(--ink);
+}
+
+.header {
+  max-width: 1120px;
+  margin: 0 auto 28px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.header h2 { margin: 0; font-size: 20px; line-height: 1.5; }
+.lede { max-width: 680px; margin: 12px 0 0; color: var(--muted); line-height: 1.6; }
+.backLink { color: var(--teal); font-weight: 700; text-decoration: none; white-space: nowrap; }
+.grid { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; }
+.card, .empty { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); box-shadow: none; }
+.card { padding: 20px; }
+.empty { max-width: 1120px; margin: 0 auto; padding: 32px; }
+.cardTopline { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
+.badge { color: var(--teal); font-weight: 800; }
+.card h2 { margin: 22px 0 16px; font-size: 20px; }
+.card dl { display: grid; gap: 10px; margin: 0 0 20px; }
+.card dl div { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.card dt { color: var(--muted); }
+.card dd { margin: 0; max-width: 62%; text-align: right; overflow-wrap: anywhere; }
+.openButton { display: inline-flex; border-radius: 10px; background: var(--teal); color: #fff; padding: 10px 14px; font-weight: 700; text-decoration: none; }
+.unavailable { margin: 0; color: #9a5d16; font-size: 13px; }
+
+@media (max-width: 560px) {
+  .page { padding: 0; }
+  .header { display: block; }
+  .backLink { display: inline-block; margin-top: 18px; }
+  .card dl div { display: block; }
+  .card dd { max-width: none; margin-top: 3px; text-align: left; }
+}
+
+.card { min-width: 0; overflow-wrap: anywhere; }
+.cardTopline { flex-wrap: wrap; }

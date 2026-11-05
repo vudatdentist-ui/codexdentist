@@ -31,4 +31,5 @@ export type OutboxDispatchResult = {
   sent: number;
   retried: number;
   failed: number;
+  lostLease: number;
 };

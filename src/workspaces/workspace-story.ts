@@ -36,11 +36,14 @@ export const workspaceStories: Record<ViewKey, Story> = {
   learning: s("team", c("Học tập", "Learning"), c("Tích lũy từng ngày", "Keep learning, together"), c("Tìm tài liệu và tiếp tục các khóa học.", "Find learning material and continue your courses.")),
   community: s("team", c("Trao đổi nội bộ", "Team conversations"), c("Để đội ngũ luôn cùng nhịp", "Keep the team connected"), c("Chia sẻ thông tin và trao đổi trong phòng khám.", "Share updates and discuss work within your practice.")),
   settings: s("practice", c("Thiết lập", "Settings"), c("Cách phòng khám của bạn vận hành", "How your practice works"), c("Thiết lập phòng khám, phân quyền và tùy chọn vận hành.", "Configure clinics, access, and practice preferences.")),
+  imaging: s("care", c("Hình ảnh học", "Imaging"), c("Hình ảnh trong hồ sơ chăm sóc", "Imaging in the care record"), c("Liên kết nghiên cứu hình ảnh và mở trình xem được cấp quyền.", "Link imaging studies and open the authorized viewer.")),
+  lab: s("care", c("Ca labo", "Lab cases"), c("Theo dõi từng ca labo", "Follow each lab case"), c("Gửi yêu cầu, theo dõi tiến độ và ghi nhận bàn giao.", "Request lab work, follow progress, and record delivery.")),
+  sterilization: s("practice", c("Vô trùng dụng cụ", "Sterilization"), c("Sẵn sàng dụng cụ an toàn", "Prepare instruments safely"), c("Theo dõi chu kỳ vô trùng và truy xuất bộ dụng cụ.", "Track sterilization cycles and instrument traceability.")),
 };
 export const workspaceNavigation: ReadonlyArray<{ chapter: WorkspaceChapter; views: readonly ViewKey[] }> = [
   { chapter: "day", views: ["dashboard", "schedule", "employee-app"] },
-  { chapter: "care", views: ["patients", "journey", "billing", "crm", "pharmacy", "forms", "patient-app"] },
-  { chapter: "practice", views: ["services", "inventory", "accounting", "reports", "settings"] },
+  { chapter: "care", views: ["patients", "journey", "imaging", "lab", "billing", "crm", "pharmacy", "forms", "patient-app"] },
+  { chapter: "practice", views: ["services", "inventory", "sterilization", "accounting", "reports", "settings"] },
   { chapter: "team", views: ["staff", "learning", "community"] },
 ];
 export function viewFromPath(path: string): ViewKey | undefined {

@@ -7,6 +7,7 @@ Install a reviewed copy outside the checkout; this program never updates itself.
 import argparse
 import datetime
 import json
+import hashlib
 import os
 from pathlib import Path
 import re
@@ -83,22 +84,40 @@ def write_atomic(path, content):
     temporary.replace(path)
 
 
-def check_migrations(source, previous):
+def check_migrations(source, previous, reviewed=None):
     # CI has the broader expand/contract checker. Unattended deployments accept
     # only new CREATE statements; anything else requires an operator review.
     changed = capture(["git", "-C", str(source), "diff", "--name-status",
                        f"{previous}..HEAD", "--", "prisma/migrations"])
+    approved = None
+    actual = {}
+    if reviewed:
+        review_path = Path(reviewed)
+        info = review_path.stat()
+        if info.st_uid != 0 or info.st_mode & 0o022:
+            raise RuntimeError("Migration review must be root-owned and not group/world writable")
+        approved = json.loads(review_path.read_text())
+        head = capture(["git", "-C", str(source), "rev-parse", "HEAD"])
+        if approved.get("sha") != head or approved.get("previous") != previous:
+            raise RuntimeError("Migration review does not match the exact release range")
     for line in changed.splitlines():
         status, path = line.split("\t", 1)
         if not path.endswith("/migration.sql"):
             continue
         if status != "A":
             raise RuntimeError("Existing migration changed; operator review required")
+        actual[path] = hashlib.sha256((source / path).read_bytes()).hexdigest()
+        if approved:
+            if approved.get("migrations", {}).get(path) != actual[path]:
+                raise RuntimeError("Migration differs from reviewed bytes")
+            continue
         sql = (source / path).read_text()
         sql = re.sub(r"/\*.*?\*/|--[^\r\n]*", " ", sql, flags=re.S)
         for statement in filter(str.strip, sql.split(";")):
             if not re.match(r"^\s*CREATE\s+(?:TABLE|(?:UNIQUE\s+)?INDEX|TYPE|SEQUENCE)\s", statement, re.I):
                 raise RuntimeError("Migration requires an operator review")
+    if approved and approved.get("migrations") != actual:
+        raise RuntimeError("Migration review does not cover the exact changed files")
 
 
 def health(base):
@@ -151,7 +170,7 @@ def restore_drill(backup, image, name):
         run(["docker", "rm", "-f", name], stdout=subprocess.DEVNULL)
 
 
-def deploy(sha, main):
+def deploy(sha, main, reviewed_migrations=None):
     marker = ROOT / "needs-attention.json"
     if marker.exists():
         raise RuntimeError("Unresolved deployment marker; inspect before retrying")
@@ -178,7 +197,7 @@ def deploy(sha, main):
     if not previous:
         raise RuntimeError("Initial deployment must establish a reviewed revision first")
     # Check the full migration range since the deployed version, not only last commit.
-    check_migrations(source, previous)
+    check_migrations(source, previous, reviewed_migrations)
     image = f"codexdentist:{sha}"
     with (ROOT / f"build-{sha}.log").open("ab") as log:
         run(["docker", "build", "--label", f"{REVISION}={sha}", "-t", image, str(source)],
@@ -253,6 +272,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sha", help="Optional exact main SHA; still requires successful push CI")
     parser.add_argument("--check", action="store_true", help="Read eligibility without deploying")
+    parser.add_argument("--reviewed-migrations", help="Root-owned exact SHA/range/SQL hash review for a manual release")
     args = parser.parse_args()
     os.umask(0o077)
     ROOT.mkdir(mode=0o700, exist_ok=True)
@@ -268,7 +288,7 @@ def main():
             return
         print("Eligible successful main", sha, flush=True)
         if not args.check:
-            deploy(sha, main_sha)
+            deploy(sha, main_sha, reviewed_migrations=args.reviewed_migrations)
 
 
 if __name__ == "__main__":

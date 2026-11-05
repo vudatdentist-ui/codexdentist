@@ -214,6 +214,46 @@ If a test exposes an existing baseline defect unrelated to the change, document 
 
 ## 10. Phased Plan And Exit Criteria
 
+### Current delivery plan — 2026-11-04
+
+The release baseline is `969259a` on `main`, deployed and verified on Hostinger.
+Phases 0–2 are in that baseline. Phase 3 has implementation and historical CI in
+draft PR #34; Phase 4–6 implementation and additional hardening are in draft PR
+#41. Those branches are not released product state. Their older dependency,
+authentication, UI-composition and hosting changes must be reconciled with main.
+
+Delivery proceeds on one integration branch in dependency order:
+
+| Milestone | Required result | Exit evidence |
+| --- | --- | --- |
+| Phase 3 | Integrate payOS/Documenso and safe provider configuration with current Revenue, consent and protected-file contracts. | Verified signatures, duplicate/reordered events, settlement reconciliation, signed-file rollback/GC, negative tenant/clinic tests, current CI and independent audit. |
+| Phases 4–5 | Integrate scoped imaging/viewer access, native lab cases and sterilization traceability. | Stable patient references, permission denials, transitions/data integrity, unavailable-PACS behavior and fresh desktop/mobile browser evidence. |
+| Phase 6 | Integrate optional standards adapters with the existing notification boundary. | Disabled providers preserve core workflows; mapping, authorization, PHI minimization and tenant tests pass. |
+| Phase 7 | Release the integrated product with current Hostinger operations. | Full regression/build/container gates, clean install/upgrade, backup plus isolated restore, candidate checks, deployed revision and public health verification. |
+
+Current evidence: the integrated implementation is in PR #68. Native PostgreSQL
+clean install applies all 57 migrations; provider signatures/retries/consent,
+concurrent invoice settlements, tenant isolation, file lifecycle/purge and restore
+tests pass locally. Lab and sterilization operator workflows pass real-browser
+create/transition/reload/audit checks at 1440/390/320px; unconfigured imaging fails
+safely without losing input. Final CI and production upgrade gates remain open.
+Current executable milestone: finish Phase 7 integrated CI and reviewed upgrade.
+Recovered migration history: `20260516090000_source_commission` has
+ledger checksum `578975509b6eede77797d42ece4d3f93ee5635c8b218abb4894b7191537efae7`
+but release SQL checksum `d31229374b52e7a29228b90fe34afbb9d664a9acdee31c530a3a3288f068ba9b`.
+The original local checkout has the exact applied bytes: 51 LF lines and one CRLF
+line. Normalizing line endings makes it byte-equivalent to Git's SQL. Readiness
+and go-live use the archived original bytes to verify this one historical variant;
+any SQL edit, unrelated name or unknown checksum still fails. The production ledger
+and historical migration files remain unchanged. See issue #69.
+Live payOS/Documenso/PACS acceptance remains pending operator-owned credentials.
+Preserve all November shared-login and patient
+audit fixes and October security/maintainability gates. Reuse completed work;
+do not rebuild equivalent modules or revive Namecheap deployment. Optional
+providers remain disabled until explicitly configured; sandbox verification and
+live-provider evidence must be reported separately. A phase is closed only when
+its current exit evidence passes; this table is updated as milestones close.
+
 ### Phase 0 — Reset Context And Enforcement
 
 **Objective**

@@ -1,3 +1,6 @@
+import { migrationChecksumMatches } from "@/infrastructure/migrations/checksums";
+import { readdirSync, readFileSync } from "node:fs";
+import path from "node:path";
 import { NextResponse } from "next/server";
 import {
   codexMedAiConfig,
@@ -7,6 +10,7 @@ import {
 } from "@/lib/env";
 import { verifyJobRequest } from "@/lib/job-auth";
 import { prisma } from "@/lib/prisma";
+import { reportApplicationError } from "@/lib/error-reporting";
 
 export const dynamic = "force-dynamic";
 
@@ -17,7 +21,7 @@ type ReadinessCheck = {
 };
 
 export async function GET(request: Request) {
-  if (process.env.NODE_ENV === "production" && !verifyJobRequest(request)) {
+  if (!verifyJobRequest(request)) {
     return NextResponse.json(
       { error: "Unauthorized" },
       {
@@ -35,7 +39,7 @@ export async function GET(request: Request) {
     await prisma.$queryRaw`SELECT 1`;
     checks.push({ name: "database", status: "ok" });
   } catch (error) {
-    console.error("readiness.database_failed", error);
+    reportApplicationError("readiness.database_failed", error);
     checks.push({
       name: "database",
       status: "fail",
@@ -44,16 +48,33 @@ export async function GET(request: Request) {
   }
 
   try {
-    const migrations = await prisma.$queryRaw<Array<{ count: bigint }>>`
-      SELECT COUNT(*)::bigint AS count FROM "_prisma_migrations"
+    const expected = new Map(
+      readdirSync(path.join(process.cwd(), "prisma", "migrations"), { withFileTypes: true })
+        .filter((entry) => entry.isDirectory() && /^\d+_/.test(entry.name))
+        .map((entry) => [
+          entry.name,
+          readFileSync(path.join(process.cwd(), "prisma", "migrations", entry.name, "migration.sql")),
+        ]),
+    );
+    const migrations = await prisma.$queryRaw<Array<{ migration_name: string; checksum: string }>>`
+      SELECT migration_name, checksum FROM "_prisma_migrations" WHERE finished_at IS NOT NULL
     `;
+    const applied = new Map(migrations.map((migration) => [migration.migration_name, migration.checksum]));
+    const missing = [...expected.keys()].filter((name) => !applied.has(name));
+    const unexpected = [...applied.keys()].filter((name) => !expected.has(name));
+    const drift = [...expected.entries()]
+      .filter(([name, bytes]) => applied.get(name) && !migrationChecksumMatches(name, bytes, applied.get(name)!))
+      .map(([name]) => name);
+    const valid = missing.length === 0 && unexpected.length === 0 && drift.length === 0;
     checks.push({
       name: "migrations",
-      status: Number(migrations[0]?.count ?? 0) > 0 ? "ok" : "warn",
-      details: `${Number(migrations[0]?.count ?? 0)} migrations recorded`,
+      status: valid ? "ok" : "fail",
+      details: valid
+        ? `${applied.size} migrations verified`
+        : `missing=${missing.length}, unexpected=${unexpected.length}, checksumDrift=${drift.length}`,
     });
   } catch (error) {
-    console.error("readiness.migrations_failed", error);
+    reportApplicationError("readiness.migrations_failed", error);
     checks.push({
       name: "migrations",
       status: "fail",
@@ -68,7 +89,7 @@ export async function GET(request: Request) {
       details: patientFileStorageDriver(),
     });
   } catch (error) {
-    console.error("readiness.storage_failed", error);
+    reportApplicationError("readiness.storage_failed", error);
     checks.push({
       name: "patient-file-storage",
       status: "fail",
@@ -85,7 +106,7 @@ export async function GET(request: Request) {
       details: resend ? "resend configured" : mode,
     });
   } catch (error) {
-    console.error("readiness.notifications_failed", error);
+    reportApplicationError("readiness.notifications_failed", error);
     checks.push({
       name: "notifications",
       status: "fail",
@@ -101,7 +122,7 @@ export async function GET(request: Request) {
       details: ai.enabled ? `${ai.provider}:${ai.model}` : "disabled",
     });
   } catch (error) {
-    console.error("readiness.ai_failed", error);
+    reportApplicationError("readiness.ai_failed", error);
     checks.push({
       name: "ai",
       status: "fail",

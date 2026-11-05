@@ -1,0 +1,21 @@
+.page { padding: 0; background: transparent; color: var(--ink); }
+.header { max-width: 1120px; margin: 0 auto 28px; display: flex; justify-content: space-between; gap: 24px; }
+.eyebrow { margin: 0 0 8px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.header h2 { margin: 0; font-size: 20px; line-height: 1.5; }
+.lede { max-width: 680px; color: var(--muted); line-height: 1.6; }
+.backLink { color: var(--teal); font-weight: 700; text-decoration: none; }
+.grid { max-width: 1120px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr)); gap: 16px; }
+.card, .empty { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); box-shadow: none; }
+.card { padding: 20px; }
+.empty { max-width: 1120px; margin: 0 auto; padding: 32px; }
+.topline { display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 12px; }
+.card h2 { margin: 20px 0 8px; font-size: 20px; }
+.meta { margin: 0 0 18px; color: var(--muted); }
+.card dl { display: grid; gap: 10px; margin: 0; }
+.card dl div { display: flex; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--line); padding-bottom: 8px; }
+.card dt { color: var(--muted); }
+.card dd { margin: 0; text-align: right; overflow-wrap: anywhere; }
+@media (max-width: 560px) { .page { padding: 0; } .header { display: block; } .card dl div { display: block; } .card dd { margin-top: 3px; text-align: left; } }
+
+.card { min-width: 0; overflow-wrap: anywhere; }
+.topline { flex-wrap: wrap; }

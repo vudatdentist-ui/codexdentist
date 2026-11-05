@@ -23,7 +23,7 @@ export const InventoryPanel = dynamic(() => import("@/modules/inventory/Inventor
 export const LearningPanel = dynamic(() => import("@/modules/learning/LearningPanel").then((module) => module.LearningPanel));
 export const StaffPayrollPanel = dynamic(() => import("@/modules/staff/StaffPayrollPanel").then((module) => module.StaffPayrollPanel));
 export const SettingsPanel = dynamic(() => import("@/modules/settings/SettingsPanel").then((module) => module.SettingsPanel));
-export const languageStorageKey = "nhavista.language";
+export { languageStorageKey } from "@/shared/browser/preferences";
 export const chainScopeStorageKey = "codexmed.chainScope";
 export const actionScrollStorageKey = "codexmed.actionScroll";
 export type JourneyReceiptMethod = "cash" | "card" | "bank_transfer";
