@@ -1685,6 +1685,9 @@ async function directActionPermissionCheck({
   );
   assert([303, 307, 308].includes(denied.status) && denied.headers.get("location"),
     `Patient billing request must be denied by redirect, received HTTP ${denied.status}.`);
+  const destination = new URL(denied.headers.get("location"), baseUrl);
+  assert(destination.origin === new URL(baseUrl).origin && destination.pathname === "/patient-app",
+    "Patient billing denial must return to the patient workspace, not login or billing validation.");
 
   const after = await prisma.invoice.count({
     where: { patientId, amount: blockedAmount },
