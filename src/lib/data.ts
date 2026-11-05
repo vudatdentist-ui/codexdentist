@@ -107,6 +107,7 @@ export type Invoice = {
   receiptId?: string;
   creditAllocationId?: string;
   issuedAtMs?: number;
+  refundRequestKey?: string;
 };
 
 export type CommunityPost = {

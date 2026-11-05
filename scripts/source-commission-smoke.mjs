@@ -1,5 +1,10 @@
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
+import { createRequire } from "node:module";
+const { load } = createRequire(import.meta.url)("./audit-source-loader.cjs");
+const { loadReceiptRefundLedger, moneyCents, receiptCommission } = load("src/lib/application/revenue/refund-ledger.ts");
+const { loadReceiptVoidReleases } = load("src/lib/application/revenue/void-ledger.ts");
+const { loadCommissionBasisSnapshots } = load("src/lib/application/revenue/commission-basis.ts");
 
 const connectionString =
   process.env.DATABASE_URL ??
@@ -36,11 +41,26 @@ async function main() {
         select: {
           allocatedAmount: true,
           amount: true,
+          allocations: { select: { invoiceId: true } },
         },
       },
     },
-    take: 1000,
+    orderBy: { id: "asc" },
   });
+
+  const refundsByOrganization = new Map();
+  const basesByOrganization = new Map();
+  for (const organizationId of new Set(accruals.map((accrual) => accrual.organizationId))) {
+    const group = accruals.filter((accrual) => accrual.organizationId === organizationId);
+    refundsByOrganization.set(organizationId, await prisma.$transaction((tx) => loadReceiptRefundLedger(
+      tx, organizationId, [...new Set(group.map((accrual) => accrual.receiptId))],
+      group.flatMap((accrual) => accrual.receipt.allocations.flatMap((row) => row.invoiceId ? [row.invoiceId] : [])),
+    )));
+    await prisma.$transaction(tx => loadReceiptVoidReleases(tx, organizationId, [...new Set(group.map(accrual => accrual.receiptId))]));
+    basesByOrganization.set(organizationId, await prisma.$transaction(tx => loadCommissionBasisSnapshots(
+      tx, organizationId, group.map(accrual => accrual.id),
+    )));
+  }
 
   for (const accrual of accruals) {
     if (accrual.source !== accrual.policy.source || accrual.source !== accrual.patient.leadSource) {
@@ -48,14 +68,22 @@ async function main() {
     }
 
     const baseAmount = Number(accrual.baseAmount);
-    const receiptBase = Number(accrual.receipt.allocatedAmount || accrual.receipt.amount);
-    const expected = Math.max(
-      Math.round((baseAmount * Number(accrual.ratePercent)) / 100 + Number(accrual.fixedAmount)),
-      0,
-    );
+    const refunds = refundsByOrganization.get(accrual.organizationId);
+    const refundedCents = refunds.byReceipt.get(accrual.receiptId) ?? 0;
+    const originalBasis = refunds.grossBases.get(accrual.receiptId);
+    const expected = receiptCommission(baseAmount, Number(accrual.ratePercent), Number(accrual.fixedAmount));
 
-    if (Math.abs(baseAmount - receiptBase) > 0.01) {
-      throw new Error(`Accrual ${accrual.id} base amount does not match receipt.`);
+    if (moneyCents(baseAmount) < 0 || moneyCents(baseAmount) > moneyCents(accrual.receipt.amount) - refundedCents ||
+        (originalBasis !== undefined && moneyCents(baseAmount) !== originalBasis - refundedCents)) {
+      throw new Error(`Accrual ${accrual.id} base amount does not reconcile with retained receipt collection.`);
+    }
+    // Transaction start timestamps cannot establish commit order. Use an atomic
+    // immutable basis captured at generation or before a proven legacy release.
+    const snapshot = basesByOrganization.get(accrual.organizationId).get(accrual.id);
+    const grossBase = originalBasis ?? snapshot?.grossBaseCents ?? moneyCents(accrual.receipt.allocatedAmount);
+    if ((snapshot && (snapshot.receiptId !== accrual.receiptId || snapshot.grossBaseCents !== grossBase)) ||
+        moneyCents(baseAmount) !== grossBase - refundedCents) {
+      throw new Error(`Accrual ${accrual.id} original eligible basis does not match receipt allocation.`);
     }
 
     if (Math.abs(Number(accrual.commissionAmount) - expected) > 0.01) {

@@ -1,6 +1,6 @@
 # Operations
 
-Last updated: 2026-11-04
+Last updated: 2026-11-05
 
 ## Local PC
 
@@ -47,7 +47,7 @@ Self-host storage:
 - Backups: `backups/codexdentist-<timestamp>/`.
 - Copy backups off the server and run a restore drill before storing real patient data.
 
-## Namecheap Shared Hosting
+## Hosted Deployment
 
 ### Hostinger migration observed 2026-10-21
 
@@ -78,6 +78,16 @@ backup directory, then restores that dump into an isolated temporary PostgreSQL
 container and applies the candidate migrations there. Unattended migration policy
 accepts only new CREATE statements; edited migrations and other SQL require an
 operator review even if CI's broader expand/contract checker passes.
+
+For a reviewed additive migration batch, use `--reviewed-migrations <file>` on
+the installed deployer. The JSON file must be root-owned, not group/world
+writable, and contain `sha`, `previous`, and `migrations` (a map of every new
+`prisma/migrations/.../migration.sql` path to its SHA-256). Pin both full revisions
+to the candidate and currently deployed image, and hash Git's exact SQL bytes.
+Review the complete range and constraints before writing the manifest; historical
+migration edits remain forbidden. The normal timer does not receive this override.
+Successful exact-main push CI, backup, isolated restore, candidate health and
+rollback checks remain mandatory for a manually reviewed release.
 
 Production migration runs with the candidate image and the existing Compose
 environment while the previous application remains available. A candidate on a
@@ -117,9 +127,13 @@ must not cache a permanent 404 when started in hosted mode. Verify `/signup`
 after building with the self-host defaults and starting with signup enabled.
 Keep the disabled runtime setting returning 404 as an emergency kill switch.
 
-### Automatic deploy from GitHub `main`
+### Historical Namecheap Deployment (inactive)
 
-The repository deploys to the Namecheap cPanel app after a successful push CI run for the current `main` SHA through `.github/workflows/deploy-namecheap.yml`. The workflow downloads that run's verified hosted release archive and uploads it over SSH. It stages the archive separately, installs dependencies, generates Prisma, runs backward-compatible migrations while the old application remains live, and prunes development dependencies. It stops only the existing CloudLinux Node.js app for the final file cutover; it does not build Next.js on the hosting server.
+The procedures below describe the previous shared-host target. They are not the
+current production release path. Leave `ENABLE_NAMECHEAP_DEPLOY` unset; use the
+Hostinger procedure above for `codexdentist.com`.
+
+When explicitly enabled for that historical target, `.github/workflows/deploy-namecheap.yml` downloads the successful main run's verified hosted release archive and uploads it over SSH. It stages the archive separately, installs dependencies, generates Prisma, runs backward-compatible migrations while the old application remains live, and prunes development dependencies. It stops only the existing CloudLinux Node.js app for the final file cutover; it does not build Next.js on the hosting server.
 
 The deploy script never replaces the production `.env`, protected patient files, or backups. It copies `.env` into the isolated staging directory for preparation; before Prisma migration it parses and exports only `DATABASE_URL` from that protected file with the pinned Node.js 22 runtime. A missing `DATABASE_URL` aborts before migration or application stop. This explicit load is required because Prisma ORM v7 evaluates `prisma.config.ts` from process environment rather than implicitly loading the project's `.env`. A fresh physical `node_modules` tree is prepared in staging and promoted with the application. PostgreSQL migrations are explicit database changes, not a reset or data replacement.
 
@@ -150,7 +164,7 @@ In cPanel, import the matching public key under **SSH Access → Manage SSH Keys
 
 The deploy workflow performs a public `/api/health` check after restart. The hourly production-health workflow remains separate and continues to monitor the public site and database.
 
-Current cPanel deployment:
+Historical cPanel deployment:
 
 - Domain: `https://codexdentist.com`
 - Node.js app root: `/home/CPANEL_USER/codexdentist-app`
@@ -158,7 +172,7 @@ Current cPanel deployment:
 - Startup file: `server.cjs`
 - Database: account-local PostgreSQL; keep credentials only in `.env` and `.env.production`
 
-Authoritative DNS is Cloudflare, using `kanye.ns.cloudflare.com` and `tara.ns.cloudflare.com`. Edit public DNS in Cloudflare, not the cPanel zone or Namecheap Advanced DNS. Root, `www`, and `*` are proxied to the shared-hosting origin; mail and cPanel service hosts remain DNS-only. Preserve the Jellyfish MX records and the existing hosting SPF/DKIM/DMARC records when changing DNS.
+The previous DNS setup used Cloudflare with `kanye.ns.cloudflare.com` and `tara.ns.cloudflare.com`, proxying root, `www`, and `*` to shared hosting. That origin description is historical; verify current DNS and the Hostinger origin before changing routing. Preserve existing mail records when changing DNS.
 
 Cloudflare SSL mode is `Full (strict)`. cPanel has a Cloudflare Origin CA certificate covering `codexdentist.com` and `*.codexdentist.com`; keep the wildcard certificate installed before changing TLS settings or moving the origin. Cloudflare also has one active rate-limiting rule named `Protect authentication endpoints`: requests from the same IP exceeding 30 `POST` requests in 10 seconds to `/login`, `/reset-password`, or `/demo` are blocked for 10 seconds. Application-level persistent rate limits remain authoritative for credential abuse.
 
@@ -205,6 +219,8 @@ npm ls next sharp --depth=0
 npm audit --omit=dev
 ```
 
+### Shared Hosted Runtime Checks
+
 Production `/api/readiness` requires `x-job-secret: <JOB_SECRET>` or a Bearer token. Do not put this secret in public uptime monitors.
 
 Public host routing:
@@ -219,7 +235,9 @@ Public host routing:
 
 Production availability is checked hourly by `.github/workflows/production-health.yml`. It verifies the product page, hosted signup page, feature guide, demo entry, application health, and database health. A failed run is an operational alert and must be investigated before release or onboarding.
 
-GitHub health checks do not expose cPanel resource exhaustion. Review CPU, memory, process, disk, PostgreSQL size, and error logs in cPanel at least weekly during the public beta.
+Public health checks do not replace VPS resource monitoring. Review CPU, memory,
+processes, disk, PostgreSQL size, container logs and deployment timer failures
+during the public beta.
 
 ## Production Environment
 

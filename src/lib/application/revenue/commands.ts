@@ -8,6 +8,8 @@ import { renderNotificationTemplate } from "@/lib/notification-templates";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 import { runSerializableTransaction } from "@/lib/transaction";
+import { attributeInvoiceRefund, moneyCents } from "./refund-ledger";
+import { retainCommissionBasesOnVoid } from "./commission-basis";
 
 export type ReceiptMethod = "cash" | "card" | "bank_transfer" | "credit_balance";
 
@@ -333,7 +335,8 @@ export async function voidInvoiceCommand(session: AppSession, invoiceNo: string)
         clinicId: { in: accessibleClinicIds(session) },
         patient: { organizationId: session.organizationId },
       },
-      select: { id: true, clinicId: true, patientId: true },
+      select: { id: true, clinicId: true, patientId: true, status: true, paidAmount: true,
+        payments: { select: { amount: true, method: true } } },
     });
     if (!invoice) throw new ApplicationCommandError("billing-invoice-not-found");
 
@@ -345,7 +348,31 @@ export async function voidInvoiceCommand(session: AppSession, invoiceNo: string)
     const directAllocations = allocations.filter((a) => !a.treatmentServiceId);
     const directReleasedAmount = sumMoney(directAllocations);
 
-    await tx.invoice.update({ where: { id: invoice.id }, data: { status: "VOID" } });
+    const paymentNet = invoice.payments.reduce((sum, payment) => sum + moneyCents(payment.amount), 0);
+    if (invoice.status === "VOID") {
+      if (paymentNet !== 0 || moneyCents(invoice.paidAmount) !== 0 || allocations.length) {
+        throw new ApplicationCommandError("billing-invoice-ledger-unreconciled");
+      }
+      return { patientId: invoice.patientId };
+    }
+    // Gross receipt allocations are historical collection records. The current
+    // schema has no refund bucket, so releasing them after a refund is unsafe.
+    if (invoice.payments.some((payment) => payment.method.startsWith("refund:"))) {
+      throw new ApplicationCommandError("billing-invoice-refund-void-unsupported");
+    }
+    if (paymentNet !== moneyCents(invoice.paidAmount) ||
+        paymentNet !== allocations.reduce((sum, allocation) => sum + moneyCents(allocation.amount), 0)) {
+      throw new ApplicationCommandError("billing-invoice-ledger-unreconciled");
+    }
+    let voidReversalPaymentId: string | null = null;
+    const commissionBasisSnapshots = await retainCommissionBasesOnVoid(tx, session.organizationId,
+      [...new Set(directAllocations.map(row => row.receiptId))]);
+    if (paymentNet > 0) {
+      const reversal = await tx.payment.create({ data: { invoiceId: invoice.id, amount: -paymentNet / 100,
+        method: "void_reversal", reference: invoiceNo } });
+      voidReversalPaymentId = reversal.id;
+    }
+    await tx.invoice.update({ where: { id: invoice.id }, data: { status: "VOID", paidAmount: 0 } });
     if (serviceAllocationIds.length > 0) {
       await tx.receiptAllocation.updateMany({
         where: { id: { in: serviceAllocationIds } },
@@ -388,6 +415,15 @@ export async function voidInvoiceCommand(session: AppSession, invoiceNo: string)
           invoiceNo,
           serviceAllocationsReleased: serviceAllocationIds.length,
           directReceiptAmountReleased: directReleasedAmount,
+          paymentReversed: paymentNet / 100,
+          invoiceVoidLedgerVersion: 1,
+          commissionBasisLedgerVersion: 1,
+          commissionBasisSnapshots,
+          voidReversalPaymentId,
+          directReceiptReleases: [...new Set(directAllocations.map(row => row.receiptId))].map(receiptId => ({
+            receiptId, amount: directAllocations.filter(row => row.receiptId === receiptId)
+              .reduce((sum, row) => sum + moneyCents(row.amount), 0) / 100,
+          })),
         } as Prisma.InputJsonValue,
       },
     });
@@ -401,6 +437,7 @@ export async function adjustInvoiceAmountCommand(session: AppSession, input: {
   reason: string | null;
 }) {
   requireAction(session, "billing.invoice.void");
+  if (moneyCents(input.amount) <= 0) throw new ApplicationCommandError("billing-money-invalid");
   return runSerializableTransaction(async (tx) => {
     const invoice = await tx.invoice.findFirst({
       where: {
@@ -408,9 +445,14 @@ export async function adjustInvoiceAmountCommand(session: AppSession, input: {
         clinicId: { in: accessibleClinicIds(session) },
         patient: { organizationId: session.organizationId },
       },
-      include: { items: { orderBy: { createdAt: "asc" }, take: 1 } },
+      include: { items: { orderBy: { createdAt: "asc" } },
+        payments: { select: { id: true } }, receiptAllocations: { select: { id: true } } },
     });
     if (!invoice || invoice.status === "VOID") throw new ApplicationCommandError("billing-invoice-not-found");
+    if (invoice.items.length !== 1 || Number(invoice.items[0]!.quantity) !== 1 ||
+        moneyCents(invoice.paidAmount) !== 0 || invoice.payments.length || invoice.receiptAllocations.length) {
+      throw new ApplicationCommandError("billing-invoice-adjustment-locked");
+    }
     const paidAmount = Math.min(Number(invoice.paidAmount), input.amount);
     const nextStatus = paidAmount >= input.amount ? "PAID" : paidAmount > 0 ? "PARTIAL" : "OPEN";
     await tx.invoice.update({
@@ -447,8 +489,13 @@ export async function recordInvoiceRefundCommand(session: AppSession, input: {
   amount: number;
   method: string;
   reference: string | null;
+  idempotencyKey?: string;
 }) {
   requireAction(session, "billing.payment.refund");
+  if (moneyCents(input.amount) <= 0) throw new ApplicationCommandError("billing-bad-payment");
+  if (!["cash", "card", "bank_transfer"].includes(input.method)) {
+    throw new ApplicationCommandError("billing-refund-method-unsupported");
+  }
   return runSerializableTransaction(async (tx) => {
     const invoice = await tx.invoice.findFirst({
       where: {
@@ -456,14 +503,35 @@ export async function recordInvoiceRefundCommand(session: AppSession, input: {
         clinicId: { in: accessibleClinicIds(session) },
         patient: { organizationId: session.organizationId },
       },
-      select: { id: true, amount: true, paidAmount: true, status: true, patientId: true },
+      select: { id: true, amount: true, paidAmount: true, status: true, patientId: true,
+        clinicId: true, payments: { select: { id: true, amount: true, method: true, reference: true } } },
     });
     if (!invoice || invoice.status === "VOID") throw new ApplicationCommandError("billing-invoice-not-found");
+    const paymentNet = invoice.payments.reduce((sum, payment) => sum + moneyCents(payment.amount), 0);
+    if (paymentNet !== moneyCents(invoice.paidAmount)) {
+      throw new ApplicationCommandError("billing-invoice-ledger-unreconciled");
+    }
+    const replay = input.idempotencyKey ? await tx.auditLog.findFirst({
+      where: { organizationId: session.organizationId, entityType: "Invoice", entityId: invoice.id,
+        action: "invoice.refund_recorded", metadata: { path: ["idempotencyKey"], equals: input.idempotencyKey } },
+      select: { metadata: true },
+    }) : null;
+    if (replay) {
+      const metadata = replay.metadata as Record<string, unknown>;
+      if (metadata.method !== input.method || moneyCents(metadata.requestedAmount) !== moneyCents(input.amount)) {
+        throw new ApplicationCommandError("billing-refund-reference-conflict");
+      }
+      return { patientId: invoice.patientId, refundAmount: Number(metadata.amount) };
+    }
     const refundAmount = Math.min(input.amount, Number(invoice.paidAmount));
     if (refundAmount <= 0) throw new ApplicationCommandError("billing-bad-payment");
     const paidAmount = Math.max(Number(invoice.paidAmount) - refundAmount, 0);
     const nextStatus = paidAmount >= Number(invoice.amount) ? "PAID" : paidAmount > 0 ? "PARTIAL" : "OPEN";
-    await tx.payment.create({
+    const attribution = await attributeInvoiceRefund(tx, {
+      organizationId: session.organizationId, clinicId: invoice.clinicId,
+      patientId: invoice.patientId, invoiceId: invoice.id, amount: refundAmount, paidAmount: Number(invoice.paidAmount),
+    });
+    const payment = await tx.payment.create({
       data: {
         invoiceId: invoice.id,
         amount: -refundAmount,
@@ -484,6 +552,11 @@ export async function recordInvoiceRefundCommand(session: AppSession, input: {
           amount: refundAmount,
           method: input.method,
           reference: input.reference,
+          refundLedgerVersion: 1,
+          paymentId: payment.id,
+          ...attribution,
+          requestedAmount: input.amount,
+          idempotencyKey: input.idempotencyKey ?? null,
         } as Prisma.InputJsonValue,
       },
     });

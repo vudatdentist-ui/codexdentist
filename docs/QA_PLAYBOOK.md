@@ -1,6 +1,6 @@
 # Codexdentist QA Playbook
 
-Last updated: 2026-11-04
+Last updated: 2026-11-05
 Status: ACTIVE
 
 This playbook implements the closed-loop quality process defined in `docs/PROJECT_CONTEXT.md`:
@@ -21,6 +21,26 @@ functions, races provider/chair bookings and batch/immediate notification worker
 and verifies credential emails cannot be sent from redacted persisted bodies.
 The database tests create and clean up only their own randomly identified workspace.
 CI runs both suites; a mock-only race test is insufficient for these database boundaries.
+
+Run `NODE_ENV=test npm run test:seed-ledger-db` on disposable loopback PostgreSQL
+after seed changes. Synthetic paid invoices must have matching payments, receipt
+totals and allocations; repeat seed bookkeeping must be idempotent and refuse
+non-fixture payment history. `prisma/seed.js` refuses production, missing explicit
+database configuration and remote database hosts. Never run it to repair live
+opening balances: historical fixtures require a separate provenance review.
+
+Revenue changes also run `test:financial-ledger-db`. The runner creates a uniquely
+named loopback database, applies the full migration history, exercises actual
+Revenue commands and removes only that generated database. Cover paid void/replay,
+two intentional partial refunds, same-intent and shared-receipt races, commission
+generation racing refund, first generation after a refund, fixed fees, unsafe
+adjustment denials and tenant/clinic permissions. `test:billing` also reconciles
+invoice paid amounts to signed payment totals. `browser:qa` includes the refund
+form, exact Server Action replay, a new intentional refund after refresh, and the
+visible refunded-void denial at 1440/390/320px. No provider or real money is used.
+The financial database runner also holds each transaction before its first read
+to prove both void/generation commit orders. Commission basis snapshots are
+atomic evidence; transaction start or receipt-update times are not substitutes.
 
 After demo lifecycle or organization-purge changes, run `NODE_ENV=test npm run
 test:demo-cleanup-db` against disposable loopback PostgreSQL. It creates an expired

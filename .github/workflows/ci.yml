@@ -104,6 +104,14 @@ jobs:
         run: npm run test:audit-db
         env:
           NODE_ENV: test
+      - name: Synthetic seed ledger and production refusal regressions
+        run: npm run test:seed-ledger-db
+        env:
+          NODE_ENV: test
+      - name: Isolated financial ledger, refund and commission races
+        run: npm run test:financial-ledger-db
+        env:
+          NODE_ENV: test
       - name: Maintainability database regressions
         run: npm run test:maintainability-db
         env:

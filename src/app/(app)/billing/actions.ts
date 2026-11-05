@@ -174,12 +174,16 @@ export async function recordInvoiceRefundAction(formData: FormData) {
   const amount = parseMoney(formData.get("amount"));
   const method = requiredString(formData.get("method")) || "cash";
   const reference = optionalString(formData.get("reference"));
+  const idempotencyKey = optionalString(formData.get("idempotencyKey"));
   if (!invoiceNo || amount === null || amount <= 0) {
     redirect("/billing?notice=billing-bad-payment");
   }
+  if (!idempotencyKey || idempotencyKey.length > 128) {
+    redirect("/billing?notice=billing-refund-intent-missing");
+  }
 
   try {
-    await recordInvoiceRefundCommand(session, { invoiceNo, amount, method, reference });
+    await recordInvoiceRefundCommand(session, { invoiceNo, amount, method, reference, idempotencyKey });
   } catch (error) {
     reportApplicationError("app/(app)/billing/actions", error);
     redirect(`/billing?notice=${applicationErrorCode(error, "billing-database")}`);
