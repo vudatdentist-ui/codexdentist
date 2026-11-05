@@ -78,12 +78,7 @@ export function restoreActionScrollState(pathname: string) {
         removeBrowserStorage("session", actionScrollStorageKey);
     }
 }
-export function shouldKeepActionNotice(notice: string) {
-    if (notice === "module-ai-ready" || notice === "module-ai-failed") {
-        return true;
-    }
-    return /denied|missing|bad|invalid|not-found|unavailable|database|conflict|exists|empty|locked|failed|error|expired/i.test(notice);
-}
+export { shouldKeepActionNotice } from "@/lib/action-notices";
 export function titleFor(view: ViewKey, language: Language) {
     return uiText[language].titles[view];
 }

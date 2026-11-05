@@ -64,6 +64,24 @@ These rules survive every refactor and integration.
 - Partial invoices are not merged after issuance.
 - External payment providers may request or report a payment, but they never write Codexdentist billing tables directly.
 
+Financial adjustment decision (2026-11-05): receipt amounts and allocations remain
+gross historical collections; cash refunds are negative Payments with versioned
+receipt shares and original commission bases in the same transaction's immutable
+`invoice.refund_recorded` audit metadata. Retain that metadata with its Payments;
+it is financial evidence, not disposable diagnostic logging. Legacy refunds with
+missing attribution fail closed. Commission generation and adjustment use the
+retained net basis, preserving other invoices on a shared receipt and fixed-fee
+policy snapshots. Paid commission payouts require separate reconciliation.
+Voiding a non-refunded invoice reverses its payment application, sets paid to zero
+and releases direct allocations to credit exactly once; service collections stay
+with their service. Internal `void_reversal` entries are not cash movements on the
+patient statement. The current schema has no refunded-receipt bucket: void after
+refund and service-linked cash refunds are explicitly unsupported. Reject them
+before mutation rather than creating spendable refunded money or overstating
+service collections. Amount adjustment is limited to an unsettled, unallocated
+single-line invoice of quantity one. The refund form sends an intent tied to the
+invoice payment-ledger version; replay cannot create another negative Payment.
+
 ### Patient files and PHI
 
 - Patient files are protected records, never public assets.

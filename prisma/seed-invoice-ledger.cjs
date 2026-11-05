@@ -25,8 +25,8 @@ async function seedInvoiceLedger(prisma, invoice) {
     });
     await tx.payment.upsert({
       where: { id: paymentId },
-      create: { id: paymentId, invoiceId: invoice.id, amount, method: 'seed:opening_balance', reference: receiptId },
-      update: { amount },
+      create: { id: paymentId, invoiceId: invoice.id, amount, method: 'seed:opening_balance', reference: `SEED-${invoice.invoiceNo}` },
+      update: { amount, reference: `SEED-${invoice.invoiceNo}` },
     });
   });
 }

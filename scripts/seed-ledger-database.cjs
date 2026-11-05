@@ -34,6 +34,7 @@ async function main() {
       const allocations = await prisma.receiptAllocation.findMany({ where: { invoiceId: invoice.id }, include: { receipt: true } });
       assert.equal(payments.length, paid ? 1 : 0);
       assert.equal(payments.reduce((sum, row) => sum + Number(row.amount), 0), paid);
+      if (paid) assert.equal(payments[0].reference, `SEED-${invoice.invoiceNo}`);
       assert.equal(allocations.reduce((sum, row) => sum + Number(row.amount), 0), paid);
       for (const row of allocations) {
         assert.equal(Number(row.receipt.amount), paid);

@@ -29,6 +29,16 @@ non-fixture payment history. `prisma/seed.js` refuses production, missing explic
 database configuration and remote database hosts. Never run it to repair live
 opening balances: historical fixtures require a separate provenance review.
 
+Revenue changes also run `test:financial-ledger-db`. The runner creates a uniquely
+named loopback database, applies the full migration history, exercises actual
+Revenue commands and removes only that generated database. Cover paid void/replay,
+two intentional partial refunds, same-intent and shared-receipt races, commission
+generation racing refund, first generation after a refund, fixed fees, unsafe
+adjustment denials and tenant/clinic permissions. `test:billing` also reconciles
+invoice paid amounts to signed payment totals. `browser:qa` includes the refund
+form, exact Server Action replay, a new intentional refund after refresh, and the
+visible refunded-void denial at 1440/390/320px. No provider or real money is used.
+
 After demo lifecycle or organization-purge changes, run `NODE_ENV=test npm run
 test:demo-cleanup-db` against disposable loopback PostgreSQL. It creates an expired
 demo with an invoice, invoice item, receipt and linked allocation, exercises the

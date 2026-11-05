@@ -44,12 +44,18 @@ export function BillingAdjustmentsSection(model: Pick<BillingPanelModel, "bt" | 
             <form action={recordInvoiceRefundAction} className="staff-form" onSubmit={(event) => {
             if (!window.confirm(billingAdvancedLabels.confirmRefund)) {
                 event.preventDefault();
+                return;
             }
+            const form = event.currentTarget;
+            const invoice = form.elements.namedItem("invoiceNo") as HTMLSelectElement;
+            const intent = form.elements.namedItem("idempotencyKey") as HTMLInputElement;
+            intent.value = invoice.selectedOptions[0]?.dataset.refundRequestKey ?? "";
         }}>
+              <input type="hidden" name="idempotencyKey" defaultValue={refundableInvoices[0]?.refundRequestKey ?? ""}/>
               <label>
                 {bt.invoiceList}
                 <select name="invoiceNo" disabled={!canMutate || refundableInvoices.length === 0} required>
-                  {refundableInvoices.map((invoice) => (<option value={invoice.id} key={invoice.id}>
+                  {refundableInvoices.map((invoice) => (<option value={invoice.id} key={invoice.id} data-refund-request-key={invoice.refundRequestKey}>
                       {invoice.id} - {invoice.patient}
                     </option>))}
                 </select>

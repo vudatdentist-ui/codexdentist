@@ -73,6 +73,7 @@ export async function getBillingWorkspace(
           },
         },
         include: {
+          _count: { select: { payments: true } },
           patient: {
             select: {
               id: true,
@@ -310,6 +311,7 @@ export async function getBillingWorkspace(
           serviceId: serviceItem?.treatmentService?.id,
           serviceCode: serviceItem?.treatmentService?.serviceCode,
           issuedAtMs: invoice.createdAt.getTime(),
+          refundRequestKey: `${invoice.id}:${invoice._count.payments}`,
         };
       }),
       treatmentServices: dbTreatmentServices.map(toBillingTreatmentServiceSummary),
@@ -790,7 +792,8 @@ function buildStatementLines(input: {
         credit: Number(receipt.amount),
       })),
     ...input.payments
-      .filter((payment) => !payment.reference || !receiptNos.has(payment.reference))
+      .filter((payment) => payment.method !== "void_reversal" &&
+        (!payment.reference || !receiptNos.has(payment.reference)))
       .map((payment) => {
       const amount = Number(payment.amount);
 
@@ -864,6 +867,11 @@ function paymentMethodLabel(method: string) {
     credit_balance: "Credit balance",
     service_receipt: "Previous receipt",
     portal_demo: "Portal",
+    void_reversal: "Invoice application reversed",
+    "seed:opening_balance": "Opening balance (sample)",
+    "refund:cash": "Cash refund",
+    "refund:card": "Card refund",
+    "refund:bank_transfer": "Bank transfer refund",
   };
 
   return labels[method] ?? method;
