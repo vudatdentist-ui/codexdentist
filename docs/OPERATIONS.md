@@ -353,6 +353,42 @@ Restore drill:
 4. Run `npm run typecheck`, `npm run test:smoke`, `npm run test:billing`, and `npm run agent:health`.
 5. Only restore over active data after the disposable restore is verified.
 
+## payOS operator setup
+
+Use **Settings → Tích hợp & AI → payOS** on the shared application host.
+Choose the organization or an authorized clinic, enter Client ID, API Key and
+Checksum Key from the operator's payOS channel, save, then verify. Verification
+registers the callback with payOS and requires its authenticated sample to arrive
+during the owner-initiated handshake; a successful API response alone is not
+readiness. The displayed confirmed address includes its registered probe nonce.
+The exact signed sample may be acknowledged again on that confirmed address;
+it never records money. Ordinary orders still require trusted internal mapping.
+
+Use **Billing → Hóa đơn → Thanh toán payOS** for QR/link creation, durable request
+history and status refresh. Only a verified webhook records a receipt; returning
+from checkout never marks an invoice paid. A verified transfer arriving after
+invoice void becomes patient credit. Existing paid invoices cannot receive more
+allocation than their remaining balance.
+
+Credentials are stored only as AES-256-GCM envelopes in `IntegrationCredential`.
+Back up the database and the selected master together: optional
+`INTEGRATION_SECRET_KEY` must be canonical base64 encoding exactly 32 random bytes;
+otherwise `AUTH_SECRET` supplies the HKDF master. Changing the master without
+resealing existing envelopes makes them unreadable. Do not rotate that key as a
+normal credential edit; retain it for restore and plan a separate re-encryption
+operation. Keys never appear in workspace DTOs, connection metadata or audit.
+
+Unresolved requests block merchant-key replacement and disabling. A timeout or
+ambiguous provider error remains unresolved even if a later retry is rejected.
+Reconcile these requests against the original payOS channel before changing its
+keys; do not edit payment metadata manually or claim that the absence of a local
+receipt proves no payment exists. Enabling the same connection remains possible.
+The generic connections API rejects payOS writes; use the dedicated settings flow.
+Legacy `env:PAYOS_DEFAULT` additionally requires `PAYOS_DEFAULT_ORGANIZATION_ID`
+to bind those environment credentials to exactly one organization. Other tenants
+must use their own stored merchant keys. Leave real payment activation pending
+until the owner supplies and verifies their actual credentials.
+
 ## Go-Live Gate
 
 The integrated roadmap release in PR #68 adds six migrations, including composite

@@ -1,6 +1,7 @@
 "use client";
 import { Download, Printer, WalletCards } from "lucide-react";
 import Link from "next/link";
+import { PayOSInvoicePayment } from "@/workspaces/integrations/PayOSInvoicePayment";
 import { recordPaymentAction, voidInvoiceAction } from "@/app/(app)/billing/actions";
 import { MoneyInput } from "@/components/MoneyInput";
 import { EmptyState, } from "@/components/suite-primitives";
@@ -78,6 +79,8 @@ export function BillingInvoicesSection(model: Pick<BillingPanelModel, "bt" | "fi
                 </div>
                 <StatusPill status={invoice.status}/>
                 <div className="invoice-actions">
+                  {canMutate && invoice.patientId && <PayOSInvoicePayment patientId={invoice.patientId}
+                    invoiceNo={invoice.id} balance={invoice.status === "Void" ? 0 : billingInvoiceBalance(invoice)} language={language} />}
                   {(<Link href={`/billing/print/${encodeURIComponent(invoice.id)}`}>
                       <Printer size={13} aria-hidden="true"/>
                       {bt.print}

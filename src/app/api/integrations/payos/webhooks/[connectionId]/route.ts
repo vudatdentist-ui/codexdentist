@@ -14,7 +14,9 @@ import {
   updateExternalReferenceMetadata,
 } from "@/infrastructure/integrations/phase3-store";
 import { recordProviderSettlementCommand } from "@/lib/application/revenue/provider-settlement";
-import { resolvePayOSConnectionSecrets } from "@/integrations/config";
+import { payOSConnectionSecrets } from "@/app/api/integrations/payos/connection-secrets";
+import { payOSRequestBody } from "@/app/api/integrations/payos/http";
+import { payOSVerificationProbe } from "@/features/integrations/payos-workspace";
 import {
   minimalPayOSWebhookPayload,
   payOSWebhookEventId,
@@ -27,23 +29,39 @@ export async function POST(
 ) {
   const { connectionId } = await context.params;
   const connection = await getIntegrationConnectionById(prisma, connectionId, "payos");
-  if (!connection || connection.status !== "ACTIVE") {
+  if (!connection || !["ACTIVE", "DISABLED"].includes(connection.status)) {
     return error("payos-connection-not-found", 404);
   }
 
   let verified;
   try {
-    const payload = await request.json();
-    const secrets = resolvePayOSConnectionSecrets(connection.secretRef);
+    const payload = await payOSRequestBody(request);
+    const secrets = await payOSConnectionSecrets(connection);
     verified = verifyPayOSWebhookPayload(payload, secrets.checksumKey);
   } catch (cause) {
     return error(errorCode(cause, "payos-webhook-invalid"), statusCode(cause, 400));
   }
 
+  // An initial probe needs the owner-issued nonce and its bounded window. The
+  // confirmed registered URL can subsequently acknowledge the same signed sample
+  // without touching financial state. Unknown real orders still fail.
+  const verificationId = new URL(request.url).searchParams.get("verification");
+  if (verificationId && payOSVerificationProbe(verified)) {
+    const observed = await prisma.$executeRawUnsafe(
+      `UPDATE "IntegrationConnection" SET "metadata"="metadata" || jsonb_build_object('verificationObservedId',$3::text),
+       "updatedAt"=(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
+       WHERE "id"=$1 AND "organizationId"=$2 AND "status"='ACTIVE'
+         AND "metadata"->>'verificationId'=$3
+         AND (("metadata"->>'verificationExpiresAt')::timestamptz > CURRENT_TIMESTAMP
+           OR ("metadata"->>'webhookConfirmed'='true' AND "metadata"->>'verificationObservedId'=$3))`,
+      connection.id, connection.organizationId, verificationId);
+    return observed === 1 ? json({ verified: true }) : error("payos-verification-expired", 409);
+  }
+
   // Verification deliberately happens before any inbox insert or business mutation.
   await prisma.$executeRawUnsafe(
     `UPDATE "IntegrationConnection"
-     SET "lastVerifiedAt" = CURRENT_TIMESTAMP, "updatedAt" = CURRENT_TIMESTAMP
+     SET "lastVerifiedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'), "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
      WHERE "id" = $1`,
     connection.id,
   );

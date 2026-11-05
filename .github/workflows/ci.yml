@@ -43,6 +43,7 @@ jobs:
       PAYOS_DEFAULT_CLIENT_ID: phase3-ci-client
       PAYOS_DEFAULT_API_KEY: phase3-ci-api-key
       PAYOS_DEFAULT_CHECKSUM_KEY: ci-phase3-payos-checksum-secret
+      PAYOS_DEFAULT_ORGANIZATION_ID: org_nhavista
 
     steps:
       - uses: actions/checkout@v7
@@ -61,6 +62,8 @@ jobs:
         run: npm audit --audit-level=high
       - name: Audit regression tests
         run: npm run test:audit
+      - name: payOS workflow and encrypted credential regressions
+        run: npm run test:payos
       - name: Maintainability regressions and budgets
         run: npm run test:maintainability
       - run: npm run encoding:check
@@ -91,6 +94,10 @@ jobs:
       - run: node scripts/phase6-architecture-check.mjs
       - run: npm run test:domain-operations
       - run: npx prisma migrate deploy
+      - name: Native encrypted credential isolation and migration verification
+        run: npm run test:integration-vault-db
+        env:
+          NODE_ENV: test
       - name: Disposable database restore and migration verification
         run: npm run test:disposable-restore
         env:
@@ -193,6 +200,11 @@ jobs:
         run: npm run browser:qa
         env:
           NODE_ENV: test
+      - name: Production payOS settings, QR history and signed settlement UI
+        run: npm run browser:payos-production
+        env:
+          NODE_ENV: test
+          PAYOS_QA_APP_URL: http://127.0.0.1:3000
       - name: Upload application browser evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -217,6 +229,18 @@ jobs:
       - name: Stop verification server
         shell: bash
         run: pkill -f 'next start' || true
+      - name: payOS full app workflow with loopback merchant
+        run: npm run browser:payos
+        env:
+          NODE_ENV: test
+      - name: Upload payOS app evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: payos-qa-${{ github.sha }}
+          path: output/workspace-qa/payos
+          if-no-files-found: warn
+          retention-days: 7
       - name: Build hosted production release
         shell: bash
         env:

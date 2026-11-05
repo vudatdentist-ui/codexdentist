@@ -69,6 +69,7 @@ if (process.env.NODE_ENV === "production") {
 }
 
 const nextConfig: NextConfig = {
+  agentRules: false,
   allowedDevOrigins: ["127.0.0.1"],
   typescript: {
     ignoreBuildErrors: process.env.CODEXMED_PHONE_BUILD === "true",

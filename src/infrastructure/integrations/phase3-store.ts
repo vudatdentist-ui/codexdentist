@@ -208,9 +208,10 @@ export async function claimExternalReferenceForRetry(
 ) {
   const rows = await db.$queryRawUnsafe<ExternalReferenceRecord[]>(
     `UPDATE "ExternalReference"
-     SET "metadata" = jsonb_set(("metadata" - 'errorCode'), '{status}', '"CREATING"'::jsonb),
+     SET "metadata" = jsonb_set(("metadata" - 'errorCode'), '{status}', '"CREATING"'::jsonb)
+           || CASE WHEN "metadata"->>'status'='ERROR' THEN '{"creationUncertain":true}'::jsonb ELSE '{}'::jsonb END,
          "updatedAt" = CURRENT_TIMESTAMP
-     WHERE "id" = $1 AND "metadata"->>'status' = 'ERROR'
+     WHERE "id" = $1 AND "metadata"->>'status' IN ('ERROR', 'FAILED')
      RETURNING *`,
     referenceId,
   );

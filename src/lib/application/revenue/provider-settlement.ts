@@ -35,18 +35,16 @@ export async function recordProviderSettlementCommand(
         AND "organizationId" = ${input.organizationId}
         AND "clinicId" = ${input.clinicId}
         AND "patientId" = ${input.patientId}
-        AND "status" <> 'VOID'
       FOR UPDATE
     `;
   }
-  const invoice = input.invoiceNo
+  const referencedInvoice = input.invoiceNo
     ? await tx.invoice.findFirst({
         where: {
           invoiceNo: input.invoiceNo,
           organizationId: input.organizationId,
           clinicId: input.clinicId,
           patientId: input.patientId,
-          status: { not: "VOID" },
         },
         select: {
           id: true,
@@ -57,9 +55,13 @@ export async function recordProviderSettlementCommand(
         },
       })
     : null;
-  if (input.invoiceNo && !invoice) {
+  if (input.invoiceNo && !referencedInvoice) {
     throw new ProviderSettlementError("provider-settlement-invoice-not-found");
   }
+
+  // A verified transfer can arrive after staff voids the invoice. Preserve the
+  // received money as patient credit; never revive or allocate a voided invoice.
+  const invoice = referencedInvoice?.status === "VOID" ? null : referencedInvoice;
 
   const invoiceBalance = invoice
     ? Math.max(Number(invoice.amount) - Number(invoice.paidAmount), 0)

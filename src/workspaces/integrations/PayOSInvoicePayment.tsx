@@ -32,11 +32,12 @@ function PaymentCode({ value, vi }: { value: string; vi: boolean }) {
   return <img className={styles.qr} src={image} width={320} height={320} alt={vi ? "Mã QR thanh toán payOS" : "payOS payment QR code"} />;
 }
 
-function OrderCard({ order, vi, money }: { order: PayOSOrderSummary; vi: boolean; money: (value: number) => string }) {
+function OrderCard({ order, vi, money, canPay }: { order: PayOSOrderSummary; vi: boolean; money: (value: number) => string; canPay: boolean }) {
   const checkout = payOSCheckoutUrl(order.checkoutUrl);
   const settled = order.status === "SETTLED";
   const pending = ["PENDING", "CREATING", "CREATED", "PROCESSING"].includes(order.status);
   const label = settled ? (vi ? "Đã ghi nhận thanh toán" : "Payment recorded")
+    : order.status === "FAILED" ? (vi ? "Không tạo được yêu cầu" : "Request rejected")
     : order.status === "ERROR" ? (vi ? "Cần kiểm tra" : "Needs review")
       : order.status === "CANCELLED" || order.status === "CANCELED" ? (vi ? "Đã hủy" : "Cancelled")
         : order.status === "EXPIRED" ? (vi ? "Đã hết hạn" : "Expired")
@@ -50,8 +51,9 @@ function OrderCard({ order, vi, money }: { order: PayOSOrderSummary; vi: boolean
     {settled && <p className={styles.success}>{order.receiptNo
       ? `${vi ? "Phiếu thu" : "Receipt"}: ${order.receiptNo}`
       : (vi ? "Đã nhận xác nhận. Tải lại để xem phiếu thu." : "Confirmation received. Refresh to view the receipt.")}</p>}
-    {pending && code && <PaymentCode value={code} vi={vi} />}
-    {pending && checkout && <a href={checkout} target="_blank" rel="noopener noreferrer">{vi ? "Mở trang thanh toán payOS" : "Open payOS payment page"} ↗</a>}
+    {pending && code && canPay && <PaymentCode value={code} vi={vi} />}
+    {pending && checkout && canPay && <a href={checkout} target="_blank" rel="noopener noreferrer">{vi ? "Mở trang thanh toán payOS" : "Open payOS payment page"} ↗</a>}
+    {pending && !canPay && <p className={styles.description}>{vi ? "Hóa đơn không còn khoản cần thu. Không sử dụng mã thanh toán trước đó." : "This invoice has no balance due. Do not use its earlier payment code."}</p>}
     {pending && !code && <p className={styles.description}>{vi ? "Chưa có mã thanh toán. Vui lòng tải lại trạng thái." : "The payment code is not available yet. Refresh the status."}</p>}
     {order.status === "ERROR" && <p className={styles.description}>{vi ? "Chưa ghi nhận khoản thu. Tải lại trạng thái trước khi tạo yêu cầu khác." : "No receipt has been recorded. Refresh the status before creating another request."}</p>}
   </article>;
@@ -138,6 +140,11 @@ function InvoicePayment({ patientId, invoiceNo, balance, language }: Props) {
         signal: AbortSignal.timeout(30000),
       });
       if (!response.ok) {
+        const detail = await response.json().catch(() => null) as { error?: string } | null;
+        if (mounted.current && detail?.error === "payos-invoice-amount-invalid") {
+          setError(vi ? "Số dư hóa đơn đã thay đổi. Tải lại hóa đơn trước khi tạo yêu cầu mới." : "The invoice balance changed. Refresh the invoice before creating another request.");
+          router.refresh(); return;
+        }
         if (mounted.current) setError(response.status === 403
           ? (vi ? "Bạn chưa có quyền tạo yêu cầu thanh toán này." : "You do not have permission to create this payment request.")
           : response.status === 400 || response.status === 422
@@ -194,7 +201,7 @@ function InvoicePayment({ patientId, invoiceNo, balance, language }: Props) {
           {intent && !intent.completed && <p className={styles.description}>{vi ? "Chỉ chọn “Tạo yêu cầu khác” khi chủ động thu khoản mới. Yêu cầu trước có thể vẫn đang chờ thanh toán." : "Choose “New payment request” only for an intentional new collection. The previous request may still be awaiting payment."}</p>}
         </div>}
         <h3 className={styles.historyHeading}>{vi ? "Lịch sử yêu cầu" : "Payment requests"}</h3>
-        {orders.length > 0 ? <ul className={styles.history}>{orders.map(order => <li key={order.id}><OrderCard order={order} vi={vi} money={money} /></li>)}</ul>
+        {orders.length > 0 ? <ul className={styles.history}>{orders.map(order => <li key={order.id}><OrderCard order={order} vi={vi} money={money} canPay={balance > 0} /></li>)}</ul>
           : !loading && <p className={styles.description}>{vi ? "Chưa có yêu cầu thanh toán." : "No payment requests yet."}</p>}
       </div>
     </WorkspaceDialog>

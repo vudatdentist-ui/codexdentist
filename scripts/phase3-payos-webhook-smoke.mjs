@@ -130,7 +130,8 @@ try {
     reference: `phase3-early-failure-${suffix}`,
     transactionCode: "01",
   });
-  assert((await postWebhook(connection.id, earlyFailure)).ok, "early non-success event is recorded");
+  const earlyResponse = await postWebhook(connection.id, earlyFailure);
+  assert(earlyResponse.ok, `early non-success event is recorded: HTTP ${earlyResponse.status} ${await earlyResponse.text()}`);
   assert(
     referenceMetadata(await orderReference(owner.organizationId, connection.id, second.orderCode)).status === "PENDING",
     "early non-success event leaves payment pending",
@@ -139,7 +140,8 @@ try {
     reference: `phase3-second-${suffix}`,
     transactionCode: "00",
   });
-  assert((await postWebhook(connection.id, secondSuccess)).ok, "later success event settles pending payment");
+  const secondResponse = await postWebhook(connection.id, secondSuccess);
+  assert(secondResponse.ok, `later success event settles pending payment: HTTP ${secondResponse.status} ${await secondResponse.text()}`);
   const secondMetadata = referenceMetadata(
     await orderReference(owner.organizationId, connection.id, second.orderCode),
   );

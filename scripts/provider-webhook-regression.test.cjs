@@ -39,7 +39,7 @@ test("payOS redelivery receives retryable status until durable inbox processing 
       getExternalReferenceByExternalId: async () => record,
     },
     "@/lib/application/revenue/provider-settlement": { recordProviderSettlementCommand: async () => { settlements++; } },
-    "@/integrations/config": { resolvePayOSConnectionSecrets: () => ({ checksumKey: "key" }) },
+    "@/app/api/integrations/payos/connection-secrets": { payOSConnectionSecrets: async () => ({ checksumKey: "key" }) },
   });
   const client = load("src/integrations/payos/client.ts");
   const data = { orderCode: 123, amount: 100000, currency: "VND" };

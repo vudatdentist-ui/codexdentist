@@ -17,6 +17,7 @@ export async function POST(request: Request) {
   const session = await getSession();
   if (!session) return error("unauthorized", 401);
   if (!canPerformAction(session, "settings.manage")) return error("forbidden", 403);
+  if (session.isDemo) return error("integration-demo-unavailable", 403);
 
   const body = await request.json().catch(() => null) as Record<string, unknown> | null;
   const provider = typeof body?.provider === "string" ? body.provider.trim().toLowerCase() : "";
@@ -25,8 +26,10 @@ export async function POST(request: Request) {
     : null;
   const secretRef = typeof body?.secretRef === "string" ? body.secretRef.trim() : "";
   if (!providers.has(provider)) return error("integration-provider-invalid", 400);
+  // payOS writes have one command boundary with credential/intent locking.
+  // This legacy transport must not replace a vaulted merchant behind that lock.
+  if (provider === "payos") return error("payos-use-settings", 409);
   if (!secretRefPattern.test(secretRef)) return error("integration-secret-ref-invalid", 400);
-  if (provider === "payos" && secretRef !== "env:PAYOS_DEFAULT") return error("payos-secret-ref-invalid", 400);
   if (provider === "documenso" && secretRef !== "env:DOCUMENSO_DEFAULT") return error("documenso-secret-ref-invalid", 400);
   if (provider === "orthanc" && secretRef !== "env:ORTHANC_DEFAULT") {
     return error("orthanc-secret-ref-invalid", 400);
@@ -51,9 +54,7 @@ export async function POST(request: Request) {
     status: "ACTIVE",
     secretRef,
     capabilities:
-      provider === "payos"
-        ? { paymentLinks: true, webhooks: true }
-        : provider === "documenso"
+      provider === "documenso"
           ? { signing: true, webhooks: true }
           : { dicomStudies: true, ohifViewer: true, webhooks: false },
     metadata: {

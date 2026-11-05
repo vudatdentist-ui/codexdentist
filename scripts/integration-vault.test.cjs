@@ -201,7 +201,9 @@ test('native PostgreSQL: full migration, vault isolation, tenant FK, UTC, rotati
       await api.writeIntegrationSecrets(db, scope, secrets);
       await client.query(`DELETE FROM "IntegrationConnection" WHERE id='connection-A'`);
       assert.equal((await client.query(`SELECT count(*)::int AS count FROM "IntegrationCredential" WHERE "connectionId"='connection-A'`)).rows[0].count, 0);
-      assert.equal((await client.query(`SELECT count(*)::int AS count FROM "_prisma_migrations" WHERE finished_at IS NOT NULL`)).rows[0].count, 58);
+      const migrations = require('node:fs').readdirSync(require('node:path').join(__dirname, '../prisma/migrations'), { withFileTypes: true })
+        .filter(entry => entry.isDirectory() && require('node:fs').existsSync(require('node:path').join(__dirname, '../prisma/migrations', entry.name, 'migration.sql')));
+      assert.equal((await client.query(`SELECT count(*)::int AS count FROM "_prisma_migrations" WHERE finished_at IS NOT NULL`)).rows[0].count, migrations.length);
     } finally {
       await Promise.all(clients.map(client => client.end()));
       if (created) { assert.match(name, /^integration_vault_test_[a-f0-9]{16}$/); await admin.query(`DROP DATABASE "${name}"`); }

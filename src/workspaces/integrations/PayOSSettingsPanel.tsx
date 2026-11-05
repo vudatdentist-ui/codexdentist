@@ -58,6 +58,12 @@ export function PayOSSettingsPanel() {
         signal: AbortSignal.timeout(30000),
       });
       if (!response.ok) {
+        const detail = await response.json().catch(() => null) as { error?: string } | null;
+        if (detail?.error === "payos-orders-unresolved") {
+          setError(vi ? "Còn yêu cầu thanh toán chưa được đối soát. Kiểm tra các yêu cầu trước khi thay thông tin hoặc tắt kết nối."
+            : "Payment requests still need reconciliation. Review them before replacing details or disabling the connection.");
+          return;
+        }
         setError(response.status === 403
           ? (vi ? "Bạn chưa có quyền thay đổi kết nối này." : "You do not have permission to change this connection.")
           : response.status === 400 || response.status === 422
@@ -118,7 +124,7 @@ export function PayOSSettingsPanel() {
         <legend>{connection?.configured ? (vi ? "Thay thông tin kết nối" : "Replace connection details") : (vi ? "Thông tin kết nối" : "Connection details")}</legend>
         <p className={styles.description}><a href="https://my.payos.vn" target="_blank" rel="noopener noreferrer">{vi ? "Lấy thông tin tại payOS" : "Get your details from payOS"} ↗</a></p>
         <div className={styles.fields}>
-          {([{ key: "clientId", label: vi ? "Mã khách hàng" : "Client ID" }, { key: "apiKey", label: vi ? "Khóa truy cập" : "Access key" }, { key: "checksumKey", label: vi ? "Khóa xác thực" : "Verification key" }] as const).map(field =>
+          {([{ key: "clientId", label: "Client ID" }, { key: "apiKey", label: "API Key" }, { key: "checksumKey", label: "Checksum Key" }] as const).map(field =>
             <label key={field.key} className={styles.field} htmlFor={`${id}-${field.key}`}><span>{field.label}</span>
               <input id={`${id}-${field.key}`} type="password" autoComplete="new-password" spellCheck={false} value={credentials[field.key]} onChange={event => setCredentials(current => ({ ...current, [field.key]: event.target.value }))} />
             </label>)}

@@ -17,6 +17,7 @@ export default defineConfig({
   tables: {
     external: [
       "public.IntegrationConnection",
+      "public.IntegrationCredential",
       "public.ExternalReference",
       "public.IntegrationInbox",
       "public.IntegrationOutbox",

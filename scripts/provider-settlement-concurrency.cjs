@@ -42,6 +42,25 @@ async function main() {
     assert.equal(receipts.reduce((sum, row) => sum + Number(row.amount), 0), 150000);
     assert.equal(Number(credit.amount), 50000);
     console.log("ok concurrent provider payments preserve invoice allocations, distinct receipts and excess patient credit");
+    const voided = await prisma.invoice.create({ data: { organizationId: org.id, clinicId: clinic.id,
+      patientId: patient.id, invoiceNo: 'PROVIDER-LATE-VOID', amount: 100000, paidAmount: 0,
+      status: 'VOID', dueDate: new Date() } });
+    const late = await prisma.$transaction(tx => recordProviderSettlementCommand(tx, {
+      organizationId: org.id, clinicId: clinic.id, patientId: patient.id, invoiceNo: voided.invoiceNo,
+      amount: 30000, method: 'bank_transfer', provider: 'payos', providerReference: 'late-transfer', providerEventId: 'late-event',
+    }));
+    assert.equal(late.allocatedAmount, 0); assert.equal(late.unallocatedAmount, 30000);
+    const unchangedVoid = await prisma.invoice.findUniqueOrThrow({ where: { id: voided.id } });
+    assert.equal(unchangedVoid.status, 'VOID'); assert.equal(Number(unchangedVoid.paidAmount), 0);
+    assert.equal(await prisma.payment.count({ where: { invoiceId: voided.id } }), 0);
+    assert.equal(await prisma.receiptAllocation.count({ where: { invoiceId: voided.id } }), 0);
+    assert.equal(Number((await prisma.patientCreditBalance.findUniqueOrThrow({ where: { patientId: patient.id } })).amount), 80000);
+    await assert.rejects(prisma.$transaction(tx => recordProviderSettlementCommand(tx, {
+      organizationId: org.id, clinicId: clinic.id, patientId: patient.id, invoiceNo: 'other-scope-or-missing',
+      amount: 30000, method: 'bank_transfer', provider: 'payos', providerReference: 'wrong-scope', providerEventId: 'wrong-event',
+    })), { code: 'provider-settlement-invoice-not-found' });
+    assert.equal(await prisma.receipt.count({ where: { organizationId: org.id } }), 3);
+    console.log('ok late verified transfer becomes credit after invoice void; missing invoice remains denied');
   } finally {
     await prisma.auditLog.deleteMany({ where: { organizationId: org.id } });
     await prisma.receiptAllocation.deleteMany({ where: { organizationId: org.id } });
