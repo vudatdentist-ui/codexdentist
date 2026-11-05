@@ -3,8 +3,8 @@ const assert = require("node:assert/strict");
 const { load } = require("./audit-source-loader.cjs");
 const templates = load("src/lib/notification-templates.ts");
 
-test("Resend never claims successful delivery for an unsupported external channel or logs its PHI", async () => {
-  for (const channel of ["SMS", "ZALO", "PUSH", "PHONE"]) {
+test("internal notifications remain local while unsupported external delivery fails without PHI logging", async () => {
+  for (const channel of ["SMS", "ZALO", "PUSH", "PHONE", "IN_APP"]) {
     let status = "SCHEDULED";
     let network = 0;
     const logs = [];
@@ -21,11 +21,12 @@ test("Resend never claims successful delivery for an unsupported external channe
       } },
     }, { fetch: async () => { network++; }, console: { info: (...items) => logs.push(items), error: (...items) => logs.push(items) } });
     const result = await service.processNotificationNow("notification");
-    assert.equal(result.sent, 0);
-    assert.equal(result.failed, 1);
-    assert.equal(status, "FAILED");
+    const internal = channel === "IN_APP";
+    assert.equal(result.sent, internal ? 1 : 0);
+    assert.equal(result.failed, internal ? 0 : 1);
+    assert.equal(status, internal ? "SENT" : "FAILED");
     assert.equal(network, 0);
     assert.doesNotMatch(JSON.stringify(logs), /PRIVATE/);
-    assert.equal(result.results[0].reason, "notification-channel-not-configured");
+    assert.equal(result.results[0].reason, internal ? undefined : "notification-channel-not-configured");
   }
 });

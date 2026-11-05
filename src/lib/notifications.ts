@@ -243,16 +243,19 @@ async function deliverNotification(
       };
     }
 
-    if (mode === "log") {
-      console.info("notification.simulated", { id: notification.id, channel: notification.channel });
-    } else if (mode === "resend") {
-      if (notification.channel === "EMAIL") {
-        await deliverToResend(notification);
+    // IN_APP is delivered by the existing persisted inbox, without a vendor.
+    if (notification.channel !== "IN_APP") {
+      if (mode === "log") {
+        console.info("notification.simulated", { id: notification.id, channel: notification.channel });
+      } else if (mode === "resend") {
+        if (notification.channel === "EMAIL") {
+          await deliverToResend(notification);
+        } else {
+          throw new Error("notification-channel-not-configured");
+        }
       } else {
-        throw new Error("notification-channel-not-configured");
+        await deliverToWebhook(notification);
       }
-    } else {
-      await deliverToWebhook(notification);
     }
 
     await prisma.notification.update({
