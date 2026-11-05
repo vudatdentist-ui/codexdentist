@@ -81,6 +81,15 @@ For visible workflow/layout changes, also run:
 npm run browser:qa
 ```
 
+Journey selection changes require the actual composer regression and real-browser
+navigation checks: valid patient -> unknown/out-of-scope/cleared URL hides editable
+content immediately, including stale topbar and AI identity; Back restores the
+same safe draft. Actual patient lookup navigation, Back/Forward and reload must
+open the intended record. A different patient must not inherit a comment, file
+selection, treatment draft or pending dialog. Exercise desktop/mobile states and
+inspect fresh captures. Native history transitions test the mismatch guard;
+positive navigation must also fetch the server-scoped workspace normally.
+
 Do not suppress a failing safety test to complete a phase. Classify the failure, fix it, and repeat the relevant gate.
 
 ### Public landing page
