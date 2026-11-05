@@ -442,7 +442,6 @@ export async function dispatchIntegrationOutbox(
   const retryDelayMs = options.retryDelayMs ?? 1_000;
   const staleLockMs = Math.max(30, options.staleLockMs ?? 5 * 60_000);
   const lockToken = randomUUID();
-  const staleBefore = new Date(Date.now() - staleLockMs);
   const claimed = await db.$queryRawUnsafe<OutboxRow[]>(
     `WITH picked AS (
        SELECT "id"
@@ -450,7 +449,7 @@ export async function dispatchIntegrationOutbox(
        WHERE "topic" = $4
          AND ($5::text IS NULL OR "organizationId" = $5)
          AND (("status" IN ('PENDING', 'RETRY') AND "availableAt" <= (CURRENT_TIMESTAMP AT TIME ZONE 'UTC'))
-          OR ("status" = 'PROCESSING' AND "lockedAt" < $3))
+          OR ("status" = 'PROCESSING' AND "lockedAt" < (clock_timestamp() AT TIME ZONE 'UTC') - ($3::double precision * INTERVAL '1 millisecond')))
        ORDER BY "createdAt"
        FOR UPDATE SKIP LOCKED
        LIMIT $1
@@ -466,7 +465,7 @@ export async function dispatchIntegrationOutbox(
      RETURNING outbox.*`,
     limit,
     lockToken,
-    staleBefore,
+    staleLockMs,
     topic,
     organizationId,
   );
@@ -553,7 +552,8 @@ export async function dispatchIntegrationOutbox(
          const updated = await tx.$executeRawUnsafe(
           `UPDATE "IntegrationOutbox"
            SET "status" = $3,
-               "availableAt" = $4,
+               "availableAt" = CASE WHEN $3='FAILED' THEN "availableAt"
+                 ELSE (clock_timestamp() AT TIME ZONE 'UTC') + ($4::double precision * INTERVAL '1 millisecond') END,
                "lockToken" = NULL,
                "lockedAt" = NULL,
                "lastErrorCode" = $5,
@@ -563,7 +563,7 @@ export async function dispatchIntegrationOutbox(
           event.id,
           lockToken,
           terminal ? "FAILED" : "RETRY",
-          terminal ? event.availableAt : new Date(Date.now() + retryDelayMs),
+          retryDelayMs,
           errorCode,
           staleLockMs,
         );

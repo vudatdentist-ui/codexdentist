@@ -251,6 +251,13 @@ Next compiles the dashboard after login on a cold CI runner. Production browser
 login keeps its 15-second limit; credential, redirect and final-page assertions
 are unchanged.
 
+The native queued-outbox heartbeat test observes both PostgreSQL lock timestamps
+advance beyond their original expiry over multiple one-second leases before
+starting a competitor. A 150-ms native lease had measured shared-runner scheduling
+latency instead of renewal correctness. Tiny deterministic heartbeat failure,
+stolen-owner and CAS tests remain intact. Reclaim/retry deadlines use PostgreSQL's
+clock; clock-skew regressions cover app time both ahead and behind by one minute.
+
 Verify:
 
 - signature validation before processing;
