@@ -271,7 +271,7 @@ runtime account's missing REFERENCES/ownership permissions. The deployer now
 uses the bootstrap migration identity only for DDL and verifies limited runtime
 CRUD after restore; the role regression reproduces the original denial and
 forward recovery. No historical migration is edited or core runtime role elevated.
-Core release sign-off is recorded in PR #73: require exact-main CI, production
+Core release sign-off is recorded in PR #74: require exact-main CI, production
 backup/restore, resolved migration history, candidate/runtime grants and public
 health before closing Phase 7. An unresolved attention marker always keeps that
 operational gate open. Optional live providers and application-job activation
