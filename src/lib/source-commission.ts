@@ -97,6 +97,7 @@ export async function generateSourceCommissionAccruals(input: {
     if (!policies.length) return { created: 0 };
     const policyBySource = new Map(policies.map((policy) => [policy.source, policy]));
     let created = 0;
+    const basisAudits: Prisma.AuditLogCreateManyInput[] = [];
     let cursor: { receivedAt: Date; id: string } | null = null;
     while (created < 1000) {
       const after: { receivedAt: Date; id: string } | null = cursor;
@@ -129,7 +130,7 @@ export async function generateSourceCommissionAccruals(input: {
         const commissionAmount = receiptCommission(baseAmount, ratePercent, fixedAmount);
         if (commissionAmount <= 0) continue;
 
-        await tx.sourceCommissionAccrual.upsert({
+        const accrual = await tx.sourceCommissionAccrual.upsert({
           where: { receiptId_policyId: { receiptId: receipt.id, policyId: policy.id } },
           update: { updatedAt: new Date() },
           create: {
@@ -147,6 +148,12 @@ export async function generateSourceCommissionAccruals(input: {
             earnedAt: receipt.receivedAt,
           },
         });
+        basisAudits.push({
+          organizationId: input.organizationId, actorId: input.actorId, action: "source_commission.accrued",
+          entityType: "SourceCommissionAccrual", entityId: accrual.id,
+          metadata: { commissionBasisLedgerVersion: 1,
+            commissionBasisSnapshots: [{ accrualId: accrual.id, receiptId: receipt.id, grossBase: grossBase / 100 }] },
+        });
         created += 1;
         if (created === 1000) break;
       }
@@ -156,6 +163,7 @@ export async function generateSourceCommissionAccruals(input: {
     }
 
     if (created > 0) {
+      await tx.auditLog.createMany({ data: basisAudits });
       await tx.auditLog.create({
         data: {
           organizationId: input.organizationId,

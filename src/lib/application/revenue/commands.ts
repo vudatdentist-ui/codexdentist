@@ -9,6 +9,7 @@ import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 import { runSerializableTransaction } from "@/lib/transaction";
 import { attributeInvoiceRefund, moneyCents } from "./refund-ledger";
+import { retainCommissionBasesOnVoid } from "./commission-basis";
 
 export type ReceiptMethod = "cash" | "card" | "bank_transfer" | "credit_balance";
 
@@ -364,6 +365,8 @@ export async function voidInvoiceCommand(session: AppSession, invoiceNo: string)
       throw new ApplicationCommandError("billing-invoice-ledger-unreconciled");
     }
     let voidReversalPaymentId: string | null = null;
+    const commissionBasisSnapshots = await retainCommissionBasesOnVoid(tx, session.organizationId,
+      [...new Set(directAllocations.map(row => row.receiptId))]);
     if (paymentNet > 0) {
       const reversal = await tx.payment.create({ data: { invoiceId: invoice.id, amount: -paymentNet / 100,
         method: "void_reversal", reference: invoiceNo } });
@@ -414,6 +417,8 @@ export async function voidInvoiceCommand(session: AppSession, invoiceNo: string)
           directReceiptAmountReleased: directReleasedAmount,
           paymentReversed: paymentNet / 100,
           invoiceVoidLedgerVersion: 1,
+          commissionBasisLedgerVersion: 1,
+          commissionBasisSnapshots,
           voidReversalPaymentId,
           directReceiptReleases: [...new Set(directAllocations.map(row => row.receiptId))].map(receiptId => ({
             receiptId, amount: directAllocations.filter(row => row.receiptId === receiptId)

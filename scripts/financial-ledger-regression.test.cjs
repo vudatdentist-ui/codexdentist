@@ -84,6 +84,7 @@ function commandFixture({ paid = 100000, payments = null, service = false, items
       state.receipt.unallocatedAmount += data.unallocatedAmount.increment;
     } },
     patientCreditBalance: { upsert: async ({ update }) => { state.credit += update.amount.increment; } },
+    sourceCommissionAccrual: { findMany: async () => [] },
     payment: { create: async ({ data }) => { state.payments.push(data); return { id: "new", ...data }; } },
     auditLog: { create: async ({ data }) => { state.audits.push(data); } },
   };
@@ -175,8 +176,12 @@ for (const prefix of ["already accrued", "zero eligible base"]) {
         const after = where.AND?.[0].OR[0].receivedAt.gt;
         return rows.filter((row) => !row.sourceCommissionAccruals.length && (!after || row.receivedAt > after)).slice(0, take);
       } },
-      auditLog: { findMany: async () => [], create: async () => ({}) },
-      sourceCommissionAccrual: { upsert: async ({ create }) => { created.push(create); } },
+      auditLog: { findMany: async () => [], create: async () => ({}), createMany: async ({ data }) => {
+        assert.equal(data.length, 1);
+        assert.equal(data[0].metadata.commissionBasisLedgerVersion, 1);
+        assert.equal(data[0].metadata.commissionBasisSnapshots[0].grossBase, 100000);
+      } },
+      sourceCommissionAccrual: { upsert: async ({ create }) => { created.push(create); return { ...create, id: "ACCRUAL" }; } },
     };
     const generator = load("src/lib/source-commission.ts", {
       "@/lib/prisma": { prisma: tx }, "@/lib/transaction": { runSerializableTransaction: (callback) => callback(tx) },

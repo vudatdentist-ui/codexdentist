@@ -38,6 +38,9 @@ adjustment denials and tenant/clinic permissions. `test:billing` also reconciles
 invoice paid amounts to signed payment totals. `browser:qa` includes the refund
 form, exact Server Action replay, a new intentional refund after refresh, and the
 visible refunded-void denial at 1440/390/320px. No provider or real money is used.
+The financial database runner also holds each transaction before its first read
+to prove both void/generation commit orders. Commission basis snapshots are
+atomic evidence; transaction start or receipt-update times are not substitutes.
 
 After demo lifecycle or organization-purge changes, run `NODE_ENV=test npm run
 test:demo-cleanup-db` against disposable loopback PostgreSQL. It creates an expired

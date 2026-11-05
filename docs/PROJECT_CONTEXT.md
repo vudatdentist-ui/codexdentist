@@ -81,9 +81,10 @@ before mutation rather than creating spendable refunded money or overstating
 service collections. Amount adjustment is limited to an unsettled, unallocated
 single-line invoice of quantity one. The refund form sends an intent tied to the
 invoice payment-ledger version; replay cannot create another negative Payment.
-Retained commission basis after void requires receipt-specific release evidence
-linked to the exact reversal Payment in `invoice.voided` metadata. A receipt's
-updated timestamp alone never excuses a ledger mismatch. Keep that evidence with
+Retained commission basis uses an immutable snapshot committed with generation,
+or a validated legacy basis captured before a receipt-specific void release
+linked to its reversal Payment. Transaction start timestamps do not establish
+commit order; no timestamp alone excuses a ledger mismatch. Keep that evidence with
 the financial ledger; commission validation covers all accruals rather than a
 1,000-record preview.
 

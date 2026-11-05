@@ -14,6 +14,7 @@ async function main() {
   for (const env of [
     { NODE_ENV: 'production', DATABASE_URL: process.env.DATABASE_URL },
     { NODE_ENV: 'test', DATABASE_URL: 'postgresql://test@remote.invalid/fixture' },
+    { NODE_ENV: 'test', DATABASE_URL: 'postgresql://test@127.0.0.1/fixture?host=remote.invalid' },
     { NODE_ENV: 'test', DATABASE_URL: '' },
   ]) {
     const result = spawnSync(process.execPath, ['prisma/seed.js'], { env: { ...process.env, ...env }, encoding: 'utf8' });

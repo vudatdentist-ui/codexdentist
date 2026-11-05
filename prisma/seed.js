@@ -4,7 +4,8 @@ const { pbkdf2Sync, randomBytes } = require("crypto");
 const { seedInvoiceLedger } = require("./seed-invoice-ledger.cjs");
 
 if (process.env.NODE_ENV === "production" || !process.env.DATABASE_URL ||
-    !["localhost", "127.0.0.1", "[::1]"].includes(new URL(process.env.DATABASE_URL).hostname)) {
+    !["localhost", "127.0.0.1", "[::1]"].includes(new URL(process.env.DATABASE_URL).hostname) ||
+    [...new URL(process.env.DATABASE_URL).searchParams.keys()].some(key => /^(host|hostaddr|database|dbname|port|service)$/i.test(key))) {
   throw new Error("Synthetic seed requires an explicit loopback development/test database.");
 }
 

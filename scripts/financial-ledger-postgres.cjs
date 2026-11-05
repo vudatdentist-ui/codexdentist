@@ -8,7 +8,8 @@ const { load } = require("./audit-source-loader.cjs");
 const url = process.env.DATABASE_URL && new URL(process.env.DATABASE_URL);
 if (process.env.NODE_ENV !== "test" || process.env.FINANCIAL_LEDGER_DISPOSABLE !== "1" || !url ||
     !["localhost", "127.0.0.1", "[::1]"].includes(url.hostname) ||
-    !/^\/financial_ledger_test(?:_[a-z0-9]+)?$/.test(url.pathname)) {
+    !/^\/financial_ledger_test(?:_[a-z0-9]+)?$/.test(url.pathname) ||
+    [...url.searchParams.keys()].some(key => /^(host|hostaddr|database|dbname|port|service)$/i.test(key))) {
   throw new Error("Requires an explicitly disposable financial_ledger_test database on loopback.");
 }
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url.toString() }) });
@@ -329,6 +330,8 @@ async function main() {
   {
     const f = await fixture({ source: `PROVEN-VOID-${serial}` }); await policy(f.patient.leadSource);
     await settle(f); await generate();
+    const legacyAccrual = await prisma.sourceCommissionAccrual.findFirstOrThrow({ where: { patientId: f.patient.id } });
+    await prisma.auditLog.deleteMany({ where: { organizationId: org.id, action: "source_commission.accrued", entityId: legacyAccrual.id } });
     await revenue.voidInvoiceCommand(session, f.invoice.invoiceNo);
     const proof = await prisma.auditLog.findFirstOrThrow({ where: { entityId: f.invoice.id, action: "invoice.voided" } });
     assert.equal(proof.metadata.directReceiptReleases.length, 1);
@@ -336,6 +339,20 @@ async function main() {
     const payment = await prisma.payment.findUniqueOrThrow({ where: { id: proof.metadata.voidReversalPaymentId } });
     assert.equal(payment.method, "void_reversal");
     assert.equal(Number(payment.amount), -100000);
+    assert.equal(proof.metadata.commissionBasisSnapshots[0].grossBase, 100000);
+    console.log("ok legacy earned basis is validated and retained atomically with its void reversal");
+  }
+  {
+    const f = await fixture({ source: `BADLEGACY-${serial}` }); await policy(f.patient.leadSource);
+    await settle(f); await generate();
+    const row = await prisma.sourceCommissionAccrual.findFirstOrThrow({ where: { patientId: f.patient.id } });
+    await prisma.auditLog.deleteMany({ where: { organizationId: org.id, action: "source_commission.accrued", entityId: row.id } });
+    await prisma.sourceCommissionAccrual.update({ where: { id: row.id }, data: { baseAmount: 10000, commissionAmount: 11000 } });
+    await expectCode(revenue.voidInvoiceCommand(session, f.invoice.invoiceNo), "billing-refund-commission-unreconciled");
+    assert.equal(Number((await snapshot(f)).invoice.paidAmount), 100000);
+    assert.equal((await snapshot(f)).credit, 0);
+    await prisma.sourceCommissionAccrual.update({ where: { id: row.id }, data: { baseAmount: row.baseAmount, commissionAmount: row.commissionAmount } });
+    console.log("ok void cannot endorse an already-corrupt legacy commission basis");
   }
   {
     const f = await fixture({ amount: 1234567890.12 });
