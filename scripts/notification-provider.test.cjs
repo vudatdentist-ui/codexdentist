@@ -3,8 +3,8 @@ const assert = require("node:assert/strict");
 const { load } = require("./audit-source-loader.cjs");
 const templates = load("src/lib/notification-templates.ts");
 
-test("Resend never claims successful delivery for an unsupported external channel or logs its PHI", async () => {
-  for (const channel of ["SMS", "ZALO", "PUSH", "PHONE"]) {
+test("internal notifications remain local while unsupported external delivery fails without PHI logging", async () => {
+  for (const [channel, demo] of ["SMS", "ZALO", "PUSH", "PHONE", "IN_APP"].flatMap(channel => [[channel, false], [channel, true]])) {
     let status = "SCHEDULED";
     let network = 0;
     const logs = [];
@@ -17,15 +17,17 @@ test("Resend never claims successful delivery for an unsupported external channe
           updateMany: async ({ data }) => { status = data.status; return { count: 1 }; },
           update: async ({ data }) => { status = data.status; },
         },
-        organization: { findUnique: async () => ({ isDemo: false }) }, auditLog: { createMany: async () => ({}) },
+        organization: { findUnique: async () => ({ isDemo: demo }) }, auditLog: { createMany: async () => ({}) },
       } },
     }, { fetch: async () => { network++; }, console: { info: (...items) => logs.push(items), error: (...items) => logs.push(items) } });
     const result = await service.processNotificationNow("notification");
-    assert.equal(result.sent, 0);
-    assert.equal(result.failed, 1);
-    assert.equal(status, "FAILED");
+    const internal = channel === "IN_APP";
+    assert.equal(result.sent, internal ? 1 : 0);
+    assert.equal(result.failed, internal || demo ? 0 : 1);
+    assert.equal(result.skipped, !internal && demo ? 1 : 0);
+    assert.equal(status, internal ? "SENT" : demo ? "CANCELLED" : "FAILED");
     assert.equal(network, 0);
     assert.doesNotMatch(JSON.stringify(logs), /PRIVATE/);
-    assert.equal(result.results[0].reason, "notification-channel-not-configured");
+    assert.equal(result.results[0].reason, internal ? undefined : demo ? "External delivery is disabled for demo workspaces." : "notification-channel-not-configured");
   }
 });
