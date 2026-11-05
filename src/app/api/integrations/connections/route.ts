@@ -29,8 +29,8 @@ export async function POST(request: Request) {
   // payOS writes have one command boundary with credential/intent locking.
   // This legacy transport must not replace a vaulted merchant behind that lock.
   if (provider === "payos") return error("payos-use-settings", 409);
+  if (provider === "documenso") return error("documenso-use-settings", 409);
   if (!secretRefPattern.test(secretRef)) return error("integration-secret-ref-invalid", 400);
-  if (provider === "documenso" && secretRef !== "env:DOCUMENSO_DEFAULT") return error("documenso-secret-ref-invalid", 400);
   if (provider === "orthanc" && secretRef !== "env:ORTHANC_DEFAULT") {
     return error("orthanc-secret-ref-invalid", 400);
   }
@@ -53,10 +53,7 @@ export async function POST(request: Request) {
     provider,
     status: "ACTIVE",
     secretRef,
-    capabilities:
-      provider === "documenso"
-          ? { signing: true, webhooks: true }
-          : { dicomStudies: true, ohifViewer: true, webhooks: false },
+    capabilities: { dicomStudies: true, ohifViewer: true, webhooks: false },
     metadata: {
       configuredByUserId: session.userId,
       secretStorage: "environment",

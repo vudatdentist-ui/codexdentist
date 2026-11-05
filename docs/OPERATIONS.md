@@ -369,6 +369,9 @@ history and status refresh. Only a verified webhook records a receipt; returning
 from checkout never marks an invoice paid. A verified transfer arriving after
 invoice void becomes patient credit. Existing paid invoices cannot receive more
 allocation than their remaining balance.
+Invoice requests use a short transfer memo of at most nine characters to support
+unlinked bank accounts; the complete order code remains the payment identity.
+See the official [payOS payment-link contract](https://payos.vn/docs/api/).
 
 Credentials are stored only as AES-256-GCM envelopes in `IntegrationCredential`.
 Back up the database and the selected master together: optional
@@ -388,6 +391,36 @@ Legacy `env:PAYOS_DEFAULT` additionally requires `PAYOS_DEFAULT_ORGANIZATION_ID`
 to bind those environment credentials to exactly one organization. Other tenants
 must use their own stored merchant keys. Leave real payment activation pending
 until the owner supplies and verifies their actual credentials.
+
+## Documenso operator setup
+
+Use **Settings → Tích hợp & AI → Documenso** to save the clinic's API Token and
+Webhook Secret in the same tenant-bound credential vault. In Documenso, register
+the displayed result URL with that secret and enable document-completion events.
+Saved credentials do not verify either service availability or webhook delivery;
+the panel separately reports whether a valid notification was observed. Legacy
+environment credentials require `DOCUMENSO_DEFAULT_ORGANIZATION_ID`.
+The supported contract is Documenso API v2 with `payload.envelopeId`,
+`DOCUMENT_COMPLETED` and `X-Documenso-Secret`; follow the official
+[webhook setup](https://docs.documenso.com/docs/developers/webhooks/setup) and
+[event reference](https://docs.documenso.com/docs/developers/webhooks/events).
+
+In **Biểu mẫu & đồng thuận → Ký qua Documenso**, choose an existing protected PDF
+from the same patient's record and attach it to the open consent. Upload missing
+PDFs through Journey. Review the source, recipient and email before sending.
+Refresh/resume continues the reserved ceremony; it must not create a replacement
+or redistribute after a lost response. A recipient correction after reservation
+requires reconciliation of the old ceremony rather than sending its old envelope
+under the newly displayed email. A creation timeout without an envelope ID stays
+blocked for trusted callback recovery; do not clear metadata to force another send.
+
+Active/uncertain ceremonies block changing keys, source PDF, manual completion
+and voiding. Definitive initial rejection permits credential repair and manual
+completion/void. The signed result is imported through protected file staging;
+invalid PDFs and failed imports stay retryable without completing consent.
+Only reconciled provider results display as electronically signed. Manual
+completion and its supporting documents retain their own labels. Configure and
+accept the real Documenso account separately before sending real patient data.
 
 ## Go-Live Gate
 

@@ -248,10 +248,10 @@ completed application feature.
 
 | Workstream | Current state | Required operational acceptance |
 | --- | --- | --- |
-| payOS operator workflow (#78) | Implemented and locally reviewed; exact-head CI and deployment remain the release gate. | Tenant/clinic-owned encrypted credentials; signed webhook setup; invoice QR/link/history; lost-response retry and exact-once receipts; negative scope tests; production UI plus full local app browser gates at 1440/390/320px. Real merchant activation awaits owner credentials. |
-| Documenso operator workflow | Backend present; staff configuration/request/status workflow still needs a rendered-app audit. | Discoverable consent signing flow, protected signed PDF, failure/retry visibility and ownership reconciliation. |
+| payOS operator workflow (#78, PR #79) | Implemented and re-audited; native and rendered app gates cover the operational path. Real merchant activation awaits owner credentials. | Tenant/clinic-owned encrypted credentials; signed webhook setup; invoice QR/link/history; lost-response retry and exact-once receipts; negative scope tests; production UI plus full local app browser gates at 1440/390/320px. Verify release separately from implementation. |
+| Documenso operator workflow (#80, PR #82) | Settings and consent signing UI implemented and re-audited; native, full-app and production UI gates pass locally. Real service activation awaits operator credentials. | Tenant-owned encrypted keys; eligible protected PDF attachment; recipient-bound send/resume; durable status; signed file with reconciliation provenance; scope/demo/race/failed-import/replay gates. Verify current exact-main CI and deployment marker before claiming rollout. |
 | Imaging and native operations | Lab/sterilization UI has local/CI evidence; live PACS remains unconfigured. | Preserve verified native flows; separately configure and accept an actual private PACS/viewer before enabling it. |
-| Operational rollout | Core through PR #76 deployed as d80318c; issues #71/#75 resolved. | Exact-main CI, backup/restore/runtime grant/candidate/public checks after each release; provider live acceptance requires real operator credentials. |
+| Operational rollout | Read the running image revision and `/opt/codexdentist-deploy/current.json`; issue #78/#80 carries verified rollout evidence. Core fallback `d80318c` was independently verified; #71/#75 resolved. | Exact-main CI, backup/restore/runtime grant/candidate/public checks after each release; provider live acceptance requires real operator credentials. |
 
 Credential decision: a dedicated IntegrationCredential stores authenticated
 encryption envelopes, never raw keys in connection metadata, audit or client
@@ -269,6 +269,18 @@ rejections permit credential correction; an older uncertain creation still block
 replacement. A late verified payment for a voided invoice becomes patient credit,
 without reviving or allocating that invoice. Inbox readiness and retry scheduling
 use the database clock so app/DB clock skew cannot distort delivery backoff.
+
+Signing decision: a Documenso request owns its form, source PDF and recipient
+identity once reserved. Credential replacement, source changes and manual
+completion/void cannot race an active or uncertain ceremony. A definitive creation
+rejection permits manual completion/void and credential repair; it does not prove
+the source may be replaced in an existing ceremony. Retrying a known envelope
+resumes its original ceremony without distributing twice; unknown creation needs
+trusted callback recovery. Patient email/name changes block resending the old
+recipient's envelope. Only the reconciled signed-file provenance supports an
+electronic-signing completion claim; manual form completion remains distinct.
+The settings panel reports saved credentials and observed valid notifications
+separately; saving keys is not live-provider verification.
 
 The November release combines PR #68 (re-audited Phase 3–7 integration), #70
 (local in-app notifications), and #72 (Revenue/commission integrity). Historical

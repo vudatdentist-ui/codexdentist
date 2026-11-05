@@ -11,6 +11,8 @@
 .field { display: grid; gap: 6px; min-width: 0; margin: 14px 0; font-weight: 500; }
 .panel .field input, .panel .field select, .panel .field textarea, .payment .field input { box-sizing: border-box; min-width: 0; width: 100%; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line-strong, #b7c4b5); border-radius: 4px; background: var(--surface, #fffefa); color: var(--ink, #233b31); font: inherit; font-size: 16px; }
 .field textarea { resize: vertical; overflow-wrap: anywhere; font-size: 13px !important; }
+.payment .field select { box-sizing: border-box; width: 100%; min-width: 0; min-height: 44px; padding: 10px 12px; border: 1px solid var(--line-strong, #b7c4b5); border-radius: 4px; background: var(--surface, #fffefa); color: var(--ink, #233b31); font: inherit; font-size: 16px; }
+.payment .field select:focus-visible { outline: 3px solid var(--teal, #28533f); outline-offset: 3px; }
 .fields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .credentials { min-width: 0; margin: 24px 0 16px; padding: 16px; border: 1px solid var(--line, #dedfd4); border-radius: 4px; }
 .credentials legend { padding: 0 8px; font-weight: 600; }

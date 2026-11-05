@@ -164,6 +164,17 @@ test('timeout then same-intent 401 preserves uncertainty and blocks credential r
   assert.equal(new Set(h.stats.http.map(request => request.orderCode)).size, 1, 'Every attempt must retain the durable order code');
 });
 
+test('invoice transfer memo fits payOS unlinked-bank nine-character limit and is signed as sent', async () => {
+  const h = fixture({ outcomes: [401] });
+  await h.post();
+  const body = h.stats.http[0];
+  assert.match(body.description, /^CDX\d{1,6}$/);
+  assert.ok(body.description.length <= 9);
+  const client = load('src/integrations/payos/client.ts');
+  assert.equal(body.signature, client.signPayOSData({ amount: body.amount, cancelUrl: body.cancelUrl,
+    description: body.description, orderCode: body.orderCode, returnUrl: body.returnUrl }, 'synthetic-checksum'));
+});
+
 for (const status of [400, 401, 403, 422]) {
   test(`first-attempt provider ${status} is definitively FAILED and permits credential repair`, async () => {
     const h = fixture({ outcomes: [status] });

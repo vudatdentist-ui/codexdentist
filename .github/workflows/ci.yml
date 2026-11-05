@@ -64,6 +64,8 @@ jobs:
         run: npm run test:audit
       - name: payOS workflow and encrypted credential regressions
         run: npm run test:payos
+      - name: Documenso signing ownership and configuration regressions
+        run: npm run test:documenso
       - name: Maintainability regressions and budgets
         run: npm run test:maintainability
       - run: npm run encoding:check
@@ -96,6 +98,10 @@ jobs:
       - run: npx prisma migrate deploy
       - name: Native encrypted credential isolation and migration verification
         run: npm run test:integration-vault-db
+        env:
+          NODE_ENV: test
+      - name: Native Documenso reservation and manual-action concurrency
+        run: npm run test:documenso-db
         env:
           NODE_ENV: test
       - name: Disposable database restore and migration verification
@@ -205,6 +211,11 @@ jobs:
         env:
           NODE_ENV: test
           PAYOS_QA_APP_URL: http://127.0.0.1:3000
+      - name: Production consent signing UI and ownership guards
+        run: npm run browser:documenso-production
+        env:
+          NODE_ENV: test
+          DOCUMENSO_QA_APP_URL: http://127.0.0.1:3000
       - name: Upload application browser evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -233,12 +244,18 @@ jobs:
         run: npm run browser:payos
         env:
           NODE_ENV: test
+      - name: Documenso full app workflow with loopback signing engine
+        run: npm run browser:documenso
+        env:
+          NODE_ENV: test
       - name: Upload payOS app evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: payos-qa-${{ github.sha }}
-          path: output/workspace-qa/payos
+          path: |
+            output/workspace-qa/payos
+            output/workspace-qa/documenso
           if-no-files-found: warn
           retention-days: 7
       - name: Build hosted production release

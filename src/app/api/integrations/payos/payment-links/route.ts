@@ -39,7 +39,9 @@ export async function POST(request: Request) {
   try {
     const base = appBaseUrl();
     created = await createPayOSPaymentLink(secrets, { orderCode: Number(intent.externalId), amount: input.amount,
-      description: `CDX ${intent.externalId.slice(-12)}`, cancelUrl: `${base}/billing?payos=cancelled`,
+      // Unlinked bank accounts accept a maximum nine-character transfer memo.
+      // The full unique order code remains the canonical payment identity.
+      description: `CDX${intent.externalId.slice(-6)}`, cancelUrl: `${base}/billing?payos=cancelled`,
       returnUrl: `${base}/billing?payos=returned`, expiredAt: Math.floor(Date.now() / 1000) + 24 * 60 * 60 });
     await updateExternalReferenceMetadataWithRetry(prisma, intent.id, { ...previous, status: "PENDING",
       paymentLinkId: created.paymentLinkId, checkoutUrl: created.checkoutUrl, qrCode: created.qrCode, providerStatus: created.status });

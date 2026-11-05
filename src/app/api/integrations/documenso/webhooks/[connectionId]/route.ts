@@ -29,7 +29,7 @@ import {
   updateExternalReferenceMetadata,
 } from "@/infrastructure/integrations/phase3-store";
 import { reconcileSignedPatientFormCommand } from "@/lib/application/forms/provider-signing";
-import { resolveDocumensoConnectionSecrets } from "@/integrations/config";
+import { documensoConnectionSecrets } from "@/app/api/integrations/documenso/connection-secrets";
 import {
   documensoWebhookEventId,
   downloadDocumensoSignedPdf,
@@ -55,7 +55,7 @@ export async function POST(
   let secrets;
   try {
     const payload = await request.json();
-    secrets = resolveDocumensoConnectionSecrets(connection.secretRef);
+    secrets = await documensoConnectionSecrets(connection);
     verified = verifyDocumensoWebhook(
       payload,
       request.headers.get("x-documenso-secret"),

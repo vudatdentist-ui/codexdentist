@@ -26,9 +26,11 @@ function signingFixture({ failure = "http", providerStatusAfterFailure = "DRAFT"
     id: "form", formNo: "FRM-1", organizationId: "org", clinicId: "clinic", patientId: "patient",
     status: "SENT", signatureUrl: null, attachments: ["/patient-files/source"],
     template: { name: "Consent", requiresSignature: true },
-    patient: { fullName: "Synthetic signer", email: "synthetic@example.test" },
+    patient: { fullName: "Synthetic signer", email: "synthetic@example.test", clinicId: "clinic" },
   };
-  let connection = { id: "organization-connection", secretRef: "env:DOCUMENSO_DEFAULT" };
+  let connection = { id: "organization-connection", organizationId: "org", clinicId: null,
+    provider: "documenso", status: "ACTIVE", secretRef: "vault:v1" };
+  const sourceFile = { id: "source", virusScanStatus: "CLEAN", storageKey: "synthetic/source.pdf", storageProvider: "local", sourceType: "LOCAL_UPLOAD" };
   const references = [];
   const calls = [];
   let distributions = 0;
@@ -56,12 +58,19 @@ function signingFixture({ failure = "http", providerStatusAfterFailure = "DRAFT"
   };
   const prisma = {
     patientForm: { findFirst: async () => ({ ...form }) },
-    patientFile: { findFirst: async () => ({ id: "source", virusScanStatus: "CLEAN" }) },
+    patientFile: { findFirst: async () => ({ ...sourceFile }) },
     auditLog: { create: async () => ({}) },
     $transaction: async (callback) => {
       const release = await acquire();
       let locked = false;
       const tx = {
+        $queryRawUnsafe: async (sql) => {
+          if (sql.includes('FROM "IntegrationConnection"')) return [{ ...connection }];
+          if (sql.includes('FROM "PatientFile"')) return [{ id: "source" }];
+          assert.ok(sql.includes('FROM "Patient"'));
+          return [{ id: "patient" }];
+        },
+        patientFile: { findFirst: async () => { assert.ok(locked); return { ...sourceFile }; } },
         $executeRaw: async (sql, ...values) => {
           assert.match(sql.join("?"), /FROM "PatientForm"[\s\S]*FOR UPDATE/);
           assert.deepEqual(values, ["form", "org", "clinic", "patient"]);
@@ -118,7 +127,7 @@ function signingFixture({ failure = "http", providerStatusAfterFailure = "DRAFT"
       getExternalReferenceByInternalId: async (_db, input) => references.find((row) => row.entityType === input.entityType && row.connectionId === input.connectionId),
       claimExternalReferenceForRetry: async (_db, id) => references.find((row) => row.id === id),
     },
-    "@/integrations/config": { resolveDocumensoConnectionSecrets: () => secrets },
+    "../connection-secrets": { documensoConnectionSecrets: async () => secrets },
     "@/integrations/documenso/client": client,
     "@/lib/request-security": { hasSameOrigin: () => true },
     "@/lib/patient-access": { allowedClinicIds: () => ["clinic"] },
@@ -127,6 +136,7 @@ function signingFixture({ failure = "http", providerStatusAfterFailure = "DRAFT"
   if (legacy) references.push({ id: "legacy", organizationId: "org", clinicId: "clinic", connectionId: connection.id,
     provider: "documenso", entityType: "DOCUMENSO_REQUEST", internalId: "form", externalId: "request-one",
     metadata: { sourcePatientFileId: "source", idempotencyKey: "consent-key", envelopeId: "envelope-one",
+      recipientName: form.patient.fullName, recipientEmail: form.patient.email,
       status: "PENDING", errorCode: "documenso-envelope-distribute-failed" } });
   return {
     form, references, calls, locks,
