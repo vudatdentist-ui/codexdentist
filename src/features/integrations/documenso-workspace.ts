@@ -10,7 +10,7 @@ export type DocumensoRequestSummary = {
   id: string; status: "CREATING" | "DISTRIBUTING" | "PENDING" | "SIGNED" | "ERROR" | "FAILED" | "CANCELLED" | "UNKNOWN";
   sourcePatientFileId: string | null; idempotencyKey: string | null; envelopeId: string | null;
   signingUrl: string | null; signedFileUrl: string | null; updatedAt: string;
-  canRetry: boolean; errorCode: "documenso-request-needs-attention" | null;
+  canRetry: boolean; errorCode: "documenso-request-needs-attention" | "documenso-recipient-changed" | null;
 };
 export type DocumensoConsentWorkspace = {
   patientFormId: string; patientId: string; formNo: string; status: string; requiresSignature: boolean;

@@ -15,7 +15,7 @@ import {
 } from "@/infrastructure/integrations/phase3-store";
 import { documensoConnectionSecrets } from "../connection-secrets";
 import { documensoJson, documensoError, documensoRequestBody } from "../http";
-import { attachDocumensoSource, getDocumensoConsent, documensoSourceWhere } from "@/lib/application/integrations/documenso-signing";
+import { attachDocumensoSource, getDocumensoConsent, documensoSourceWhere, documensoRecipientMatches } from "@/lib/application/integrations/documenso-signing";
 import { documensoSigningUrl } from "@/features/integrations/documenso-workspace";
 import {
   createDocumensoSigningEnvelope,
@@ -183,6 +183,9 @@ export async function POST(request: Request) {
     }
     const metadata = referenceMetadata(existing ?? null);
     if (existing) {
+      if (!documensoRecipientMatches(metadata, current.patient)) {
+        return { error: "documenso-recipient-changed" } as const;
+      }
       if (metadata.sourcePatientFileId !== sourceFile.id) {
         return { error: "documenso-source-pdf-conflict" } as const;
       }
@@ -219,6 +222,7 @@ export async function POST(request: Request) {
           internalId: patientForm.id,
           externalId: randomUUID(),
           metadata: { patientFormId: patientForm.id, sourcePatientFileId: sourceFile.id,
+            recipientName: current.patient.fullName, recipientEmail: current.patient.email,
             idempotencyKey: requestedIdempotencyKey || null, status: "CREATING",
             attemptStartedAt: new Date().toISOString() },
         });
@@ -269,6 +273,7 @@ export async function POST(request: Request) {
 
     const envelope = createdEnvelope;
     await updateExternalReferenceMetadataWithRetry(prisma, requestReference.id, {
+      ...requestMetadata,
       patientFormId: patientForm.id,
       sourcePatientFileId: sourceFile.id,
       idempotencyKey: requestMetadata.idempotencyKey ?? (requestedIdempotencyKey || null),

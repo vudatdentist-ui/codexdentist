@@ -6,12 +6,17 @@ import { canMutateForms } from "@/lib/forms";
 import { accessibleClinicIds } from "@/lib/tenant-scope";
 import { canServePatientFile } from "@/lib/resource-policy";
 import { runSerializableTransaction } from "@/lib/transaction";
-import { findActiveIntegrationConnection, referenceMetadata } from "@/infrastructure/integrations/phase3-store";
+import { findActiveIntegrationConnection, getExternalReferenceByExternalId, referenceMetadata } from "@/infrastructure/integrations/phase3-store";
 import { documensoConnectionSummary, documensoFormRequests } from "@/infrastructure/integrations/documenso-workspace-store";
 import { documensoSigningUrl, type DocumensoConsentWorkspace, type DocumensoRequestSummary } from "@/features/integrations/documenso-workspace";
 import { documensoFail } from "./documenso-settings";
 
 type DB = Prisma.TransactionClient | typeof prisma;
+export function documensoRecipientMatches(metadata: Record<string, unknown>, recipient: { fullName: string; email: string | null }) {
+  return typeof metadata.recipientName === "string" && typeof metadata.recipientEmail === "string" &&
+    metadata.recipientName === recipient.fullName && metadata.recipientEmail === recipient.email;
+}
+
 export function authorizeDocumensoSigning(session: AppSession, mutate = false) {
   if (!canMutateForms(session)) documensoFail("forbidden", 403);
   if (mutate && session.isDemo) documensoFail("documenso-demo-unavailable", 403);
@@ -39,7 +44,7 @@ export async function getDocumensoConsent(session: AppSession, patientFormId: st
   const [connection, files, requests] = await Promise.all([
     findActiveIntegrationConnection(prisma, { organizationId: session.organizationId, clinicId: form.clinicId!, provider: "documenso" }),
     prisma.patientFile.findMany({ where: documensoSourceWhere(session, form), orderBy: { createdAt: "desc" },
-      select: { id: true, title: true, fileName: true, virusScanStatus: true } }),
+      select: { id: true, title: true, fileName: true, category: true, virusScanStatus: true } }),
     documensoFormRequests(prisma, session.organizationId, form.id),
   ]);
   if (requests.length > 1 || (requests[0] && requests[0].clinicId !== form.clinicId)) documensoFail("documenso-ceremony-ownership-conflict", 409);
@@ -49,7 +54,20 @@ export async function getDocumensoConsent(session: AppSession, patientFormId: st
   const attached = form.attachments.map(url => eligible.find(file => url === `/patient-files/${file.id}`)?.id).filter((id): id is string => Boolean(id));
   const sourceId = typeof metadata.sourcePatientFileId === "string" ? metadata.sourcePatientFileId : attached[attached.length - 1] ?? null;
   const protectedPath = form.signatureUrl?.match(/^\/patient-files\/([A-Za-z0-9_-]{1,128})$/);
-  const signedFileUrl = protectedPath && eligible.some(file => file.id === protectedPath[1]) ? form.signatureUrl : null;
+  // A manual completion and a protected source PDF are not signing evidence.
+  // Require the canonical request/envelope/file links written by reconciliation.
+  let signedFileUrl: string | null = null;
+  if (owner?.connectionId && metadata.status === "SIGNED" && form.status === "COMPLETED" && protectedPath &&
+      metadata.patientFileId === protectedPath[1] && typeof metadata.envelopeId === "string" &&
+      eligible.some(file => file.id === protectedPath[1] && file.category === "SIGNED_CONSENT")) {
+    const envelope = await getExternalReferenceByExternalId(prisma, { organizationId: session.organizationId,
+      connectionId: owner.connectionId, provider: "documenso", entityType: "DOCUMENSO_ENVELOPE", externalId: metadata.envelopeId });
+    const evidence = referenceMetadata(envelope);
+    if (envelope?.internalId === form.id && envelope.clinicId === form.clinicId && evidence.status === "SIGNED" &&
+        evidence.patientId === form.patientId && evidence.patientFileId === metadata.patientFileId &&
+        typeof evidence.completedEventId === "string" && evidence.completedEventId.length > 0) signedFileUrl = form.signatureUrl;
+  }
+  const recipientMatches = !owner || documensoRecipientMatches(metadata, form.patient);
   let request: DocumensoRequestSummary | null = null;
   if (owner) {
     const status = ["CREATING", "DISTRIBUTING", "PENDING", "SIGNED", "ERROR", "FAILED", "CANCELLED"].includes(String(metadata.status))
@@ -58,15 +76,16 @@ export async function getDocumensoConsent(session: AppSession, patientFormId: st
     request = { id: owner.id, status, sourcePatientFileId: sourceId,
       idempotencyKey: typeof metadata.idempotencyKey === "string" ? metadata.idempotencyKey : null,
       envelopeId: typeof metadata.envelopeId === "string" ? metadata.envelopeId : null,
-      signingUrl: documensoSigningUrl(metadata.signingUrl), signedFileUrl, updatedAt: owner.updatedAt.toISOString(),
-      canRetry: status === "FAILED" || (status === "ERROR" && Boolean(metadata.envelopeId)) || (status === "DISTRIBUTING" && Boolean(metadata.envelopeId) && leaseExpired),
-      errorCode: metadata.errorCode ? "documenso-request-needs-attention" : null };
+      signingUrl: recipientMatches ? documensoSigningUrl(metadata.signingUrl) : null, signedFileUrl, updatedAt: owner.updatedAt.toISOString(),
+      canRetry: recipientMatches && (status === "FAILED" || (status === "ERROR" && Boolean(metadata.envelopeId)) || (status === "DISTRIBUTING" && Boolean(metadata.envelopeId) && leaseExpired)),
+      errorCode: !recipientMatches && status !== "SIGNED" ? "documenso-recipient-changed" : metadata.errorCode ? "documenso-request-needs-attention" : null };
   }
   const configured = !!connection && documensoConnectionSummary(connection, "").configured && !session.isDemo;
   const open = ["DRAFT", "SENT"].includes(form.status) && !form.signatureUrl && (!form.expiresAt || form.expiresAt > new Date());
   return { patientFormId: form.id, patientId: form.patientId, formNo: form.formNo, status: form.status,
     requiresSignature: form.template.requiresSignature, configured, isDemo: session.isDemo,
-    recipient: { name: form.patient.fullName, email: form.patient.email },
+    recipient: owner && typeof metadata.recipientName === "string" && typeof metadata.recipientEmail === "string"
+      ? { name: metadata.recipientName, email: metadata.recipientEmail } : { name: form.patient.fullName, email: form.patient.email },
     sources: eligible.map(file => ({ id: file.id, name: file.fileName || file.title })),
     sourcePatientFileId: sourceId, request, signedFileUrl,
     canRequest: configured && open && form.template.requiresSignature && Boolean(form.patient.email) &&

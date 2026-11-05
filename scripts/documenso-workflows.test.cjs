@@ -76,7 +76,8 @@ function fixture({ configured = true, role = 'OWNER', demo = false } = {}) {
       }
       if (sql.trimStart().startsWith('SELECT') && sql.includes('"ExternalReference"')) {
         if (sql.includes('ORDER BY')) return refs.filter(ref => ref.organizationId === params[0] && ref.internalId === params[1] && ref.entityType === 'DOCUMENSO_REQUEST').map(copy);
-        return refs.filter(ref => ref.organizationId === params[0] && ref.connectionId === params[3] && ref.entityType === params[2] &&
+        const storeLookup = sql.includes('"connectionId" = $2');
+        return refs.filter(ref => ref.organizationId === params[0] && ref.connectionId === params[storeLookup ? 1 : 3] && ref.entityType === params[storeLookup ? 3 : 2] &&
           (sql.includes('"externalId" = $5') ? ref.externalId === params[4] : ref.internalId === params[4])).map(copy);
       }
       if (sql.startsWith('INSERT INTO "ExternalReference"')) {
@@ -250,8 +251,78 @@ test('GET filters unsafe signing URLs/errors and authorizes protected signed PDF
   let reply = await (await h.get()).json(); assert.equal(reply.request.signingUrl, null); assert.equal(reply.request.errorCode, 'documenso-request-needs-attention');
   assert.ok(!JSON.stringify(reply).includes('NEVER-SHOW'));
   h.form.status = 'COMPLETED'; h.form.signatureUrl = '/patient-files/source'; h.refs[0].metadata.status = 'SIGNED';
+  h.refs[0].metadata.patientFileId = 'source'; h.files[0].category = 'SIGNED_CONSENT';
+  const envelope = h.refs.find(ref => ref.entityType === 'DOCUMENSO_ENVELOPE');
+  envelope.metadata = { ...envelope.metadata, status: 'SIGNED', patientFileId: 'source', completedEventId: 'signed-event' };
   reply = await (await h.get()).json(); assert.equal(reply.signedFileUrl, '/patient-files/source');
   h.files[0].virusScanStatus = 'INFECTED'; reply = await (await h.get()).json(); assert.equal(reply.signedFileUrl, null);
+});
+
+test('changed recipient after failed distribution blocks resume before any provider I/O; restoring identity resumes one draft', async () => {
+  for (const field of ['email', 'fullName']) {
+    const h = fixture(); h.form.attachments = ['/patient-files/source']; let distributions = 0;
+    h.failProvider(async url => {
+      if (url.endsWith('/create')) return Response.json({ id: 'envelope' });
+      if (url.endsWith('/distribute')) return ++distributions === 1
+        ? Response.json({ message: 'Synthetic delivery failure' }, { status: 503 })
+        : Response.json({ recipients: [{ signingUrl: 'https://sign.example.test/ceremony' }] });
+      return Response.json({ id: 'envelope', status: 'DRAFT', recipients: [{ email: 'synthetic@example.test', name: 'Synthetic signer' }] });
+    });
+    assert.equal((await h.post()).status, 502);
+    const metadata = h.refs[0].metadata;
+    assert.equal(metadata.recipientName, 'Synthetic signer'); assert.equal(metadata.recipientEmail, 'synthetic@example.test');
+    const original = h.form.patient[field]; h.form.patient[field] = field === 'email' ? 'corrected@example.test' : 'Corrected signer';
+    const snapshot = await (await h.get()).json(); assert.equal(snapshot.canRequest, false);
+    assert.equal(snapshot.request.canRetry, false); assert.equal(snapshot.request.errorCode, 'documenso-recipient-changed');
+    assert.equal(snapshot.recipient.email, 'synthetic@example.test');
+    const calls = h.calls.length, writes = h.counts.writes;
+    const denied = await h.post(); assert.equal(denied.status, 409); assert.equal((await denied.json()).error, 'documenso-recipient-changed');
+    assert.equal(h.calls.length, calls); assert.equal(h.counts.writes, writes);
+    h.form.patient[field] = original; assert.equal((await h.post()).status, 200);
+    assert.equal(h.calls.filter(call => call.url.endsWith('/create')).length, 1);
+    assert.equal(h.refs[0].metadata.recipientName, 'Synthetic signer'); assert.equal(h.refs[0].metadata.recipientEmail, 'synthetic@example.test');
+    assert.ok(h.audit.every(entry => !JSON.stringify(entry).includes('synthetic@example.test')), 'Recipient identity belongs only in ceremony metadata, never audit');
+  }
+});
+
+test('known legacy ceremony without recipient identity fails closed and suppresses its signing link', async () => {
+  const h = fixture(); h.form.attachments = ['/patient-files/source']; await h.post();
+  delete h.refs[0].metadata.recipientEmail; delete h.refs[0].metadata.recipientName;
+  const dto = await (await h.get()).json(); assert.equal(dto.canRequest, false); assert.equal(dto.request.signingUrl, null);
+  assert.equal(dto.request.errorCode, 'documenso-recipient-changed');
+  const calls = h.calls.length;
+  assert.equal((await h.post()).status, 409); assert.equal(h.calls.length, calls);
+});
+
+test('manual completion with an eligible source PDF never claims a reconciled signed document', async () => {
+  const h = fixture(); h.form.attachments = ['/patient-files/source'];
+  h.failProvider(async () => Response.json({}, { status: 401 })); await h.post();
+  const data = new FormData(); data.set('patientFormId', 'form'); data.set('responses', 'Synthetic manually completed');
+  data.set('signatureUrl', '/patient-files/source');
+  await assert.rejects(h.module('src/app/(app)/forms/actions.ts').completePatientFormAction(data), { message: '/forms?notice=forms-completed' });
+  const dto = await (await h.get()).json(); assert.equal(dto.status, 'COMPLETED');
+  assert.equal(dto.request.status, 'FAILED'); assert.equal(dto.signedFileUrl, null); assert.equal(dto.request.signedFileUrl, null);
+});
+
+test('signed provenance rejects missing, wrong-category, mismatched or unrelated envelope/file evidence', async () => {
+  const mutations = [
+    h => { h.files[0].category = 'CONSENT'; },
+    h => { h.refs[0].metadata.patientFileId = 'different-file'; },
+    h => { h.refs[1].metadata.patientFileId = 'different-file'; },
+    h => { h.refs[1].metadata.patientId = 'other-patient'; },
+    h => { h.refs[1].internalId = 'other-form'; },
+    h => { h.refs[1].clinicId = 'other-clinic'; },
+    h => { h.refs[1].metadata.status = 'PENDING'; },
+    h => { delete h.refs[1].metadata.completedEventId; },
+    h => { h.refs.splice(1, 1); },
+  ];
+  for (const mutate of mutations) {
+    const h = fixture(); h.form.attachments = ['/patient-files/source']; await h.post();
+    h.form.status = 'COMPLETED'; h.form.signatureUrl = '/patient-files/source'; h.files[0].category = 'SIGNED_CONSENT';
+    h.refs[0].metadata = { ...h.refs[0].metadata, status: 'SIGNED', patientFileId: 'source' };
+    h.refs[1].metadata = { ...h.refs[1].metadata, status: 'SIGNED', patientFileId: 'source', completedEventId: 'signed-event' };
+    mutate(h); const dto = await (await h.get()).json(); assert.equal(dto.signedFileUrl, null); assert.equal(dto.request.signedFileUrl, null);
+  }
 });
 
 test('legacy Documenso configuration is rejected and environment fallback requires an organization binding', async () => {
