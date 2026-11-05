@@ -369,6 +369,9 @@ history and status refresh. Only a verified webhook records a receipt; returning
 from checkout never marks an invoice paid. A verified transfer arriving after
 invoice void becomes patient credit. Existing paid invoices cannot receive more
 allocation than their remaining balance.
+Invoice requests use a short transfer memo of at most nine characters to support
+unlinked bank accounts; the complete order code remains the payment identity.
+See the official [payOS payment-link contract](https://payos.vn/docs/api/).
 
 Credentials are stored only as AES-256-GCM envelopes in `IntegrationCredential`.
 Back up the database and the selected master together: optional
