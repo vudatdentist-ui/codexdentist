@@ -4,6 +4,14 @@ import "server-only";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
+import { runSerializableTransaction } from "@/lib/transaction";
+import { loadReceiptRefundLedger, moneyCents, receiptCommission } from "@/lib/application/revenue/refund-ledger";
+
+type CommissionReceipt = Prisma.ReceiptGetPayload<{ include: {
+  patient: { select: { leadSource: true } };
+  sourceCommissionAccruals: { select: { policyId: true } };
+  allocations: { select: { invoiceId: true } };
+} }>;
 
 export type SourceCommissionPolicySummary = {
   id: string;
@@ -82,52 +90,34 @@ export async function generateSourceCommissionAccruals(input: {
   clinicIds: string[];
   actorId: string | null;
 }) {
-  const policies = await prisma.sourceCommissionPolicy.findMany({
-    where: {
-      organizationId: input.organizationId,
-      active: true,
-    },
-  });
-
-  if (policies.length === 0) {
-    return { created: 0 };
-  }
-
-  const policyBySource = new Map(policies.map((policy) => [policy.source, policy]));
-  const receipts = await prisma.receipt.findMany({
-    where: {
-      organizationId: input.organizationId,
-      clinicId: {
-        in: input.clinicIds,
-      },
-      patient: {
-        leadSource: {
-          in: [...policyBySource.keys()],
+  return runSerializableTransaction(async (tx) => {
+    const policies = await tx.sourceCommissionPolicy.findMany({
+      where: { organizationId: input.organizationId, active: true },
+    });
+    if (!policies.length) return { created: 0 };
+    const policyBySource = new Map(policies.map((policy) => [policy.source, policy]));
+    let created = 0;
+    let cursor: { receivedAt: Date; id: string } | null = null;
+    while (created < 1000) {
+      const after: { receivedAt: Date; id: string } | null = cursor;
+      const receipts: CommissionReceipt[] = await tx.receipt.findMany({
+        where: {
+          organizationId: input.organizationId, clinicId: { in: input.clinicIds },
+          OR: policies.map((policy) => ({ patient: { leadSource: policy.source },
+            sourceCommissionAccruals: { none: { policyId: policy.id } } })),
+          ...(after ? { AND: [{ OR: [{ receivedAt: { gt: after.receivedAt } },
+            { receivedAt: after.receivedAt, id: { gt: after.id } }] }] } : {}),
         },
-      },
-    },
-    include: {
-      patient: {
-        select: {
-          leadSource: true,
-        },
-      },
-      sourceCommissionAccruals: {
-        select: {
-          policyId: true,
-        },
-      },
-    },
-    orderBy: {
-      receivedAt: "asc",
-    },
-    take: 1000,
-  });
-
-  let created = 0;
-
-  await prisma.$transaction(async (tx) => {
-    for (const receipt of receipts) {
+        include: { patient: { select: { leadSource: true } },
+          sourceCommissionAccruals: { select: { policyId: true } },
+          allocations: { select: { invoiceId: true } } },
+        orderBy: [{ receivedAt: "asc" }, { id: "asc" }], take: 1000,
+      });
+      if (!receipts.length) break;
+      const refunds = await loadReceiptRefundLedger(tx, input.organizationId,
+        receipts.map((receipt) => receipt.id),
+        receipts.flatMap((receipt) => receipt.allocations.flatMap((row) => row.invoiceId ? [row.invoiceId] : [])));
+      for (const receipt of receipts) {
       const source = receipt.patient.leadSource;
       const policy = policyBySource.get(source);
 
@@ -135,10 +125,11 @@ export async function generateSourceCommissionAccruals(input: {
         continue;
       }
 
-      const baseAmount = Number(receipt.allocatedAmount || receipt.amount);
+      const grossBase = refunds.grossBases.get(receipt.id) ?? moneyCents(receipt.allocatedAmount);
+      const baseAmount = Math.max(grossBase - (refunds.byReceipt.get(receipt.id) ?? 0), 0) / 100;
       const ratePercent = Number(policy.ratePercent);
       const fixedAmount = Number(policy.fixedAmount);
-      const commissionAmount = Math.max(Math.round((baseAmount * ratePercent) / 100 + fixedAmount), 0);
+      const commissionAmount = receiptCommission(baseAmount, ratePercent, fixedAmount);
 
       if (commissionAmount <= 0) {
         continue;
@@ -161,6 +152,11 @@ export async function generateSourceCommissionAccruals(input: {
         },
       });
       created += 1;
+      if (created === 1000) break;
+      }
+      const last = receipts[receipts.length - 1]!;
+      cursor = { receivedAt: last.receivedAt, id: last.id };
+      if (receipts.length < 1000) break;
     }
 
     if (created > 0) {
@@ -177,9 +173,8 @@ export async function generateSourceCommissionAccruals(input: {
         },
       });
     }
+    return { created };
   });
-
-  return { created };
 }
 
 function toPolicySummary(policy: {
