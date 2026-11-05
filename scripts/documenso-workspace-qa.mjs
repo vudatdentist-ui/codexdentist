@@ -118,7 +118,12 @@ try {
   assert.equal((await page.request.post('/api/integrations/documenso/settings', { headers: { origin: base }, data: { action: 'disable', clinicId: null } })).status(), 409);
   assert.equal((await page.request.post('/api/integrations/documenso/signing-requests', { headers: { origin: base }, data: { action: 'attach-source', patientFormId: form.id, sourcePatientFileId: fileId } })).status(), 409);
   for (const width of [1440, 390, 320]) {
-    await page.setViewportSize({ width, height: width < 600 ? 844 : 1000 }); await page.screenshot({ path: `${output}/signing-pending-${width}.png` });
+    await page.setViewportSize({ width, height: width < 600 ? 844 : 1000 });
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+    const geometry = await dialog.evaluate(node => { const r = node.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: innerHeight, scrollY }; });
+    assert.ok(geometry.top >= 0 && geometry.bottom <= geometry.height, `Dialog remains in viewport: ${JSON.stringify(geometry)}`);
+    await dialog.locator('h2').scrollIntoViewIfNeeded();
+    await page.screenshot({ path: `${output}/signing-pending-${width}.png` });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2));
   }
   await page.reload({ waitUntil: 'networkidle' }); await row.getByRole('button', { name: 'Ký qua Documenso', exact: true }).click();
