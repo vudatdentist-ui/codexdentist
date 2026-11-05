@@ -441,6 +441,7 @@ Add production-grade DICOM/PACS viewing without turning DICOM storage into Codex
 - Codexdentist stores tenant/clinic/patient-scoped imaging references and stable external IDs.
 - DICOM blobs remain in Orthanc-managed storage.
 - Viewing requires Codexdentist authorization and cannot cross tenant/clinic boundaries.
+- Environment-backed Orthanc credentials require an explicit `ORTHANC_DEFAULT_ORGANIZATION_ID` matching the authenticated setup organization and the stored connection owner at import/viewer resolution; legacy unbound connections fail closed.
 - Patient mapping uses stable identifiers, not name/email heuristics.
 - Backup/restore and unavailable-PACS behavior are documented and tested.
 - OHIF access path works at desktop/mobile widths required by the supported workflow.

@@ -8,6 +8,7 @@ import { upsertIntegrationConnection } from "@/infrastructure/integrations/subst
 import { hasSameOrigin } from "@/lib/request-security";
 import { allowedClinicIds } from "@/lib/patient-access";
 import { reportApplicationError } from "@/lib/error-reporting";
+import { assertOrthancOrganizationScope } from "@/integrations/config";
 
 const providers = new Set(["payos", "documenso", "orthanc"]);
 const secretRefPattern = /^env:[A-Z][A-Z0-9_]*$/;
@@ -33,6 +34,13 @@ export async function POST(request: Request) {
   if (!secretRefPattern.test(secretRef)) return error("integration-secret-ref-invalid", 400);
   if (provider === "orthanc" && secretRef !== "env:ORTHANC_DEFAULT") {
     return error("orthanc-secret-ref-invalid", 400);
+  }
+  if (provider === "orthanc") {
+    try {
+      assertOrthancOrganizationScope(session.organizationId);
+    } catch {
+      return error("orthanc-organization-not-bound", 403);
+    }
   }
   if (requestedClinicId && !allowedClinicIds(session).includes(requestedClinicId)) {
     return error("integration-clinic-forbidden", 403);

@@ -69,14 +69,25 @@ export function documensoBaseUrl() {
   return optionalBaseUrl("DOCUMENSO_DEFAULT_BASE_URL", "https://app.documenso.com/api/v2", "documenso");
 }
 
-export function resolveOrthancConnectionSecrets(secretRef: string | null) {
-  const prefix = envPrefix(secretRef, "orthanc");
+export function assertOrthancOrganizationScope(organizationId: string) {
+  const boundOrganizationId = process.env.ORTHANC_DEFAULT_ORGANIZATION_ID?.trim();
+  if (!organizationId || !boundOrganizationId || boundOrganizationId !== organizationId) {
+    throw new IntegrationConfigurationError(
+      "orthanc-organization-not-bound",
+      "Orthanc environment credentials require an explicit matching organization binding",
+    );
+  }
+}
+
+export function resolveOrthancConnectionSecrets(connection: { secretRef: string | null; organizationId: string }) {
+  const prefix = envPrefix(connection.secretRef, "orthanc");
   if (prefix !== "ORTHANC_DEFAULT") {
     throw new IntegrationConfigurationError(
       "orthanc-secret-ref-invalid",
       "Orthanc connections must use env:ORTHANC_DEFAULT",
     );
   }
+  assertOrthancOrganizationScope(connection.organizationId);
   const baseUrl = orthancBaseUrl(
     `${prefix}_BASE_URL`,
     process.env.NODE_ENV === "production" ? "https://orthanc.invalid" : "http://127.0.0.1:8042",

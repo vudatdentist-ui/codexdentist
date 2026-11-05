@@ -422,6 +422,20 @@ Only reconciled provider results display as electronically signed. Manual
 completion and its supporting documents retain their own labels. Configure and
 accept the real Documenso account separately before sending real patient data.
 
+## Orthanc credential scope
+
+Before enabling PACS, set `ORTHANC_DEFAULT_ORGANIZATION_ID` to the exact owning
+organization ID alongside the `ORTHANC_DEFAULT_*` connection settings. The default
+PACS credentials serve only that organization in hosted and self-hosted deployments.
+Missing or mismatched bindings reject connection setup and block provider access
+through existing import/viewer connections. Request fields cannot select the owner.
+This binding does not activate PACS or replace private viewer authorization; keep
+both services disabled until separately configured and accepted.
+On upgrades of configured self-hosted installations, audit existing connections
+and study/patient mappings for incorrect organization ownership before activation.
+Do not automatically delete cached clinical metadata; reconcile any mismatches
+through an operator-reviewed correction.
+
 ## Go-Live Gate
 
 The integrated roadmap release in PR #68 adds six migrations, including composite
