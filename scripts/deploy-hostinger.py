@@ -15,6 +15,7 @@ import shutil
 import subprocess
 import time
 import urllib.request
+from urllib.parse import parse_qsl, quote, unquote, urlparse, urlunparse
 
 REPOSITORY = "vudatdentist-ui/codexdentist"
 ROOT = Path("/opt/codexdentist-deploy")
@@ -146,6 +147,62 @@ def wait_health(base):
             time.sleep(2)
 
 
+def migration_connection(environment, postgres_environment):
+    database = urlparse(environment.get("DATABASE_URL", ""))
+    if database.scheme not in {"postgres", "postgresql"} or database.hostname != "nc-migration-postgres" or database.path != "/" + DATABASE or any(
+        key.lower() in {"host", "hostaddr", "database", "dbname", "port", "service", "user", "password", "connectionstring"}
+        for key, _ in parse_qsl(database.query)
+    ):
+        raise RuntimeError("Unexpected migration database target")
+    owner = postgres_environment.get("POSTGRES_USER", "")
+    password = postgres_environment.get("POSTGRES_PASSWORD", "")
+    if not owner or not password or not database.username or unquote(database.username) == owner:
+        raise RuntimeError("Separate runtime and bootstrap migration credentials are required")
+    authority = f"{quote(owner, safe='')}:{quote(password, safe='')}@{database.hostname}:{database.port or 5432}"
+    return urlunparse(database._replace(netloc=authority))
+
+
+def sql_identifier(value):
+    if not value or "\0" in value:
+        raise RuntimeError("Invalid database role")
+    return '"' + value.replace('"', '""') + '"'
+
+
+def runtime_default_privileges(environment, postgres_environment):
+    owner = sql_identifier(postgres_environment["POSTGRES_USER"])
+    runtime = sql_identifier(unquote(urlparse(environment["DATABASE_URL"]).username or ""))
+    return (
+        f"ALTER DEFAULT PRIVILEGES FOR ROLE {owner} IN SCHEMA public "
+        f"GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO {runtime};\n"
+        f"ALTER DEFAULT PRIVILEGES FOR ROLE {owner} IN SCHEMA public "
+        f"GRANT USAGE, SELECT ON SEQUENCES TO {runtime};\n"
+    )
+
+
+def database_admin_command():
+    return ["docker", "exec", "-i", POSTGRES, "sh", "-c",
+            'exec psql -qAt -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" --dbname ' + DATABASE]
+
+
+def check_migration_identity():
+    # The isolated restore uses the bootstrap superuser privilege class too.
+    # Refuse to claim that drill verifies a different production DDL principal.
+    result = run(database_admin_command(), input=b"SELECT rolsuper FROM pg_roles WHERE rolname=current_user;\n",
+                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    if result.strip() != b"t":
+        raise RuntimeError("Bootstrap migration principal does not match restore privileges")
+
+
+def check_migration_credentials(image, connection):
+    probe = b"const {Pool}=require('pg');const p=new Pool({connectionString:process.env.DATABASE_URL,max:1});" \
+            b"(async()=>{try{const r=await p.query('SELECT current_user AS name,rolsuper FROM pg_roles WHERE rolname=current_user');" \
+            b"if(r.rows[0]?.name!==decodeURIComponent(new URL(process.env.DATABASE_URL).username)||!r.rows[0]?.rolsuper)throw Error();" \
+            b"}finally{await p.end()}})().catch(()=>{console.error('Migration credential probe failed');process.exitCode=1});"
+    run(["docker", "run", "--rm", "-i", "--network", "container:" + CONTAINER,
+         "--env", "DATABASE_URL", "--entrypoint", "node", image, "-"],
+        input=probe, env={**os.environ, "DATABASE_URL": connection})
+
+
 def restore_drill(backup, image, name):
     run(["docker", "run", "-d", "--name", name, "--network", "none",
          "--tmpfs", "/var/lib/postgresql/data:rw,size=1g",
@@ -162,10 +219,23 @@ def restore_drill(backup, image, name):
         with (backup / "database.dump").open("rb") as dump:
             run(["docker", "exec", "-i", name, "pg_restore", "--exit-on-error", "--no-owner",
                  "--no-acl", "-U", "postgres", "-d", "postgres"], stdin=dump)
+        run(["docker", "exec", "-i", name, "psql", "-q", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres"],
+            input=b"CREATE ROLE codexdentist_restore_runtime NOLOGIN;\n"
+                  b"GRANT USAGE ON SCHEMA public TO codexdentist_restore_runtime;\n"
+                  b"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO codexdentist_restore_runtime;\n"
+                  b"ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO codexdentist_restore_runtime;\n"
+                  b"ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO codexdentist_restore_runtime;\n",
+            stdout=subprocess.DEVNULL)
         run(["docker", "run", "--rm", "--network", f"container:{name}",
              "-e", "DATABASE_URL=postgresql://postgres@127.0.0.1:5432/postgres",
              "--entrypoint", "npx", image, "prisma", "migrate", "deploy"])
-        (backup / "restore-verified").write_text("backup restored; candidate migrations applied\n")
+        run(["docker", "exec", "-i", name, "psql", "-q", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres"],
+            input=b"SET ROLE codexdentist_restore_runtime;\nDO $$ BEGIN IF EXISTS ("
+                  b"SELECT 1 FROM pg_tables t CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE')) p(privilege) "
+                  b"WHERE t.schemaname='public' AND NOT has_table_privilege(current_user,format('%I.%I',t.schemaname,t.tablename),p.privilege)) "
+                  b"THEN RAISE EXCEPTION 'Restored runtime is missing CRUD access'; END IF; END $$;\n",
+            stdout=subprocess.DEVNULL)
+        (backup / "restore-verified").write_text("backup restored; candidate owner migrations and limited runtime CRUD verified\n")
     finally:
         run(["docker", "rm", "-f", name], stdout=subprocess.DEVNULL)
 
@@ -181,10 +251,13 @@ def deploy(sha, main, reviewed_migrations=None):
         return
     # Verify target identity without exposing any production secret.
     environment = dict(item.split("=", 1) for item in current["Config"]["Env"])
-    from urllib.parse import urlparse
     database = urlparse(environment.get("DATABASE_URL", ""))
     if database.hostname != "nc-migration-postgres" or database.path != "/" + DATABASE:
         raise RuntimeError("Unexpected production database; aborting")
+    postgres = json.loads(capture(["docker", "inspect", POSTGRES]))[0]
+    postgres_environment = dict(item.split("=", 1) for item in postgres["Config"]["Env"])
+    migration_url = migration_connection(environment, postgres_environment)
+    check_migration_identity()
     source = ROOT / "releases" / sha
     if not source.exists():
         run(["git", "clone", "--no-checkout", f"https://github.com/{REPOSITORY}.git", str(source)])
@@ -205,6 +278,7 @@ def deploy(sha, main, reviewed_migrations=None):
     # A newer main or an API failure aborts before backup/migration/cutover.
     if api("git/ref/heads/main")["object"]["sha"] != main:
         raise RuntimeError("Main changed while building; defer to next run")
+    check_migration_credentials(image, migration_url)
     stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     backup = ROOT / "backups" / f"{stamp}-{sha[:12]}"
     backup.mkdir(mode=0o700)
@@ -230,8 +304,13 @@ def deploy(sha, main, reviewed_migrations=None):
     try:
         if api("git/ref/heads/main")["object"]["sha"] != main:
             raise RuntimeError("Main changed before migration; defer release")
-        run(compose("run", "--rm", "--no-deps", "-T", "--entrypoint", "npx", "codexdentist",
-                    "prisma", "migrate", "deploy", override=override))
+        run(database_admin_command(), input=runtime_default_privileges(environment, postgres_environment).encode(),
+            stdout=subprocess.DEVNULL)
+        # Forward through the child environment, never command arguments, logs,
+        # Compose files, candidate configuration or the runtime container.
+        run(["docker", "run", "--rm", "--network", "container:" + CONTAINER,
+             "--env", "DATABASE_URL", "--entrypoint", "npx", image, "prisma", "migrate", "deploy"],
+            env={**os.environ, "DATABASE_URL": migration_url})
         run(compose("run", "-d", "--no-deps", "--name", candidate, "-p", "127.0.0.1::3000",
                     "--entrypoint", "node", "codexdentist", "node_modules/next/dist/bin/next", "start",
                     "-H", "0.0.0.0", "-p", "3000", override=override), stdout=subprocess.DEVNULL)

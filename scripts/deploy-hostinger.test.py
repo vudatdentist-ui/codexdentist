@@ -115,6 +115,69 @@ class DeploymentGuards(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, r"^docker failed \(exit 1\)$"):
                 deploy.capture(["docker", "inspect"])
 
+    def test_migration_credentials_are_separate_encoded_and_target_bound(self):
+        from urllib.parse import urlparse, unquote
+        runtime = {"DATABASE_URL": "postgresql://runtime:runtime-secret@nc-migration-postgres/thegnebd_codexdentist?schema=public"}
+        owner = {"POSTGRES_USER": "owner@role", "POSTGRES_PASSWORD": "synthetic:p@ss/word?%"}
+        result = urlparse(deploy.migration_connection(runtime, owner))
+        self.assertEqual(unquote(result.username), owner["POSTGRES_USER"])
+        self.assertEqual(unquote(result.password), owner["POSTGRES_PASSWORD"])
+        self.assertEqual(result.hostname, "nc-migration-postgres")
+        self.assertEqual(result.path, "/thegnebd_codexdentist")
+        self.assertEqual(result.query, "schema=public")
+        self.assertIn("runtime-secret", runtime["DATABASE_URL"])
+        for value in [{}, {"POSTGRES_USER": "runtime", "POSTGRES_PASSWORD": "secret"}]:
+            with self.assertRaises(RuntimeError):
+                deploy.migration_connection(runtime, value)
+        for suffix in ["?host=other", "?database=other", "?PORT=1", "?user=other", "?connectionString=other"]:
+            with self.assertRaises(RuntimeError):
+                deploy.migration_connection({"DATABASE_URL": runtime["DATABASE_URL"].split("?")[0] + suffix}, owner)
+
+    def test_default_grants_allow_runtime_data_without_ddl_or_role_elevation(self):
+        sql = deploy.runtime_default_privileges(
+            {"DATABASE_URL": "postgresql://runtime%22role:secret@nc-migration-postgres/thegnebd_codexdentist"},
+            {"POSTGRES_USER": 'migration"owner'},
+        )
+        self.assertIn('FOR ROLE "migration""owner"', sql)
+        self.assertIn('TO "runtime""role"', sql)
+        self.assertIn("GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES", sql)
+        self.assertIn("GRANT USAGE, SELECT ON SEQUENCES", sql)
+        self.assertNotIn("REFERENCES", sql)
+        self.assertNotIn("ALTER ROLE", sql)
+        self.assertNotIn("secret", sql)
+
+    def test_restore_privilege_class_must_match_production_migrator(self):
+        with patch.object(deploy, "run", return_value=b"t\n"):
+            deploy.check_migration_identity()
+        with patch.object(deploy, "run", return_value=b"f\n"):
+            with self.assertRaises(RuntimeError):
+                deploy.check_migration_identity()
+
+    def test_owner_tcp_probe_keeps_credentials_out_of_arguments(self):
+        connection = "postgresql://owner:synthetic-secret@nc-migration-postgres/thegnebd_codexdentist"
+        with patch.object(deploy, "run") as command:
+            deploy.check_migration_credentials("codexdentist:" + SHA, connection)
+        args = command.call_args.args[0]
+        self.assertIn("container:" + deploy.CONTAINER, args)
+        self.assertIn("--env", args)
+        self.assertNotIn("synthetic-secret", " ".join(args))
+        self.assertEqual(command.call_args.kwargs["env"]["DATABASE_URL"], connection)
+        self.assertIn(b"rolsuper", command.call_args.kwargs["input"])
+
+    def test_restore_checks_limited_runtime_access_after_candidate_migrations(self):
+        import subprocess
+        with tempfile.TemporaryDirectory() as root:
+            backup = Path(root)
+            (backup / "database.dump").write_bytes(b"synthetic")
+            with patch.object(deploy, "run") as commands, patch.object(deploy.subprocess, "run",
+                    return_value=subprocess.CompletedProcess([], 0)):
+                deploy.restore_drill(backup, "codexdentist:" + SHA, "isolated-test")
+            inputs = [call.kwargs.get("input", b"") for call in commands.call_args_list]
+            self.assertTrue(any(b"CREATE ROLE codexdentist_restore_runtime NOLOGIN" in data for data in inputs))
+            self.assertTrue(any(b"ALTER DEFAULT PRIVILEGES FOR ROLE postgres" in data for data in inputs))
+            self.assertTrue(any(b"SET ROLE codexdentist_restore_runtime" in data and b"has_table_privilege" in data for data in inputs))
+            self.assertIn("limited runtime CRUD", (backup / "restore-verified").read_text())
+
     def test_public_probes_have_identified_agent_and_verify_schema(self):
         import io
         import json
@@ -148,6 +211,8 @@ class DeploymentGuards(unittest.TestCase):
 
             def capture(command):
                 if command[:2] == ["docker", "inspect"]:
+                    if command[-1] == deploy.POSTGRES:
+                        return json.dumps([{"Config": {"Env": ["POSTGRES_USER=migration_owner", "POSTGRES_PASSWORD=owner-secret"]}}])
                     return json.dumps([next(inspections)])
                 if command[:2] == ["docker", "port"]:
                     return "127.0.0.1:49163"
@@ -161,6 +226,7 @@ class DeploymentGuards(unittest.TestCase):
             commands = stack.enter_context(patch.object(deploy, "run"))
             stack.enter_context(patch.object(deploy.subprocess, "run"))
             stack.enter_context(patch.object(deploy, "restore_drill"))
+            stack.enter_context(patch.object(deploy, "check_migration_identity"))
             stack.enter_context(patch.object(deploy, "api", return_value={"object": {"sha": SHA}}))
             wait = stack.enter_context(patch.object(deploy, "wait_health"))
             public = stack.enter_context(patch.object(deploy, "health"))
@@ -182,6 +248,13 @@ class DeploymentGuards(unittest.TestCase):
                 command = call.args[0]
                 if "up" in command:
                     self.assertEqual(command[-4:], ["--no-deps", "--pull", "never", "codexdentist"])
+                if "migrate" in command or ("--env" in command and "node" in command):
+                    self.assertIn("--env", command)
+                    self.assertNotIn("owner-secret", " ".join(command))
+                    self.assertIn("migration_owner:owner-secret@", call.kwargs["env"]["DATABASE_URL"])
+                else:
+                    self.assertNotIn("env", call.kwargs)
+            self.assertEqual(current["Config"]["Env"], ["DATABASE_URL=postgresql://user:secret@nc-migration-postgres/thegnebd_codexdentist"])
             self.assertIn("image: untouched:latest", compose.read_text())
 
     def test_success_records_exact_revision_and_clears_marker(self):
