@@ -308,12 +308,20 @@ try {
   const gate = new Promise((resolve) => { release = resolve; });
   const started = new Promise((resolve) => { entered = resolve; });
   let firstCalls = 0;
-  const first = dispatchIntegrationOutbox(prisma, async () => { firstCalls++; entered(); await gate; }, { topic: slowTopic, staleLockMs: 150 });
+  // A native PostgreSQL round trip on a shared CI runner can exceed 150 ms.
+  // Observe renewals over two full one-second leases instead of asserting
+  // sub-150-ms scheduler latency. Deterministic unit tests retain tiny leases.
+  const leaseMs = 1000;
+  const first = dispatchIntegrationOutbox(prisma, async () => { firstCalls++; entered(); await gate; }, { topic: slowTopic, staleLockMs: leaseMs });
   await started;
   let competitor;
   try {
-    await new Promise((resolve) => setTimeout(resolve, 450));
-    competitor = await dispatchIntegrationOutbox(prisma, async () => { throw new Error("duplicate provider call"); }, { topic: slowTopic, staleLockMs: 150 });
+    const observed = await prisma.$queryRawUnsafe(`SELECT "id","lockedAt" FROM "IntegrationOutbox" WHERE "topic"=$1 ORDER BY "id"`, slowTopic);
+    await new Promise((resolve) => setTimeout(resolve, leaseMs * 2 + 100));
+    const renewed = await prisma.$queryRawUnsafe(`SELECT "id","lockedAt" FROM "IntegrationOutbox" WHERE "topic"=$1 ORDER BY "id"`, slowTopic);
+    assert(renewed.length === 2 && renewed.every((row, index) => row.lockedAt.getTime() - observed[index].lockedAt.getTime() >= leaseMs),
+      "PostgreSQL heartbeat advances both queued leases beyond the original expiry");
+    competitor = await dispatchIntegrationOutbox(prisma, async () => { throw new Error("duplicate provider call"); }, { topic: slowTopic, staleLockMs: leaseMs });
   } finally { release(); }
   const firstResult = await first;
   assert(competitor.claimed === 0 && firstResult.sent === 2 && firstCalls === 2, "PostgreSQL heartbeat protects the entire queued outbox batch");
