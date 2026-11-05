@@ -88,6 +88,7 @@ try {
     await prisma.$executeRawUnsafe(`INSERT INTO "ExternalReference" ("id","organizationId","clinicId","connectionId","provider","entityType","internalId","externalId","metadata")
       VALUES ($1,$2,$3,$4,'documenso','DOCUMENSO_REQUEST',$5,$6,$7::jsonb)`, randomUUID(), a.organization.id, a.clinic.id, connection.id,
       form.id, randomUUID(), JSON.stringify({ patientFormId: form.id, sourcePatientFileId: fileId, envelopeId,
+        recipientName: patient.fullName, recipientEmail: patient.email,
         status: 'PENDING', distributionStatus: 'SENT', signingUrl: 'https://sign.example.test/synthetic-only' }));
     await dialog.getByRole('button', { name: 'Tải lại trạng thái', exact: true }).click();
     state = { ids: [envelopeId] };
