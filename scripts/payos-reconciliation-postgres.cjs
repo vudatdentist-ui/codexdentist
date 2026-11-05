@@ -17,6 +17,7 @@ async function main() {
   try {
     await admin.connect(); assert.match(name, /^payos_reconcile_test_[a-f0-9]{16}$/);
     await admin.query(`CREATE DATABASE "${name}"`); created = true;
+    await admin.query(`ALTER DATABASE "${name}" SET timezone TO 'Asia/Bangkok'`);
     execFileSync(process.execPath, [require.resolve('prisma/build/index.js'), 'migrate', 'deploy'], {
       env: { ...process.env, DATABASE_URL: target.toString() }, stdio: 'pipe', timeout: 60000, windowsHide: true,
     });
@@ -91,6 +92,11 @@ async function main() {
     assert.equal(retained.status, 'ERROR'); assert.equal(retained.amountPaid, 100000);
     await assert.rejects(savePayOSSettings(session, { action: 'disable', clinicId: clinic.id }), { code: 'payos-orders-unresolved' });
     assert.equal(await prisma.receipt.count(), 1); assert.equal(await prisma.payment.count(), 0);
+    const observed = await row(third.id);
+    const late = await store.updateExternalReferenceMetadataWithRetry(prisma, third.id, { ...third.metadata, status: 'PENDING', checkoutUrl: 'https://stale.test', qrCode: 'stale' });
+    assert.equal(late.metadata.providerAmountPaid, 100000); assert.equal(late.metadata.providerStatus, 'PAID');
+    assert.equal(late.metadata.providerCheckedAt, observed.metadata.providerCheckedAt);
+    assert.ok(Math.abs(Date.now() - late.updatedAt.getTime()) < 5000, 'Metadata UTC timestamps remain correct in a UTC+7 session');
     console.log('ok native status recovery: webhook race, paid observation ordering, sealed-key rotation and late-write fencing');
   } finally {
     for (const release of gates) release(); await Promise.allSettled(pending);

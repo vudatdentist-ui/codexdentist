@@ -158,6 +158,8 @@ export async function updateExternalReferenceMetadata(
   referenceId: string,
   metadata: Record<string, unknown>,
 ) {
+  // Creation can finish after a status check. Fence retired orders and retain
+  // authenticated money observations even when that writer holds older JSON.
   const rows = await db.$queryRawUnsafe<ExternalReferenceRecord[]>(
     `UPDATE "ExternalReference"
      SET "metadata" = CASE
@@ -167,9 +169,18 @@ export async function updateExternalReferenceMetadata(
        WHEN "provider"='payos' AND "entityType"='PAYOS_ORDER' AND "metadata"->>'status'='CANCELLED'
         AND COALESCE(($2::jsonb)->>'status', '') <> 'SETTLED'
        THEN "metadata"
+       WHEN "provider"='payos' AND "entityType"='PAYOS_ORDER'
+        AND ((CASE WHEN jsonb_typeof("metadata"->'providerAmountPaid')='number'
+          THEN ("metadata"->>'providerAmountPaid')::numeric ELSE 0 END)>0 OR "metadata"->>'providerStatus'='PAID')
+       THEN $2::jsonb || jsonb_strip_nulls(jsonb_build_object(
+         'providerAmountPaid', GREATEST(
+           CASE WHEN jsonb_typeof("metadata"->'providerAmountPaid')='number' THEN ("metadata"->>'providerAmountPaid')::numeric ELSE 0 END,
+           CASE WHEN jsonb_typeof(($2::jsonb)->'providerAmountPaid')='number' THEN (($2::jsonb)->>'providerAmountPaid')::numeric ELSE 0 END),
+         'providerStatus', CASE WHEN "metadata"->>'providerStatus'='PAID' THEN 'PAID' ELSE COALESCE(($2::jsonb)->>'providerStatus',"metadata"->>'providerStatus') END,
+         'providerCheckedAt', GREATEST("metadata"->>'providerCheckedAt',($2::jsonb)->>'providerCheckedAt')))
        ELSE $2::jsonb
      END,
-         "updatedAt" = CURRENT_TIMESTAMP
+         "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
      WHERE "id" = $1
      RETURNING *`,
     referenceId,
@@ -213,7 +224,7 @@ export async function claimExternalReferenceForRetry(
     `UPDATE "ExternalReference"
      SET "metadata" = jsonb_set(("metadata" - 'errorCode'), '{status}', '"CREATING"'::jsonb)
            || CASE WHEN "metadata"->>'status'='ERROR' THEN '{"creationUncertain":true}'::jsonb ELSE '{}'::jsonb END,
-         "updatedAt" = CURRENT_TIMESTAMP
+         "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
      WHERE "id" = $1 AND "metadata"->>'status' IN ('ERROR', 'FAILED')
      RETURNING *`,
     referenceId,

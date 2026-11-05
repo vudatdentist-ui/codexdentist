@@ -78,7 +78,17 @@ function fixture(options = {}) {
         const cancelledGuard = sql.includes('"provider"=\'payos\' AND "entityType"=\'PAYOS_ORDER\' AND "metadata"->>\'status\'=\'CANCELLED\'') && sql.includes("<> 'SETTLED'");
         const preserve = originalGuard && ['SETTLED', 'SIGNED'].includes(order.metadata.status) && !['SETTLED', 'SIGNED'].includes(next.status) ||
           cancelledGuard && order.provider === 'payos' && order.entityType === 'PAYOS_ORDER' && order.metadata.status === 'CANCELLED' && next.status !== 'SETTLED';
-        stats.updates++; if (!preserve) order.metadata = next;
+        const paid = Number(order.metadata.providerAmountPaid ?? 0);
+        const providerStatus = order.metadata.providerStatus;
+        const checkedAt = order.metadata.providerCheckedAt;
+        const keepMoney = sql.includes("'providerAmountPaid', GREATEST(") && order.provider === 'payos' && order.entityType === 'PAYOS_ORDER' &&
+          (paid > 0 || providerStatus === 'PAID');
+        stats.updates++; if (!preserve) {
+          order.metadata = next;
+          if (keepMoney) order.metadata = { ...next, providerAmountPaid: Math.max(paid, Number(next.providerAmountPaid ?? 0)),
+            providerStatus: providerStatus === 'PAID' ? 'PAID' : next.providerStatus ?? providerStatus,
+            providerCheckedAt: next.providerCheckedAt && next.providerCheckedAt > checkedAt ? next.providerCheckedAt : checkedAt };
+        }
         return [copy(order)];
       }
       stats.financialTouches++; throw new Error(`Unexpected persistence statement: ${sql}`);
@@ -313,4 +323,13 @@ test('successful creation audit cannot return a stale QR after recovery commits 
   const h = fixture(); h.duringCreateAudit(async () => { assert.equal((await h.post()).status, 200); });
   const response = await h.createPost(); assert.equal(response.status, 200);
   const body = await response.json(); assert.equal(body.status, 'CANCELLED'); assert.equal(body.checkoutUrl, null); assert.equal(body.qrCode, null);
+});
+
+test('late creation preserves a verified paid observation and suppresses its stale QR response', async () => {
+  const h = fixture({ data: { status: 'PAID', amountPaid: 100000, amountRemaining: 0 } });
+  h.duringCreate(async () => { assert.equal((await h.post()).status, 200); });
+  const response = await h.createPost(); assert.equal(response.status, 200);
+  const body = await response.json(); assert.equal(body.checkoutUrl, null); assert.equal(body.qrCode, null);
+  assert.equal(body.providerAmountPaid, 100000); assert.equal(h.order.metadata.providerAmountPaid, 100000);
+  assert.equal(await h.unresolved(), true);
 });
