@@ -42,6 +42,15 @@ The financial database runner also holds each transaction before its first read
 to prove both void/generation commit orders. Commission basis snapshots are
 atomic evidence; transaction start or receipt-update times are not substitutes.
 
+Deployment principal changes require `python3 scripts/deploy-hostinger.test.py`
+and `NODE_ENV=test npm run test:migration-role-db`. The PostgreSQL regression
+reproduces REFERENCES denial under a limited runtime role, checks the empty
+partial artifact, completes the exact canonical FK suffix as migration admin,
+and proves new owner-created tables keep runtime CRUD without granting core
+REFERENCES or elevated roles. The restore drill must verify both migrated schema
+and limited runtime access; data restored with `--no-owner --no-acl` alone cannot
+verify production permission parity.
+
 After demo lifecycle or organization-purge changes, run `NODE_ENV=test npm run
 test:demo-cleanup-db` against disposable loopback PostgreSQL. It creates an expired
 demo with an invoice, invoice item, receipt and linked allocation, exercises the

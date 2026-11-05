@@ -79,6 +79,27 @@ container and applies the candidate migrations there. Unattended migration polic
 accepts only new CREATE statements; edited migrations and other SQL require an
 operator review even if CI's broader expand/contract checker passes.
 
+The application keeps its existing runtime database identity. DDL uses the
+PostgreSQL container's separate bootstrap migration principal, read in memory
+from the root-only Docker configuration and verified over TCP before migration.
+That identity must match the superuser privilege class used by the isolated
+restore. Its URL is forwarded only to the short-lived migration process through
+the child environment; never put it in command arguments, Compose, a candidate,
+the application or a release marker. Default privileges give the runtime role
+CRUD on newly created tables and usage/select on new sequences; they do not give
+it core-table REFERENCES, DDL or elevated roles. The restore drill also verifies
+a limited NOLOGIN runtime role can access the resulting tables. Run
+`test:migration-role-db` on disposable loopback PostgreSQL after changing this
+boundary: restoring as superuser alone does not prove runtime migrations work.
+
+For a partially failed migration, keep the attention marker and inspect actual
+objects, row counts, ownership, constraints and migration history first. A
+reviewed recovery may complete only the missing statements from the exact
+canonical SQL, then use `prisma migrate resolve --applied` with the migration
+principal. Do not edit historical SQL, reset data or mark incomplete DDL applied.
+Retain a fresh backup and restore rehearsal. Archive the resolved marker only
+after schema/history, runtime grants and old/candidate health are verified.
+
 For a reviewed additive migration batch, use `--reviewed-migrations <file>` on
 the installed deployer. The JSON file must be root-owned, not group/world
 writable, and contain `sha`, `previous`, and `migrations` (a map of every new
@@ -265,6 +286,14 @@ Call with `POST` plus `x-job-secret: <JOB_SECRET>` or `Authorization: Bearer <JO
 - `/api/jobs/notifications`: every 5 minutes.
 - `/api/jobs/recalls`: daily before clinic opening.
 - `/api/jobs/demo-cleanup`: hourly on the public demo host.
+- `/api/jobs/patient-file-gc`: staged/purge cleanup and expired-file retention;
+  activate its schedule only after reviewing the configured retention policy.
+
+Application job scheduling is an operator configuration, separate from the
+deployment timer. The VPS cron/systemd inventory on 2026-11-05 did not contain
+these application jobs. Do not infer scheduling from an installed route. Verify
+outbound recipients/provider policy before enabling notification/recall delivery,
+and retention/restore policy before activating file deletion.
 
 Failed notification webhooks become `FAILED` rows and should be retried/triaged from Dashboard.
 
