@@ -271,10 +271,14 @@ runtime account's missing REFERENCES/ownership permissions. The deployer now
 uses the bootstrap migration identity only for DDL and verifies limited runtime
 CRUD after restore; the role regression reproduces the original denial and
 forward recovery. No historical migration is edited or core runtime role elevated.
-Core release sign-off is recorded in PR #74: require exact-main CI, production
-backup/restore, resolved migration history, candidate/runtime grants and public
-health before closing Phase 7. An unresolved attention marker always keeps that
-operational gate open. Optional live providers and application-job activation
+PR #74 records the verified deployment of `a3aa571`: exact-main CI, production
+backup/restore, all 57 migrations, candidate/runtime grants, formal go-live and
+public/authenticated readiness passed. No unresolved attention marker remains.
+The subsequent clinical navigation audit is tracked in #75: URL, editable record,
+topbar and AI context must agree on one authorized patient, and changing patients
+must not carry unsent comments, attachments or pending actions into another record.
+Its focused tests, real navigation/browser review and verified release are required
+before closing that finding. Optional live providers and application-job activation
 remain separate operator configuration; see `OPERATIONS.md`.
 Recovered migration history: `20260516090000_source_commission` has
 ledger checksum `578975509b6eede77797d42ece4d3f93ee5635c8b218abb4894b7191537efae7`
@@ -490,3 +494,11 @@ topbar and dossier aligned with that URL. Journey lookup keeps keyboard focus in
 combobox and the patient menu uses the shared native modal. Browser preferences
 and action-scroll storage are optional: denied storage access must not prevent
 opening a workspace or editing a form.
+Journey distinguishes unavailable patient data, an empty scope, no selection,
+an invalid link and a pending patient switch. A mismatched URL hides editable
+record content and clears patient context in the topbar/AI. No selected Journey
+patient means no patient workspace is serialized into an AI request. Temporary invalid
+navigation preserves hidden comments, attachments and treatment targets for Back;
+a different valid patient gets
+a new owner for draft fields, attachments and pending dialogs. Server-side
+tenant/clinic/action authorization remains mandatory regardless of UI state.

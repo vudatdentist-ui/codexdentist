@@ -2,6 +2,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import { readBrowserStorage, writeBrowserStorage } from "@/shared/browser/storage";
+import { resolvePatientSelection } from "@/workspaces/patients/patient-selection-state";
 import { type Language } from "@/components/AppLanguage";
 import { accessibleViews, type ViewKey } from "@/lib/permissions";
 import type { PatientWorkspace } from "@/lib/patient-types";
@@ -230,7 +231,16 @@ export function useDentalSuiteModel({ activeView, staffDirectory = [], accountin
     const journeyChartSearchQuery = normalizeSearchText(journeyChartSearch.trim());
     const billingTopbarSearchQuery = normalizeSearchText(billingSearch.trim());
     const patientLookupSearchQuery = normalizeSearchText(patientLookupSearch.trim());
-    const journeySelectedPatient = visiblePatients.find((patient) => patient.id === journeySelectedPatientId) ?? null;
+    const journeyRecordPatientId = visiblePatients.some(patient => patient.id === journeySelectedPatientId) ? journeySelectedPatientId : "";
+    const journeySelectionState = resolvePatientSelection({
+        available: patientWorkspace?.source === "database",
+        patientIds: visiblePatients.map(patient => patient.id),
+        selectedPatientId: journeyRecordPatientId,
+        requestedPatientId,
+    });
+    const journeySelectedPatient = journeySelectionState === "ready"
+        ? visiblePatients.find(patient => patient.id === journeyRecordPatientId) ?? null
+        : null;
     const journeyPatientSearchMatches = patientSearchMatches(visiblePatients, journeyChartSearchQuery);
     const selectJourneyPatient = (patient: PatientSearchRecord) => {
         setJourneySelectedPatientId(patient.id);
@@ -436,6 +446,6 @@ export function useDentalSuiteModel({ activeView, staffDirectory = [], accountin
     const moduleAiMeta = latestModuleAiRun?.totalTokens
         ? `${latestModuleAiRun.model} · ${latestModuleAiRun.totalTokens} tokens`
         : latestModuleAiRun?.model ?? "";
-    return { activeView, staffDirectory, accountingWorkspace, billingWorkspace, clinicalWorkspace, communityWorkspace, crmWorkspace, dashboardWorkspace, formsWorkspace, inventoryWorkspace, journeyRecordsWorkspace, learningWorkspace, moduleAiRuns, patientFilesWorkspace, patientPortalWorkspace, patientWorkspace, pharmacyWorkspace, reportsWorkspace, scheduleWorkspace, servicesWorkspace, settingsWorkspace, session, staffPayrollWorkspace, taskInboxWorkspace, treatmentWorkspace, language, setLanguage, t, journeyChartSearch, setJourneyChartSearch, billingSearch, setBillingSearch, patientLookupSearch, setPatientLookupSearch, patientFilterId, setPatientFilterId, chainScopeId, setChainScopeId, journeyPatientMenuOpen, setJourneyPatientMenuOpen, journeySearchShowsSelectedPatientLabel, setJourneySearchShowsSelectedPatientLabel, showModuleAiResult, moduleAiModalOpen, setModuleAiModalOpen, journeyReceipts, journeyInvoiceIds, chainOptions, permittedViews, visibleClinics, visibleClinicIds, visibleAppointments, visiblePatients, usesJourneyControls, hasTopbarControls, journeySelectedPatient, journeyPatientSearchMatches, selectJourneyPatient, openPatientRoute, billingPatientSearchMatches, billingSelectedPatient, patientLookupSearchMatches, selectedSharedPatient, visiblePlans, visibleInvoices, patientScopedPatients, patientScopedAppointments, scheduleScopedAppointments, patientScopedInvoices, production, collection, todayVisits, utilization, latestModuleAiRun, latestModuleAiOutput, moduleAiSupported, moduleAiContextJson, moduleAiText, moduleAiMeta };
+    return { activeView, staffDirectory, accountingWorkspace, billingWorkspace, clinicalWorkspace, communityWorkspace, crmWorkspace, dashboardWorkspace, formsWorkspace, inventoryWorkspace, journeyRecordsWorkspace, learningWorkspace, moduleAiRuns, patientFilesWorkspace, patientPortalWorkspace, patientWorkspace, pharmacyWorkspace, reportsWorkspace, scheduleWorkspace, servicesWorkspace, settingsWorkspace, session, staffPayrollWorkspace, taskInboxWorkspace, treatmentWorkspace, language, setLanguage, t, journeyChartSearch, setJourneyChartSearch, billingSearch, setBillingSearch, patientLookupSearch, setPatientLookupSearch, patientFilterId, setPatientFilterId, chainScopeId, setChainScopeId, journeyPatientMenuOpen, setJourneyPatientMenuOpen, journeySearchShowsSelectedPatientLabel, setJourneySearchShowsSelectedPatientLabel, showModuleAiResult, moduleAiModalOpen, setModuleAiModalOpen, journeyReceipts, journeyInvoiceIds, chainOptions, permittedViews, visibleClinics, visibleClinicIds, visibleAppointments, visiblePatients, usesJourneyControls, hasTopbarControls, journeyRecordPatientId, journeySelectedPatient, journeyPatientSearchMatches, selectJourneyPatient, openPatientRoute, billingPatientSearchMatches, billingSelectedPatient, patientLookupSearchMatches, selectedSharedPatient, visiblePlans, visibleInvoices, patientScopedPatients, patientScopedAppointments, scheduleScopedAppointments, patientScopedInvoices, production, collection, todayVisits, utilization, latestModuleAiRun, latestModuleAiOutput, moduleAiSupported, moduleAiContextJson, moduleAiText, moduleAiMeta };
 }
 export type DentalSuiteModel = ReturnType<typeof useDentalSuiteModel>;

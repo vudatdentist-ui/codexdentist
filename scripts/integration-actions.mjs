@@ -2,14 +2,15 @@ import { Buffer } from "node:buffer";
 import { execFile } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { promisify } from "node:util";
+import { readFile } from "node:fs/promises";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 
 const baseUrl = process.env.INTEGRATION_BASE_URL ?? "http://127.0.0.1:3000";
 const integrationOwnerEmail = process.env.INTEGRATION_OWNER_EMAIL ?? "owner@nhavista.vn";
-const integrationOwnerPassword = process.env.INTEGRATION_OWNER_PASSWORD ?? "demo1234";
+const integrationOwnerPassword = process.env.INTEGRATION_OWNER_PASSWORD ?? "CodexSmoke2026!";
 const integrationPatientEmail = process.env.INTEGRATION_PATIENT_EMAIL ?? "patient@nhavista.vn";
-const integrationPatientPassword = process.env.INTEGRATION_PATIENT_PASSWORD ?? "demo1234";
+const integrationPatientPassword = process.env.INTEGRATION_PATIENT_PASSWORD ?? "CodexSmoke2026!";
 const connectionString =
   process.env.DATABASE_URL ??
   "postgresql://postgres:postgres@localhost:5432/vietnam_dental_suite?schema=public";
@@ -30,6 +31,12 @@ const tinyPng = Buffer.from(
 const execFileAsync = promisify(execFile);
 
 async function main() {
+  const loopback = new Set(["localhost", "127.0.0.1", "[::1]"]);
+  const database = new URL(connectionString);
+  assert(process.env.NODE_ENV === "test" && process.env.DATABASE_URL &&
+    loopback.has(new URL(baseUrl).hostname) && loopback.has(database.hostname) &&
+    ![...database.searchParams.keys()].some(key => /^(host|hostaddr|database|dbname|port|service)$/i.test(key)),
+    "Integration actions require an explicit disposable loopback test installation.");
   await assertDatabaseReady();
   await assertSeedData();
 
@@ -1652,14 +1659,20 @@ async function directActionPermissionCheck({
   patientCookie,
   patientId,
 }) {
-  const billingHtml = await getPage("/billing", actionCookie);
-  const billingAction = findActionName(billingHtml, "Create invoice");
+  await getPage("/billing", actionCookie);
+  // The invoice form mounts only after selecting its tab. Use this production
+  // build's actual reference rather than relying on the initial collection HTML.
+  const manifest = JSON.parse(await readFile(new URL("../.next/server/server-reference-manifest.json", import.meta.url), "utf8"));
+  const references = Object.entries(manifest.node).filter(([, entry]) =>
+    entry.exportedName === "createInvoiceAction" && entry.workers?.["app/(app)/billing/page"]);
+  assert(references.length === 1, "Expected one current billing createInvoiceAction reference.");
+  const billingAction = `$ACTION_ID_${references[0][0]}`;
   const blockedAmount = 7654321;
   const before = await prisma.invoice.count({
     where: { patientId, amount: blockedAmount },
   });
 
-  await postAction(
+  const denied = await postAction(
     "/billing",
     patientCookie,
     billingAction,
@@ -1670,6 +1683,11 @@ async function directActionPermissionCheck({
     },
     { allowAnyRedirect: true },
   );
+  assert([303, 307, 308].includes(denied.status) && denied.headers.get("location"),
+    `Patient billing request must be denied by redirect, received HTTP ${denied.status}.`);
+  const destination = new URL(denied.headers.get("location"), baseUrl);
+  assert(destination.origin === new URL(baseUrl).origin && destination.pathname === "/patient-app",
+    "Patient billing denial must return to the patient workspace, not login or billing validation.");
 
   const after = await prisma.invoice.count({
     where: { patientId, amount: blockedAmount },
