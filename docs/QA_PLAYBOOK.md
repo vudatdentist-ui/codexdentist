@@ -246,6 +246,10 @@ Stop the production verification server first because Next shares its build
 directory. Production provider HTTPS guards stay unchanged; no custom CA trust
 or TLS override is required. Both gates require an explicit loopback database,
 purge only their newly owned organizations, and save separate browser evidence.
+The development gate allows 60 seconds for the initial authenticated navigation:
+Next compiles the dashboard after login on a cold CI runner. Production browser
+login keeps its 15-second limit; credential, redirect and final-page assertions
+are unchanged.
 
 Verify:
 
