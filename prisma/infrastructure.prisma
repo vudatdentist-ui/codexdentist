@@ -11,6 +11,9 @@ model IntegrationConnection {
   createdAt      DateTime @default(now())
   updatedAt      DateTime @default(now())
   imagingStudies ImagingStudy[]
+  credential     IntegrationCredential?
+
+  @@unique([id, organizationId], map: "IntegrationConnection_id_organizationId_key")
 }
 
 model ExternalReference {
