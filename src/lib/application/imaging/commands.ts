@@ -48,7 +48,7 @@ export async function linkOrthancStudyCommand(
 
   let remote;
   try {
-    remote = await fetchOrthancStudy(resolveOrthancConnectionSecrets(connection.secretRef), input.externalStudyId);
+    remote = await fetchOrthancStudy(resolveOrthancConnectionSecrets(connection), input.externalStudyId);
   } catch (error) {
     const code = error instanceof IntegrationConfigurationError
       ? error.code
@@ -175,7 +175,7 @@ export async function getImagingViewerCommand(session: AppSession, studyId: stri
   }
   let secrets;
   try {
-    secrets = resolveOrthancConnectionSecrets(connection.secretRef);
+    secrets = resolveOrthancConnectionSecrets(connection);
     if (secrets.viewerAccessMode !== "private") {
       throw new ApplicationCommandError("imaging-viewer-access-not-configured");
     }

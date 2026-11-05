@@ -25,9 +25,10 @@ test("provider configuration cannot read arbitrary environment credential prefix
   const env = { NODE_ENV: "production", DEPLOYMENT_MODE: "hosted",
     PAYOS_DEFAULT_CLIENT_ID: "client", PAYOS_DEFAULT_API_KEY: "key", PAYOS_DEFAULT_CHECKSUM_KEY: "checksum",
     DOCUMENSO_DEFAULT_API_TOKEN: "token", DOCUMENSO_DEFAULT_WEBHOOK_SECRET: "secret",
-    OTHER_TENANT_API_KEY: "private" };
+    ORTHANC_DEFAULT_ORGANIZATION_ID: "org", OTHER_TENANT_API_KEY: "private" };
   const config = load("src/integrations/config.ts", {}, { process: { env } });
-  for (const resolver of [config.resolvePayOSConnectionSecrets, config.resolveDocumensoConnectionSecrets, config.resolveOrthancConnectionSecrets]) {
+  for (const resolver of [config.resolvePayOSConnectionSecrets, config.resolveDocumensoConnectionSecrets,
+    secretRef => config.resolveOrthancConnectionSecrets({ secretRef, organizationId: "org" })]) {
     for (const reference of [null, "OTHER_TENANT", "env:OTHER_TENANT", "env:AUTH_SECRET", "env:PAYOS_DEFAULT\n"]) {
       assert.throws(() => resolver(reference));
     }
@@ -38,7 +39,8 @@ test("provider configuration cannot read arbitrary environment credential prefix
   assert.throws(() => config.resolvePayOSConnectionSecrets("env:PAYOS_DEFAULT"));
   env.DEPLOYMENT_MODE = "self-hosted";
   env.ORTHANC_DEFAULT_BASE_URL = "ftp://pacs.test";
-  assert.throws(() => config.resolveOrthancConnectionSecrets("env:ORTHANC_DEFAULT"));
+  assert.throws(() => config.resolveOrthancConnectionSecrets({ secretRef: "env:ORTHANC_DEFAULT", organizationId: "org" }),
+    error => error.code === "orthanc-base-url-invalid");
 });
 
 test("readiness requires job authorization even outside production", async () => {
