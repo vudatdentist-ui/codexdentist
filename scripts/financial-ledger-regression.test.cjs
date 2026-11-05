@@ -2,6 +2,22 @@ const { test } = require("node:test");
 const assert = require("node:assert/strict");
 const { load } = require("./audit-source-loader.cjs");
 const ledger = load("src/lib/application/revenue/refund-ledger.ts");
+const voidLedger = load("src/lib/application/revenue/void-ledger.ts");
+
+test("retained commission basis requires receipt-specific reversal evidence, not timestamps", () => {
+  const payment = { id: "V", invoiceId: "I", amount: -100, method: "void_reversal" };
+  const audit = { entityId: "I", createdAt: new Date(), metadata: {
+    invoiceVoidLedgerVersion: 1, voidReversalPaymentId: "V", paymentReversed: 100,
+    directReceiptReleases: [{ receiptId: "R", amount: 100 }],
+  } };
+  assert.equal(voidLedger.readVoidReleaseLedger([audit], [payment]).get("R")[0].amount, 10000);
+  for (const payments of [[], [{ ...payment, invoiceId: "OTHER" }], [{ ...payment, amount: -50 }]]) {
+    assert.throws(() => voidLedger.readVoidReleaseLedger([audit], payments),
+      error => error.code === "billing-invoice-ledger-unreconciled");
+  }
+  assert.throws(() => voidLedger.readVoidReleaseLedger([audit, audit], [payment]),
+    error => error.code === "billing-invoice-ledger-unreconciled");
+});
 
 test("refund attribution conserves every cent and is independent of receipt order", () => {
   for (let cents = 1; cents <= 301; cents++) {

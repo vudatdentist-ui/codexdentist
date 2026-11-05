@@ -3,6 +3,7 @@ import { PrismaClient } from "@prisma/client";
 import { createRequire } from "node:module";
 const { load } = createRequire(import.meta.url)("./audit-source-loader.cjs");
 const { loadReceiptRefundLedger, moneyCents, receiptCommission } = load("src/lib/application/revenue/refund-ledger.ts");
+const { loadReceiptVoidReleases } = load("src/lib/application/revenue/void-ledger.ts");
 
 const connectionString =
   process.env.DATABASE_URL ??
@@ -39,20 +40,23 @@ async function main() {
         select: {
           allocatedAmount: true,
           amount: true,
-          updatedAt: true,
           allocations: { select: { invoiceId: true } },
         },
       },
     },
-    take: 1000,
+    orderBy: { id: "asc" },
   });
 
   const refundsByOrganization = new Map();
+  const voidsByOrganization = new Map();
   for (const organizationId of new Set(accruals.map((accrual) => accrual.organizationId))) {
     const group = accruals.filter((accrual) => accrual.organizationId === organizationId);
     refundsByOrganization.set(organizationId, await prisma.$transaction((tx) => loadReceiptRefundLedger(
       tx, organizationId, [...new Set(group.map((accrual) => accrual.receiptId))],
       group.flatMap((accrual) => accrual.receipt.allocations.flatMap((row) => row.invoiceId ? [row.invoiceId] : [])),
+    )));
+    voidsByOrganization.set(organizationId, await prisma.$transaction(tx => loadReceiptVoidReleases(
+      tx, organizationId, [...new Set(group.map(accrual => accrual.receiptId))],
     )));
   }
 
@@ -71,10 +75,12 @@ async function main() {
         (originalBasis !== undefined && moneyCents(baseAmount) !== originalBasis - refundedCents)) {
       throw new Error(`Accrual ${accrual.id} base amount does not reconcile with retained receipt collection.`);
     }
-    // An unchanged receipt must match its eligible allocation. After a void,
-    // cash remains retained as credit and the already-earned basis is a snapshot.
-    if (originalBasis === undefined && accrual.receipt.updatedAt <= accrual.createdAt &&
-        moneyCents(baseAmount) !== moneyCents(accrual.receipt.allocatedAmount)) {
+    // A timestamp is not evidence. Only a durable payment-backed release after
+    // accrual can explain why retained earned cash exceeds today's allocation.
+    const releasedAfterAccrual = (voidsByOrganization.get(accrual.organizationId).get(accrual.receiptId) ?? [])
+      .filter(release => release.createdAt >= accrual.createdAt).reduce((sum, release) => sum + release.amount, 0);
+    if (originalBasis === undefined &&
+        moneyCents(baseAmount) !== moneyCents(accrual.receipt.allocatedAmount) + releasedAfterAccrual) {
       throw new Error(`Accrual ${accrual.id} original eligible basis does not match receipt allocation.`);
     }
 

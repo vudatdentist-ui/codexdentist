@@ -326,6 +326,32 @@ async function main() {
     await generate(); await accrual(rows[1000].receiptId, 100, 10);
     console.log("ok PostgreSQL generator reaches eligible receipt after 1000 already-accrued rows");
   }
+  {
+    const f = await fixture({ source: `PROVEN-VOID-${serial}` }); await policy(f.patient.leadSource);
+    await settle(f); await generate();
+    await revenue.voidInvoiceCommand(session, f.invoice.invoiceNo);
+    const proof = await prisma.auditLog.findFirstOrThrow({ where: { entityId: f.invoice.id, action: "invoice.voided" } });
+    assert.equal(proof.metadata.directReceiptReleases.length, 1);
+    assert.equal(proof.metadata.directReceiptReleases[0].amount, 100000);
+    const payment = await prisma.payment.findUniqueOrThrow({ where: { id: proof.metadata.voidReversalPaymentId } });
+    assert.equal(payment.method, "void_reversal");
+    assert.equal(Number(payment.amount), -100000);
+  }
+  {
+    const f = await fixture({ source: `TIMESTAMP-${serial}` }); await policy(f.patient.leadSource);
+    await settle(f); await generate();
+    const row = await prisma.sourceCommissionAccrual.findFirstOrThrow({ where: { patientId: f.patient.id } });
+    await prisma.sourceCommissionAccrual.update({ where: { id: row.id }, data: { baseAmount: 10000, commissionAmount: 11000 } });
+    await prisma.receipt.updateMany({ where: { patientId: f.patient.id }, data: { updatedAt: new Date(Date.now() + 1000) } });
+    const invalid = spawnSync(process.execPath, ["scripts/source-commission-smoke.mjs"], {
+      encoding: "utf8", windowsHide: true, env: process.env,
+    });
+    assert.notEqual(invalid.status, 0, "A changed timestamp must not hide an incorrect commission basis.");
+    assert.match(invalid.stderr, /original eligible basis does not match receipt allocation/);
+    await prisma.sourceCommissionAccrual.update({ where: { id: row.id },
+      data: { baseAmount: row.baseAmount, commissionAmount: row.commissionAmount } });
+    console.log("ok actual commission gate rejects timestamp-only basis drift beyond 1000 accruals");
+  }
   await assertConservation();
   const gate = spawnSync(process.execPath, ["scripts/source-commission-smoke.mjs"], {
     encoding: "utf8", windowsHide: true, env: process.env,

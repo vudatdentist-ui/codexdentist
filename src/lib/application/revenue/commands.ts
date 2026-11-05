@@ -363,9 +363,11 @@ export async function voidInvoiceCommand(session: AppSession, invoiceNo: string)
         paymentNet !== allocations.reduce((sum, allocation) => sum + moneyCents(allocation.amount), 0)) {
       throw new ApplicationCommandError("billing-invoice-ledger-unreconciled");
     }
+    let voidReversalPaymentId: string | null = null;
     if (paymentNet > 0) {
-      await tx.payment.create({ data: { invoiceId: invoice.id, amount: -paymentNet / 100,
+      const reversal = await tx.payment.create({ data: { invoiceId: invoice.id, amount: -paymentNet / 100,
         method: "void_reversal", reference: invoiceNo } });
+      voidReversalPaymentId = reversal.id;
     }
     await tx.invoice.update({ where: { id: invoice.id }, data: { status: "VOID", paidAmount: 0 } });
     if (serviceAllocationIds.length > 0) {
@@ -411,6 +413,11 @@ export async function voidInvoiceCommand(session: AppSession, invoiceNo: string)
           serviceAllocationsReleased: serviceAllocationIds.length,
           directReceiptAmountReleased: directReleasedAmount,
           paymentReversed: paymentNet / 100,
+          invoiceVoidLedgerVersion: 1,
+          voidReversalPaymentId,
+          directReceiptReleases: [...new Set(directAllocations.map(row => row.receiptId))].map(receiptId => ({
+            receiptId, amount: sumMoney(directAllocations.filter(row => row.receiptId === receiptId)),
+          })),
         } as Prisma.InputJsonValue,
       },
     });
