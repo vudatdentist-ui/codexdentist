@@ -1,5 +1,6 @@
 "use client";
 import { StaffDirectorySection } from "./StaffDirectorySection";
+import { PayOSSettingsPanel } from "@/workspaces/integrations/PayOSSettingsPanel";
 import { OrganizationSettingsSection } from "./OrganizationSettingsSection";
 import { StaffAccountDialog } from "./StaffAccountDialog";
 import { OperationalDialog, WorkspaceTabs } from "@/components/ui/WorkspaceControls";
@@ -48,6 +49,8 @@ export function SettingsPanelView(model: SettingsPanelModel) {
             {section.label}
           </button>))}
       </WorkspaceTabs>
+
+      {settingsSection === "providers" && <PayOSSettingsPanel />}
 
       <section className="settings-overview-grid" data-settings-section={settingsSection}>
         <StaffDirectorySection {...model}/>

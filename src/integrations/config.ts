@@ -45,12 +45,12 @@ export function resolvePayOSConnectionSecrets(secretRef: string | null) {
     clientId: requiredEnv(`${prefix}_CLIENT_ID`, "payos"),
     apiKey: requiredEnv(`${prefix}_API_KEY`, "payos"),
     checksumKey: requiredEnv(`${prefix}_CHECKSUM_KEY`, "payos"),
-    baseUrl: optionalBaseUrl(
-      `${prefix}_BASE_URL`,
-      "https://api-merchant.payos.vn",
-      "payos",
-    ),
+    baseUrl: payOSBaseUrl(),
   };
+}
+
+export function payOSBaseUrl() {
+  return optionalBaseUrl("PAYOS_DEFAULT_BASE_URL", "https://api-merchant.payos.vn", "payos");
 }
 
 export function resolveDocumensoConnectionSecrets(secretRef: string | null) {

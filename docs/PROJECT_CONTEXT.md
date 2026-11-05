@@ -240,6 +240,36 @@ If a test exposes an existing baseline defect unrelated to the change, document 
 
 ### Current delivery plan — 2026-11-05
 
+User-facing completion loop: plan a complete operational path, implement it,
+exercise the real app, independently audit/fix/retest, then choose the next gap.
+An integration with API handlers but no discoverable configuration and staff
+workflow is **partial**, even when its backend tests pass. Do not report it as a
+completed application feature.
+
+| Workstream | Current state | Required operational acceptance |
+| --- | --- | --- |
+| payOS operator workflow (#78) | Implemented and locally reviewed; exact-head CI and deployment remain the release gate. | Tenant/clinic-owned encrypted credentials; signed webhook setup; invoice QR/link/history; lost-response retry and exact-once receipts; negative scope tests; production UI plus full local app browser gates at 1440/390/320px. Real merchant activation awaits owner credentials. |
+| Documenso operator workflow | Backend present; staff configuration/request/status workflow still needs a rendered-app audit. | Discoverable consent signing flow, protected signed PDF, failure/retry visibility and ownership reconciliation. |
+| Imaging and native operations | Lab/sterilization UI has local/CI evidence; live PACS remains unconfigured. | Preserve verified native flows; separately configure and accept an actual private PACS/viewer before enabling it. |
+| Operational rollout | Core through PR #76 deployed as d80318c; issues #71/#75 resolved. | Exact-main CI, backup/restore/runtime grant/candidate/public checks after each release; provider live acceptance requires real operator credentials. |
+
+Credential decision: a dedicated IntegrationCredential stores authenticated
+encryption envelopes, never raw keys in connection metadata, audit or client
+DTOs. AES-256-GCM binds organization, connection and provider in associated data;
+HKDF separates its key from authentication. INTEGRATION_SECRET_KEY may provide a
+dedicated 32-byte base64 master; otherwise the existing AUTH_SECRET is the master.
+Back up and retain the selected master before rotation or restoration. Existing
+environment-based payOS merchants require an explicit organization binding.
+Settings replacement and payment-intent reservation share a connection lock;
+unresolved orders block credential replacement/disable. HTTP provider calls occur
+after the transaction commits. A stored credential is not proof of readiness:
+the owner must complete the signed webhook verification handshake.
+Creation uncertainty survives subsequent rejected attempts. New definitive
+rejections permit credential correction; an older uncertain creation still blocks
+replacement. A late verified payment for a voided invoice becomes patient credit,
+without reviving or allocating that invoice. Inbox readiness and retry scheduling
+use the database clock so app/DB clock skew cannot distort delivery backoff.
+
 The November release combines PR #68 (re-audited Phase 3–7 integration), #70
 (local in-app notifications), and #72 (Revenue/commission integrity). Historical
 drafts #34/#41 are closed as superseded; do not merge them over current main.
@@ -256,8 +286,9 @@ The integrated milestones retain these independent exit gates:
 | Phase 6 | Integrate optional standards adapters with the existing notification boundary. | Disabled providers preserve core workflows; mapping, authorization, PHI minimization and tenant tests pass. |
 | Phase 7 | Release the integrated product with current Hostinger operations. | Full regression/build/container gates, clean install/upgrade, backup plus isolated restore, candidate checks, deployed revision and public health verification. |
 
-Current evidence: the integrated implementation is merged through PRs #68/#72. Native PostgreSQL
-clean install applies all 57 migrations; provider signatures/retries/consent,
+Current evidence: the integrated implementation is merged through PRs #68/#72/#76.
+The payOS credential branch adds a CREATE-only 58th migration; native PostgreSQL
+clean install and encrypted-vault isolation pass. Provider signatures/retries/consent,
 concurrent invoice settlements, tenant isolation, file lifecycle/purge and restore
 tests pass locally. Lab and sterilization operator workflows pass real-browser
 create/transition/reload/audit checks at 1440/390/320px; unconfigured imaging fails
@@ -274,11 +305,10 @@ forward recovery. No historical migration is edited or core runtime role elevate
 PR #74 records the verified deployment of `a3aa571`: exact-main CI, production
 backup/restore, all 57 migrations, candidate/runtime grants, formal go-live and
 public/authenticated readiness passed. No unresolved attention marker remains.
-The subsequent clinical navigation audit is tracked in #75: URL, editable record,
-topbar and AI context must agree on one authorized patient, and changing patients
-must not carry unsent comments, attachments or pending actions into another record.
-Its focused tests, real navigation/browser review and verified release are required
-before closing that finding. Optional live providers and application-job activation
+PR #76 deployed as `d80318c` closes #75: URL, editable record, topbar and AI context
+agree on the authorized patient; changing patients clears unsent drafts/actions.
+Its focused tests, real navigation/browser review and verified release passed.
+Optional live providers and application-job activation
 remain separate operator configuration; see `OPERATIONS.md`.
 Recovered migration history: `20260516090000_source_commission` has
 ledger checksum `578975509b6eede77797d42ece4d3f93ee5635c8b218abb4894b7191537efae7`
@@ -290,10 +320,10 @@ any SQL edit, unrelated name or unknown checksum still fails. The production led
 and historical migration files remain unchanged. See issue #69.
 Live payOS/Documenso/PACS acceptance remains pending operator-owned credentials.
 The production audit isolated two invoice/payment mismatches to exact historical
-seed fixtures in the test tenant, distinct from the main tenant. Issue #71 owns
-their reviewed, backed-up correction and its execution evidence. Only synthetic
-opening-balance bookkeeping is allowed; preserve invoice headers, credit and
-clinical records. New seeds are balanced/repeat-safe and refuse production or
+seed fixtures in the test tenant, distinct from the main tenant. Issue #71 is
+closed after the reviewed, backed-up correction and independent reconciliation.
+Invoice headers, credit and clinical records were preserved. New seeds are
+balanced/repeat-safe and refuse production or
 remote targets. Never run the general seed to repair operational data.
 Preserve all November shared-login and patient
 audit fixes and October security/maintainability gates. Reuse completed work;

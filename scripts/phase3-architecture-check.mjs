@@ -5,6 +5,7 @@ const files = {
   documensoClient: "src/integrations/documenso/client.ts",
   payosWebhook: "src/app/api/integrations/payos/webhooks/[connectionId]/route.ts",
   payosLink: "src/app/api/integrations/payos/payment-links/route.ts",
+  payosOrders: "src/lib/application/integrations/payos-orders.ts",
   documensoWebhook: "src/app/api/integrations/documenso/webhooks/[connectionId]/route.ts",
   documensoRequest: "src/app/api/integrations/documenso/signing-requests/route.ts",
   connectionRoute: "src/app/api/integrations/connections/route.ts",
@@ -76,9 +77,10 @@ assert(
   "Documenso signing idempotency is anchored to PatientForm",
 );
 assert(
-  source.payosLink.includes("organizationId: session.organizationId") &&
-    source.payosLink.includes("clinicId: patient.clinicId") &&
-    source.payosLink.includes('provider: "payos"'),
+  source.payosLink.includes("reservePayOSOrder(session,") &&
+    source.payosOrders.includes("organizationId: session.organizationId") &&
+    source.payosOrders.includes("clinicId: patient.clinicId") &&
+    source.payosOrders.includes('provider: "payos"'),
   "payOS payment link is tenant and clinic scoped",
 );
 assert(

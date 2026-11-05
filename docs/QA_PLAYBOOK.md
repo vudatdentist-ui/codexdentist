@@ -228,12 +228,37 @@ Run affected schema/data integrity and protected-file suites after every fix.
 
 ### payOS
 
+Run `test:payos` for merchant binding, encrypted envelope handling, permissions,
+retry uncertainty, invoice revalidation and legacy-configuration refusal.
+`NODE_ENV=test npm run test:integration-vault-db` explicitly runs the native
+loopback PostgreSQL gate: fresh migrations, tenant FK/AAD isolation, UTC,
+rotation races, rollback and cascade. Unit-only runs may skip that native case;
+never report the skip as native evidence.
+
+`browser:payos-production` checks the built app with fresh owned synthetic
+organizations: real credential save/no readback, pre-verified order fixtures,
+QR/history/reload, permission denials, signed callback and receipt reconciliation
+at 1440/390/320px. Set `PAYOS_QA_APP_URL=http://127.0.0.1:3000` and `NODE_ENV=test`.
+It performs no outbound provider requests. `browser:payos` separately starts a
+development app on 3001 and a loopback HTTP merchant on 11444, exercises actual
+verification/link creation, lost-response retry and repeated signed callbacks.
+Stop the production verification server first because Next shares its build
+directory. Production provider HTTPS guards stay unchanged; no custom CA trust
+or TLS override is required. Both gates require an explicit loopback database,
+purge only their newly owned organizations, and save separate browser evidence.
+
 Verify:
 
 - signature validation before processing;
 - tenant/clinic mapping through trusted internal references;
 - duplicate, delayed and reordered notifications;
 - amount/currency/reference validation;
+- verified late transfers after invoice void become patient credit without
+  reviving the invoice; missing/wrong-scope invoices still reject;
+- uncertain creation stays unresolved across later rejected retries; fresh
+  definitive rejections allow correction, while pending orders block key changes;
+- a fresh inbox event is ready according to the database clock; clock skew must
+  not turn its first delivery into retry backoff;
 - application Revenue command is the only path that records settlement;
 - no provider adapter imports Prisma/core billing repository implementation directly;
 - billing reconciliation and concurrency suites remain green.

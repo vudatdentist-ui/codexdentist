@@ -183,14 +183,14 @@ export function useSettingsPanelModel({ settingsWorkspace, }: {
             { key: "accounts", label: "Tài khoản" },
             { key: "organization", label: "Hệ thống & chi nhánh" },
             { key: "archive", label: "Lưu trữ" },
-            { key: "providers", label: "AI & thông báo" },
+            { key: "providers", label: "Tích hợp & AI" },
             { key: "governance", label: "Quyền & kiểm soát" },
         ] as const
         : [
             { key: "accounts", label: "Accounts" },
             { key: "organization", label: "Systems & branches" },
             { key: "archive", label: "Archive" },
-            { key: "providers", label: "AI & notifications" },
+            { key: "providers", label: "Integrations & AI" },
             { key: "governance", label: "Access & controls" },
         ] as const;
     const roleCounts = roleOptions

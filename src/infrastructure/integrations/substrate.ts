@@ -292,8 +292,9 @@ export async function processIntegrationInbox<T>(
 
   try {
     return await db.$transaction(async (tx) => {
-      const rows = await tx.$queryRawUnsafe<InboxRow[]>(
-        `SELECT * FROM "IntegrationInbox" WHERE "id" = $1 FOR UPDATE`,
+      const rows = await tx.$queryRawUnsafe<Array<InboxRow & { ready: boolean }>>(
+        `SELECT *, ("availableAt" <= (clock_timestamp() AT TIME ZONE 'UTC')) AS "ready"
+         FROM "IntegrationInbox" WHERE "id" = $1 FOR UPDATE`,
         inboxId,
       );
       const event = rows[0];
@@ -304,7 +305,9 @@ export async function processIntegrationInbox<T>(
       if (event.status === "FAILED") {
         return { status: "failed", result: null as T | null } as const;
       }
-      if (event.availableAt.getTime() > Date.now()) {
+      // availableAt is written by PostgreSQL. Compare using the same clock;
+      // even millisecond host skew can otherwise defer a newly received event.
+      if (!event.ready) {
         return { status: "retry_pending", result: null as T | null } as const;
       }
 
@@ -330,21 +333,21 @@ export async function processIntegrationInbox<T>(
     });
   } catch (error) {
     const errorCode = safeErrorCode(error, "integration-handler-failed");
-    const retryAt = new Date(Date.now() + retryDelayMs);
     const failedRows = await db.$queryRawUnsafe<
       Array<{ id: string; organizationId: string; attempts: number; status: string }>
     >(
       `UPDATE "IntegrationInbox"
        SET "attempts" = "attempts" + 1,
            "status" = CASE WHEN "attempts" + 1 >= $2 THEN 'FAILED' ELSE 'RETRY' END,
-           "availableAt" = CASE WHEN "attempts" + 1 >= $2 THEN "availableAt" ELSE $3 END,
+           "availableAt" = CASE WHEN "attempts" + 1 >= $2 THEN "availableAt"
+             ELSE (clock_timestamp() AT TIME ZONE 'UTC') + ($3::double precision * interval '1 millisecond') END,
            "lastErrorCode" = $4,
            "updatedAt" = (CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
        WHERE "id" = $1 AND "status" <> 'PROCESSED'
        RETURNING "id", "organizationId", "attempts", "status"`,
       inboxId,
       maxAttempts,
-      retryAt,
+      retryDelayMs,
       errorCode,
     );
     if (failedRows[0]) {

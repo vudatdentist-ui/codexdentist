@@ -81,6 +81,7 @@ export async function createPayOSPaymentLink(
     },
     body: JSON.stringify({ ...payload, signature }),
     cache: "no-store",
+    signal: AbortSignal.timeout(20_000),
   });
   const body = await safeJson(response);
   if (!response.ok || String(body.code ?? "") !== "00") {
@@ -108,6 +109,17 @@ export async function createPayOSPaymentLink(
     qrCode: typeof data.qrCode === "string" ? data.qrCode : null,
     status: typeof data.status === "string" ? data.status : null,
   };
+}
+
+export async function confirmPayOSWebhook(secrets: PayOSSecrets, webhookUrl: string): Promise<void> {
+  const response = await fetch(`${secrets.baseUrl}/confirm-webhook`, {
+    method: "POST", headers: { "Content-Type": "application/json", "x-client-id": secrets.clientId, "x-api-key": secrets.apiKey },
+    body: JSON.stringify({ webhookUrl }), cache: "no-store", signal: AbortSignal.timeout(20_000),
+  });
+  const body = await safeJson(response);
+  if (!response.ok || body.code !== "00" || asRecord(body.data).webhookUrl !== webhookUrl) {
+    throw new PayOSProviderError("payos-webhook-not-confirmed", 502, "Webhook verification failed");
+  }
 }
 
 export function verifyPayOSWebhookPayload(
