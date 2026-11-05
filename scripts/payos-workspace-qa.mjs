@@ -183,9 +183,17 @@ try {
   assert.equal(cannotDisable.status(), 409);
   results.push(productionUI ? 'production QR/history/refresh/reload; pending order blocks replacement/disable'
     : 'real QR; lost response/retry creates one intent; reload retains order; pending order blocks replacement/disable');
-  if (!productionUI) {
+  {
+    if (productionUI) {
+      // Production UI exercises the persisted observation fixture without making
+      // a request to the real merchant API with synthetic credentials.
+      await prisma.$executeRawUnsafe(`UPDATE "ExternalReference" SET "metadata"="metadata" ||
+        '{"providerStatus":"PAID","providerAmountPaid":100000}'::jsonb WHERE "id"=$1 AND "organizationId"=$2`, order.id, a.organization.id);
+      await dialog.getByRole('button', { name: 'Tải lại trạng thái', exact: true }).click();
+    } else {
     await fetch(`${provider}/__test/order-status`, { method: 'POST', body: JSON.stringify({ orderCode: order.orderCode, status: 'PAID', amountPaid: 100000 }) });
     await dialog.getByRole('button', { name: 'Kiểm tra với payOS', exact: true }).click();
+    }
     await dialog.getByText(/payOS báo đã nhận tiền/).waitFor();
     assert.equal(await qr.count(), 0);
     assert.equal(await prisma.receipt.count({ where: { organizationId: a.organization.id } }), 0, 'A status query cannot fabricate collection');
@@ -196,8 +204,10 @@ try {
     await dialog.getByText(/payOS báo đã nhận tiền/).waitFor();
     assert.equal(await qr.count(), 0);
     assert.equal(await dialog.getByRole('button', { name: 'Tạo mã thanh toán', exact: true }).isEnabled(), false);
+    await dialog.locator('h2').scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${output}/paid-awaiting-receipt-320.png` });
-    results.push('signed PAID observation persists and hides QR while receipt and credential guards await the webhook');
+    results.push(productionUI ? 'production paid-observation fixture hides QR and blocks new collection while awaiting receipt'
+      : 'signed PAID observation persists and hides QR while receipt and credential guards await the webhook');
   }
   assert.equal(await prisma.receipt.count({ where: { organizationId: a.organization.id } }), 0);
   async function settle(reference, signed = true) {
@@ -240,6 +250,7 @@ try {
     await dialog.getByText('Đã hết hạn', { exact: true }).waitFor();
     assert.equal(await qr.count(), 0);
     assert.equal(await prisma.receipt.count({ where: { organizationId: a.organization.id } }), 1);
+    await dialog.locator('h2').scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${output}/expired-unpaid-320.png` });
     const repair = await page.request.post('/api/integrations/payos/settings', { headers: { origin: base }, data: { action: 'save', clinicId: null, credentials } });
     assert.equal(repair.status(), 200, 'A verified unpaid terminal order may release the credential lock');
