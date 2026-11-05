@@ -48,7 +48,7 @@ try {
       description: 'Synthetic QR service', quantity: 1, unitPrice: 100000, amount: 100000 } } } });
   const context = await browser.newContext({ baseURL: base, viewport: { width: 1440, height: 1000 }, reducedMotion: 'reduce' });
   page = await context.newPage(); page.setDefaultTimeout(30000); page.on('pageerror', error => errors.push(error.message));
-  await loginForBrowserAudit(page, { baseUrl: base, email: a.user.email, password: 'CodexSmoke2026!', evidencePath: `${output}/login` });
+  await loginForBrowserAudit(page, { baseUrl: base, email: a.user.email, password: 'CodexSmoke2026!', evidencePath: `${output}/login`, navigationTimeout: productionUI ? 15000 : 60000 });
   await page.goto(`${base}/settings?section=providers`, { waitUntil: 'networkidle' });
   const settings = page.locator('#payos'); await settings.waitFor();
   await settings.getByText('Chưa thiết lập', { exact: true }).waitFor();
