@@ -223,7 +223,7 @@ async function deliverNotification(
       },
     });
 
-    if (organization?.isDemo) {
+    if (organization?.isDemo && notification.channel !== "IN_APP") {
       await prisma.notification.update({
         where: {
           id: notification.id,
