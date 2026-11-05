@@ -17,6 +17,8 @@ import {
 import { canMutateForms, nextPatientFormNo } from "@/lib/forms";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
+import { runSerializableTransaction } from "@/lib/transaction";
+import { assertNoDocumensoCeremony } from "@/lib/application/integrations/documenso-signing";
 
 const formTypes = [
   "CONSENT",
@@ -215,40 +217,44 @@ export async function completePatientFormAction(formData: FormData) {
   }
 
   try {
-    const patientForm = await scopedPatientForm(session, patientFormId);
+    await runSerializableTransaction(async tx => {
+      await tx.$executeRawUnsafe(`SELECT "id" FROM "PatientForm" WHERE "id"=$1 AND "organizationId"=$2 FOR UPDATE`, patientFormId, session.organizationId);
+      const patientForm = await scopedPatientForm(session, patientFormId, tx);
 
-    if (!patientForm) {
-      redirect("/forms?notice=forms-missing");
-    }
+      if (!patientForm) {
+        redirect("/forms?notice=forms-missing");
+      }
 
-    if (patientForm.status === "VOID" || patientForm.status === "COMPLETED") {
-      redirect("/forms?notice=forms-not-open");
-    }
+      if (patientForm.status === "VOID" || patientForm.status === "COMPLETED") {
+        redirect("/forms?notice=forms-not-open");
+      }
 
-    if (patientForm.template.requiresSignature && !signatureUrl) {
-      redirect("/forms?notice=forms-signature-missing");
-    }
+      if (patientForm.template.requiresSignature && !signatureUrl) {
+        redirect("/forms?notice=forms-signature-missing");
+      }
+      await assertNoDocumensoCeremony(tx, session.organizationId, patientForm.id, true);
+      await tx.patientForm.update({
+        where: {
+          id: patientForm.id,
+        },
+        data: {
+          status: "COMPLETED",
+          completedAt: new Date(),
+          responses: {
+            notes,
+            completedBy: session.fullName,
+          } as Prisma.InputJsonValue,
+          signatureUrl,
+          attachments: splitList(formData.get("attachments")),
+        },
+      });
 
-    await prisma.patientForm.update({
-      where: {
-        id: patientForm.id,
-      },
-      data: {
-        status: "COMPLETED",
-        completedAt: new Date(),
-        responses: {
-          notes,
-          completedBy: session.fullName,
-        } as Prisma.InputJsonValue,
-        signatureUrl,
-        attachments: splitList(formData.get("attachments")),
-      },
-    });
-
-    await writeFormsAuditLog(session, "patient_form.completed", "PatientForm", patientForm.id, {
-      formNo: patientForm.formNo,
+      await writeFormsAuditLog(session, "patient_form.completed", "PatientForm", patientForm.id, {
+        formNo: patientForm.formNo,
+      }, tx);
     });
   } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "documenso-ceremony-active") redirect("/forms?notice=forms-signing-active");
     reportApplicationError("app/(app)/forms/actions", error);
     if (isNextRedirect(error)) {
       throw error;
@@ -276,30 +282,35 @@ export async function voidPatientFormAction(formData: FormData) {
   }
 
   try {
-    const patientForm = await scopedPatientForm(session, patientFormId);
+    await runSerializableTransaction(async tx => {
+      await tx.$executeRawUnsafe(`SELECT "id" FROM "PatientForm" WHERE "id"=$1 AND "organizationId"=$2 FOR UPDATE`, patientFormId, session.organizationId);
+      const patientForm = await scopedPatientForm(session, patientFormId, tx);
 
-    if (!patientForm) {
-      redirect("/forms?notice=forms-missing");
-    }
+      if (!patientForm) {
+        redirect("/forms?notice=forms-missing");
+      }
 
-    if (patientForm.status === "VOID") {
-      redirect("/forms?notice=forms-not-open");
-    }
+      if (patientForm.status === "VOID") {
+        redirect("/forms?notice=forms-not-open");
+      }
 
-    await prisma.patientForm.update({
-      where: {
-        id: patientForm.id,
-      },
-      data: {
-        status: "VOID",
-      },
-    });
+      await assertNoDocumensoCeremony(tx, session.organizationId, patientForm.id, true);
+      await tx.patientForm.update({
+        where: {
+          id: patientForm.id,
+        },
+        data: {
+          status: "VOID",
+        },
+      });
 
-    await writeFormsAuditLog(session, "patient_form.voided", "PatientForm", patientForm.id, {
-      formNo: patientForm.formNo,
-      reason: voidReason,
+      await writeFormsAuditLog(session, "patient_form.voided", "PatientForm", patientForm.id, {
+        formNo: patientForm.formNo,
+        reason: voidReason,
+      }, tx);
     });
   } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "documenso-ceremony-active") redirect("/forms?notice=forms-signing-active");
     reportApplicationError("app/(app)/forms/actions", error);
     if (isNextRedirect(error)) {
       throw error;
@@ -312,12 +323,12 @@ export async function voidPatientFormAction(formData: FormData) {
   redirect("/forms?notice=forms-voided");
 }
 
-async function scopedPatientForm(session: AppSession, patientFormId: string) {
+async function scopedPatientForm(session: AppSession, patientFormId: string, db: Prisma.TransactionClient | typeof prisma = prisma) {
   if (!patientFormId) {
     return null;
   }
 
-  return prisma.patientForm.findFirst({
+  return db.patientForm.findFirst({
     where: {
       id: patientFormId,
       organizationId: session.organizationId,
@@ -351,8 +362,9 @@ async function writeFormsAuditLog(
   entityType: string,
   entityId: string,
   metadata: Prisma.InputJsonValue = {},
+  db: Prisma.TransactionClient | typeof prisma = prisma,
 ) {
-  await prisma.auditLog.create({
+  await db.auditLog.create({
     data: {
       organizationId: session.organizationId,
       actorId: databaseActorId(session.userId),

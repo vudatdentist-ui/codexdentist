@@ -86,7 +86,7 @@ function documensoHarness({ completed = false, failStorage = false } = {}) {
       referenceMetadata: value => value.metadata,
     },
     "@/lib/application/forms/provider-signing": { reconcileSignedPatientFormCommand: async () => undefined },
-    "@/integrations/config": { resolveDocumensoConnectionSecrets: () => ({ webhookSecret: "secret" }) },
+    "@/app/api/integrations/documenso/connection-secrets": { documensoConnectionSecrets: async () => ({ webhookSecret: "secret" }) },
     "@/integrations/documenso/client": {
       verifyDocumensoWebhook: () => ({ event: completed ? "DOCUMENT_COMPLETED" : "DOCUMENT_SENT" }),
       minimalDocumensoWebhookPayload: () => ({ envelopeId: "envelope" }), documensoWebhookEventId: () => "event",

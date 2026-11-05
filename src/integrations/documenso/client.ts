@@ -92,6 +92,7 @@ export async function createDocumensoSigningEnvelope(
     headers: { Authorization: secrets.apiToken },
     body: form,
     cache: "no-store",
+    signal: AbortSignal.timeout(20_000),
   });
   const created = await safeJson(createResponse);
   if (!createResponse.ok) {
@@ -247,6 +248,7 @@ export async function downloadDocumensoSignedPdf(
     {
       headers: { Authorization: secrets.apiToken },
       cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
     },
   );
   const envelope = await safeJson(envelopeResponse);
@@ -280,6 +282,7 @@ export async function downloadDocumensoSignedPdf(
     {
       headers: { Authorization: secrets.apiToken },
       cache: "no-store",
+      signal: AbortSignal.timeout(20_000),
     },
   );
   if (!downloadResponse.ok) {

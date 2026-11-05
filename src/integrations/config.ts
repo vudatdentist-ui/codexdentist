@@ -61,12 +61,12 @@ export function resolveDocumensoConnectionSecrets(secretRef: string | null) {
   return {
     apiToken: requiredEnv(`${prefix}_API_TOKEN`, "documenso"),
     webhookSecret: requiredEnv(`${prefix}_WEBHOOK_SECRET`, "documenso"),
-    baseUrl: optionalBaseUrl(
-      `${prefix}_BASE_URL`,
-      "https://app.documenso.com/api/v2",
-      "documenso",
-    ),
+    baseUrl: documensoBaseUrl(),
   };
+}
+
+export function documensoBaseUrl() {
+  return optionalBaseUrl("DOCUMENSO_DEFAULT_BASE_URL", "https://app.documenso.com/api/v2", "documenso");
 }
 
 export function resolveOrthancConnectionSecrets(secretRef: string | null) {
