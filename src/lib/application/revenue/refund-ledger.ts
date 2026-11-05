@@ -128,8 +128,8 @@ export async function attributeInvoiceRefund(
   // so concurrent refunds/generation cannot use stale commission snapshots.
   for (const id of receiptIds) {
     const touched = await tx.receipt.updateMany({
-    where: { id, organizationId: input.organizationId,
-      clinicId: input.clinicId, patientId: input.patientId }, data: { updatedAt: new Date() },
+      where: { id, organizationId: input.organizationId,
+        clinicId: input.clinicId, patientId: input.patientId }, data: { updatedAt: new Date() },
     });
     if (touched.count !== 1) throw new ApplicationCommandError("billing-refund-ledger-unreconciled");
   }

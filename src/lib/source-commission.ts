@@ -118,41 +118,37 @@ export async function generateSourceCommissionAccruals(input: {
         receipts.map((receipt) => receipt.id),
         receipts.flatMap((receipt) => receipt.allocations.flatMap((row) => row.invoiceId ? [row.invoiceId] : [])));
       for (const receipt of receipts) {
-      const source = receipt.patient.leadSource;
-      const policy = policyBySource.get(source);
+        const source = receipt.patient.leadSource;
+        const policy = policyBySource.get(source);
+        if (!policy || receipt.sourceCommissionAccruals.some((item) => item.policyId === policy.id)) continue;
 
-      if (!policy || receipt.sourceCommissionAccruals.some((item) => item.policyId === policy.id)) {
-        continue;
-      }
+        const grossBase = refunds.grossBases.get(receipt.id) ?? moneyCents(receipt.allocatedAmount);
+        const baseAmount = Math.max(grossBase - (refunds.byReceipt.get(receipt.id) ?? 0), 0) / 100;
+        const ratePercent = Number(policy.ratePercent);
+        const fixedAmount = Number(policy.fixedAmount);
+        const commissionAmount = receiptCommission(baseAmount, ratePercent, fixedAmount);
+        if (commissionAmount <= 0) continue;
 
-      const grossBase = refunds.grossBases.get(receipt.id) ?? moneyCents(receipt.allocatedAmount);
-      const baseAmount = Math.max(grossBase - (refunds.byReceipt.get(receipt.id) ?? 0), 0) / 100;
-      const ratePercent = Number(policy.ratePercent);
-      const fixedAmount = Number(policy.fixedAmount);
-      const commissionAmount = receiptCommission(baseAmount, ratePercent, fixedAmount);
-
-      if (commissionAmount <= 0) {
-        continue;
-      }
-
-      await tx.sourceCommissionAccrual.create({
-        data: {
-          organizationId: input.organizationId,
-          clinicId: receipt.clinicId,
-          patientId: receipt.patientId,
-          receiptId: receipt.id,
-          policyId: policy.id,
-          source,
-          baseAmount,
-          ratePercent,
-          fixedAmount,
-          commissionAmount,
-          status: "EARNED",
-          earnedAt: receipt.receivedAt,
-        },
-      });
-      created += 1;
-      if (created === 1000) break;
+        await tx.sourceCommissionAccrual.upsert({
+          where: { receiptId_policyId: { receiptId: receipt.id, policyId: policy.id } },
+          update: { updatedAt: new Date() },
+          create: {
+            organizationId: input.organizationId,
+            clinicId: receipt.clinicId,
+            patientId: receipt.patientId,
+            receiptId: receipt.id,
+            policyId: policy.id,
+            source,
+            baseAmount,
+            ratePercent,
+            fixedAmount,
+            commissionAmount,
+            status: "EARNED",
+            earnedAt: receipt.receivedAt,
+          },
+        });
+        created += 1;
+        if (created === 1000) break;
       }
       const last = receipts[receipts.length - 1]!;
       cursor = { receivedAt: last.receivedAt, id: last.id };

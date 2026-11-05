@@ -148,7 +148,7 @@ for (const prefix of ["already accrued", "zero eligible base"]) {
         return rows.filter((row) => !row.sourceCommissionAccruals.length && (!after || row.receivedAt > after)).slice(0, take);
       } },
       auditLog: { findMany: async () => [], create: async () => ({}) },
-      sourceCommissionAccrual: { create: async ({ data }) => { created.push(data); } },
+      sourceCommissionAccrual: { upsert: async ({ create }) => { created.push(create); } },
     };
     const generator = load("src/lib/source-commission.ts", {
       "@/lib/prisma": { prisma: tx }, "@/lib/transaction": { runSerializableTransaction: (callback) => callback(tx) },
