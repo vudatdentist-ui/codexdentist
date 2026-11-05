@@ -240,6 +240,14 @@ for (const status of ['PENDING', 'CANCELLED', 'EXPIRED']) test(`older signed ${s
   assert.equal(h.stats.financialTouches, 0);
 });
 
+test('legacy signed PAID status without an amount stays unresolved across repeated zero-paid snapshots', async () => {
+  const h = fixture({ metadata: { providerStatus: 'PAID' }, data: { status: 'CANCELLED' } });
+  for (let attempt = 0; attempt < 2; attempt++) {
+    assert.equal((await h.post()).status, 200); assert.equal(h.order.metadata.status, 'ERROR');
+    assert.equal(h.order.metadata.providerStatus, 'PAID'); assert.equal(await h.unresolved(), true);
+  }
+});
+
 test('cancel-zero then key replacement cannot be undone by late creation success or failure; a verified settlement can still advance', async () => {
   const h = fixture(); const staleCreation = structuredClone(h.order.metadata);
   assert.equal((await h.post()).status, 200); assert.equal(await h.unresolved(), false);

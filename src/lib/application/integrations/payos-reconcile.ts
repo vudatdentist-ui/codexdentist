@@ -87,7 +87,7 @@ export async function reconcilePayOSOrder(session: AppSession, orderId: string,
       ? Math.max(0, metadata.providerAmountPaid) : 0;
     const paid = Math.max(previousPaid, observation.amountPaid);
     const cancel = ["CANCELLED", "EXPIRED"].includes(observation.status) && paid === 0 && metadata.providerStatus !== "PAID";
-    const next = { ...metadata, providerStatus: observation.status, providerAmountPaid: paid,
+    const next = { ...metadata, providerStatus: metadata.providerStatus === "PAID" ? "PAID" : observation.status, providerAmountPaid: paid,
       providerCheckedAt: new Date().toISOString(),
       ...(cancel ? { status: "CANCELLED", creationUncertain: false, checkoutUrl: null, qrCode: null } : {}) };
     const updated = await updateExternalReferenceMetadata(tx, current.id, next);
