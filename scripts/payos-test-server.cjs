@@ -9,7 +9,7 @@ if (process.env.NODE_ENV !== 'test' || !loopback.has(app.hostname) ||
 }
 const clientId = 'synthetic-payos-client', apiKey = 'a'.repeat(64), checksumKey = 'c'.repeat(64);
 const orders = new Map();
-let webhookUrl, requests = 0;
+let webhookUrl, requests = 0, failNextConfirmation = false;
 const signature = data => createHmac('sha256', checksumKey).update(Object.keys(data).sort().map(key => `${key}=${data[key] ?? ''}`).join('&')).digest('hex');
 async function deliver(data, signed = true) {
   if (!webhookUrl) throw new Error('Synthetic webhook not registered');
@@ -27,6 +27,7 @@ transport.createServer(async (request, response) => {
     const body = text ? JSON.parse(text) : {};
     const url = new URL(request.url, 'https://127.0.0.1');
     if (url.pathname === '/__test/state') return reply(200, { requests, orders: [...orders.values()] });
+    if (url.pathname === '/__test/fail-next-confirm' && request.method === 'POST') { failNextConfirmation = true; return reply(200, {}); }
     if (url.pathname === '/__test/settle' && request.method === 'POST') {
       const order = orders.get(Number(body.orderCode));
       if (!order) return reply(404, {});
@@ -38,6 +39,7 @@ transport.createServer(async (request, response) => {
     }
     if (request.headers['x-client-id'] !== clientId || request.headers['x-api-key'] !== apiKey) return reply(401, { code: '01', desc: 'Invalid synthetic merchant' });
     if (url.pathname === '/confirm-webhook' && request.method === 'POST') {
+      if (failNextConfirmation) { failNextConfirmation = false; return reply(503, { code: '01' }); }
       webhookUrl = body.webhookUrl;
       const result = await deliver({ orderCode: 123, amount: 3000, description: 'VQRIO123', reference: 'TF230204212323',
         currency: 'VND', paymentLinkId: '124c33293c43417ab7879e14c8d9eb18' });

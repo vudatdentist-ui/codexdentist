@@ -16,8 +16,8 @@ export function payOSConnectionSummary(connection: IntegrationConnectionRecord, 
   const configured = stored || (connection.secretRef === "env:PAYOS_DEFAULT" &&
     process.env.PAYOS_DEFAULT_ORGANIZATION_ID === connection.organizationId &&
     ["PAYOS_DEFAULT_CLIENT_ID", "PAYOS_DEFAULT_API_KEY", "PAYOS_DEFAULT_CHECKSUM_KEY"].every(key => Boolean(process.env[key]?.trim())));
-  const confirmedProbe = metadata.webhookConfirmed === true && typeof metadata.verificationId === "string"
-    ? `?verification=${encodeURIComponent(metadata.verificationId)}` : "";
+  const confirmedProbe = metadata.webhookConfirmed === true && typeof metadata.confirmedVerificationId === "string"
+    ? `?verification=${encodeURIComponent(metadata.confirmedVerificationId)}` : "";
   return { id: connection.id, clinicId: connection.clinicId, enabled: connection.status === "ACTIVE", configured,
     verified: configured && Boolean(connection.lastVerifiedAt) && (!stored || metadata.webhookConfirmed === true),
     webhookUrl: `${origin}/api/integrations/payos/webhooks/${encodeURIComponent(connection.id)}${confirmedProbe}`,

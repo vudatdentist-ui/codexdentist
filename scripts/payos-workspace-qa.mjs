@@ -96,6 +96,15 @@ try {
     headers: { 'x-client-id': credentials.clientId, 'x-api-key': credentials.apiKey },
     body: JSON.stringify({ webhookUrl: connection.webhookUrl }) });
   assert.equal(probe.status, 200);
+  await fetch(`${provider}/__test/fail-next-confirm`, { method: 'POST' });
+  await settings.getByRole('button', { name: 'Xác minh kết nối', exact: true }).click();
+  await settings.getByRole('alert').waitFor();
+  const afterFailedVerification = await (await page.request.get('/api/integrations/payos/settings')).json();
+  assert.equal(afterFailedVerification.connections.find(row => row.id === connection.id).webhookUrl, connection.webhookUrl);
+  const oldProbe = await fetch(`${provider}/confirm-webhook`, { method: 'POST',
+    headers: { 'x-client-id': credentials.clientId, 'x-api-key': credentials.apiKey },
+    body: JSON.stringify({ webhookUrl: connection.webhookUrl }) });
+  assert.equal(oldProbe.status, 200, 'Failed re-verification must preserve the confirmed registration');
   }
   const stored = await prisma.$queryRawUnsafe('SELECT ciphertext FROM "IntegrationCredential" WHERE "connectionId"=$1', connection.id);
   for (const value of Object.values(credentials)) assert.ok(!JSON.stringify(stored).includes(value));

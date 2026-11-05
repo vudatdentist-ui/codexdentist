@@ -48,12 +48,12 @@ export async function POST(
   const verificationId = new URL(request.url).searchParams.get("verification");
   if (verificationId && payOSVerificationProbe(verified)) {
     const observed = await prisma.$executeRawUnsafe(
-      `UPDATE "IntegrationConnection" SET "metadata"="metadata" || jsonb_build_object('verificationObservedId',$3::text),
+      `UPDATE "IntegrationConnection" SET "metadata"=CASE WHEN "metadata"->>'verificationId'=$3
+         THEN "metadata" || jsonb_build_object('verificationObservedId',$3::text) ELSE "metadata" END,
        "updatedAt"=(CURRENT_TIMESTAMP AT TIME ZONE 'UTC')
        WHERE "id"=$1 AND "organizationId"=$2 AND "status"='ACTIVE'
-         AND "metadata"->>'verificationId'=$3
-         AND (("metadata"->>'verificationExpiresAt')::timestamptz > CURRENT_TIMESTAMP
-           OR ("metadata"->>'webhookConfirmed'='true' AND "metadata"->>'verificationObservedId'=$3))`,
+         AND (("metadata"->>'verificationId'=$3 AND ("metadata"->>'verificationExpiresAt')::timestamptz > CURRENT_TIMESTAMP)
+           OR ("metadata"->>'webhookConfirmed'='true' AND "metadata"->>'confirmedVerificationId'=$3))`,
       connection.id, connection.organizationId, verificationId);
     return observed === 1 ? json({ verified: true }) : error("payos-verification-expired", 409);
   }

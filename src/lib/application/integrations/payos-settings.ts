@@ -89,7 +89,7 @@ export async function verifyPayOSSettings(session: AppSession, body: Record<stri
   const changed = await prisma.$executeRawUnsafe(
     `UPDATE "IntegrationConnection" SET "lastVerifiedAt"=(CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
       "updatedAt"=(CURRENT_TIMESTAMP AT TIME ZONE 'UTC'),
-      "metadata"="metadata" || '{"webhookConfirmed":true}'::jsonb
+      "metadata"="metadata" || jsonb_build_object('webhookConfirmed',true,'confirmedVerificationId',$3::text)
      WHERE "id"=$1 AND "organizationId"=$2 AND "status"='ACTIVE'
        AND "metadata"->>'verificationId'=$3 AND "metadata"->>'verificationObservedId'=$3
        AND ("metadata"->>'verificationExpiresAt')::timestamptz > CURRENT_TIMESTAMP`,
