@@ -84,7 +84,9 @@ npm run browser:qa
 Journey selection changes require the actual composer regression and real-browser
 navigation checks: valid patient -> unknown/out-of-scope/cleared URL hides editable
 content immediately, including stale topbar and AI identity; Back restores the
-same safe draft. Actual patient lookup navigation, Back/Forward and reload must
+same comments, attachments and temporary treatment targets. A hidden record must
+pause native media and leave no open native modal or inert background. Actual
+patient lookup navigation, Back/Forward and reload must
 open the intended record. A different patient must not inherit a comment, file
 selection, treatment draft or pending dialog. Exercise desktop/mobile states and
 inspect fresh captures. Native history transitions test the mismatch guard;

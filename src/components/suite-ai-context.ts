@@ -91,6 +91,9 @@ export function buildModuleAiContext(input: ModuleAiContextInput) {
             case "treatment":
                 const scopedPatientId = input.journeySelectedPatient?.id ?? "";
                 const scopedPatientName = input.journeySelectedPatient?.name;
+                if (!scopedPatientId) {
+                    return { selectedPatient: null, selectedPatientId: null };
+                }
                 return {
                     selectedPatient: input.journeySelectedPatient ?? null,
                     selectedPatientId: scopedPatientId || null,

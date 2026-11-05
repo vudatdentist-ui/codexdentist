@@ -496,7 +496,9 @@ and action-scroll storage are optional: denied storage access must not prevent
 opening a workspace or editing a form.
 Journey distinguishes unavailable patient data, an empty scope, no selection,
 an invalid link and a pending patient switch. A mismatched URL hides editable
-record content and clears patient context in the topbar/AI. Temporary invalid
-navigation may preserve a hidden draft for Back; a different valid patient gets
+record content and clears patient context in the topbar/AI. No selected Journey
+patient means no patient workspace is serialized into an AI request. Temporary invalid
+navigation preserves hidden comments, attachments and treatment targets for Back;
+a different valid patient gets
 a new owner for draft fields, attachments and pending dialogs. Server-side
 tenant/clinic/action authorization remains mandatory regardless of UI state.

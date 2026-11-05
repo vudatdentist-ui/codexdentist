@@ -25,10 +25,13 @@ async function createProgressFixture() {
   }
   fixturePrisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url.toString() }) });
   const patient = await fixturePrisma.patient.findUniqueOrThrow({ where: { id: 'patient-minh-anh' }, select: { id: true, organizationId: true, clinicId: true } });
+  const creator = await fixturePrisma.user.findFirstOrThrow({
+    where: { organizationId: patient.organizationId, email: process.env.BROWSER_QA_EMAIL ?? 'owner@nhavista.vn' }, select: { id: true },
+  });
   const id = `journey-route-${randomUUID()}`;
-  await fixturePrisma.treatmentService.create({ data: { id, organizationId: patient.organizationId, clinicId: patient.clinicId,
-    patientId: patient.id, serviceCode: id, serviceName: 'Synthetic route progress fixture', toothLabel: '11', teeth: ['11'], finalPrice: 100000 } });
   progressFixtureId = id;
+  await fixturePrisma.treatmentService.create({ data: { id, organizationId: patient.organizationId, clinicId: patient.clinicId,
+    patientId: patient.id, createdById: creator.id, serviceCode: id, serviceName: 'Synthetic route progress fixture', targetSummary: '11', teeth: ['11'], finalPrice: 100000 } });
 }
 page.on('pageerror', error => errors.push(error.message));
 async function settle(target = page) {
@@ -202,6 +205,10 @@ try {
     assert.equal(await form.locator('input[name=patientId]').inputValue(), 'patient-minh-anh');
     const body = 'Synthetic unsent draft for A only';
     await form.locator('textarea[name=body]').fill(body);
+    const archTarget = page.locator('.arch-target').first();
+    if (await archTarget.getAttribute('aria-pressed') !== 'true') await archTarget.click();
+    const unsentTargets = await page.locator('.odontogram-planner input[name=targets]').inputValue();
+    assert.ok(unsentTargets, 'Fixture must have an unsent treatment target');
     await form.locator('input[type=file]').setInputFiles({ name: 'patient-A-only.txt', mimeType: 'text/plain', buffer: Buffer.from('Synthetic attachment, never submitted') });
     await page.evaluate(async () => {
       const canvas = document.createElement('canvas');
@@ -221,8 +228,7 @@ try {
     const ai = page.locator('.module-ai-chat-form'); await ai.waitFor();
     assert.equal(await ai.locator('input[name=selectedPatientId]').inputValue(), '');
     const context = JSON.parse(await ai.locator('input[name=contextJson]').inputValue());
-    assert.equal(context.selectedPatientId, null);
-    assert.equal(context.selectedPatient, null);
+    assert.deepEqual(context.workspace, { selectedPatient: null, selectedPatientId: null }, 'No stale clinical/billing/patient workspace may enter an unselected AI request');
     await page.keyboard.press('Escape');
     for (const width of [1440, 390, 320]) {
       await page.setViewportSize({ width, height: width < 600 ? 844 : 1000 });
@@ -233,6 +239,7 @@ try {
     await page.waitForURL(url => url.searchParams.get('patientId') === 'patient-minh-anh');
     await form.waitFor();
     assert.equal(await form.locator('textarea[name=body]').inputValue(), body);
+    assert.equal(await page.locator('.odontogram-planner input[name=targets]').inputValue(), unsentTargets, 'Back must preserve temporary treatment targets without persisting them');
     assert.equal(await form.locator('input[type=file]').evaluate(input => input.files[0]?.name), 'patient-A-only.txt');
     await page.goForward();
     await page.getByRole('heading', { name: 'Không thể mở hồ sơ này', exact: true }).waitFor();
@@ -249,6 +256,9 @@ try {
     assert.equal(await page.locator('dialog[open]').count(), 0, 'A hidden record must leave no native modal in the top layer');
     await page.locator('.patient-search-combobox input').fill('gia han');
     await page.locator('.patient-search-option').first().waitFor();
+    await page.locator('.patient-search-combobox input').press('Escape');
+    // Clear this intentional lookup query before checking selected-label leakage.
+    await page.locator('.patient-search-combobox input').fill('');
     await page.locator('.patient-search-combobox input').press('Escape');
     assert.equal(await page.evaluate(() => document.body.style.overflow), '');
     await page.goBack(); await form.waitFor();
@@ -320,7 +330,7 @@ try {
   await writeFile(`${output}/report.json`, JSON.stringify({ commit: process.env.GITHUB_SHA, results, errors }, null, 2));
   await browser.close();
   try {
-    if (progressFixtureId) await fixturePrisma.treatmentService.delete({ where: { id: progressFixtureId } });
+    if (progressFixtureId) await fixturePrisma.treatmentService.deleteMany({ where: { id: progressFixtureId } });
   } finally { await fixturePrisma?.$disconnect(); }
   console.log(JSON.stringify({ output, results }, null, 2));
   if (results.some(result => result.status === 'failed')) process.exitCode = 1;

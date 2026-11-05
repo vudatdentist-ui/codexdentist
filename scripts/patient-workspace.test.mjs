@@ -7,6 +7,7 @@ import { readBrowserStorage, writeBrowserStorage, removeBrowserStorage } from '.
 const require = createRequire(import.meta.url);
 const { load } = require('./audit-source-loader.cjs');
 const { resolvePatientSelection } = load('src/workspaces/patients/patient-selection-state.ts');
+const { buildModuleAiContext, stringifyAiContext } = load('src/components/suite-ai-context.ts');
 
 const a = { id: 'a', patientCode: 'PT001', name: 'Nguy\u1ec5n An', phone: '0901000000', flags: [], age: 30 };
 const b = { id: 'b', patientCode: 'PT002', name: 'L\u00ea B\u00ecnh', phone: '0902000000', flags: [], age: 40, visitReason: '\u0110au r\u0103ng' };
@@ -106,7 +107,7 @@ function journeyModelHarness() {
     './suite-shared': { initialLanguage: 'en', uiText: { en: {}, vi: {} }, saveActionScrollState() {}, restoreActionScrollState() {},
       shouldKeepActionNotice: () => true, normalizeSearchText: value => value.toLowerCase(), patientSearchMatches: list => list,
       matchesChartSearch: () => true, moduleAiOutput: () => '',
-      buildModuleAiContext: context => ({ patientId: context.journeySelectedPatient?.id ?? null }), stringifyAiContext: JSON.stringify },
+      buildModuleAiContext, stringifyAiContext },
   });
   function render() { index = 0; effects = []; dirty = false; return useDentalSuiteModel(props); }
   function settle() {
@@ -128,7 +129,7 @@ test('actual composer never exposes stale chart/topbar/AI identity, including be
     h.navigate(query);
     for (const model of [h.render(), h.settle()]) {
       assert.equal(model.journeySelectedPatient, null);
-      assert.equal(JSON.parse(model.moduleAiContextJson).patientId, null);
+      assert.deepEqual(JSON.parse(model.moduleAiContextJson).workspace, { selectedPatient: null, selectedPatientId: null });
       assert.equal(model.journeyRecordPatientId, 'A', 'Temporary route mismatch keeps the draft owner mounted');
     }
     h.navigate('patientId=A'); assert.equal(h.settle().journeySelectedPatient.id, 'A');
@@ -142,6 +143,24 @@ test('actual composer never exposes stale chart/topbar/AI identity, including be
   assert.equal(h.render().journeySelectedPatient, null, 'Scope changes cannot retain an unauthorized patient');
   h.props.patientWorkspace = null;
   assert.equal(h.render().journeySelectedPatient, null, 'Unavailable data cannot establish identity');
+});
+
+test('Journey AI serialization includes patient data only after a matching identity is established', () => {
+  const patientA = { id: 'A', name: 'Synthetic A' }, patientB = { id: 'B', name: 'Synthetic B' };
+  const input = { patientWorkspace: { patients: [patientA, patientB] },
+    clinicalWorkspace: { notes: [{ patientId: 'A', text: 'A only' }, { patientId: 'B', text: 'B only' }] } };
+  for (const activeView of ['journey', 'clinical', 'treatment']) {
+    const serialize = selected => JSON.parse(stringifyAiContext(buildModuleAiContext({ ...input, activeView, journeySelectedPatient: selected })));
+    for (const selected of [null, undefined]) {
+      assert.deepEqual(serialize(selected).workspace, { selectedPatient: null, selectedPatientId: null });
+    }
+    const selected = serialize(patientA).workspace;
+    assert.equal(selected.selectedPatientId, 'A');
+    assert.deepEqual(selected.patientWorkspace.patients.sample.map(patient => patient.id), ['A']);
+    assert.deepEqual(selected.clinicalWorkspace.notes.sample.map(note => note.patientId), ['A']);
+  }
+  const general = JSON.parse(stringifyAiContext(buildModuleAiContext({ ...input, activeView: 'patients' })));
+  assert.deepEqual(general.workspace.patientWorkspace.patients.sample.map(patient => patient.id), ['A', 'B']);
 });
 
 test('actual Journey boundary hides mismatched editable content and keys all record state by patient', () => {

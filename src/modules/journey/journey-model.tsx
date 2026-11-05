@@ -2,7 +2,7 @@
 import { buildJourneyTimeline } from "./journey-timeline";
 import { FileText, } from "lucide-react";
 import { useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState, type FocusEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FocusEvent } from "react";
 import { useAppLanguage } from "@/components/AppLanguage";
 import { visibleActionNoticeParam } from "@/lib/action-notices";
 import { serviceAppliedAmount as calculateServiceAppliedAmount } from "@/lib/billing-calculations";
@@ -151,7 +151,13 @@ export function usePatientJourneyPanelModel({ actorName, billingWorkspace, clini
         null;
     const selectedOdontogram = journeyRecordsWorkspace?.odontograms.find((odontogram) => odontogram.patientId === selectedPatientKey) ?? null;
     const selectedJourneyComments = journeyRecordsWorkspace?.comments.filter((comment) => comment.patientId === selectedPatientKey) ?? [];
+    const toothSelectionSource = useRef<{ patientId: string; stateId?: string } | null>(null);
     useEffect(() => {
+        const stateId = selectedJourneyState?.id;
+        // Restoring a hidden record remounts effects, not its temporary selection.
+        if (toothSelectionSource.current?.patientId === selectedPatientKey &&
+            toothSelectionSource.current.stateId === stateId) return;
+        toothSelectionSource.current = { patientId: selectedPatientKey, stateId };
         setSelectedTeeth(selectedJourneyState?.odontogramTeeth ?? []);
     }, [selectedJourneyState?.id, selectedPatientKey]);
     const selectedCrmActivities = crmWorkspace?.activities.filter((activity) => activity.patientId === selectedPatientKey) ??
