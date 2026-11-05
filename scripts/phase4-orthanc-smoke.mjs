@@ -3,20 +3,28 @@ const {
   fetchOrthancStudy,
   OrthancProviderError,
 } = await import("../src/integrations/orthanc/client.ts");
+const { resolveOrthancConnectionSecrets } = await import("../src/integrations/config.ts");
 
 const originalFetch = globalThis.fetch;
-const secrets = {
-  baseUrl: "http://orthanc.test",
-  viewerBaseUrl: "http://ohif.test/viewer",
-  viewerAccessMode: "private",
-  username: "orthanc-user",
-  password: "orthanc-password",
+const fixtureEnvironment = {
+  ORTHANC_DEFAULT_ORGANIZATION_ID: "synthetic-orthanc-organization",
+  ORTHANC_DEFAULT_BASE_URL: "https://orthanc.test",
+  ORTHANC_DEFAULT_VIEWER_BASE_URL: "https://ohif.test/viewer",
+  ORTHANC_DEFAULT_VIEWER_ACCESS_MODE: "private",
+  ORTHANC_DEFAULT_USERNAME: "orthanc-user",
+  ORTHANC_DEFAULT_PASSWORD: "orthanc-password",
 };
+const previousEnvironment = Object.fromEntries(Object.keys(fixtureEnvironment).map(key => [key, process.env[key]]));
 
 try {
+  Object.assign(process.env, fixtureEnvironment);
+  const secrets = resolveOrthancConnectionSecrets({
+    organizationId: fixtureEnvironment.ORTHANC_DEFAULT_ORGANIZATION_ID,
+    secretRef: "env:ORTHANC_DEFAULT",
+  });
   globalThis.fetch = async (url, init = {}) => {
     const studyId = decodeURIComponent(String(url).split("/").pop());
-    assert(String(url) === `http://orthanc.test/studies/${studyId}`, "Orthanc study endpoint is scoped to the study id");
+    assert(String(url) === `https://orthanc.test/studies/${studyId}`, "Orthanc study endpoint is scoped to the study id");
     assert(init.headers.get("Authorization") === `Basic ${Buffer.from("orthanc-user:orthanc-password").toString("base64")}`, "Orthanc credentials use basic auth");
     if (studyId === "missing-study") return new Response("not found", { status: 404 });
     const tags = {
@@ -43,7 +51,7 @@ try {
   assert(!Object.hasOwn(study, "patientName"), "PHI-heavy DICOM tags are not returned");
 
   const viewerUrl = buildOhifStudyUrl(secrets.viewerBaseUrl, study.studyInstanceUid);
-  assert(viewerUrl === `http://ohif.test/viewer?StudyInstanceUIDs=${encodeURIComponent(study.studyInstanceUid)}`, "OHIF URL carries only the stable study UID");
+  assert(viewerUrl === `https://ohif.test/viewer?StudyInstanceUIDs=${encodeURIComponent(study.studyInstanceUid)}`, "OHIF URL carries only the stable study UID");
   assert(buildOhifStudyUrl(null, study.studyInstanceUid) === null, "OHIF fails closed when no viewer is configured");
 
   let missingStudy = false;
@@ -84,6 +92,10 @@ try {
   console.log("ok phase4 Orthanc/OHIF smoke");
 } finally {
   globalThis.fetch = originalFetch;
+  for (const [key, value] of Object.entries(previousEnvironment)) {
+    if (value === undefined) delete process.env[key];
+    else process.env[key] = value;
+  }
 }
 
 function assert(condition, label) {

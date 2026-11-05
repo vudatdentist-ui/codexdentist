@@ -44,6 +44,7 @@ jobs:
       PAYOS_DEFAULT_API_KEY: phase3-ci-api-key
       PAYOS_DEFAULT_CHECKSUM_KEY: ci-phase3-payos-checksum-secret
       PAYOS_DEFAULT_ORGANIZATION_ID: org_nhavista
+      ORTHANC_DEFAULT_ORGANIZATION_ID: org_nhavista
 
     steps:
       - uses: actions/checkout@v7
