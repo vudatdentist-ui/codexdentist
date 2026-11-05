@@ -308,8 +308,9 @@ def deploy(sha, main, reviewed_migrations=None):
             stdout=subprocess.DEVNULL)
         # Forward through the child environment, never command arguments, logs,
         # Compose files, candidate configuration or the runtime container.
-        run(compose("run", "--rm", "--no-deps", "-T", "--env", "DATABASE_URL", "--entrypoint", "npx", "codexdentist",
-                    "prisma", "migrate", "deploy", override=override), env={**os.environ, "DATABASE_URL": migration_url})
+        run(["docker", "run", "--rm", "--network", "container:" + CONTAINER,
+             "--env", "DATABASE_URL", "--entrypoint", "npx", image, "prisma", "migrate", "deploy"],
+            env={**os.environ, "DATABASE_URL": migration_url})
         run(compose("run", "-d", "--no-deps", "--name", candidate, "-p", "127.0.0.1::3000",
                     "--entrypoint", "node", "codexdentist", "node_modules/next/dist/bin/next", "start",
                     "-H", "0.0.0.0", "-p", "3000", override=override), stdout=subprocess.DEVNULL)
