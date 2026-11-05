@@ -23,6 +23,7 @@ import { EmptyState, MetricCard, PanelHeader, RecordTile, StatusPill as BaseStat
 import type { Patient } from "@/lib/data";
 import type { FormsWorkspace } from "@/lib/forms-types";
 import type { PatientWorkspace } from "@/lib/patient-types";
+import { DocumensoConsentSigning } from "@/workspaces/integrations/DocumensoConsentSigning";
 
 type PatientSearchRecord = Pick<Patient, "id" | "name" | "phone"> &
   Partial<Pick<Patient, "email" | "patientCode">>;
@@ -50,6 +51,7 @@ function noticeText(notice: string | null, language: Language) {
     "forms-denied": { vi: "Tài khoản này không thể thay đổi biểu mẫu bệnh nhân.", en: "This role cannot change patient forms." },
     "forms-missing": { vi: "Điền đủ trường bắt buộc của biểu mẫu.", en: "Complete the required form fields." },
     "forms-not-open": { vi: "Chỉ biểu mẫu đang mở mới có thể hoàn tất.", en: "Only open forms can be completed." },
+    "forms-signing-active": { vi: "Biểu mẫu đang có phiên ký. Chờ nhận kết quả trước khi hoàn tất thủ công hoặc hủy.", en: "This form has an active signing request. Await its result before manually completing or voiding it." },
     "forms-signature-missing": { vi: "Biểu mẫu này cần link chữ ký trước khi hoàn tất.", en: "This form requires a signature link before completion." },
     "forms-void-reason-missing": { vi: "Nhập lý do trước khi hủy biểu mẫu bệnh nhân.", en: "Enter a reason before voiding the patient form." },
     "forms-database": { vi: "Chưa lưu được thay đổi. Vui lòng thử lại sau.", en: "The change could not be saved. Please try again." },
@@ -79,6 +81,12 @@ function StatusPill({ status }: { status: string }) {
   const { language } = useAppLanguage();
 
   return <BaseStatusPill label={displayStatus(status, language)} status={status} />;
+}
+
+function ProtectedFormFile({ url, label }: { url: string; label: string }) {
+  return /^\/patient-files\/[A-Za-z0-9_-]{1,128}$/.test(url)
+    ? <a href={url} target="_blank" rel="noopener noreferrer">{label} ↗</a>
+    : <span>{label}</span>;
 }
 
 
@@ -731,14 +739,15 @@ export function FormsPanel({
                     {(form.responseText || form.signatureUrl || form.attachments.length > 0) && (
                       <div className="forms-row-details">
                         {form.responseText && <small>{form.responseText}</small>}
-                        {form.signatureUrl && <small>{formStorageLabels.signature}: {form.signatureUrl}</small>}
+                        {form.signatureUrl && <small><ProtectedFormFile url={form.signatureUrl} label={formStorageLabels.signature} /></small>}
                         {form.attachments.length > 0 && (
-                          <small>{formStorageLabels.attachments}: {form.attachments.join(", ")}</small>
+                          <small>{formStorageLabels.attachments}: {form.attachments.map((url, index) => <span key={`${url}-${index}`}>{index > 0 ? " · " : ""}<ProtectedFormFile url={url} label={`${language === "vi" ? "Tài liệu" : "Document"} ${index + 1}`} /></span>)}</small>
                         )}
                       </div>
                     )}
                   </div>
                   <StatusPill status={form.status} />
+                  {canMutate && form.requiresSignature && form.status !== "VOID" && <DocumensoConsentSigning patientFormId={form.id} language={language} />}
                   {form.status !== "VOID" && form.status !== "COMPLETED" && (
                     <button
                       type="button"

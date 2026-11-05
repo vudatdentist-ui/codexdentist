@@ -276,6 +276,25 @@ before object I/O so interruption cannot erase its discovery record.
 
 ### Documenso
 
+Run `test:documenso` for real handler/command regressions and
+`NODE_ENV=test npm run test:documenso-db` for a newly created/migrated loopback
+database with credential/reservation, duplicate send and manual-action guards.
+The production app gate `browser:documenso-production` creates fresh owned
+fixtures, exercises settings/PDF attachment/manual-completion refusal and signed
+states without making provider requests. Full `browser:documenso` separately
+runs a development app on 3002 plus a loopback signing engine on 11445: actual
+create, interrupted distribution, resume without duplicate delivery, reload,
+invalid secret/PDF, import retry and duplicate completion. Verify exactly one
+protected signed file, Journey event and completion audit. Both capture
+1440/390/320px and clean only their newly owned organizations/files. The local
+runner prepares the normal font assets before visual review.
+
+Include recipient edits between creation and resume, manual-only completion,
+definitive FAILED labels, key/source replacement and signed-file provenance in
+independent review. Never use a manually completed form or an attached source
+PDF as evidence that the provider signed it. Keep real-provider acceptance
+separate from synthetic/browser fixtures.
+
 Verify:
 
 - only minimized necessary participant/document data leaves Codexdentist;

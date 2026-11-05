@@ -136,6 +136,7 @@ function signingFixture({ failure = "http", providerStatusAfterFailure = "DRAFT"
   if (legacy) references.push({ id: "legacy", organizationId: "org", clinicId: "clinic", connectionId: connection.id,
     provider: "documenso", entityType: "DOCUMENSO_REQUEST", internalId: "form", externalId: "request-one",
     metadata: { sourcePatientFileId: "source", idempotencyKey: "consent-key", envelopeId: "envelope-one",
+      recipientName: form.patient.fullName, recipientEmail: form.patient.email,
       status: "PENDING", errorCode: "documenso-envelope-distribute-failed" } });
   return {
     form, references, calls, locks,
