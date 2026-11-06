@@ -1,6 +1,6 @@
 # Codexdentist QA Playbook
 
-Last updated: 2026-11-05
+Last updated: 2026-11-06
 Status: ACTIVE
 
 This playbook implements the closed-loop quality process defined in `docs/PROJECT_CONTEXT.md`:
@@ -247,6 +247,13 @@ loopback database, then checks actual row locks, encrypted key replacement,
 canonical settlement racing status recovery, late writes and reversed paid/zero
 observation completion order. Its provider boundary is synthetic; signature
 validation is exercised independently by handler and full-app tests.
+The native gate also races two new intents after a paid observation, checks an
+older organization merchant cannot be bypassed by a clinic merchant, preserves
+unrelated invoices and permits new credit requests only after canonical settlement.
+Full-app/production UI gates directly POST both a replay and a new key while money
+awaits its receipt: both must return 409 without creating another request. Configure
+the production QA server's `PAYOS_DEFAULT_BASE_URL=https://127.0.0.1:11444` (as CI
+does) so a regressed guard cannot send synthetic keys to a real merchant endpoint.
 `NODE_ENV=test npm run test:integration-vault-db` explicitly runs the native
 loopback PostgreSQL gate: fresh migrations, tenant FK/AAD isolation, UTC,
 rotation races, rollback and cascade. Unit-only runs may skip that native case;

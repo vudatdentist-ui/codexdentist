@@ -53,6 +53,20 @@ export async function reservePayOSOrder(session: AppSession, input: { patientId:
     const connection = connections[0];
     if (!connection) fail("payos-connection-not-configured", 409);
     if (connection.secretRef === "vault:v1" && !payOSConnectionSummary(connection, "").verified) fail("payos-webhook-not-confirmed", 409);
+    // A signed observation of money blocks both a fresh intent and a replay
+    // until the canonical webhook records its receipt. Search all merchants:
+    // switching from an organization connection to a clinic connection must
+    // not bypass the same patient/invoice's reconciliation requirement.
+    const waiting = await tx.$queryRawUnsafe<Array<{ awaitingReceipt: boolean }>>(
+      `SELECT EXISTS(SELECT 1 FROM "ExternalReference" WHERE "organizationId"=$1 AND "clinicId"=$2
+       AND "provider"='payos' AND "entityType"='PAYOS_ORDER' AND "metadata"->>'patientId'=$3
+       AND NULLIF("metadata"->>'invoiceNo','') IS NOT DISTINCT FROM NULLIF($4::text,'')
+       AND COALESCE("metadata"->>'status','')<>'SETTLED'
+       AND ("metadata"->>'providerStatus'='PAID' OR
+         CASE WHEN jsonb_typeof("metadata"->'providerAmountPaid')='number'
+           THEN ("metadata"->>'providerAmountPaid')::numeric ELSE 0 END > 0)) AS "awaitingReceipt"`,
+      session.organizationId, patient.clinicId, patient.id, input.invoiceNo);
+    if (waiting[0]?.awaitingReceipt) fail("payos-payment-awaiting-receipt", 409);
     const secrets = await loadSecrets(connection, tx);
     const existing = await getExternalReferenceByInternalId(tx, { organizationId: session.organizationId,
       connectionId: connection.id, provider: "payos", entityType: "PAYOS_ORDER", internalId });

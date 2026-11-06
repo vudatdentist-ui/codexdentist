@@ -31,6 +31,7 @@ export async function POST(request: Request) {
   const { intent, secrets } = reservation;
   const previous = referenceMetadata(intent);
   if (reservation.duplicate) {
+    if (previous.status === "SETTLED") return terminalResponse(Number(intent.externalId), previous);
     if (typeof previous.checkoutUrl !== "string" && previous.status !== "SETTLED") return payOSJson({ error: "payos-payment-link-pending-recovery" }, 409);
     return payOSJson({ orderCode: Number(intent.externalId), paymentLinkId: previous.paymentLinkId ?? null,
       checkoutUrl: previous.checkoutUrl ?? null, qrCode: previous.qrCode ?? null, status: previous.status ?? "PENDING", duplicate: true });

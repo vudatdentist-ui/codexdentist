@@ -1,6 +1,6 @@
 # Operations
 
-Last updated: 2026-11-05
+Last updated: 2026-11-06
 
 ## Local PC
 
@@ -391,6 +391,9 @@ The app validates the signed response and complete order identity. Confirmed
 cancelled/expired requests with zero paid amount stop displaying their QR and
 release the credential lock. A reported paid/partial amount hides the old QR and
 shows that reconciliation is pending; the status query never creates a receipt.
+Server-side reservation also rejects fresh intents and replays while that money
+awaits a canonical receipt, even after selecting another merchant connection.
+This guard is scoped to the same patient/invoice; other invoices remain usable.
 Timeouts, missing orders, invalid signatures and paid cancellations leave the
 request unresolved. A calendar expiry alone is not cancellation proof. Already
 settled/retired history is not queried using replacement merchant credentials.

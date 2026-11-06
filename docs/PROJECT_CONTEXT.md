@@ -1,6 +1,6 @@
 # Codexdentist Canonical Product Context
 
-Last updated: 2026-11-05
+Last updated: 2026-11-06
 Status: ACTIVE / CANONICAL
 
 > This file replaces every previous product direction, refactor queue, migration-route plan, and architecture context. Git history is an archive, not an active instruction source. Do not revive an older plan merely because it appears in a previous commit, chat, issue, or deleted document.
@@ -270,6 +270,11 @@ rejections permit credential correction; an older uncertain creation still block
 replacement. A late verified payment for a voided invoice becomes patient credit,
 without reviving or allocating that invoice. Inbox readiness and retry scheduling
 use the database clock so app/DB clock skew cannot distort delivery backoff.
+Reported money awaiting a canonical receipt blocks fresh payment intents and
+replays on the server, before decrypting keys or contacting payOS. The guard
+covers all merchant connections for the same organization/clinic/patient/invoice,
+including unallocated credit requests. Other invoices remain independent. Only
+canonical settlement releases the guard; settled replays never return an old QR.
 
 Signing decision: a Documenso request owns its form, source PDF and recipient
 identity once reserved. Credential replacement, source changes and manual

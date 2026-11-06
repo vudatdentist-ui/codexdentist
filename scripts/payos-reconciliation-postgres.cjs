@@ -97,7 +97,38 @@ async function main() {
     assert.equal(late.metadata.providerAmountPaid, 100000); assert.equal(late.metadata.providerStatus, 'PAID');
     assert.equal(late.metadata.providerCheckedAt, observed.metadata.providerCheckedAt);
     assert.ok(Math.abs(Date.now() - late.updatedAt.getTime()) < 5000, 'Metadata UTC timestamps remain correct in a UTC+7 session');
+    const { reservePayOSOrder } = module('src/lib/application/integrations/payos-orders.ts');
+    await prisma.$executeRawUnsafe(`UPDATE "IntegrationConnection" SET "lastVerifiedAt"=clock_timestamp() AT TIME ZONE 'UTC',
+      "metadata"="metadata" || '{"webhookConfirmed":true}'::jsonb WHERE "id"=$1`, connection.id);
+    // A new clinic merchant cannot bypass money observed through an older
+    // organization-wide merchant. All rows here belong to this disposable DB.
+    const globalConnection = await substrate.upsertIntegrationConnection(prisma, {
+      organizationId: org.id, clinicId: null, provider: 'payos', secretRef: 'vault:v1' });
+    await prisma.$executeRawUnsafe('UPDATE "ExternalReference" SET "connectionId"=$1 WHERE "id"=$2', globalConnection.id, third.id);
+    let secretLoads = 0;
+    const reserveSecrets = async (value, tx) => { secretLoads++; return secrets(value, tx); };
+    const before = await prisma.$queryRawUnsafe('SELECT count(*)::int AS count FROM "ExternalReference"');
+    const denied = await Promise.allSettled(['first-new-intent', 'second-new-intent'].map(idempotencyKey =>
+      reservePayOSOrder(session, { patientId: patient.id, invoiceNo: null, amount: 100000, idempotencyKey }, reserveSecrets)));
+    for (const result of denied) { assert.equal(result.status, 'rejected'); assert.equal(result.reason.code, 'payos-payment-awaiting-receipt'); }
+    assert.equal(secretLoads, 0, 'Blocked requests never decrypt merchant secrets');
+    assert.equal((await prisma.$queryRawUnsafe('SELECT count(*)::int AS count FROM "ExternalReference"'))[0].count, before[0].count);
+    assert.equal(await prisma.receipt.count(), 1);
+    const unrelated = await prisma.invoice.create({ data: { organizationId: org.id, clinicId: clinic.id,
+      patientId: patient.id, invoiceNo: 'UNRELATED', amount: 100000, paidAmount: 0, status: 'OPEN', dueDate: new Date() } });
+    assert.equal((await reservePayOSOrder(session, { patientId: patient.id, invoiceNo: unrelated.invoiceNo,
+      amount: 100000, idempotencyKey: 'unrelated-invoice-intent' }, reserveSecrets)).duplicate, false);
+    // Only canonical settlement clears this receipt-waiting guard.
+    await prisma.$transaction(async tx => {
+      const receipt = await recordProviderSettlementCommand(tx, { organizationId: org.id, clinicId: clinic.id,
+        patientId: patient.id, amount: 100000, method: 'bank_transfer', provider: 'payos',
+        providerReference: 'synthetic-observed-transfer', providerEventId: 'synthetic-observed-event' });
+      await store.updateExternalReferenceMetadata(tx, third.id, { ...late.metadata, status: 'SETTLED', receiptNo: receipt.receiptNo });
+    });
+    assert.equal((await reservePayOSOrder(session, { patientId: patient.id, invoiceNo: null, amount: 100000,
+      idempotencyKey: 'after-canonical-settlement' }, reserveSecrets)).duplicate, false);
     console.log('ok native status recovery: webhook race, paid observation ordering, sealed-key rotation and late-write fencing');
+    console.log('ok native receipt-waiting guard: concurrent denials across merchants, invoice isolation and canonical release');
   } finally {
     for (const release of gates) release(); await Promise.allSettled(pending);
     if (prisma) await prisma.$disconnect();

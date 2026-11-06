@@ -44,6 +44,8 @@ jobs:
       PAYOS_DEFAULT_API_KEY: phase3-ci-api-key
       PAYOS_DEFAULT_CHECKSUM_KEY: ci-phase3-payos-checksum-secret
       PAYOS_DEFAULT_ORGANIZATION_ID: org_nhavista
+      # A failed guard must never send synthetic merchant keys to the real API.
+      PAYOS_DEFAULT_BASE_URL: https://127.0.0.1:11444
       ORTHANC_DEFAULT_ORGANIZATION_ID: org_nhavista
 
     steps:
