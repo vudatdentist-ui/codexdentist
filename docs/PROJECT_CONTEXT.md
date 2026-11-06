@@ -479,6 +479,12 @@ Add replaceable communication and standards integrations only after core boundar
 - Optional sidecars can be disabled without breaking the core clinic workflow.
 - PHI minimization, webhook idempotency, auditability and tenant isolation are verified.
 
+FHIR identity decision (#88): the canonical patient has one unstructured full
+name. Export that value in `HumanName.text`; never infer family/given boundaries
+from token position. Keep stable patient identifiers, tenant/clinic authorization,
+minimal export audit and the disabled-by-default provider gate unchanged. Structured
+name parts require explicit source fields, not a cultural ordering heuristic.
+
 ### Phase 7 — Release Hardening
 
 **Objective**
