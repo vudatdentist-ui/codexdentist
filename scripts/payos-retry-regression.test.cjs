@@ -35,6 +35,14 @@ function fixture({ outcomes = [], metadata, invoice = { amount: 100000, paidAmou
     auditLog: { create: async () => { stats.writes++; return {}; } },
     $queryRawUnsafe: async (sql, ...params) => {
       stats.queries++;
+      if (sql.includes('AS "awaitingReceipt"')) {
+        assert.deepEqual(params, [session.organizationId, connection.clinicId, input.patientId, input.invoiceNo]);
+        assert.match(sql, /"provider"='payos'/);
+        assert.match(sql, /"entityType"='PAYOS_ORDER'/);
+        assert.match(sql, /jsonb_typeof/);
+        return [{ awaitingReceipt: Boolean(order && order.metadata.status !== 'SETTLED' &&
+          (order.metadata.providerStatus === 'PAID' || Number(order.metadata.providerAmountPaid) > 0)) }];
+      }
       if (sql.includes('SELECT EXISTS')) {
         assert.deepEqual(params, [connection.id, session.organizationId]);
         assert.match(sql, /"provider"='payos'/);
@@ -131,8 +139,8 @@ function fixture({ outcomes = [], metadata, invoice = { amount: 100000, paidAmou
   const store = module('src/infrastructure/integrations/payos-workspace-store.ts');
   return {
     stats, input, metadata: () => copy(order?.metadata),
-    post: () => route.POST(new Request('https://app.example.test/api/integrations/payos/payment-links', {
-      method: 'POST', body: JSON.stringify(input),
+    post: (overrides = {}) => route.POST(new Request('https://app.example.test/api/integrations/payos/payment-links', {
+      method: 'POST', body: JSON.stringify({ ...input, ...overrides }),
     })),
     unresolved: () => store.hasUnresolvedPayOSOrders(db, connection.id, session.organizationId),
     changeSettings: action => module('src/lib/application/integrations/payos-settings.ts').savePayOSSettings(session, {
@@ -144,6 +152,21 @@ function fixture({ outcomes = [], metadata, invoice = { amount: 100000, paidAmou
     })),
   };
 }
+
+for (const metadata of [
+  { status: 'ERROR', providerStatus: 'PAID', providerAmountPaid: 100000 },
+  { status: 'PENDING', providerStatus: 'PAID' },
+  { status: 'PENDING', providerStatus: 'UNDERPAID', providerAmountPaid: 1 },
+  { status: 'FAILED', providerStatus: 'PAID', providerAmountPaid: 100000 },
+]) test(`reported money blocks API creation and intent replay: ${JSON.stringify(metadata)}`, async () => {
+  const h = fixture({ metadata });
+  for (const overrides of [{}, { idempotencyKey: 'another-payment-intent' }]) {
+    const response = await h.post(overrides);
+    assert.equal(response.status, 409);
+    assert.equal((await response.json()).error, 'payos-payment-awaiting-receipt');
+  }
+  assert.equal(h.stats.http.length + h.stats.writes + h.stats.claims + h.stats.inserts, 0);
+});
 
 test('timeout then same-intent 401 preserves uncertainty and blocks credential replacement/disable', async () => {
   const h = fixture({ outcomes: ['timeout', 401, 401] });
@@ -162,6 +185,16 @@ test('timeout then same-intent 401 preserves uncertainty and blocks credential r
   assert.equal(h.stats.inserts, 1);
   assert.equal(h.stats.claims, 2);
   assert.equal(new Set(h.stats.http.map(request => request.orderCode)).size, 1, 'Every attempt must retain the durable order code');
+});
+
+test('settled intent replay never returns the earlier QR or checkout link', async () => {
+  const h = fixture({ metadata: { status: 'SETTLED', providerStatus: 'PAID', providerAmountPaid: 100000,
+    checkoutUrl: 'https://pay.test/old', qrCode: 'old-code' } });
+  const response = await h.post();
+  assert.equal(response.status, 200);
+  const result = await response.json();
+  assert.equal(result.status, 'SETTLED'); assert.equal(result.qrCode, null); assert.equal(result.checkoutUrl, null);
+  assert.equal(h.stats.http.length + h.stats.writes, 0);
 });
 
 test('invoice transfer memo fits payOS unlinked-bank nine-character limit and is signed as sent', async () => {

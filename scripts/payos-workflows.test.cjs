@@ -71,6 +71,7 @@ test('settled payment-intent replay returns the original order without requiring
   const reference = { id: 'order', externalId: '1234', metadata: { patientId: 'patient', amount: 100000, invoiceNo: 'INV', status: 'SETTLED', checkoutUrl: 'https://pay.test/order' } };
   let existing = reference;
   const tx = { $queryRawUnsafe: async (sql, ...params) => {
+    if (sql.includes('AS "awaitingReceipt"')) return [{ awaitingReceipt: false }];
     if (sql.includes('FROM "Invoice"')) return [{ amount: 100000, paidAmount: 0, status: 'OPEN' }];
     assert.ok(sql.includes('FOR UPDATE') && sql.includes('IntegrationConnection'));
     assert.deepEqual(params, ['connection', 'A']); return [connection];

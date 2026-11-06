@@ -23,7 +23,8 @@ await mkdir(output, { recursive: true });
 const browser = await chromium.launch();
 const results = [], errors = [];
 const credentials = { clientId: 'synthetic-payos-client', apiKey: 'a'.repeat(64), checksumKey: 'c'.repeat(64) };
-let page;
+let page, firstKey;
+const productionIntentKey = randomUUID();
 async function openInvoices() {
   // A cold development route can paint its server-rendered tabs before their
   // handlers are hydrated. WorkspaceTabs adds tabindex in its layout effect;
@@ -139,7 +140,7 @@ try {
     const orderCode = Date.now() * 100 + 11;
     await prisma.$executeRawUnsafe(`INSERT INTO "ExternalReference" ("id","organizationId","clinicId","connectionId","provider","entityType","internalId","externalId","metadata")
       VALUES ($1,$2,$3,$4,'payos','PAYOS_ORDER',$5,$6,$7::jsonb)`, randomUUID(), a.organization.id, a.clinic.id, connection.id,
-      randomUUID(), String(orderCode), JSON.stringify({ patientId: patient.id, invoiceNo: invoice.invoiceNo, amount: 100000,
+      productionIntentKey, String(orderCode), JSON.stringify({ patientId: patient.id, invoiceNo: invoice.invoiceNo, amount: 100000,
         status: 'PENDING', currency: 'VND', paymentLinkId: `synthetic-${orderCode}`,
         checkoutUrl: `https://pay.payos.vn/web/synthetic-${orderCode}`, qrCode: `synthetic-qr-${orderCode}` }));
   }
@@ -151,7 +152,7 @@ try {
   await dialog.getByRole('button', { name: 'Tạo mã thanh toán', exact: true }).waitFor();
   const qr = dialog.getByRole('img', { name: 'Mã QR thanh toán payOS', exact: true });
   if (!productionUI) {
-  let interrupted = false, firstKey, replayKey, interceptedStatus, interceptedBody;
+  let interrupted = false, replayKey, interceptedStatus, interceptedBody;
   const countBefore = (await (await fetch(`${provider}/__test/state`)).json()).requests;
   await page.route('**/api/integrations/payos/payment-links', async route => {
     if (route.request().method() === 'POST' && !interrupted) {
@@ -206,6 +207,17 @@ try {
     await dialog.getByText(/payOS báo đã nhận tiền/).waitFor();
     assert.equal(await qr.count(), 0);
     assert.equal(await prisma.receipt.count({ where: { organizationId: a.organization.id } }), 0, 'A status query cannot fabricate collection');
+    const requestsBefore = await prisma.$queryRawUnsafe(`SELECT count(*)::int AS count FROM "ExternalReference"
+      WHERE "organizationId"=$1 AND "provider"='payos' AND "entityType"='PAYOS_ORDER'`, a.organization.id);
+    for (const idempotencyKey of [firstKey ?? productionIntentKey, `another-${token}`]) {
+      const blocked = await page.request.post('/api/integrations/payos/payment-links', { headers: { origin: base },
+        data: { patientId: patient.id, invoiceNo: invoice.invoiceNo, amount: 100000, idempotencyKey } });
+      assert.equal(blocked.status(), 409, 'Server must reject another collection while reported money awaits a receipt');
+      assert.equal((await blocked.json()).error, 'payos-payment-awaiting-receipt');
+    }
+    const requestsAfter = await prisma.$queryRawUnsafe(`SELECT count(*)::int AS count FROM "ExternalReference"
+      WHERE "organizationId"=$1 AND "provider"='payos' AND "entityType"='PAYOS_ORDER'`, a.organization.id);
+    assert.equal(requestsAfter[0].count, requestsBefore[0].count);
     assert.equal((await page.request.post('/api/integrations/payos/settings', { headers: { origin: base }, data: { action: 'disable', clinicId: null } })).status(), 409);
     await page.reload({ waitUntil: 'networkidle' });
     await openInvoices();
