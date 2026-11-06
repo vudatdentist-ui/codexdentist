@@ -20,6 +20,7 @@ import { EmptyState, PanelHeader } from "@/components/suite-primitives";
 import { formatVnd, type Clinic, type Patient } from "@/lib/data";
 import type { PatientWorkspace } from "@/lib/patient-types";
 import type { AppRole } from "@/lib/permissions";
+import { PatientIntegrationTools } from "@/workspaces/integrations/PatientIntegrationTools";
 
 
 function clinicIsActive(clinic: Pick<Clinic, "active">) {
@@ -413,6 +414,7 @@ export function PatientsPanel({
                 <p>{visibleClinics.find((clinic) => clinic.id === selectedPatient.clinicId)?.name ?? text.unknown}</p>
               </header>
 
+              <PatientIntegrationTools patientId={selectedPatient.id} language={language} />
               <div className="patient-profile-strip">
                 <div>
                   <span>{text.phone}</span>
