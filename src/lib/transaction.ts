@@ -29,14 +29,23 @@ export async function runSerializableTransaction<T>(
 function isRetryableTransactionError(error: unknown) {
   // adapter-pg can expose a COMMIT conflict as DriverAdapterError rather than P2034.
   // Inspect structured SQLSTATEs only; messages are neither stable nor safe classifiers.
-  let current = error;
+  const pending: unknown[] = [error];
   const seen = new Set<unknown>();
-  for (let depth = 0; depth < 4 && current && typeof current === "object" && !seen.has(current); depth++) {
+  for (let inspected = 0; pending.length && inspected < 12; inspected++) {
+    const current = pending.shift();
+    if (!current || typeof current !== "object" || seen.has(current)) continue;
     seen.add(current);
-    const record = current as { code?: unknown; originalCode?: unknown; cause?: unknown };
+    const record = current as { code?: unknown; originalCode?: unknown; cause?: unknown;
+      meta?: { code?: unknown; driverAdapterError?: unknown } };
     if (record.code === "P2034" || record.code === "40001" || record.code === "40P01" ||
         record.originalCode === "40001" || record.originalCode === "40P01") return true;
-    current = record.cause;
+    pending.push(record.cause);
+    // Raw SQL statements wrap the same adapter conflict in P2010/meta instead
+    // of the direct cause chain used for COMMIT. Do not retry other P2010 errors.
+    if (record.code === "P2010") {
+      if (record.meta?.code === "40001" || record.meta?.code === "40P01") return true;
+      pending.push(record.meta?.driverAdapterError);
+    }
   }
   return false;
 }
