@@ -16,7 +16,8 @@ function harness(options = {}) {
   const state = { patient: { ...source, ...options.patient }, session: options.session === undefined ? owner : options.session,
     row: null, audits: [], calls: [], remote: null, transaction: false, updatedAt: new Date('2026-11-06Z') };
   const connection = () => ({ id: 'conn-a', organizationId: 'org-a', clinicId: 'clinic-a', provider: 'medplum',
-    status: 'ACTIVE', lastVerifiedAt: new Date(), updatedAt: state.updatedAt, ...options.connection });
+    status: 'ACTIVE', lastVerifiedAt: new Date(), secretRef:'vault:v1', updatedAt: state.updatedAt,
+    metadata:{configurationVersion:'version-A',verifiedVersion:'version-A',providerIdentity:'Project/project-a'}, ...options.connection });
   const findPatient = async ({ where }) => {
     assert.equal(where.organizationId, state.session.organizationId);
     if (options.missing || where.id !== state.patient.id || where.organizationId !== state.patient.organizationId ||
@@ -30,7 +31,7 @@ function harness(options = {}) {
       update: async ({ data }) => { state.row = copy({ ...state.row, ...data }); },
     }, auditLog: { create: async ({ data }) => { if (options.auditFails) throw new Error('audit'); state.audits.push(copy(data)); } },
     $queryRawUnsafe: async (sql, ...args) => {
-      if (sql.includes('IntegrationConnection')) return [{ updatedAt: state.updatedAt, now: new Date() }];
+      if (sql.includes('IntegrationConnection')) return [{ ...connection(), now: new Date(), ...(options.reservationConnection || {}) }];
       assert.equal(args[1], 'org-a');
       return state.row ? [copy(state.row)] : [];
     },
@@ -41,8 +42,10 @@ function harness(options = {}) {
     if (options.fetch) return options.fetch(url, init, state);
     if (url.endsWith('/oauth2/token')) return Response.json({ token_type: 'Bearer', access_token: 'synthetic-access' });
     if (url.endsWith('/auth/me')) return Response.json({ project: { resourceType: 'Project', id: options.projectId ?? 'project-a' }, profile: { resourceType: 'ClientApplication', id: 'client-a' } });
-    if (init.method === 'PUT') {
-      state.remote = { ...JSON.parse(init.body), id: 'remote-a' };
+    if (url.includes('/Patient?')) return Response.json({ resourceType:'Bundle', total:state.remote ? 1 : 0,
+      entry:state.remote ? [{resource:state.remote}] : [] });
+    if (init.method === 'PUT' || init.method === 'POST') {
+      state.remote = { ...JSON.parse(init.body), id: 'remote-a', meta:{versionId:'version-'+(state.calls.length)} };
       if (options.changeInFlight) state.patient.fullName = 'Changed synthetic name';
       if (options.changeConnection) state.updatedAt = new Date('2026-11-07Z');
       if (options.lost && !state.lost) { state.lost = true; throw new Error('lost response with PRIVATE token'); }
@@ -73,12 +76,12 @@ function harness(options = {}) {
   return { state, request, adapter };
 }
 
-test('scoped export uses lossless mapper, explicit identifier conditional PUT and verified readback', async () => {
+test('scoped export uses lossless mapper, explicit identifier conditional creation and verified readback', async () => {
   const h = harness(); const response = await h.request();
   assert.equal(response.status, 200); assert.equal(response.headers.get('cache-control'), 'no-store');
   assert.equal((await response.json()).status, 'VERIFIED');
-  const put = h.state.calls.find(call => call.init.method === 'PUT');
-  assert.equal(new URL(put.url).searchParams.get('identifier'), 'https://codexdentist.com/fhir/organization/org-a/patient|synthetic-patient');
+  const put = h.state.calls.find(call => call.init.method === 'POST' && call.url.endsWith('/Patient'));
+  assert.equal(new URLSearchParams(put.init.headers['If-None-Exist']).get('identifier'), 'https://codexdentist.com/fhir/organization/org-a/patient|synthetic-patient');
   const body = JSON.parse(put.init.body);
   assert.deepEqual(body.name, [{ use: 'official', text: source.fullName }]);
   assert.equal(body.id, undefined);
@@ -113,8 +116,9 @@ test('lost response retains retry metadata and repeats same identity without dup
   const h = harness({ lost: true });
   assert.equal((await (await h.request()).json()).status, 'RETRY');
   assert.equal((await (await h.request()).json()).status, 'VERIFIED');
-  const puts = h.state.calls.filter(call => call.init.method === 'PUT');
-  assert.equal(puts[0].url, puts[1].url); assert.equal(puts[0].init.body, puts[1].init.body);
+  const writes = h.state.calls.filter(call => /\/(Patient|Patient\/remote-a)$/.test(call.url) && ['POST','PUT'].includes(call.init.method));
+  assert.equal(writes[0].init.method,'POST'); assert.equal(writes[1].init.method,'PUT');
+  assert.match(writes[1].init.headers['If-Match'],/^W\/"version-/);
   assert.equal(h.state.row.metadata.attempts, 2); assert.ok(!JSON.stringify(h.state.row).includes('PRIVATE'));
 });
 test('patient edit in flight or after verified export never claims current sync', async () => {
@@ -125,10 +129,41 @@ test('patient edit in flight or after verified export never claims current sync'
 test('credential replacement during flight cannot verify current binding', async () => {
   const h = harness({ changeConnection: true }); assert.equal((await (await h.request()).json()).status, 'SOURCE_CHANGED');
 });
+
+test('a configuration change with the same timestamp is fenced before provider access', async () => {
+  for (const metadata of [{configurationVersion:'version-B',verifiedVersion:'version-B',providerIdentity:'Project/project-a'},
+    {configurationVersion:'version-A',verifiedVersion:'old',providerIdentity:'Project/project-a'},
+    {configurationVersion:'version-A',verifiedVersion:'version-A',providerIdentity:'Project/other'}]) {
+    const h = harness({reservationConnection:{metadata}});
+    assert.equal((await h.request()).status,409); assert.equal(h.state.calls.length,0);
+  }
+});
+
+test('late export cannot overwrite newer remote demographics after concurrent source updates', async () => {
+  let remote = {resourceType:'Patient',id:'remote-a',meta:{versionId:'v1'},identifier:[{system:'urn:qa',value:'patient'}],name:[{text:'initial'}]};
+  let readers=0, bothRead, newerDone;
+  const aligned = new Promise(resolve=>{bothRead=resolve}), committed = new Promise(resolve=>{newerDone=resolve});
+  const api = load('src/integrations/medplum/client.ts',{'@/integrations/optional-http':{optionalProviderFetch:async(url,init)=>{
+    if(url.endsWith('/oauth2/token'))return Response.json({token_type:'Bearer',access_token:'synthetic'});
+    if(url.endsWith('/auth/me'))return Response.json({project:{resourceType:'Project',id:'project-a'},profile:{resourceType:'ClientApplication',id:'client-a'}});
+    if(url.includes('/Patient?')){const snapshot=copy(remote);if(++readers===2)bothRead();await aligned;return Response.json({resourceType:'Bundle',entry:[{resource:snapshot}],total:1});}
+    if(init.method==='PUT'){
+      const body=JSON.parse(init.body);if(body.name[0].text==='older')await committed;
+      if(init.headers['If-Match']!==`W/"${remote.meta.versionId}"`)return Response.json({}, {status:412});
+      remote={...body,meta:{versionId:'v2'}};newerDone();return Response.json(remote);
+    }
+    return Response.json(remote);
+  }}});
+  const identity={system:'urn:qa',value:'patient'};
+  const results=await Promise.allSettled(['older','newer'].map(text=>api.upsertMedplumPatient(secrets,
+    {resourceType:'Patient',identifier:[identity],name:[{text}]},identity)));
+  assert.equal(results[0].status,'rejected');assert.match(results[0].reason.message,/medplum-identity-conflict/);
+  assert.equal(results[1].status,'fulfilled');assert.equal(remote.name[0].text,'newer');
+});
 test('concurrent attempts reserve only one external write', async () => {
   const h = harness(); const responses = await Promise.all([h.request(), h.request()]);
   assert.deepEqual(responses.map(r => r.status).sort(), [200, 409]);
-  assert.equal(h.state.calls.filter(c => c.init.method === 'PUT').length, 1);
+  assert.equal(h.state.calls.filter(c => /\/(Patient|Patient\/remote-a)$/.test(c.url) && ['POST','PUT'].includes(c.init.method)).length, 1);
 });
 test('project mismatch never sends patient data', async () => {
   const h = harness({ projectId: 'wrong-project' });
@@ -158,7 +193,8 @@ for (const scenario of ['rejection', 'invalid-token', 'malformed', 'readback-mis
       if (url.endsWith('/oauth2/token')) return Response.json({ token_type: 'Bearer', access_token: scenario === 'invalid-token' ? '' : 'synthetic' });
       if (url.endsWith('/auth/me')) return Response.json({ project: { resourceType: 'Project', id: 'project-a' }, profile: { resourceType: 'ClientApplication', id: 'client-a' } });
       if (scenario === 'malformed') return new Response('PRIVATE');
-      if (init.method === 'PUT') { state.remote = { ...JSON.parse(init.body), id: 'remote-a' }; return Response.json(state.remote); }
+      if (url.includes('/Patient?')) return Response.json({resourceType:'Bundle',entry:[]});
+      if (init.method === 'PUT' || init.method === 'POST') { state.remote = { ...JSON.parse(init.body), id: 'remote-a' }; return Response.json(state.remote); }
       return Response.json({ ...state.remote, name: [{ text: 'different' }] });
     } });
     const response = await h.request(); const body = await response.json();
@@ -181,11 +217,15 @@ test('real adapter loopback contract: OAuth Basic, project identity, conditional
     }
     assert.equal(req.headers.authorization, 'Bearer loopback-token');
     if (req.url === '/auth/me') { res.end(JSON.stringify({ project: { resourceType: 'Project', id: 'project-a' }, profile: { resourceType: 'ClientApplication', id: 'client-a' } })); return; }
-    if (req.method === 'PUT') {
-      const identity = new URL(req.url, 'http://localhost').searchParams.get('identifier');
-      assert.equal(identity, 'urn:synthetic|patient-a');
+    if (req.url.startsWith('/fhir/R4/Patient?')) {
+      assert.equal(new URL(req.url,'http://localhost').searchParams.get('identifier'),'urn:synthetic|patient-a');
+      res.end(JSON.stringify({resourceType:'Bundle',entry:[...patients.values()].map(resource=>({resource})),total:patients.size})); return;
+    }
+    if (req.method === 'PUT' || req.method === 'POST') {
+      if (req.method === 'POST') assert.equal(new URLSearchParams(req.headers['if-none-exist']).get('identifier'),'urn:synthetic|patient-a');
+      else assert.equal(req.headers['if-match'],'W/"v1"');
       if (mode === 'conflict') { res.writeHead(412).end('{}'); return; }
-      const patient = { ...JSON.parse(body), id: 'remote-a' }; patients.set(identity, patient);
+      const patient = { ...JSON.parse(body), id: 'remote-a',meta:{versionId:'v1'} }; patients.set('urn:synthetic|patient-a', patient);
       if (mode === 'lost') { req.socket.destroy(); return; }
       res.end(JSON.stringify(patient)); return;
     }

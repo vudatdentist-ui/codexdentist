@@ -53,8 +53,26 @@ export async function upsertMedplumPatient(secrets: Record<string, string>, pati
   const { config, headers } = await authenticate(secrets);
   const { id: _localId, ...body } = patient;
   const query = new URLSearchParams({ identifier: `${identity.system}|${identity.value}` });
-  const result = await request(`${config.baseUrl}/fhir/R4/Patient?${query}`, { method: "PUT",
-    headers: { ...headers, "Content-Type": "application/fhir+json", Prefer: "return=representation" }, body: JSON.stringify(body) });
+  const search = await request(`${config.baseUrl}/fhir/R4/Patient?${query}&_count=2`, { headers });
+  if (search.resourceType !== "Bundle" || !Array.isArray(search.entry ?? []) || (search.entry?.length ?? 0) > 1 ||
+      (typeof search.total === "number" && search.total > (search.entry?.length ?? 0))) fail("medplum-identity-conflict");
+  const existing = search.entry?.[0]?.resource;
+  const writes: Record<string, string> = { ...headers, "Content-Type": "application/fhir+json", Prefer: "return=representation" };
+  let path = "Patient", method = "POST", payload: Record<string, unknown> = body;
+  if (existing) {
+    const version = existing.meta?.versionId;
+    if (existing.resourceType !== "Patient" || !/^[A-Za-z0-9.-]{1,64}$/.test(existing.id ?? "") ||
+        !/^[A-Za-z0-9.-]{1,128}$/.test(version ?? "") || !Array.isArray(existing.identifier) ||
+        !existing.identifier.some((v: { system?: string; value?: string }) => v.system === identity.system && v.value === identity.value)) fail("medplum-identity-conflict");
+    path += `/${existing.id}`; method = "PUT"; payload = { ...body, id: existing.id };
+    writes["If-Match"] = `W/"${version}"`;
+  } else {
+    // Conditional creation never overwrites a concurrent newer version. An old
+    // timed-out request must not replace newer demographics after a lease expires.
+    writes["If-None-Exist"] = query.toString();
+  }
+  const result = await request(`${config.baseUrl}/fhir/R4/${path}`, { method,
+    headers: writes, body: JSON.stringify(payload) });
   if (result.resourceType !== "Patient" || typeof result.id !== "string" || !/^[A-Za-z0-9.-]{1,64}$/.test(result.id)) fail("medplum-response-invalid");
   const verified = await request(`${config.baseUrl}/fhir/R4/Patient/${result.id}`, { headers });
   if (verified.resourceType !== "Patient" || verified.id !== result.id || !Array.isArray(verified.identifier) ||

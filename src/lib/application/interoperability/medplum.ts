@@ -10,7 +10,7 @@ import { loadOptionalProviderConnection } from "@/lib/application/integrations/o
 import { toFhirPatient } from "@/integrations/fhir/patient";
 import { fail, medplumConfig, upsertMedplumPatient } from "@/integrations/medplum/client";
 import type { MedplumPatientWorkspace, MedplumSyncStatus } from "@/features/integrations/medplum";
-import type { ExternalReferenceRecord } from "@/infrastructure/integrations/phase3-store";
+import { referenceMetadata, type IntegrationConnectionRecord, type ExternalReferenceRecord } from "@/infrastructure/integrations/phase3-store";
 
 type SyncMetadata = { status: MedplumSyncStatus; attempts: number; attemptId: string; sourceHash: string; targetHash: string;
   lastAttemptAt: string; lastVerifiedAt: string | null; errorCode: string | null };
@@ -23,6 +23,7 @@ async function context(session: AppSession, patientId: string) {
   if (!patientId || patientId.length > 128) fail("medplum-patient-invalid", 400);
   const patient = await prisma.patient.findFirst({ where: { ...patientAccessWhere(session), id: patientId }, select });
   if (!patient || !accessibleClinicIds(session).includes(patient.clinicId)) fail("medplum-patient-not-found", 404);
+  if (!canPerformAction({ ...session, activeClinicId: patient.clinicId }, "interop.patient.export")) fail("medplum-export-denied", 403);
   const binding = await loadOptionalProviderConnection(session, "medplum", patient.clinicId);
   const c = binding.connection;
   if (c.organizationId !== session.organizationId || (c.clinicId !== null && c.clinicId !== patient.clinicId) ||
@@ -56,11 +57,17 @@ export async function exportMedplumPatient(session: AppSession, patientId: strin
   const metadata = await runSerializableTransaction(async tx => {
     // Lock the connection to serialize initial reservation with key replacement;
     // network I/O happens only after this transaction has committed.
-    const connections = await tx.$queryRawUnsafe<{ updatedAt: Date; now: Date }[]>(
-      `SELECT "updatedAt", timezone('UTC', clock_timestamp()) AS now FROM "IntegrationConnection"
-       WHERE id=$1 AND "organizationId"=$2 AND status='ACTIVE' FOR UPDATE`, ctx.connection.id, session.organizationId);
+    const connections = await tx.$queryRawUnsafe<(IntegrationConnectionRecord & { now: Date })[]>(
+      `SELECT *, timezone('UTC', clock_timestamp()) AS now FROM "IntegrationConnection"
+       WHERE id=$1 AND "organizationId"=$2 AND provider='medplum' AND status='ACTIVE'
+       AND ("clinicId" IS NULL OR "clinicId"=$3) FOR UPDATE`, ctx.connection.id, session.organizationId, ctx.patient.clinicId);
     const connection = connections[0];
     if (!connection || connection.updatedAt.getTime() !== ctx.connection.updatedAt.getTime()) fail("medplum-connection-changed", 409);
+    const currentVersion = referenceMetadata(connection), capturedVersion = referenceMetadata(ctx.connection);
+    if (connection.secretRef !== "vault:v1" || !connection.lastVerifiedAt || !currentVersion.configurationVersion ||
+        currentVersion.verifiedVersion !== currentVersion.configurationVersion ||
+        currentVersion.configurationVersion !== capturedVersion.configurationVersion ||
+        !currentVersion.providerIdentity || currentVersion.providerIdentity !== capturedVersion.providerIdentity) fail("medplum-connection-changed", 409);
     const rows = await tx.$queryRawUnsafe<ExternalReferenceRecord[]>(`SELECT * FROM "ExternalReference" WHERE id=$1 AND "organizationId"=$2 FOR UPDATE`, ctx.id, session.organizationId);
     const previous = rows[0]?.metadata as SyncMetadata | undefined;
     if (previous?.status === "PENDING" && connection.now.getTime() - Date.parse(previous.lastAttemptAt) < 300_000) fail("medplum-export-in-progress", 409);
