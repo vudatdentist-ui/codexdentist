@@ -1,5 +1,5 @@
 import "server-only";
-import { randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import type { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
@@ -20,8 +20,9 @@ function manage(session: AppSession, clinicId?: unknown, mutate = false) {
   if (!canPerformAction(session, "settings.manage")) optionalProviderFail("forbidden", 403);
   if (mutate && session.isDemo) optionalProviderFail("integration-demo-unavailable", 403);
   if (clinicId === undefined) return;
-  if (clinicId === null && hasAnyRole(session, ["OWNER", "AREA_MANAGER"])) return;
-  if (typeof clinicId !== "string" || !accessibleClinicIds(session).includes(clinicId)) optionalProviderFail("integration-clinic-forbidden", 403);
+  if (clinicId === null && hasAnyRole({ ...session, activeClinicId: null }, ["OWNER", "AREA_MANAGER"])) return;
+  if (typeof clinicId !== "string" || !accessibleClinicIds(session).includes(clinicId) ||
+      !canPerformAction({ ...session, activeClinicId: clinicId }, "settings.manage")) optionalProviderFail("integration-clinic-forbidden", 403);
 }
 async function connectionAt(db: DB, org: string, provider: OptionalProvider, clinicId: string | null, lock = false) {
   const rows = await db.$queryRawUnsafe<IntegrationConnectionRecord[]>(`SELECT * FROM "IntegrationConnection"
@@ -30,7 +31,7 @@ async function connectionAt(db: DB, org: string, provider: OptionalProvider, cli
 }
 async function hasReferences(db: DB, connection: IntegrationConnectionRecord) {
   const rows = await db.$queryRawUnsafe<Array<{ linked: boolean }>>(`SELECT EXISTS(SELECT 1 FROM "ExternalReference"
-    WHERE "organizationId"=$1 AND "connectionId"=$2 AND "provider"=$3) AS linked`, connection.organizationId, connection.id, connection.provider);
+    WHERE "organizationId"=$1 AND "connectionId"=$2 AND "provider"=$3 AND "entityType"<>'PROVIDER_ACCOUNT') AS linked`, connection.organizationId, connection.id, connection.provider);
   return rows[0]?.linked === true;
 }
 function isVerified(connection: IntegrationConnectionRecord) {
@@ -38,9 +39,11 @@ function isVerified(connection: IntegrationConnectionRecord) {
   return connection.secretRef === "vault:v1" && Boolean(connection.lastVerifiedAt) && typeof metadata.configurationVersion === "string" &&
     metadata.verifiedVersion === metadata.configurationVersion && typeof metadata.providerIdentity === "string" && Boolean(metadata.providerIdentity);
 }
+export { isVerified as optionalConnectionIsVerified };
 export async function getOptionalProviderSettings(session: AppSession, definition: OptionalProviderDefinition): Promise<OptionalProviderWorkspace> {
   manage(session);
-  const clinics = session.clinics.filter(clinic => accessibleClinicIds(session).includes(clinic.id)).map(({ id, name }) => ({ id, name }));
+  const clinics = session.clinics.filter(clinic => accessibleClinicIds(session).includes(clinic.id) &&
+    canPerformAction({ ...session, activeClinicId: clinic.id }, "settings.manage")).map(({ id, name }) => ({ id, name }));
   const rows = await prisma.$queryRawUnsafe<IntegrationConnectionRecord[]>(`SELECT * FROM "IntegrationConnection"
     WHERE "organizationId"=$1 AND "provider"=$2 AND ("clinicId" IS NULL OR "clinicId"=ANY($3::text[])) ORDER BY "createdAt"`,
     session.organizationId, definition.provider, clinics.map(clinic => clinic.id));
@@ -54,7 +57,7 @@ function credentialsFor(definition: OptionalProviderDefinition, value: unknown) 
   const entries = value as Record<string, unknown>, secrets: Record<string, string> = {};
   if (Object.keys(entries).some(key => !definition.fields.some(field => field.key === key))) optionalProviderFail("integration-input-invalid");
   for (const field of definition.fields) {
-    const input = entries[field.key];
+    const input = entries[field.key] ?? field.defaultValue;
     if ((input === undefined || input === "") && !field.required) { secrets[field.key] = ""; continue; }
     if (typeof input !== "string" || !input.trim() || input.length > 4096 || /[\u0000-\u001f\u007f]/.test(input)) optionalProviderFail("integration-credential-invalid");
     secrets[field.key] = field.secret ? input : input.trim();
@@ -107,9 +110,20 @@ export async function configureOptionalProvider(session: AppSession, definition:
           referenceMetadata(current).configurationVersion !== captured.metadata.configurationVersion) optionalProviderFail("integration-configuration-changed", 409);
       const version = action === "rotate" ? randomUUID() : captured.metadata.configurationVersion;
       if (typeof version !== "string") optionalProviderFail("integration-use-provider-settings", 409);
+      // The global primary key, rather than a read-before-write check, arbitrates
+      // concurrent claims by different organizations. Shared clinics in the same
+      // organization remain valid. Retain ownership until reviewed account transfer.
+      const bindingHash = createHash("sha256").update(JSON.stringify([definition.provider, captured.secrets.baseUrl, observed.identity])).digest("hex");
+      const bindings = await tx.$queryRawUnsafe<Array<{ id: string }>>(`INSERT INTO "ExternalReference"
+        ("id","organizationId","clinicId","connectionId","provider","entityType","internalId","externalId","metadata","createdAt","updatedAt")
+        VALUES ($1,$2,NULL,NULL,$3,'PROVIDER_ACCOUNT',$4,$4,'{}'::jsonb,timezone('UTC',clock_timestamp()),timezone('UTC',clock_timestamp()))
+        ON CONFLICT ("id") DO UPDATE SET "updatedAt"=timezone('UTC',clock_timestamp())
+        WHERE "ExternalReference"."organizationId"=EXCLUDED."organizationId" AND "ExternalReference"."provider"=EXCLUDED."provider"
+        RETURNING "id"`, `provider-account-${bindingHash}`, session.organizationId, definition.provider, bindingHash);
+      if (bindings.length !== 1) optionalProviderFail("integration-account-owned-by-other-organization", 409);
       await upsertIntegrationConnection(tx, { organizationId: session.organizationId, clinicId, provider: definition.provider, status: "ACTIVE",
         lastVerifiedAt: new Date(), metadata: { ...referenceMetadata(current), configurationVersion: version,
-          verifiedVersion: version, providerIdentity: observed.identity } });
+          verifiedVersion: version, providerIdentity: observed.identity, providerBindingHash: bindingHash } });
       if (submitted) await writeIntegrationSecrets(tx, { organizationId: session.organizationId, connectionId: current.id, provider: definition.provider }, submitted);
       await tx.auditLog.create({ data: { organizationId: session.organizationId, actorId: session.userId, action: `integration.${definition.provider}_${action}`,
         entityType: "IntegrationConnection", entityId: current.id, metadata: { clinicId, credentialsChanged: action === "rotate" } } });

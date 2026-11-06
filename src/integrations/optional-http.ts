@@ -22,7 +22,7 @@ export function assertOptionalProviderUrl(value: string): URL {
   // cannot grant approval by submitting an origin in their connection settings.
   if (url.protocol === "http:" && !["localhost", "127.0.0.1", "[::1]",
     "codexdentist-orthanc", "codexdentist-chatwoot", "codexdentist-novu", "codexdentist-medplum",
-    "codexdentist-documenso"].includes(url.hostname)) return reject();
+    "codexdentist-documenso", "codexdentist-ohif", "codexdentist-ollama"].includes(url.hostname)) return reject();
   return url;
 }
 export function optionalProviderBaseUrl(value: string) {

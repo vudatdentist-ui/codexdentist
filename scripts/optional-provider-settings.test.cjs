@@ -10,7 +10,7 @@ const owner = { userId: 'owner-a', organizationId: 'org-a', role: 'OWNER', roles
   clinicIds: ['clinic-a'], clinics: [{ id: 'clinic-a', name: 'Synthetic' }], activeClinicId: null };
 const credentials = { baseUrl: 'https://provider.test', accountId: '1', apiToken: 'synthetic-private-key' };
 function fixture() {
-  let row = null, stored = null, references = false, depth = 0, demo = false;
+  let row = null, stored = null, references = false, depth = 0, demo = false, boundOrg = null;
   const audits = [], calls = { reads: 0, writes: 0, secretReads: 0 };
   const db = {
     organization: { findUnique: async () => ({ isDemo: demo }) },
@@ -18,6 +18,12 @@ function fixture() {
     auditLog: { create: async input => { audits.push(structuredClone(input.data)); } },
     $queryRawUnsafe: async (sql, ...params) => {
       calls.reads++;
+      if (sql.includes("'PROVIDER_ACCOUNT'") && sql.includes('INSERT INTO')) {
+        assert.match(sql, /ON CONFLICT \("id"\)/);
+        assert.match(sql, /"organizationId"=EXCLUDED\."organizationId"/);
+        if (boundOrg && boundOrg !== params[1]) return [];
+        boundOrg = params[1]; return [{ id: params[0] }];
+      }
       if (sql.includes('AS linked')) { assert.deepEqual(params, ['org-a', 'connection-a', 'chatwoot']); return [{ linked: references }]; }
       if (sql.includes('IntegrationConnection')) {
         if (sql.includes('"provider" = $2')) return row?.status === 'ACTIVE' ? [structuredClone(row)] : [];
@@ -47,7 +53,7 @@ function fixture() {
   const change = (action, input = {}, session = owner, probe = verify) => api.configureOptionalProvider(session, definition,
     { clinicId: 'clinic-a', action, ...(action === 'save' || action === 'rotate' ? { credentials } : {}), ...input }, probe);
   return { api, calls, audits, change, verify, row: () => row, stored: () => stored,
-    references: value => { references = value; }, demo: value => { demo = value; } };
+    references: value => { references = value; }, demo: value => { demo = value; }, boundOrg: value => { boundOrg = value; } };
 }
 test('saved optional credentials remain disabled, are not read back, and require actual verification', async () => {
   const h = fixture(); const saved = await h.change('save');
@@ -69,6 +75,17 @@ test('verification failure cannot activate or replace saved credentials', async 
   await assert.rejects(h.change('verify', {}, owner, async () => { throw new Error('synthetic provider outage'); }));
   assert.equal(h.row().status, 'DISABLED'); assert.equal(h.row().lastVerifiedAt, null);
 });
+
+test('a manager in one clinic cannot configure an accessible clinic where assigned only dentist', async () => {
+  const h = fixture();
+  const session = { ...owner, role: 'CLINIC_MANAGER', roles: ['CLINIC_MANAGER', 'DENTIST'], activeClinicId: 'clinic-b',
+    clinicIds: ['clinic-a', 'clinic-b'], roleAssignments: [
+      { role: 'CLINIC_MANAGER', organizationId: 'org-a', clinicId: 'clinic-b' },
+      { role: 'DENTIST', organizationId: 'org-a', clinicId: 'clinic-a' }] };
+  await assert.rejects(h.change('save', {}, session), { code: 'integration-clinic-forbidden' });
+  assert.equal(h.calls.reads + h.calls.writes, 0);
+  assert.equal((await h.api.getOptionalProviderSettings(session, definition)).clinics.length, 0);
+});
 for (const action of ['save', 'disable']) test(`${action} during verification prevents stale activation even with identical timestamps`, async () => {
   const h = fixture(); await h.change('save');
   await assert.rejects(h.change('verify', {}, owner, async () => { await h.change(action); return { identity: 'account:1' }; }), { code: 'integration-configuration-changed' });
@@ -89,4 +106,9 @@ test('worker loader validates canonical demo and clinic ownership before reading
   h.demo(true);
   await assert.rejects(h.api.loadOptionalProviderConnectionForScope({ organizationId: 'org-a', clinicId: 'clinic-a' }, 'chatwoot'), { code: 'integration-demo-unavailable' });
   assert.equal(h.calls.secretReads, before);
+});
+test('the same external account cannot activate in another organization', async () => {
+  const h = fixture(); await h.change('save'); h.boundOrg('org-b');
+  await assert.rejects(h.change('verify'), { code: 'integration-account-owned-by-other-organization' });
+  assert.equal(h.row().status, 'DISABLED'); assert.equal(h.row().lastVerifiedAt, null);
 });

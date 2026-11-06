@@ -33,13 +33,16 @@ export function OptionalProviderSettingsPanel({ provider }: { provider: Optional
     try {
       const response = await fetch(endpoint, { method: "POST", headers: { "Content-Type": "application/json" },
         signal: AbortSignal.timeout(60000), body: JSON.stringify({ action, clinicId: scope || null,
-          ...(["save", "rotate"].includes(action) ? { credentials: fields } : {}) }) });
+          ...(["save", "rotate"].includes(action) ? { credentials: Object.fromEntries(workspace!.definition.fields.map(field =>
+            [field.key, fields[field.key] ?? field.defaultValue ?? ""])) } : {}) }) });
       const result = await response.json().catch(() => null) as (OptionalProviderWorkspace & { error?: string }) | null;
       if (!mounted.current) return;
       if (!response.ok || !result?.definition) {
         const code = result?.error;
         setError(code === "integration-use-credential-rotation" || code === "integration-account-binding-mismatch"
           ? (vi ? "Kết nối đã có dữ liệu liên kết. Chỉ thay khóa cho cùng máy chủ và tài khoản đã xác minh." : "Linked data exists. Rotate keys only for the same verified server and account.")
+          : code === "integration-account-owned-by-other-organization"
+            ? (vi ? "Tài khoản dịch vụ này đã thuộc tổ chức khác. Dùng tài khoản riêng của phòng khám." : "This service account belongs to another organization. Use your clinic's own account.")
           : code === "integration-origin-not-allowed"
             ? (vi ? "Địa chỉ dịch vụ chưa được quản trị hệ thống cho phép. Kiểm tra địa chỉ máy chủ tự host." : "This service address is not approved by the system operator. Check your self-hosted server.")
             : code === "integration-configuration-changed"
@@ -72,8 +75,11 @@ export function OptionalProviderSettingsPanel({ provider }: { provider: Optional
     <fieldset className={styles.credentials} disabled={disabled}><legend>{vi ? "Thông tin kết nối" : "Connection details"}</legend>
       <p className={styles.description}>{vi ? "Thông tin được mã hóa và không hiển thị lại. Lưu thông tin chưa đồng nghĩa với kết nối đã hoạt động." : "Details are encrypted and never read back. Saving does not mean the service is operational."}</p>
       <div className={styles.fields}>{workspace?.definition.fields.map(field => <label key={field.key} className={styles.field} htmlFor={`${id}-${field.key}`}>{field.label}
-        <input id={`${id}-${field.key}`} type={field.secret ? "password" : "text"} value={fields[field.key] ?? ""} autoComplete="off" spellCheck={false}
-          maxLength={4096} required={field.required} onChange={event => setFields(current => ({ ...current, [field.key]: event.target.value }))} />
+        {field.options ? <select id={`${id}-${field.key}`} value={fields[field.key] ?? field.defaultValue ?? ""}
+          onChange={event => setFields(current => ({ ...current, [field.key]: event.target.value }))}>
+          {field.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+          : <input id={`${id}-${field.key}`} type={field.secret ? "password" : "text"} value={fields[field.key] ?? field.defaultValue ?? ""} autoComplete="off" spellCheck={false}
+            maxLength={4096} required={field.required} onChange={event => setFields(current => ({ ...current, [field.key]: event.target.value }))} />}
       </label>)}</div>
       <div className={styles.actions}><button type="button" className={styles.primary} onClick={() => change(connection?.hasReferences ? "rotate" : "save")}>
         {pending ? (vi ? "Đang xử lý…" : "Working…") : connection?.hasReferences ? (vi ? "Xác minh và thay khóa cùng tài khoản" : "Verify and rotate same-account keys") : (vi ? "Lưu kết nối" : "Save connection")}</button></div>
