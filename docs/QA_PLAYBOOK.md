@@ -58,6 +58,13 @@ real purge SQL under billing constraints, and proves an unrelated tenant survive
 
 ## 1. Universal Baseline Gate
 
+FHIR changes run `test:phase6`: assert unstructured names retain their text across
+Vietnamese, multipart international and single-token examples without guessed
+family/given fields. The real export command/route regressions also check disabled,
+unauthenticated, denied-role, tenant/clinic/missing-record and failed-audit responses,
+FHIR media type/no-store and the PHI-minimized export audit. The source-loader
+replaces database/session I/O only; permission, scope and mapping code stay real.
+
 Run before and after every non-trivial phase/change:
 
 ```bash

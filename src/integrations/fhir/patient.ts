@@ -9,13 +9,14 @@ export type FhirPatientSource = {
 };
 
 export function toFhirPatient(patient: FhirPatientSource) {
-  const [family, ...given] = patient.fullName.trim().split(/\s+/).reverse();
+  // The canonical record stores an unstructured full name. Its family/given
+  // boundaries cannot be inferred safely across cultures (including Viet Nam).
   return {
     resourceType: "Patient",
     id: patient.id,
     meta: { profile: ["https://codexdentist.com/fhir/StructureDefinition/codexdentist-patient"] },
     identifier: [{ system: "https://codexdentist.com/fhir/patient", value: patient.id }],
-    name: [{ use: "official", family: family || patient.fullName, given: given.reverse() }],
+    name: [{ use: "official", text: patient.fullName.trim() }],
     ...(patient.gender ? { gender: mapGender(patient.gender) } : {}),
     ...(patient.dateOfBirth ? { birthDate: patient.dateOfBirth.toISOString().slice(0, 10) } : {}),
     telecom: [

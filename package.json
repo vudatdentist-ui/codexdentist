@@ -96,7 +96,7 @@
     "test:phase4:scope": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/phase4-imaging-scope-smoke.mjs",
     "test:phase5": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/phase5-lab-smoke.mjs",
     "test:phase5:sterilization": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/phase5-sterilization-smoke.mjs",
-    "test:phase6": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/phase6-fhir-smoke.mjs",
+    "test:phase6": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/phase6-fhir-smoke.mjs && node --test scripts/fhir-export-regression.test.cjs",
     "test:api-contract": "node scripts/api-contract-smoke.mjs",
     "test:disposable-restore": "node scripts/disposable-postgres-restore-smoke.mjs",
     "test:domain-operations": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-transform-types --experimental-loader ./scripts/ts-alias-loader.mjs scripts/domain-operations-smoke.mjs && node scripts/phase5-operator-contract-smoke.mjs"
