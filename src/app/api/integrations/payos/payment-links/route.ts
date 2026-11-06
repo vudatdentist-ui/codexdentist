@@ -3,7 +3,7 @@ import { appBaseUrl } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { hasSameOrigin } from "@/lib/request-security";
 import { getPayOSInvoice, reservePayOSOrder } from "@/lib/application/integrations/payos-orders";
-import { referenceMetadata, updateExternalReferenceMetadataWithRetry } from "@/infrastructure/integrations/phase3-store";
+import { getExternalReferenceByExternalId, referenceMetadata, updateExternalReferenceMetadataWithRetry } from "@/infrastructure/integrations/phase3-store";
 import { createPayOSPaymentLink, PayOSProviderError, type PayOSPaymentLink } from "@/integrations/payos/client";
 import { payOSConnectionSecrets } from "../connection-secrets";
 import { payOSJson, payOSError, payOSRequestBody } from "../http";
@@ -43,13 +43,26 @@ export async function POST(request: Request) {
       // The full unique order code remains the canonical payment identity.
       description: `CDX${intent.externalId.slice(-6)}`, cancelUrl: `${base}/billing?payos=cancelled`,
       returnUrl: `${base}/billing?payos=returned`, expiredAt: Math.floor(Date.now() / 1000) + 24 * 60 * 60 });
-    await updateExternalReferenceMetadataWithRetry(prisma, intent.id, { ...previous, status: "PENDING",
+    const persisted = await updateExternalReferenceMetadataWithRetry(prisma, intent.id, { ...previous, status: "PENDING",
       paymentLinkId: created.paymentLinkId, checkoutUrl: created.checkoutUrl, qrCode: created.qrCode, providerStatus: created.status });
+    const durable = referenceMetadata(persisted);
+    if (durable.status === "CANCELLED" || durable.status === "SETTLED") {
+      return terminalResponse(Number(intent.externalId), durable);
+    }
     await prisma.auditLog.create({ data: { organizationId: session.organizationId, actorId: session.userId,
       action: "payos.payment_link_created", entityType: "ExternalReference", entityId: intent.id,
       metadata: { clinicId: intent.clinicId, patientId: input.patientId, invoiceNo: input.invoiceNo,
         orderCode: Number(intent.externalId), amount: input.amount, paymentLinkId: created.paymentLinkId } } });
-    return payOSJson({ ...created, duplicate: false });
+    const latest = await getExternalReferenceByExternalId(prisma, { organizationId: session.organizationId,
+      connectionId: intent.connectionId!, provider: "payos", entityType: "PAYOS_ORDER", externalId: intent.externalId });
+    if (!latest) return payOSJson({ error: "payos-payment-link-pending-recovery" }, 409);
+    const latestMetadata = referenceMetadata(latest);
+    if (latestMetadata.status === "CANCELLED" || latestMetadata.status === "SETTLED") {
+      return terminalResponse(Number(intent.externalId), latestMetadata);
+    }
+    const moneyReported = Number(latestMetadata.providerAmountPaid ?? 0) > 0 || latestMetadata.providerStatus === "PAID";
+    return payOSJson({ ...created, ...(moneyReported ? { checkoutUrl: null, qrCode: null,
+      providerStatus: latestMetadata.providerStatus ?? null, providerAmountPaid: latestMetadata.providerAmountPaid ?? null } : {}), duplicate: false });
   } catch (cause) {
     // Retain an authenticated provider response if a later DB/audit step fails.
     const rejected = cause instanceof PayOSProviderError && cause.code === "payos-payment-link-create-failed" &&
@@ -57,10 +70,19 @@ export async function POST(request: Request) {
     // A rejection of this attempt says nothing about a previously timed-out
     // creation. Never permit merchant replacement while that order may exist.
     const uncertain = previous.creationUncertain === true || previous.status === "ERROR" || !rejected;
-    await updateExternalReferenceMetadataWithRetry(prisma, intent.id, { ...previous,
+    const persisted = await updateExternalReferenceMetadataWithRetry(prisma, intent.id, { ...previous,
       creationUncertain: !created && uncertain,
       status: created ? "PENDING" : uncertain ? "ERROR" : "FAILED", ...(created ? { paymentLinkId: created.paymentLinkId,
         checkoutUrl: created.checkoutUrl, qrCode: created.qrCode, providerStatus: created.status } : {}) });
+    const durable = persisted && referenceMetadata(persisted);
+    if (durable && (durable.status === "CANCELLED" || durable.status === "SETTLED")) {
+      return terminalResponse(Number(intent.externalId), durable);
+    }
     return payOSError(cause);
   }
+}
+
+function terminalResponse(orderCode: number, metadata: Record<string, unknown>) {
+  return payOSJson({ orderCode, paymentLinkId: metadata.paymentLinkId ?? null,
+    checkoutUrl: null, qrCode: null, status: metadata.status, duplicate: true });
 }

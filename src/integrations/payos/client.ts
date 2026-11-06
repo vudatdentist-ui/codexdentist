@@ -111,6 +111,52 @@ export async function createPayOSPaymentLink(
   };
 }
 
+export type PayOSPaymentLinkStatus = "PENDING" | "CANCELLED" | "UNDERPAID" | "PAID" | "EXPIRED" | "PROCESSING" | "FAILED";
+export type PayOSPaymentLinkObservation = {
+  paymentLinkId: string; orderCode: number; amount: number;
+  amountPaid: number; amountRemaining: number; status: PayOSPaymentLinkStatus;
+};
+
+// GET uses data.id (not paymentLinkId) and has no currency field. Authenticate
+// the entire data object, including transactions, before returning minimal data.
+export async function getPayOSPaymentLinkStatus(secrets: PayOSSecrets,
+  expected: { orderCode: number; amount: number; paymentLinkId: string | null },
+): Promise<PayOSPaymentLinkObservation> {
+  assertPositiveInteger(expected.orderCode, "payos-order-code-invalid");
+  assertPositiveInteger(expected.amount, "payos-amount-invalid");
+  let response: Response;
+  try {
+    response = await fetch(`${secrets.baseUrl}/v2/payment-requests/${expected.orderCode}`, {
+      method: "GET", headers: { "x-client-id": secrets.clientId, "x-api-key": secrets.apiKey },
+      cache: "no-store", signal: AbortSignal.timeout(20_000),
+    });
+  } catch {
+    throw new PayOSProviderError("payos-payment-link-status-unavailable", 503, "Payment status could not be confirmed");
+  }
+  const body = await safeJson(response);
+  if (!response.ok || body.code !== "00") {
+    throw new PayOSProviderError("payos-payment-link-status-unavailable", 502, "Payment status could not be confirmed");
+  }
+  const data = asRecord(body.data);
+  if (!safeHexEqual(String(body.signature ?? ""), signPayOSData(data, secrets.checksumKey))) {
+    throw new PayOSProviderError("payos-payment-link-status-signature-invalid", 502, "Invalid payment status signature");
+  }
+  const paymentLinkId = requiredString(data.id, "payos-payment-link-status-identity-mismatch");
+  if (data.id !== paymentLinkId || paymentLinkId.length > 128 || data.orderCode !== expected.orderCode || data.amount !== expected.amount ||
+      (expected.paymentLinkId !== null && paymentLinkId !== expected.paymentLinkId)) {
+    throw new PayOSProviderError("payos-payment-link-status-identity-mismatch", 502, "Payment status identity does not match the order");
+  }
+  if (!Number.isSafeInteger(data.amountPaid) || data.amountPaid < 0 ||
+      !Number.isSafeInteger(data.amountRemaining) || data.amountRemaining < 0 ||
+      data.amountRemaining !== Math.max(0, expected.amount - data.amountPaid) ||
+      (data.status === "PAID" && data.amountPaid < expected.amount) ||
+      !["PENDING", "CANCELLED", "UNDERPAID", "PAID", "EXPIRED", "PROCESSING", "FAILED"].includes(data.status)) {
+    throw new PayOSProviderError("payos-payment-link-status-invalid", 502, "Invalid payment status data");
+  }
+  return { paymentLinkId, orderCode: data.orderCode, amount: data.amount, amountPaid: data.amountPaid,
+    amountRemaining: data.amountRemaining, status: data.status as PayOSPaymentLinkStatus };
+}
+
 export async function confirmPayOSWebhook(secrets: PayOSSecrets, webhookUrl: string): Promise<void> {
   const response = await fetch(`${secrets.baseUrl}/confirm-webhook`, {
     method: "POST", headers: { "Content-Type": "application/json", "x-client-id": secrets.clientId, "x-api-key": secrets.apiKey },

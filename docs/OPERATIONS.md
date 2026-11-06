@@ -386,6 +386,17 @@ ambiguous provider error remains unresolved even if a later retry is rejected.
 Reconcile these requests against the original payOS channel before changing its
 keys; do not edit payment metadata manually or claim that the absence of a local
 receipt proves no payment exists. Enabling the same connection remains possible.
+Use **Kiểm tra với payOS** on an unresolved request to query its original merchant.
+The app validates the signed response and complete order identity. Confirmed
+cancelled/expired requests with zero paid amount stop displaying their QR and
+release the credential lock. A reported paid/partial amount hides the old QR and
+shows that reconciliation is pending; the status query never creates a receipt.
+Timeouts, missing orders, invalid signatures and paid cancellations leave the
+request unresolved. A calendar expiry alone is not cancellation proof. Already
+settled/retired history is not queried using replacement merchant credentials.
+This action does not cancel a link, issue a refund or record money. Continue to
+resolve disputed/partial payments against the original channel and canonical
+receipt workflow; do not force a metadata edit.
 The generic connections API rejects payOS writes; use the dedicated settings flow.
 Legacy `env:PAYOS_DEFAULT` additionally requires `PAYOS_DEFAULT_ORGANIZATION_ID`
 to bind those environment credentials to exactly one organization. Other tenants

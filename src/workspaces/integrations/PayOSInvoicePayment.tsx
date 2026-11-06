@@ -8,7 +8,7 @@ import styles from "./PayOSWorkspace.module.css";
 
 type Props = { patientId: string; invoiceNo: string; balance: number; language: "vi" | "en" };
 type Intent = { key: string; amount: number; completed: boolean };
-type CreatedOrder = { orderCode: number; paymentLinkId: string; checkoutUrl: string | null; qrCode: string | null; status: string; duplicate: boolean };
+type CreatedOrder = { orderCode: number; paymentLinkId: string; checkoutUrl: string | null; qrCode: string | null; status: string; duplicate: boolean; providerStatus?: string | null; providerAmountPaid?: number | null };
 const settingsUrl = "/settings?section=providers#payos";
 
 function PaymentCode({ value, vi }: { value: string; vi: boolean }) {
@@ -32,13 +32,15 @@ function PaymentCode({ value, vi }: { value: string; vi: boolean }) {
   return <img className={styles.qr} src={image} width={320} height={320} alt={vi ? "Mã QR thanh toán payOS" : "payOS payment QR code"} />;
 }
 
-function OrderCard({ order, vi, money, canPay }: { order: PayOSOrderSummary; vi: boolean; money: (value: number) => string; canPay: boolean }) {
+function OrderCard({ order, vi, money, canPay, checking, onCheck }: { order: PayOSOrderSummary; vi: boolean; money: (value: number) => string; canPay: boolean; checking: boolean; onCheck: () => void }) {
   const checkout = payOSCheckoutUrl(order.checkoutUrl);
   const settled = order.status === "SETTLED";
   const pending = ["PENDING", "CREATING", "CREATED", "PROCESSING"].includes(order.status);
+  const moneyReported = (order.providerAmountPaid ?? 0) > 0 || order.providerStatus === "PAID";
   const label = settled ? (vi ? "Đã ghi nhận thanh toán" : "Payment recorded")
     : order.status === "FAILED" ? (vi ? "Không tạo được yêu cầu" : "Request rejected")
     : order.status === "ERROR" ? (vi ? "Cần kiểm tra" : "Needs review")
+      : order.status === "CANCELLED" && order.providerStatus === "EXPIRED" ? (vi ? "Đã hết hạn" : "Expired")
       : order.status === "CANCELLED" || order.status === "CANCELED" ? (vi ? "Đã hủy" : "Cancelled")
         : order.status === "EXPIRED" ? (vi ? "Đã hết hạn" : "Expired")
           : pending || order.status === "PAID" ? (vi ? "Chờ xác nhận" : "Awaiting confirmation") : (vi ? "Đang kiểm tra" : "Checking status");
@@ -51,11 +53,13 @@ function OrderCard({ order, vi, money, canPay }: { order: PayOSOrderSummary; vi:
     {settled && <p className={styles.success}>{order.receiptNo
       ? `${vi ? "Phiếu thu" : "Receipt"}: ${order.receiptNo}`
       : (vi ? "Đã nhận xác nhận. Tải lại để xem phiếu thu." : "Confirmation received. Refresh to view the receipt.")}</p>}
-    {pending && code && canPay && <PaymentCode value={code} vi={vi} />}
-    {pending && checkout && canPay && <a href={checkout} target="_blank" rel="noopener noreferrer">{vi ? "Mở trang thanh toán payOS" : "Open payOS payment page"} ↗</a>}
+    {pending && code && canPay && !moneyReported && <PaymentCode value={code} vi={vi} />}
+    {pending && checkout && canPay && !moneyReported && <a href={checkout} target="_blank" rel="noopener noreferrer">{vi ? "Mở trang thanh toán payOS" : "Open payOS payment page"} ↗</a>}
+    {!settled && moneyReported && <p className={styles.note}>{vi ? "payOS báo đã nhận tiền. Khoản thu đang chờ đối soát; chưa có phiếu thu được ghi nhận cho yêu cầu này. Kiểm tra kênh thanh toán trước khi thu thêm." : "payOS reports money received. This request awaits reconciliation and has no recorded receipt yet. Check the payment channel before collecting more."}</p>}
     {pending && !canPay && <p className={styles.description}>{vi ? "Hóa đơn không còn khoản cần thu. Không sử dụng mã thanh toán trước đó." : "This invoice has no balance due. Do not use its earlier payment code."}</p>}
     {pending && !code && <p className={styles.description}>{vi ? "Chưa có mã thanh toán. Vui lòng tải lại trạng thái." : "The payment code is not available yet. Refresh the status."}</p>}
     {order.status === "ERROR" && <p className={styles.description}>{vi ? "Chưa ghi nhận khoản thu. Tải lại trạng thái trước khi tạo yêu cầu khác." : "No receipt has been recorded. Refresh the status before creating another request."}</p>}
+    {!settled && !["CANCELLED", "CANCELED", "FAILED"].includes(order.status) && !order.id.startsWith("created-") && <button type="button" className={styles.secondary} disabled={checking} onClick={onCheck}>{vi ? "Kiểm tra với payOS" : "Check with payOS"}</button>}
   </article>;
 }
 
@@ -113,9 +117,31 @@ function InvoicePayment({ patientId, invoiceNo, balance, language }: Props) {
   useEffect(() => { if (open && !busy.current) void load(); }, [open, load]);
   const parsedAmount = Number(amount);
   const validAmount = /^\d+$/.test(amount) && Number.isSafeInteger(parsedAmount) && parsedAmount > 0 && parsedAmount <= balance;
-  const canCreate = !!workspace?.configured && workspace.verified && validAmount && !loading && !pending && !intent?.completed;
+  const awaitingMoney = workspace?.orders.some(order => order.status !== "SETTLED" && ((order.providerAmountPaid ?? 0) > 0 || order.providerStatus === "PAID"));
+  const canCreate = !!workspace?.configured && workspace.verified && validAmount && !loading && !pending && !intent?.completed && !awaitingMoney;
   const orders = [...(workspace?.orders ?? [])];
   if (created && !orders.some(order => order.orderCode === created.orderCode)) orders.unshift(created);
+
+  async function check(order: PayOSOrderSummary) {
+    if (busy.current) return;
+    busy.current = true; setPending(true); setError(""); setNotice("");
+    try {
+      const response = await fetch(`/api/integrations/payos/payment-links/${encodeURIComponent(order.id)}/reconcile`, {
+        method: "POST", cache: "no-store", signal: AbortSignal.timeout(30000),
+      });
+      if (!response.ok) throw new Error(String(response.status));
+      const data = await response.json() as { status: string; providerStatus: string | null; amountPaid: number | null };
+      if (!mounted.current) return;
+      await load();
+      if (!mounted.current) return;
+      setNotice(data.status === "CANCELLED"
+        ? (vi ? "payOS xác nhận yêu cầu đã kết thúc và chưa nhận tiền. Mã cũ đã được ngừng hiển thị." : "payOS confirms the request ended without payment. Its old code is no longer shown.")
+        : (data.amountPaid ?? 0) > 0 || data.providerStatus === "PAID"
+          ? (vi ? "Đã kiểm tra. Khoản thu đang chờ đối soát; chưa tạo thêm phiếu thu." : "Checked. The payment awaits reconciliation; no additional receipt was created.")
+          : (vi ? "Đã kiểm tra trạng thái mới nhất từ payOS." : "Latest payOS status checked."));
+    } catch { if (mounted.current) setError(vi ? "Chưa đối chiếu được với payOS. Trạng thái chưa được xác nhận; vui lòng thử lại sau." : "Could not verify the request with payOS. Its status is unconfirmed; please retry later."); }
+    finally { busy.current = false; if (mounted.current) setPending(false); }
+  }
 
   async function create() {
     if (busy.current || !canCreate) return;
@@ -161,6 +187,8 @@ function InvoicePayment({ patientId, invoiceNo, balance, language }: Props) {
       intentRef.current = completed;
       setIntent(completed);
       setCreated({ id: `created-${data.orderCode}`, orderCode: data.orderCode, amount: current.amount, invoiceNo, status: data.status,
+        providerStatus: typeof data.providerStatus === "string" ? data.providerStatus : null,
+        providerAmountPaid: typeof data.providerAmountPaid === "number" && Number.isSafeInteger(data.providerAmountPaid) && data.providerAmountPaid >= 0 ? data.providerAmountPaid : null,
         checkoutUrl: payOSCheckoutUrl(data.checkoutUrl), qrCode: typeof data.qrCode === "string" ? data.qrCode : null,
         receiptNo: null, createdAt: "", updatedAt: "" });
       setNotice(data.duplicate ? (vi ? "Đã tìm thấy yêu cầu trước đó." : "Your existing request was found.") : (vi ? "Đã tạo yêu cầu thanh toán." : "Payment request created."));
@@ -201,7 +229,7 @@ function InvoicePayment({ patientId, invoiceNo, balance, language }: Props) {
           {intent && !intent.completed && <p className={styles.description}>{vi ? "Chỉ chọn “Tạo yêu cầu khác” khi chủ động thu khoản mới. Yêu cầu trước có thể vẫn đang chờ thanh toán." : "Choose “New payment request” only for an intentional new collection. The previous request may still be awaiting payment."}</p>}
         </div>}
         <h3 className={styles.historyHeading}>{vi ? "Lịch sử yêu cầu" : "Payment requests"}</h3>
-        {orders.length > 0 ? <ul className={styles.history}>{orders.map(order => <li key={order.id}><OrderCard order={order} vi={vi} money={money} canPay={balance > 0} /></li>)}</ul>
+        {orders.length > 0 ? <ul className={styles.history}>{orders.map(order => <li key={order.id}><OrderCard order={order} vi={vi} money={money} canPay={balance > 0} checking={loading || pending} onCheck={() => void check(order)} /></li>)}</ul>
           : !loading && <p className={styles.description}>{vi ? "Chưa có yêu cầu thanh toán." : "No payment requests yet."}</p>}
       </div>
     </WorkspaceDialog>

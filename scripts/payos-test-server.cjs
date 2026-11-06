@@ -10,7 +10,7 @@ if (process.env.NODE_ENV !== 'test' || !loopback.has(app.hostname) ||
 const clientId = 'synthetic-payos-client', apiKey = 'a'.repeat(64), checksumKey = 'c'.repeat(64);
 const orders = new Map();
 let webhookUrl, requests = 0, failNextConfirmation = false;
-const signature = data => createHmac('sha256', checksumKey).update(Object.keys(data).sort().map(key => `${key}=${data[key] ?? ''}`).join('&')).digest('hex');
+const signature = data => createHmac('sha256', checksumKey).update(Object.keys(data).sort().map(key => `${key}=${data[key] == null ? '' : typeof data[key] === 'object' ? JSON.stringify(data[key]) : data[key]}`).join('&')).digest('hex');
 async function deliver(data, signed = true) {
   if (!webhookUrl) throw new Error('Synthetic webhook not registered');
   const target = new URL(webhookUrl);
@@ -27,6 +27,11 @@ transport.createServer(async (request, response) => {
     const body = text ? JSON.parse(text) : {};
     const url = new URL(request.url, 'https://127.0.0.1');
     if (url.pathname === '/__test/state') return reply(200, { requests, orders: [...orders.values()] });
+    if (url.pathname === '/__test/order-status' && request.method === 'POST') {
+      const order = orders.get(Number(body.orderCode)); if (!order) return reply(404, {});
+      if (!['PENDING','PAID','CANCELLED','EXPIRED'].includes(body.status)) return reply(400, {});
+      order.status = body.status; order.amountPaid = Number(body.amountPaid ?? 0); return reply(200, {});
+    }
     if (url.pathname === '/__test/fail-next-confirm' && request.method === 'POST') { failNextConfirmation = true; return reply(200, {}); }
     if (url.pathname === '/__test/settle' && request.method === 'POST') {
       const order = orders.get(Number(body.orderCode));
@@ -38,6 +43,13 @@ transport.createServer(async (request, response) => {
       return reply(200, { webhookStatus: result.status, body: await result.json() });
     }
     if (request.headers['x-client-id'] !== clientId || request.headers['x-api-key'] !== apiKey) return reply(401, { code: '01', desc: 'Invalid synthetic merchant' });
+    if (url.pathname.startsWith('/v2/payment-requests/') && request.method === 'GET') {
+      const order = orders.get(Number(url.pathname.split('/').at(-1))); if (!order) return reply(404, { code: '01' });
+      const data = { id: order.paymentLinkId, orderCode: order.orderCode, amount: order.amount,
+        amountPaid: order.amountPaid ?? 0, amountRemaining: Math.max(0, order.amount - (order.amountPaid ?? 0)),
+        status: order.status, createdAt: '2026-11-05T12:00:00Z', transactions: [] };
+      return reply(200, { code: '00', data, signature: signature(data) });
+    }
     if (url.pathname === '/confirm-webhook' && request.method === 'POST') {
       if (failNextConfirmation) { failNextConfirmation = false; return reply(503, { code: '01' }); }
       webhookUrl = body.webhookUrl;

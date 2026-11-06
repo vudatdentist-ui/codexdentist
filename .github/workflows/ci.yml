@@ -105,6 +105,10 @@ jobs:
         run: npm run test:documenso-db
         env:
           NODE_ENV: test
+      - name: Native payOS recovery, late writes and observation races
+        run: npm run test:payos-reconcile-db
+        env:
+          NODE_ENV: test
       - name: Disposable database restore and migration verification
         run: npm run test:disposable-restore
         env:

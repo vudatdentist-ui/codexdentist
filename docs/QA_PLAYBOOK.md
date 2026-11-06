@@ -230,6 +230,16 @@ Run affected schema/data integrity and protected-file suites after every fix.
 
 Run `test:payos` for merchant binding, encrypted envelope handling, permissions,
 retry uncertainty, invoice revalidation and legacy-configuration refusal.
+The same gate includes signed status recovery: full identity/signature checks,
+unpaid terminal retirement, paid/partial refusal, tenant/clinic/patient/demo/CSRF
+denials, concurrent SETTLED preservation, and late creation responses that cannot
+restore a retired QR. Full app QA checks paid observations across reload without
+fabricating a receipt, then confirms unpaid expiry alone permits key repair.
+`NODE_ENV=test npm run test:payos-reconcile-db` creates and migrates a fresh
+loopback database, then checks actual row locks, encrypted key replacement,
+canonical settlement racing status recovery, late writes and reversed paid/zero
+observation completion order. Its provider boundary is synthetic; signature
+validation is exercised independently by handler and full-app tests.
 `NODE_ENV=test npm run test:integration-vault-db` explicitly runs the native
 loopback PostgreSQL gate: fresh migrations, tenant FK/AAD isolation, UTC,
 rotation races, rollback and cascade. Unit-only runs may skip that native case;
@@ -250,6 +260,10 @@ The development gate allows 60 seconds for the initial authenticated navigation:
 Next compiles the dashboard after login on a cold CI runner. Production browser
 login keeps its 15-second limit; credential, redirect and final-page assertions
 are unchanged.
+Billing tab interactions wait for WorkspaceTabs' layout-effect tabindex before
+clicking, then assert the selected tab. A cold development route can display its
+server-rendered buttons before hydration attaches their event handlers; network
+idle alone is not an interaction-readiness assertion.
 
 The native queued-outbox heartbeat test observes both PostgreSQL lock timestamps
 advance beyond their original expiry over multiple one-second leases before

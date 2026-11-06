@@ -34,7 +34,10 @@ export async function payOSOrders(db: DB, input: { organizationId: string; clini
       status: typeof metadata.status === "string" ? metadata.status : "PENDING", checkoutUrl: payOSCheckoutUrl(metadata.checkoutUrl),
       qrCode: typeof metadata.qrCode === "string" && metadata.qrCode.length <= 4096 ? metadata.qrCode : null,
       createdAt: row.createdAt.toISOString(), updatedAt: row.updatedAt.toISOString(),
-      receiptNo: typeof metadata.receiptNo === "string" ? metadata.receiptNo : null };
+      receiptNo: typeof metadata.receiptNo === "string" ? metadata.receiptNo : null,
+      providerStatus: typeof metadata.providerStatus === "string" ? metadata.providerStatus : null,
+      providerAmountPaid: typeof metadata.providerAmountPaid === "number" && Number.isSafeInteger(metadata.providerAmountPaid) && metadata.providerAmountPaid >= 0 ? metadata.providerAmountPaid : null,
+      providerCheckedAt: typeof metadata.providerCheckedAt === "string" ? metadata.providerCheckedAt : null };
   });
 }
 export async function hasUnresolvedPayOSOrders(db: DB, connectionId: string, organizationId: string) {
