@@ -15,7 +15,7 @@ export async function GET(
     return json(result);
   } catch (cause) {
     const code = applicationErrorCode(cause, "imaging-viewer-failed");
-    const status = code === "imaging-view-denied"
+    const status = code === "imaging-view-denied" || code === "imaging-demo-unavailable"
       ? 403
       : code === "imaging-study-not-found"
         ? 404

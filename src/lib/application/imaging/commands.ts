@@ -17,11 +17,12 @@ import {
   updateImagingStudyAvailability,
 } from "@/infrastructure/imaging/store";
 import { fetchOrthancStudy } from "@/integrations/orthanc/client";
-import { IntegrationConfigurationError, resolveOrthancConnectionSecrets } from "@/integrations/config";
+import { IntegrationConfigurationError } from "@/integrations/config";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
 import { safeErrorCode } from "@/shared/error-codes";
-import { buildOhifStudyUrl } from "@/integrations/orthanc/client";
+import { resolveImagingConnection } from "@/lib/application/imaging/connection";
+import { isDicomUid } from "@/integrations/orthanc/dicomweb-policy";
 
 export async function linkOrthancStudyCommand(
   session: AppSession,
@@ -48,13 +49,14 @@ export async function linkOrthancStudyCommand(
 
   let remote;
   try {
-    remote = await fetchOrthancStudy(resolveOrthancConnectionSecrets(connection), input.externalStudyId);
+    remote = await fetchOrthancStudy(await resolveImagingConnection(session, connection, patient.clinicId), input.externalStudyId);
   } catch (error) {
     const code = error instanceof IntegrationConfigurationError
       ? error.code
       : safeErrorCode(error, "orthanc-unavailable");
     throw new ApplicationCommandError(code.startsWith("orthanc-") ? code : "orthanc-unavailable");
   }
+  if (!isDicomUid(remote.studyInstanceUid)) throw new ApplicationCommandError("orthanc-study-uid-missing");
   const externalPatientId = remote.externalPatientId;
   if (!externalPatientId) throw new ApplicationCommandError("orthanc-patient-id-missing");
 
@@ -154,7 +156,18 @@ export async function listImagingStudiesCommand(
 }
 
 export async function getImagingViewerCommand(session: AppSession, studyId: string) {
+  const { study } = await authorizeImagingStudy(session, studyId);
+  if (!process.env.OPTIONAL_OHIF_BASE_URL?.trim()) throw new ApplicationCommandError("imaging-viewer-not-configured");
+  const viewerUrl = `/imaging/ohif/viewer?${new URLSearchParams({ studyId: study.id, StudyInstanceUIDs: study.studyInstanceUid! })}`;
+  await updateImagingStudyAvailability(prisma, { id: study.id, availability: "AVAILABLE" });
+  return { study, viewerUrl };
+}
+
+/** Called on every PHI response, including metadata, bulkdata and individual frames. */
+export async function authorizeImagingStudy(session: AppSession, studyId: string, expectedStudyUid?: string) {
   requireAction(session, "imaging.study.view", "imaging-view-denied");
+  if (session.isDemo) throw new ApplicationCommandError("imaging-demo-unavailable");
+  if (!/^[A-Za-z0-9_-]{1,128}$/.test(studyId)) throw new ApplicationCommandError("imaging-study-not-found");
   const clinicIds = allowedClinicIds(session);
   const study = await getImagingStudyForScope({
     id: studyId,
@@ -162,7 +175,9 @@ export async function getImagingViewerCommand(session: AppSession, studyId: stri
     clinicIds,
   });
   if (!study) throw new ApplicationCommandError("imaging-study-not-found");
-  if (!study.studyInstanceUid) throw new ApplicationCommandError("imaging-study-uid-missing");
+  if (study.provider !== "orthanc") throw new ApplicationCommandError("imaging-study-not-found");
+  if (!isDicomUid(study.studyInstanceUid)) throw new ApplicationCommandError("imaging-study-uid-missing");
+  if (expectedStudyUid !== undefined && expectedStudyUid !== study.studyInstanceUid) throw new ApplicationCommandError("imaging-dicomweb-request-invalid");
 
   const connection = await getIntegrationConnectionById(prisma, study.connectionId, "orthanc");
   if (
@@ -175,7 +190,7 @@ export async function getImagingViewerCommand(session: AppSession, studyId: stri
   }
   let secrets;
   try {
-    secrets = resolveOrthancConnectionSecrets(connection);
+    secrets = await resolveImagingConnection(session, connection, study.clinicId);
     if (secrets.viewerAccessMode !== "private") {
       throw new ApplicationCommandError("imaging-viewer-access-not-configured");
     }
@@ -200,10 +215,7 @@ export async function getImagingViewerCommand(session: AppSession, studyId: stri
     await updateImagingStudyAvailability(prisma, { id: study.id, availability: "UNAVAILABLE", lastErrorCode: code });
     throw new ApplicationCommandError(code.startsWith("orthanc-") ? code : "orthanc-unavailable");
   }
-  const viewerUrl = buildOhifStudyUrl(secrets.viewerBaseUrl, study.studyInstanceUid);
-  if (!viewerUrl) throw new ApplicationCommandError("imaging-viewer-not-configured");
-  await updateImagingStudyAvailability(prisma, { id: study.id, availability: "AVAILABLE" });
-  return { study, viewerUrl };
+  return { study, secrets };
 }
 
 function requireAction(
