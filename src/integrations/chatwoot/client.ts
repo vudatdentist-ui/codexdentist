@@ -37,7 +37,11 @@ export function chatwootSettings(secrets: Record<string, string>) {
   if (!["https:", "http:"].includes(url.protocol) || url.pathname !== "/" || url.username || url.password || url.search || url.hash ||
       !/^[1-9][0-9]{0,14}$/.test(secrets.accountId ?? "") || !/^[1-9][0-9]{0,14}$/.test(secrets.inboxId ?? "") ||
       !secrets.apiToken || /[\r\n]/.test(secrets.apiToken)) throw new ChatwootError("chatwoot-settings-invalid", 409);
-  return { origin: url.origin, accountId: secrets.accountId, inboxId: secrets.inboxId };
+  let publicUrl: URL;
+  try { publicUrl = new URL(secrets.publicBaseUrl || url.origin); } catch { throw new ChatwootError("chatwoot-settings-invalid", 409); }
+  if ((secrets.publicBaseUrl && publicUrl.protocol !== "https:") || publicUrl.username || publicUrl.password ||
+      publicUrl.pathname !== "/" || publicUrl.search || publicUrl.hash) throw new ChatwootError("chatwoot-settings-invalid", 409);
+  return { origin: url.origin, publicOrigin: publicUrl.origin, accountId: secrets.accountId, inboxId: secrets.inboxId };
 }
 type Obj = Record<string, unknown>;
 function obj(value: unknown): Obj { return value && typeof value === "object" && !Array.isArray(value) ? value as Obj : {}; }

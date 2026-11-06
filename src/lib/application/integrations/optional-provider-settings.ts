@@ -71,6 +71,7 @@ function credentialsFor(definition: OptionalProviderDefinition, value: unknown) 
     secrets[field.key] = field.secret ? input : input.trim();
   }
   secrets.baseUrl = optionalProviderBaseUrl(secrets.baseUrl!);
+  if (secrets.publicBaseUrl) secrets.publicBaseUrl = optionalProviderBaseUrl(secrets.publicBaseUrl);
   return secrets;
 }
 export async function configureOptionalProvider(session: AppSession, definition: OptionalProviderDefinition,
@@ -90,7 +91,8 @@ export async function configureOptionalProvider(session: AppSession, definition:
       if (current!.secretRef !== "vault:v1") optionalProviderFail("integration-use-provider-settings", 409);
       const oldSecrets = await readIntegrationSecrets(tx, { organizationId: session.organizationId, connectionId: current!.id, provider: definition.provider });
       if (!oldSecrets) optionalProviderFail("integration-credentials-missing", 409);
-      if (action === "rotate" && (!isVerified(current!) || definition.fields.some(field => !field.secret && submitted![field.key] !== oldSecrets[field.key]))) {
+      if (action === "rotate" && (!isVerified(current!) || definition.fields.some(field => !field.secret &&
+          (submitted![field.key] ?? field.defaultValue ?? "") !== (oldSecrets[field.key] ?? field.defaultValue ?? "")))) {
         optionalProviderFail("integration-account-binding-mismatch", 409);
       }
       return { current: current!, metadata, secrets: submitted ?? oldSecrets };

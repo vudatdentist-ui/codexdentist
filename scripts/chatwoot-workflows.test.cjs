@@ -22,6 +22,16 @@ test('real command creates one opaque contact/conversation; replay/list minimize
   assert.equal(f.audit().length, 4);
   assert.doesNotMatch(JSON.stringify({ first, refs: f.refs(), audit: f.audit(), calls: f.provider.calls }), /synthetic-private|synthetic-chatwoot-token/);
 });
+
+test('private API credentials stay on the API origin while staff links use the configured HTTPS origin', async () => {
+  const f=fixture({secrets:{baseUrl:'http://codexdentist-chatwoot:3000',publicBaseUrl:'https://chat.example.test'}});
+  const view=await f.ensure();
+  assert.equal(view.conversations[0].url,'https://chat.example.test/app/accounts/1/conversations/20');
+  // The fixture asserts the actual origin on every provider HTTP request.
+  assert.ok(f.provider.calls.length>0);
+  for(const publicBaseUrl of ['http://public.example.test','https://user:key@chat.example.test','https://chat.example.test/path','https://chat.example.test?key=secret'])
+    assert.throws(()=>f.adapter.chatwootSettings({...f.secrets,publicBaseUrl}),/chatwoot-settings-invalid/);
+});
 test('concurrent commands reserve only one contact and conversation', async () => {
   const f = fixture(); await Promise.all([f.ensure(), f.ensure(), f.ensure()]);
   assert.equal((await f.get()).state, 'SAVED'); assert.equal(count(f, '/contacts'), 1); assert.equal(count(f, '/conversations'), 1);

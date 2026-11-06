@@ -71,7 +71,7 @@ export async function getChatwootPatient(session: AppSession, patientId: string)
     const conversations = await listChatwootConversations(secrets, linked);
     return { ...view, state: data.status === "SAVED" && conversations.some(row => row.id === data.conversationId) ? "SAVED" : "UNKNOWN",
       conversations: conversations.map(row => ({ id: row.id, status: row.status,
-      url: safeChatwootLink(`${binding.origin}/app/accounts/${binding.accountId}/conversations/${row.id}`) })) };
+      url: safeChatwootLink(`${binding.publicOrigin}/app/accounts/${binding.accountId}/conversations/${row.id}`) })) };
   } catch { return { ...view, state: "UNKNOWN" }; }
 }
 

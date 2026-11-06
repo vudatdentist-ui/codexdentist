@@ -3,6 +3,8 @@ from pathlib import Path
 import tempfile
 import unittest
 import os
+import io
+from unittest.mock import patch
 
 spec=importlib.util.spec_from_file_location('optional_services',Path(__file__).with_name('optional-services.py'))
 module=importlib.util.module_from_spec(spec)
@@ -31,6 +33,7 @@ class ServiceConfigurationTests(unittest.TestCase):
             self.assertIn('mem_limit',service);self.assertLessEqual(service['cpus'],1)
             self.assertIn('@sha256:',service['image'])
             self.assertNotIn('DATABASE_URL',service.get('environment',{}))
+            self.assertNotIn('traefik.enable',service.get('labels',{}))
         mounts=[mount for service in self.config['services'].values() for mount in service.get('volumes',[])]
         self.assertFalse(any('/opt/namecheap-migration' in mount or 'codexdentist-db' in mount for mount in mounts))
 
@@ -51,5 +54,16 @@ class ServiceConfigurationTests(unittest.TestCase):
             self.assertEqual(path.read_text().strip(),'{\n  "secret": "synthetic"\n}')
             self.assertFalse(path.with_suffix('.json.tmp').exists())
             if os.name=='posix':self.assertEqual(path.stat().st_mode & 0o777,0o600)
+
+    def test_owned_account_is_insufficient_while_installation_onboarding_is_open(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);(root/'bootstrap-output').mkdir()
+            (root/'bootstrap-output/chatwoot-config.json').write_text('{"accountId":"1","apiToken":"synthetic"}')
+            account=io.BytesIO(b'{"id":1}');account.status=200
+            onboarding=io.BytesIO(b'first-run form');onboarding.status=200
+            onboarding.geturl=lambda:'http://127.0.0.1:23803/installation/onboarding'
+            with patch.object(module.urllib.request,'urlopen',side_effect=[account,onboarding]):
+                with self.assertRaisesRegex(SystemExit,'onboarding is still open'):
+                    module.verify_chatwoot_before_publication(root)
 
 if __name__=='__main__':unittest.main()

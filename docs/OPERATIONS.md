@@ -484,7 +484,9 @@ Do not publish PACS, MongoDB, PostgreSQL, Valkey or OHIF directly.
 Use `optional-chatwoot-bootstrap.rb` through the owned Rails runner after
 `db:chatwoot_prepare`. Its private mounts create an owned confirmed administrator,
 a dedicated API inbox with greetings/automations disabled, and a separate QA
-account. It writes credentials only to a root-private output file. The Chatwoot
+account. Separate ordinary service agents belong to exactly one account/inbox;
+their API tokens, rather than the installation administrator's token, enter the
+app vault. It writes credentials only to root-private output files. The Chatwoot
 staff link needs the owned HTTPS Chatwoot route and its own authenticated account;
 never publish an uninitialized installation. `optional-services-acceptance.py`
 creates separate project-bound Medplum credentials and a marked synthetic Novu
@@ -492,6 +494,19 @@ in-app subscriber/workflow. Its explicitly requested empty-bootstrap repair
 refuses any existing patients, encounters, observations or client applications;
 it rotates upstream defaults through the supported API without a database reset.
 Bootstrap/acceptance response files contain secrets and stay root-private.
+For the existing Traefik host, `up --profiles chatwoot
+--chatwoot-proxy-network coolify --publish-chatwoot` first verifies the initialized
+owned account and closed installation onboarding, then publishes only Chatwoot
+through its own generated HTTPS routing file. It preserves Coolify's existing
+routing files and publishes no other optional service. The corresponding
+`--unpublish-chatwoot` removes only this exact generated file.
+The separate Chatwoot login uses its generated administrator password in the
+root-private `secrets.json`; do not put that password or service API tokens in chat,
+issues or screenshots. Provision separate staff accounts before giving staff
+direct access to the external Chatwoot workspace.
+Use the private gateway URL for Chatwoot API calls and the separate approved
+`publicBaseUrl` for staff browser links; service credentials never need to traverse
+the public edge proxy. Both configured origins must be operator-approved.
 
 Cold snapshots: run `optional-services-backup.py backup --profiles imaging
 medplum chatwoot novu`. This briefly stops only the selected optional services,

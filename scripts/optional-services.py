@@ -12,6 +12,55 @@ from pathlib import Path
 import secrets
 import subprocess
 import uuid
+import urllib.request
+import urllib.error
+import time
+
+def verify_chatwoot_before_publication(directory):
+    # Publish only the initialized owned account, never first-run registration.
+    credentials=json.loads((directory/'bootstrap-output/chatwoot-config.json').read_text())
+    request=urllib.request.Request('http://127.0.0.1:23803/api/v1/accounts/'+credentials['accountId'],
+        headers={'Authorization':'Bearer '+credentials['apiToken']})
+    for attempt in range(15):
+        try:
+            with urllib.request.urlopen(request,timeout=5) as response:
+                account=json.load(response)
+                if str(account.get('id'))!=credentials['accountId']:
+                    raise SystemExit('Chatwoot account probe failed before publishing.')
+            break
+        except (OSError,urllib.error.URLError):
+            time.sleep(1)
+    else:
+        raise SystemExit('Chatwoot account is not ready; publication refused.')
+    # Rails may still expose its first-run form even after an API account exists.
+    with urllib.request.urlopen('http://127.0.0.1:23803/app/login',timeout=15) as response:
+        if response.status!=200 or '/installation/' in response.geturl():
+            raise SystemExit('Chatwoot installation onboarding is still open; publication refused.')
+    print('Initialized owned Chatwoot account verified before publication.')
+
+def chatwoot_route():
+    name='codexdentist-chatwoot'
+    return {'http':{'routers':{
+        name+'-https':{'entryPoints':['https'],'rule':'Host(`chat.codexdentist.com`)','priority':250000,'service':name,'tls':{}},
+        name+'-http':{'entryPoints':['http'],'rule':'Host(`chat.codexdentist.com`)','priority':250000,'service':name,'middlewares':[name+'-redirect']}},
+        'services':{name:{'loadBalancer':{'servers':[{'url':'http://codexdentist-optional-chatwoot-1:3000'}]}}},
+        'middlewares':{name+'-redirect':{'redirectScheme':{'scheme':'https','permanent':True}}}}}
+
+def route_file(publish):
+    # Coolify legitimately owns this private mount as UID 9999. Router files
+    # contain no credentials; retain that ownership and all existing routes.
+    parent=Path('/data/coolify/proxy/dynamic').resolve()
+    if not parent.is_dir() or parent.stat().st_mode & 0o022:
+        raise SystemExit('Existing private proxy configuration directory required.')
+    path=parent/'codexdentist-chatwoot.yaml'
+    expected=chatwoot_route()
+    if path.exists() and json.loads(path.read_text())!=expected:
+        raise SystemExit('Existing route differs; review rather than overwrite it.')
+    if publish:
+        write_private(path,expected)
+        os.chmod(path,0o644)
+    elif path.exists():
+        path.unlink()  # Exact, owned generated routing file only; no service data.
 
 IMAGES = {
     'orthanc': 'orthancteam/orthanc:26.11.0',
@@ -106,6 +155,9 @@ def configuration(keys, images):
         entrypoint=['docker/entrypoints/rails.sh'],command=['bundle','exec','rails','s','-p','3000','-b','0.0.0.0'],
         volumes=[volume('chatwoot-files')+':/app/storage'],ports=['127.0.0.1:23803:3000'],depends_on=dependencies)
     chat['networks'] = {'chatwoot':{},'gateway':{'aliases':['codexdentist-chatwoot']}}
+    if keys.get('chatwoot-proxy-network'):
+        networks['chatwoot-proxy']={'external':True,'name':keys['chatwoot-proxy-network']}
+        chat['networks']['chatwoot-proxy']={}
     service('chatwoot-worker','chatwoot','chatwoot',chat_env, command=['bundle','exec','sidekiq','-C','config/sidekiq.yml'],
         volumes=['chatwoot-files:/app/storage'],depends_on=dependencies)
     novu_cache = cache('novu')
@@ -132,7 +184,12 @@ def main():
     parser.add_argument('--profiles', nargs='+', choices=GROUPS, required=True)
     parser.add_argument('--owner-email', help='Existing owner email; required on first preparation, never sends email.')
     parser.add_argument('--ohif-image', help='Locally built official OHIF at PUBLIC_URL=/imaging/ohif/; resolves to image ID.')
+    parser.add_argument('--chatwoot-proxy-network',help='Existing owned HTTPS proxy network; exposes no route by itself.')
+    parser.add_argument('--publish-chatwoot',action='store_true',help='Publish the initialized owned Chatwoot account on its reviewed HTTPS host.')
+    parser.add_argument('--unpublish-chatwoot',action='store_true',help='Remove only the owned generated Chatwoot route.')
     args = parser.parse_args()
+    if args.publish_chatwoot and args.unpublish_chatwoot:
+        raise SystemExit('Choose publication or withdrawal, not both.')
     directory = Path(args.directory).resolve()
     if os.name != 'posix' or os.geteuid() != 0:
         raise SystemExit('Run as root on the owned Linux Docker host.')
@@ -147,9 +204,16 @@ def main():
         keys['owner-email'] = args.owner_email
     elif args.owner_email and args.owner_email != keys['owner-email']:
         raise SystemExit('Changing the service owner needs an explicit account transfer.')
+    if args.chatwoot_proxy_network:
+        if 'chatwoot' not in args.profiles:
+            raise SystemExit('A Chatwoot proxy network requires the chatwoot profile.')
+        run('docker','network','inspect',args.chatwoot_proxy_network,stdout=subprocess.DEVNULL)
+        keys['chatwoot-proxy-network']=args.chatwoot_proxy_network
     for key in ['orthanc','medplum-db','medplum-cache','medplum-admin','medplum-admin-client-secret','chatwoot','chatwoot-db','chatwoot-cache','novu','novu-db','novu-cache','novu-jwt','novu-store']:
         keys.setdefault(key, secrets.token_hex(32))
     keys.setdefault('chatwoot-owner-password', 'Cdx!'+secrets.token_hex(24))
+    keys.setdefault('chatwoot-api-password', 'Cdx!'+secrets.token_hex(24))
+    keys.setdefault('chatwoot-qa-api-password', 'Cdx!'+secrets.token_hex(24))
     keys.setdefault('medplum-admin-client-id', str(uuid.uuid4()))
     if 'medplum-signing-key' not in keys:
         keys['medplum-signing-key'] = run('openssl','genpkey','-algorithm','RSA','-pkeyopt','rsa_keygen_bits:2048',
@@ -182,7 +246,21 @@ def main():
         run(*command,'up','-d','--remove-orphans=false')
     elif args.action == 'status':
         run(*command,'ps','--format','json')
-    print('Private service configuration ready; no core data or public routes changed.')
+    if args.publish_chatwoot:
+        if args.action!='up' or 'chatwoot' not in args.profiles or not keys.get('chatwoot-proxy-network'):
+            raise SystemExit('Publishing requires the chatwoot up profile and an explicit owned proxy network.')
+        verify_chatwoot_before_publication(directory)
+        keys['chatwoot-published']=True
+        write_private(state,keys)
+        route_file(True)
+        print('Owned Chatwoot HTTPS route applied; existing routing files unchanged.')
+    if args.unpublish_chatwoot:
+        if 'chatwoot' not in args.profiles:
+            raise SystemExit('Route withdrawal requires the explicit chatwoot profile.')
+        route_file(False)
+        keys['chatwoot-published']=False
+        write_private(state,keys)
+    print('Optional service configuration ready; core data unchanged.')
 
 if __name__ == '__main__':
     main()

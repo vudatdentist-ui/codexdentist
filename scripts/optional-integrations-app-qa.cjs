@@ -43,7 +43,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
     app = spawn(process.execPath, ['node_modules/next/dist/bin/next','dev','--webpack','-H','127.0.0.1','-p','3002'], {
       env: { ...process.env, NODE_ENV: 'development', DATABASE_URL: target.toString(), APP_BASE_URL: base, SESSION_COOKIE_SECURE: 'false',
         PATIENT_FILE_STORAGE_DRIVER: 'local', AUTH_SECRET: 'synthetic-app-qa-secret-at-least-32-characters',
-        OPTIONAL_PROVIDER_ALLOWED_ORIGINS: live ? [...['orthanc','chatwoot','medplum','novu'].map(key => live[key].baseUrl),'http://127.0.0.1:24805'].join(',') : '',
+        OPTIONAL_PROVIDER_ALLOWED_ORIGINS: live ? [...['orthanc','chatwoot','medplum','novu'].map(key => live[key].baseUrl),live.chatwoot.publicBaseUrl,'http://127.0.0.1:24805'].filter(Boolean).join(',') : '',
         OPTIONAL_OHIF_BASE_URL: live ? 'http://127.0.0.1:24805/imaging/ohif' : '' },
       stdio: ['ignore', log, log], windowsHide: true });
     let ready = false;
@@ -114,7 +114,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
         for (const field of workspace.definition.fields) {
           const element = panel.getByLabel(field.label,{ exact:true });
           if (field.options) await element.selectOption(live[provider][field.key]);
-          else await element.fill(live[provider][field.key]);
+          else await element.fill(live[provider][field.key] ?? field.defaultValue ?? '');
         }
         await panel.getByRole('button',{name:'Lưu kết nối',exact:true}).click();
         await panel.getByText('Đã lưu. Kết nối đang tắt; kiểm tra kết nối để bật sử dụng.',{exact:true}).waitFor();
@@ -143,6 +143,7 @@ const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
       const chat = page.getByRole('region',{name:'Hội thoại bệnh nhân',exact:true});
       await chat.getByRole('checkbox').check(); await chat.getByRole('button',{name:'Tạo hoặc tiếp tục liên kết',exact:true}).click();
       await chat.getByText('Đã lưu liên kết',{exact:true}).waitFor();
+      if(live.chatwoot.publicBaseUrl)assert.ok((await chat.getByRole('link',{name:/Mở trong Chatwoot/}).getAttribute('href')).startsWith(live.chatwoot.publicBaseUrl+'/app/accounts/'));
       await page.getByRole('button',{name:'Liên kết người nhận',exact:true}).click();
       await page.getByText('Đã xác minh người nhận',{exact:true}).waitFor();
       for (const width of [1440,390,320]) {

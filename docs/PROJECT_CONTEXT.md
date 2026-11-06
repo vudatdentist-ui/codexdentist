@@ -308,6 +308,12 @@ organization bindings and independent go-live proof remain required. A real bank
 receiving account is an owner-entered clinic setting; never substitute the test
 account. Existing cloud mail/AI/file configuration remains preserved pending a
 verified free migration; its current billing plan is not established.
+Chatwoot's public staff login has separate HTTPS browser/API origins and was
+rendered at 1440/390/320px. Publication additionally proves the installation form
+is closed; an account API response alone is insufficient. Main and synthetic
+accounts now use distinct ordinary service agents, with real cross-account
+requests denied in both directions. The installation administrator's token is
+not exported as an application credential.
 
 ### Current delivery plan — 2026-11-05
 
