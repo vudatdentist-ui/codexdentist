@@ -24,6 +24,15 @@ const browser = await chromium.launch();
 const results = [], errors = [];
 const credentials = { clientId: 'synthetic-payos-client', apiKey: 'a'.repeat(64), checksumKey: 'c'.repeat(64) };
 let page;
+async function openInvoices() {
+  // A cold development route can paint its server-rendered tabs before their
+  // handlers are hydrated. WorkspaceTabs adds tabindex in its layout effect;
+  // wait for that observable readiness rather than clicking an inert SSR button.
+  const tab = page.getByRole('tab', { name: /^Hóa đơn/ });
+  await tab.and(page.locator('[tabindex]')).waitFor();
+  await tab.click();
+  await tab.and(page.locator('[aria-selected="true"]')).waitFor();
+}
 try {
   const seed = await prisma.user.findUniqueOrThrow({ where: { email: 'owner@nhavista.vn' }, select: { passwordHash: true } });
   async function workspace(label) {
@@ -135,7 +144,7 @@ try {
         checkoutUrl: `https://pay.payos.vn/web/synthetic-${orderCode}`, qrCode: `synthetic-qr-${orderCode}` }));
   }
   await page.goto(`${base}/billing?patientId=${patient.id}`, { waitUntil: 'networkidle' });
-  await page.getByRole('tab', { name: /Hóa đơn/ }).click();
+  await openInvoices();
   const row = page.locator('.billing-invoice-row').filter({ hasText: invoice.invoiceNo }); await row.waitFor();
   await row.getByRole('button', { name: 'Thanh toán payOS', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: 'Thanh toán qua payOS', exact: true });
@@ -174,7 +183,7 @@ try {
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2));
   }
   await page.reload({ waitUntil: 'networkidle' });
-  await page.getByRole('tab', { name: /Hóa đơn/ }).click();
+  await openInvoices();
   await page.locator('.billing-invoice-row').filter({ hasText: invoice.invoiceNo }).getByRole('button', { name: 'Thanh toán payOS', exact: true }).click();
   await qr.waitFor();
   const cannotReplace = await page.request.post('/api/integrations/payos/settings', { headers: { origin: base }, data: { action: 'save', clinicId: null, credentials } });
@@ -199,7 +208,7 @@ try {
     assert.equal(await prisma.receipt.count({ where: { organizationId: a.organization.id } }), 0, 'A status query cannot fabricate collection');
     assert.equal((await page.request.post('/api/integrations/payos/settings', { headers: { origin: base }, data: { action: 'disable', clinicId: null } })).status(), 409);
     await page.reload({ waitUntil: 'networkidle' });
-    await page.getByRole('tab', { name: /Hóa đơn/ }).click();
+    await openInvoices();
     await page.locator('.billing-invoice-row').filter({ hasText: invoice.invoiceNo }).getByRole('button', { name: 'Thanh toán payOS', exact: true }).click();
     await dialog.getByText(/payOS báo đã nhận tiền/).waitFor();
     assert.equal(await qr.count(), 0);
@@ -240,7 +249,7 @@ try {
       items: { create: { organizationId: a.organization.id, clinicId: a.clinic.id, patientId: patient.id,
         description: 'Synthetic unpaid expiry', quantity: 1, unitPrice: 40000, amount: 40000 } } } });
     await dialog.getByRole('button', { name: 'Đóng', exact: true }).click();
-    await page.reload({ waitUntil: 'networkidle' }); await page.getByRole('tab', { name: /Hóa đơn/ }).click();
+    await page.reload({ waitUntil: 'networkidle' }); await openInvoices();
     await page.locator('.billing-invoice-row').filter({ hasText: expiring.invoiceNo }).getByRole('button', { name: 'Thanh toán payOS', exact: true }).click();
     await dialog.getByRole('button', { name: 'Tạo mã thanh toán', exact: true }).click();
     await qr.waitFor();

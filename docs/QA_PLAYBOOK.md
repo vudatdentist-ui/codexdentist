@@ -260,6 +260,10 @@ The development gate allows 60 seconds for the initial authenticated navigation:
 Next compiles the dashboard after login on a cold CI runner. Production browser
 login keeps its 15-second limit; credential, redirect and final-page assertions
 are unchanged.
+Billing tab interactions wait for WorkspaceTabs' layout-effect tabindex before
+clicking, then assert the selected tab. A cold development route can display its
+server-rendered buttons before hydration attaches their event handlers; network
+idle alone is not an interaction-readiness assertion.
 
 The native queued-outbox heartbeat test observes both PostgreSQL lock timestamps
 advance beyond their original expiry over multiple one-second leases before
