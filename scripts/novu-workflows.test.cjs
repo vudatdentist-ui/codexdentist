@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./audit-source-loader.cjs');
 const plain = value => JSON.parse(JSON.stringify(value));
-const secrets = { baseUrl: 'https://novu.example.test', apiKey: 'synthetic-secret-key', environmentId: 'env-A', workflowId: 'generic-notice', testSubscriberId: 'cdx-test-operator' };
+const secrets = { baseUrl: 'https://novu.example.test', apiKey: 'synthetic-secret-key', environmentId: 'env-A', workflowId: 'generic-notice', testSubscriberId: 'cdx-test-operator', deliveryChannel: 'email' };
 const workflow = { _id: 'workflow-db', workflowId: secrets.workflowId, active: true, status: 'ACTIVE', steps: [{ type: 'email' }] };
 const smtp = { _id: 'smtp', _environmentId: 'env-A', channel: 'email', providerId: 'nodemailer', active: true };
 const subscriber = { _id: 'subscriber-db', subscriberId: secrets.testSubscriberId, _environmentId: 'env-A', email: 'synthetic@example.test', data: { codexdentistSynthetic: true } };
@@ -27,6 +27,28 @@ test('verifier proves environment/key identity, active workflow and explicit mar
   }
   assert.equal(h.requests.length, 4);
 });
+test('in-app is the free default and verifies without SMTP or a subscriber email', async () => {
+  const nativeSecrets = { ...secrets, deliveryChannel: undefined };
+  const inbox = { _id: 'inbox', _environmentId: 'env-A', channel: 'in_app', providerId: 'novu', active: true };
+  const h = adapterHarness(url => url.pathname === '/v1/environments'
+    ? response([{ _id: 'env-A', _organizationId: 'provider-org', identifier: 'app-id', apiKeys: [{ key: secrets.apiKey }] }])
+    : url.pathname.startsWith('/v2/workflows') ? response({ ...workflow, steps: [{ type: 'in_app' }] })
+      : response({ ...subscriber, email: undefined }), [inbox]);
+  assert.equal(h.api.novuConfig(nativeSecrets).deliveryChannel, 'in_app');
+  assert.deepEqual(plain(await h.api.verifyNovuConnection(nativeSecrets)), { identity: 'provider-org/env-A/app-id' });
+  const bad = adapterHarness(() => response(workflow), [inbox]);
+  await assert.rejects(bad.api.verifyNovuWorkflow(nativeSecrets), { code: 'novu-workflow-not-supported' });
+});
+test('in-app delivery requires an authenticated matching in-app message, not email acceptance', async () => {
+  const nativeSecrets = { ...secrets, deliveryChannel: 'in_app' };
+  const observed = { transactionId: 'tx-a', _environmentId: 'env-A', _subscriberId: 'sub-a', _templateId: 'workflow-db', channel: 'in_app', status: 'sent' };
+  // Use a real Response; the API checks only its documented authenticated payload.
+  const good = adapterHarness(url => { assert.equal(url.searchParams.get('channel'), 'in_app'); return Response.json({ hasMore: false, data: [observed] }); });
+  const input = { transactionId: 'tx-a', subscriberDatabaseId: 'sub-a', workflowDatabaseId: 'workflow-db' };
+  assert.equal(await good.api.observeNovuDelivery(nativeSecrets, input), 'SENT');
+  const wrong = adapterHarness(() => Response.json({ data: [{ ...observed, channel: 'email' }] }));
+  await assert.rejects(wrong.api.observeNovuDelivery(nativeSecrets, input), { code: 'novu-message-mismatch' });
+});
 test('successful HTTP is insufficient: wrong environment/key, inactive/multi-channel workflow and real recipient fail', async () => {
   for (const env of [[{ _id: 'env-B', apiKeys: [{ key: secrets.apiKey }] }], [{ _id: 'env-A', apiKeys: [{ key: 'other-key' }] }], []]) {
     const h = adapterHarness(() => response(env));
@@ -40,6 +62,28 @@ test('successful HTTP is insufficient: wrong environment/key, inactive/multi-cha
     const h = adapterHarness(() => response(changed));
     await assert.rejects(h.api.verifyNovuSyntheticSubscriber(secrets));
   }
+});
+
+test('subscriber provisioning is create-only, recovers lost responses and refuses another binding without email disclosure', async () => {
+  const config = { ...secrets, deliveryChannel: 'in_app' }, binding = 'a'.repeat(64), id = 'cdx-sub-opaque';
+  for (const mode of ['created', 'conflict', 'lost']) {
+    const h = adapterHarness((url, init) => {
+      if (init.method === 'POST') {
+        assert.equal(url.pathname, '/v2/subscribers'); assert.equal(url.searchParams.get('failIfExists'), 'true');
+        assert.deepEqual(JSON.parse(init.body), { subscriberId: id, data: { codexdentistBinding: binding } });
+        if (mode === 'conflict') return new Response('{}', { status: 409 });
+        if (mode === 'lost') throw new Error('accepted but response lost');
+        return response({});
+      }
+      return response({ ...subscriber, subscriberId: id, email: undefined, data: { codexdentistBinding: binding } });
+    });
+    assert.equal((await h.api.createNovuSubscriber(config, id, binding)).subscriberDatabaseId, 'subscriber-db');
+    assert.equal(h.requests.length, 2);
+  }
+  const foreign = adapterHarness((_url, init) => init.method === 'POST' ? new Response('{}', { status: 409 })
+    : response({ ...subscriber, subscriberId: id, data: { codexdentistBinding: 'b'.repeat(64) } }));
+  await assert.rejects(foreign.api.createNovuSubscriber(config, id, binding), { code: 'novu-subscriber-binding-mismatch' });
+  assert.equal(foreign.requests.filter(r => r.init.method === 'POST').length, 1);
 });
 test('free-only contract rejects Novu Cloud, paid/free-tier email integrations, deleted subscribers and workflow errors', async () => {
   for (const host of ['https://api.novu.co', 'https://eu.api.novu.co']) {

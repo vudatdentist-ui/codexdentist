@@ -15,10 +15,10 @@ export type NovuScope = { organizationId: string; clinicId: string };
 export type NovuConnection = { connection: IntegrationConnectionRecord; secrets: Record<string, string> };
 type DB = Prisma.TransactionClient | typeof prisma;
 export const novuFingerprint = (secrets: Record<string, string>) => {
-  const { baseUrl, environmentId, workflowId, testSubscriberId } = novuConfig(secrets);
+  const { baseUrl, environmentId, workflowId, testSubscriberId, deliveryChannel } = novuConfig(secrets);
   // Parent verification binds rotations to the same provider identity. Rotating
   // an API key must not strand reconciliation for an otherwise identical account.
-  return createHash("sha256").update(JSON.stringify({ baseUrl, environmentId, workflowId, testSubscriberId })).digest("hex");
+  return createHash("sha256").update(JSON.stringify({ baseUrl, environmentId, workflowId, testSubscriberId, deliveryChannel })).digest("hex");
 };
 const referenceId = (organizationId: string, id: string) => `novu-${createHash("sha256").update(JSON.stringify([organizationId, id])).digest("hex")}`;
 export function novuFail(code: string, status = 409): never { throw new NovuError(code, status); }
@@ -106,6 +106,7 @@ export async function deliverNotificationToNovu(notification: Notification) {
     credentialNotificationTemplateKeys.some(key => key === notification.templateKey)) novuFail("novu-notification-ineligible");
   const scope = { organizationId: notification.organizationId, clinicId: notification.clinicId };
   const loaded = await loadOptionalProviderConnectionForScope(scope, "novu");
+  if (novuConfig(loaded.secrets).deliveryChannel !== "email") novuFail("novu-email-workflow-required");
   const patient = await prisma.patient.findFirst({ where: { id: notification.patientId, ...scope }, select: { id: true, email: true } });
   if (!patient?.email || patient.email !== notification.recipient) novuFail("novu-recipient-mismatch");
   const mapping = await novuSubscriberReference(prisma, scope, loaded.connection.id, patient.id);

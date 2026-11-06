@@ -51,7 +51,7 @@ export function NovuNotificationPanel({ clinicId, patientId, language }: {
     <header className={styles.heading}><div><p className={styles.eyebrow}>{vi ? "Thông báo" : "Notifications"}</p><h3 id={headingId}>Novu</h3></div>
       <button type="button" className={styles.secondary} disabled={pending} onClick={() => setReload(value => value + 1)}>{vi ? "Tải lại" : "Reload"}</button></header>
     <p className={styles.description}>{patientId
-      ? (vi ? "Liên kết người nhận cho bệnh nhân đang mở. Tạo người nhận trong Novu bằng mã dưới đây, sau đó xác minh địa chỉ email." : "Link a recipient for the selected patient. Create the Novu subscriber using the ID below, then verify its email address.")
+      ? (vi ? "Liên kết người nhận cho bệnh nhân đang mở. Thông báo nội bộ không cần email; kênh email dùng địa chỉ hiện có trong hồ sơ." : "Link a recipient for the selected patient. In-app notifications need no email; email delivery uses the address in the patient record.")
       : (vi ? "Kiểm tra luồng thông báo bằng người nhận thử nghiệm đã thiết lập. Không dùng thông tin bệnh nhân cho lần thử này." : "Check the configured workflow with its synthetic recipient. This test uses no patient information.")}</p>
     {error && <p role="alert" className={styles.error}>{error}</p>}
     {notice && <p role="status" className={styles.success}>{notice}</p>}
@@ -60,7 +60,7 @@ export function NovuNotificationPanel({ clinicId, patientId, language }: {
       {patientId ? <>
         {workspace.subscriber && <div className={styles.readiness}><p style={{ overflowWrap: "anywhere" }}>{workspace.subscriber.subscriberId}</p>
           <p>{workspace.subscriber.verified ? (vi ? "Đã xác minh người nhận" : "Recipient verified") : (vi ? "Chờ xác minh người nhận" : "Recipient verification pending")}</p></div>}
-        <div className={styles.actions}><button type="button" className={styles.secondary} disabled={pending || Boolean(workspace.subscriber)} onClick={() => command("allocate-subscriber")}>{vi ? "Tạo mã người nhận" : "Create recipient ID"}</button>
+        <div className={styles.actions}><button type="button" className={styles.secondary} disabled={pending || Boolean(workspace.subscriber?.verified)} onClick={() => command("allocate-subscriber")}>{vi ? "Liên kết người nhận" : "Link recipient"}</button>
           <button type="button" className={styles.primary} disabled={pending || !workspace.subscriber} onClick={() => command("verify-subscriber")}>{vi ? "Xác minh người nhận" : "Verify recipient"}</button></div>
       </> : <div className={styles.actions}><button type="button" className={styles.primary} disabled={pending || workspace.deliveries.length > 0} onClick={() => command("test")}>{vi ? "Gửi thử nghiệm" : "Send synthetic test"}</button></div>}
       <p className={styles.note}>{vi ? "Thông báo được chấp nhận vẫn cần xác nhận gửi. Mục chưa rõ kết quả sẽ không được gửi lại tự động." : "Accepted requests still need delivery confirmation. Requests with uncertain results are never sent again automatically."}</p>

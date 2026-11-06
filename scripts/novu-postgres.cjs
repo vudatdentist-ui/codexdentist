@@ -31,13 +31,14 @@ const executor = client => {
     await connection.query(`INSERT INTO "IntegrationConnection" (id,"organizationId","clinicId",provider,"lastVerifiedAt",metadata)
       VALUES ('connection','novu-org','clinic','novu',now(),'{"configurationVersion":"synthetic-version","verifiedVersion":"synthetic-version","providerIdentity":"provider-org/env/app"}')`);
     const loaded = { connection: (await connection.query('SELECT * FROM "IntegrationConnection" WHERE id=$1', ['connection'])).rows[0],
-      secrets: { baseUrl: 'https://novu.example.test', apiKey: 'synthetic-key', environmentId: 'env', workflowId: 'generic-notice', testSubscriberId: 'cdx-test-operator' } };
+      secrets: { baseUrl: 'https://novu.example.test', apiKey: 'synthetic-key', environmentId: 'env', workflowId: 'generic-notice', testSubscriberId: 'cdx-test-operator', deliveryChannel: 'email' } };
     const db = executor(connection), scope = { organizationId: 'novu-org', clinicId: 'clinic' };
     const adapter = load('src/integrations/novu/client.ts', { '@/integrations/optional-http': {} });
     let loseResponse = true;
     const provider = { ...adapter, verifyNovuWorkflow: async () => ({ workflowDatabaseId: 'workflow' }),
       verifyNovuSyntheticSubscriber: async () => ({ subscriberDatabaseId: 'subscriber' }),
       verifyNovuSubscriber: async () => ({ subscriberDatabaseId: 'subscriber' }),
+      createNovuSubscriber: async () => ({ subscriberDatabaseId: 'subscriber' }),
       triggerNovu: async () => { sends++; if (loseResponse) throw new Error('Synthetic accepted-but-lost response'); },
       observeNovuDelivery: async () => 'SENT' };
     const api = load('src/lib/application/integrations/novu-delivery.ts', {

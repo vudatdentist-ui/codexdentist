@@ -3,6 +3,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useAppLanguage } from "@/components/AppLanguage";
 import type { OptionalProvider, OptionalProviderWorkspace } from "@/features/integrations/optional-provider";
 import styles from "./PayOSWorkspace.module.css";
+import { NovuNotificationPanel } from "./NovuNotificationPanel";
 
 export function OptionalProviderSettingsPanel({ provider }: { provider: OptionalProvider }) {
   const { language } = useAppLanguage(), vi = language === "vi", id = useId();
@@ -88,5 +89,7 @@ export function OptionalProviderSettingsPanel({ provider }: { provider: Optional
       <button type="button" className={styles.secondary} disabled={disabled || connection?.status !== "ACTIVE"} onClick={() => change("disable")}>{vi ? "Tắt kết nối" : "Disable"}</button>
       <button type="button" className={styles.secondary} disabled={pending} onClick={() => setRefresh(value => value + 1)}>{vi ? "Tải lại trạng thái" : "Refresh status"}</button></div>
     {connection?.verifiedAt && <p className={styles.description}>{vi ? "Xác minh lần cuối: " : "Last verified: "}{new Date(connection.verifiedAt).toLocaleString(vi ? "vi-VN" : "en-GB")}</p>}
+    {provider === "novu" && connection?.status === "ACTIVE" && connection.verified && (scope || workspace?.clinics[0]?.id) &&
+      <NovuNotificationPanel key={connection.id} clinicId={scope || workspace!.clinics[0].id} language={language} />}
   </section>;
 }

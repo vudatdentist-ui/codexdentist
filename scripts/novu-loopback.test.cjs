@@ -32,7 +32,7 @@ test('loopback Novu protocol: exact routes/auth, fixed payload, lost response an
   });
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const origin = `http://127.0.0.1:${server.address().port}`;
-  const secrets = { baseUrl: origin, apiKey: secret, environmentId: 'env', workflowId: 'generic-notice', testSubscriberId: 'cdx-test-operator' };
+  const secrets = { baseUrl: origin, apiKey: secret, environmentId: 'env', workflowId: 'generic-notice', testSubscriberId: 'cdx-test-operator', deliveryChannel: 'email' };
   const transport = load('src/integrations/optional-http.ts', {}, { fetch, Headers, Response,
     process: { env: { OPTIONAL_PROVIDER_ALLOWED_ORIGINS: origin } } });
   const api = load('src/integrations/novu/client.ts', { '@/integrations/optional-http': transport });

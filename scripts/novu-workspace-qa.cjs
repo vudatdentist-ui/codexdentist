@@ -64,7 +64,7 @@ const runCompiler = () => new Promise((resolve, reject) => webpack({ mode: 'prod
     await page.getByText('Đã gửi', { exact: true }).waitFor();
     await page.screenshot({ path: path.join(output, 'operator-sent-320.png') });
     state = { subscriber: null, deliveries: [] };
-    await page.goto(`${origin}/?patient`); await page.getByRole('button', { name: 'Tạo mã người nhận', exact: true }).click();
+    await page.goto(`${origin}/?patient`); await page.getByRole('button', { name: 'Liên kết người nhận', exact: true }).click();
     await page.getByText('Chờ xác minh người nhận', { exact: true }).waitFor();
     for (const width of [1440, 390, 320]) {
       await page.setViewportSize({ width, height: width < 500 ? 844 : 1000 });
