@@ -55,8 +55,9 @@ function fixture(options = {}) {
     imagingStudy: {
     findFirst: async ({ where }) => { databaseReads.push(where); return studies.find(row => row.id === where.id && row.organizationId === where.organizationId && where.clinicId.in.includes(row.clinicId)) || null; },
     update: async ({ where, data }) => { const row = studies.find(s => s.id === where.id); Object.assign(row, data); return row; },
-  }, $queryRawUnsafe: async (sql, ...params) => sql.includes('"organizationId" = $1')
-    ? (params[0] === connection.organizationId && params[1] === 'orthanc' && connection.status === 'ACTIVE' ? [state.loadedConnection] : [])
+  }, $queryRawUnsafe: async (sql, ...params) => /"organizationId"\s*=\s*\$1/.test(sql)
+    ? (params[0] === connection.organizationId && params[1] === 'orthanc' &&
+      (!/"status"\s*=\s*'ACTIVE'/.test(sql) || connection.status === 'ACTIVE') ? [state.loadedConnection] : [])
     : params[0] === connection.id ? [connection] : [] };
   const mocks = { 'next/server': { NextResponse: Response }, '@/lib/auth': { getSession: async () => session }, '@/lib/prisma': { prisma: db },
     '@/integrations/optional-http': optionalHttp,

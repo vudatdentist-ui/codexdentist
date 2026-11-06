@@ -71,9 +71,14 @@ async function main() {
     await started; await change(winner, 'disable'); release();
     await assert.rejects(verifying, { code: 'integration-configuration-changed' });
     await assert.rejects(api.loadOptionalProviderConnection(winner.session,'chatwoot',winner.clinic.id), { code: 'integration-connection-not-ready' });
+    await change(winner,'save',{clinicId:null}); await change(winner,'verify',{clinicId:null});
+    const global = await prisma.integrationConnection.findFirstOrThrow({where:{organizationId:winner.org.id,provider:'chatwoot',clinicId:null}});
+    assert.equal(global.status,'ACTIVE');
+    await assert.rejects(api.loadOptionalProviderConnection(winner.session,'chatwoot',winner.clinic.id), { code:'integration-connection-not-ready' },
+      'Disabled clinic must never inherit the active organization account');
     const audits = await prisma.auditLog.findMany({ select: { metadata: true } });
     assert.ok(!JSON.stringify(audits).includes(credentials.apiToken));
-    console.log('ok native optional settings: sealed keys, cross-organization account race, same-org clinics, rotation and disable/version fence');
+    console.log('ok native optional settings: sealed keys, cross-organization account race, same-org clinics, rotation, disable/version fence and no disabled-clinic fallback');
   } finally {
     release?.(); await Promise.allSettled(pending);
     await prisma?.$disconnect();

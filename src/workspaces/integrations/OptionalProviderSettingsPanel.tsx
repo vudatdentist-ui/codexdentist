@@ -69,14 +69,14 @@ export function OptionalProviderSettingsPanel({ provider }: { provider: Optional
     {notice && <p role="status" className={styles.success}>{notice}</p>}
     {workspace?.isDemo && <p className={styles.note}>{vi ? "Không thay đổi hoặc gửi dữ liệu ra dịch vụ ngoài trong bản dùng thử." : "External service changes and exports are unavailable in demo workspaces."}</p>}
     <label className={styles.field} htmlFor={`${id}-scope`}>{vi ? "Phạm vi sử dụng" : "Scope"}
-      <select id={`${id}-scope`} disabled={disabled} value={scope} onChange={event => { setScope(event.target.value); setFields({}); setError(""); setNotice(""); }}>
+      <select id={`${id}-scope`} aria-label={vi ? "Phạm vi sử dụng" : "Scope"} disabled={disabled} value={scope} onChange={event => { setScope(event.target.value); setFields({}); setError(""); setNotice(""); }}>
         {workspace?.canManageOrganization && <option value="">{vi ? "Toàn tổ chức" : "Organization"}</option>}
         {workspace?.clinics.map(clinic => <option key={clinic.id} value={clinic.id}>{clinic.name}</option>)}
       </select></label>
     <fieldset className={styles.credentials} disabled={disabled}><legend>{vi ? "Thông tin kết nối" : "Connection details"}</legend>
       <p className={styles.description}>{vi ? "Thông tin được mã hóa và không hiển thị lại. Lưu thông tin chưa đồng nghĩa với kết nối đã hoạt động." : "Details are encrypted and never read back. Saving does not mean the service is operational."}</p>
       <div className={styles.fields}>{workspace?.definition.fields.map(field => <label key={field.key} className={styles.field} htmlFor={`${id}-${field.key}`}>{field.label}
-        {field.options ? <select id={`${id}-${field.key}`} value={fields[field.key] ?? field.defaultValue ?? ""}
+        {field.options ? <select id={`${id}-${field.key}`} aria-label={field.label} value={fields[field.key] ?? field.defaultValue ?? ""}
           onChange={event => setFields(current => ({ ...current, [field.key]: event.target.value }))}>
           {field.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
           : <input id={`${id}-${field.key}`} type={field.secret ? "password" : "text"} value={fields[field.key] ?? field.defaultValue ?? ""} autoComplete="off" spellCheck={false}

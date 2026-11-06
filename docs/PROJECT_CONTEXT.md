@@ -281,6 +281,34 @@ service-generated credentials are valid only for those owned instances. Preserve
 real records, current mail/AI/R2 configuration and existing deployment rollback.
 Do not enable outbound patient jobs or delete files under an inferred policy.
 
+Current evidence for issue #91 (release still pending): the branch implements
+offline NAPAS bank QR in Settings/Billing, four encrypted optional-provider
+panels and patient-scoped Chatwoot/Medplum/Novu tools. Shared provider accounts
+are atomically owned by one organization; disabled clinic overrides never fall
+back to an organization account. Configuration versions fence concurrent save,
+disable, rotation and provider operations even with identical timestamps.
+Medplum uses conditional creation and version-matched updates so a late export
+cannot overwrite newer remote demographics. Novu defaults to a self-hosted
+in-app workflow, provisions opaque bound recipients without email, and requires
+authenticated sent evidence; queue acceptance is insufficient.
+
+The owned VPS now runs separate private community services. Actual adapter and
+full Next/PostgreSQL acceptance exercised all four providers using synthetic QA
+accounts/projects; no real patient messages or bank transfers were made. OHIF
+3.13.14 is built from pinned commit `e4cd86153a1aaa429ef749330eaeefd4df96a88a`
+at `/imaging/ohif/`; its reviewed responsive adaptation preserves provider
+onboarding and investigational-use notices. Synthetic DICOM pixels rendered at
+1440/390/320px; foreign-organization metadata/viewer requests were denied.
+The optional stack cold snapshot `20261106T143908Z-fe9661d2` was restored into
+separate volumes/networks with matching PostgreSQL/MongoDB counts and an
+authenticated PACS index. Original core/sidecar volumes were not restore targets.
+
+Do not report this branch as deployed: exact-head CI, main release, production
+organization bindings and independent go-live proof remain required. A real bank
+receiving account is an owner-entered clinic setting; never substitute the test
+account. Existing cloud mail/AI/file configuration remains preserved pending a
+verified free migration; its current billing plan is not established.
+
 ### Current delivery plan — 2026-11-05
 
 User-facing completion loop: plan a complete operational path, implement it,

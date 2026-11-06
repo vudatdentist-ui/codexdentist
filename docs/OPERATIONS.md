@@ -452,6 +452,60 @@ through an operator-reviewed correction.
 
 ## Go-Live Gate
 
+### Free optional services
+
+`scripts/optional-services.py` prepares root-private configuration under
+`/opt/codexdentist-optional`, resolves upstream images to immutable digests and
+starts only explicitly selected profiles. On first preparation pass the actual
+owner's email with `--owner-email`; this creates no cloud account and sends no
+email. Available profiles are `imaging`, `chatwoot`, `novu`, `medplum`. Services
+have separate persistent volumes and private database networks. Administrative
+HTTP ports 23801–23805 bind only to host loopback. No DICOM port is exposed.
+
+The accepted versions are Orthanc 26.11.0, Chatwoot 4.19.1 CE, Medplum 5.2.14 and
+Novu 3.19.0. Community features used here require no paid API or enterprise key;
+Chatwoot's enterprise directory is excluded. Novu uses Valkey and MongoDB;
+MongoDB is SSPL source-available, not an OSI license. Review upstream licenses
+when redistributing. These services use the already-owned VPS; this is not a
+claim that hosting, banking or an existing cloud account has no cost.
+
+Build OHIF with `python3 scripts/build-private-ohif.py`, then select its local
+image through `optional-services.py up --profiles imaging --ohif-image
+codexdentist-ohif:e4cd861-responsive1`. The build verifies the exact official
+commit, applies bounded responsive changes and uses a separate 4-GiB/two-CPU
+builder. It retains upstream notices, builds the app subpath and records the
+local immutable image ID. Keep the source revision/build script with backups.
+Set `OPTIONAL_OHIF_BASE_URL` only to that private static subpath, and approve
+each exact provider origin through `OPTIONAL_PROVIDER_ALLOWED_ORIGINS` before
+saving/verifying the tenant-owned connection. Core app containers must join the
+optional gateway network; databases remain on their separate internal networks.
+Do not publish PACS, MongoDB, PostgreSQL, Valkey or OHIF directly.
+
+Use `optional-chatwoot-bootstrap.rb` through the owned Rails runner after
+`db:chatwoot_prepare`. Its private mounts create an owned confirmed administrator,
+a dedicated API inbox with greetings/automations disabled, and a separate QA
+account. It writes credentials only to a root-private output file. The Chatwoot
+staff link needs the owned HTTPS Chatwoot route and its own authenticated account;
+never publish an uninitialized installation. `optional-services-acceptance.py`
+creates separate project-bound Medplum credentials and a marked synthetic Novu
+in-app subscriber/workflow. Its explicitly requested empty-bootstrap repair
+refuses any existing patients, encounters, observations or client applications;
+it rotates upstream defaults through the supported API without a database reset.
+Bootstrap/acceptance response files contain secrets and stay root-private.
+
+Cold snapshots: run `optional-services-backup.py backup --profiles imaging
+medplum chatwoot novu`. This briefly stops only the selected optional services,
+records provider counts, snapshots their cold volumes and private configuration,
+and restarts them even after backup failure. It never stops the core clinic app.
+Run `optional-services-backup.py drill --snapshot <completed-directory>` before
+activation. Checksums and safe archive extraction precede restoration into new
+randomly named volumes; only databases/PACS start on internal networks, without
+host ports or message workers. Compare record counts and authenticated PACS
+startup, then remove only those generated restore containers/volumes. Back up
+the core database and its unchanged vault master separately using the existing
+reviewed deployer. A cloud mail/file/AI migration requires its own verified
+cutover; do not delete existing R2 objects or disable credential email delivery.
+
 The integrated roadmap release in PR #68 adds six migrations, including composite
 tenant/clinic constraints. Review the exact migration range and run a production
 backup through isolated restore/migrate before cutover. The unattended Hostinger

@@ -9,7 +9,7 @@ import { accessibleClinicIds } from "@/lib/tenant-scope";
 import { runSerializableTransaction } from "@/lib/transaction";
 import { readIntegrationSecrets, writeIntegrationSecrets } from "@/infrastructure/integrations/credential-vault";
 import { upsertIntegrationConnection } from "@/infrastructure/integrations/substrate";
-import { findActiveIntegrationConnection, referenceMetadata, type IntegrationConnectionRecord } from "@/infrastructure/integrations/phase3-store";
+import { referenceMetadata, type IntegrationConnectionRecord } from "@/infrastructure/integrations/phase3-store";
 import { optionalProviderBaseUrl } from "@/integrations/optional-http";
 import type { OptionalProvider, OptionalProviderDefinition, OptionalProviderWorkspace } from "@/features/integrations/optional-provider";
 
@@ -40,6 +40,14 @@ function isVerified(connection: IntegrationConnectionRecord) {
     metadata.verifiedVersion === metadata.configurationVersion && typeof metadata.providerIdentity === "string" && Boolean(metadata.providerIdentity);
 }
 export { isVerified as optionalConnectionIsVerified };
+export async function findOptionalProviderConnection(db: DB, scope: {organizationId:string;clinicId:string;provider:OptionalProvider}) {
+  // A disabled clinic override is an intentional stop, not permission to fall
+  // back to a different organization-wide archive/account.
+  const rows = await db.$queryRawUnsafe<IntegrationConnectionRecord[]>(`SELECT * FROM "IntegrationConnection"
+    WHERE "organizationId"=$1 AND "provider"=$2 AND ("clinicId"=$3 OR "clinicId" IS NULL)
+    ORDER BY CASE WHEN "clinicId"=$3 THEN 0 ELSE 1 END, "createdAt" LIMIT 1`, scope.organizationId, scope.provider, scope.clinicId);
+  return rows[0] ?? null;
+}
 export async function getOptionalProviderSettings(session: AppSession, definition: OptionalProviderDefinition): Promise<OptionalProviderWorkspace> {
   manage(session);
   const clinics = session.clinics.filter(clinic => accessibleClinicIds(session).includes(clinic.id) &&
@@ -136,8 +144,8 @@ export async function loadOptionalProviderConnectionForScope(scope: { organizati
   if (!organization || organization.isDemo) optionalProviderFail("integration-demo-unavailable", 403);
   const clinic = await prisma.clinic.findFirst({ where: { id: scope.clinicId, organizationId: scope.organizationId }, select: { id: true } });
   if (!clinic) optionalProviderFail("integration-clinic-forbidden", 403);
-  const connection = await findActiveIntegrationConnection(prisma, { ...scope, provider });
-  if (!connection || !isVerified(connection)) optionalProviderFail("integration-connection-not-ready", 409);
+  const connection = await findOptionalProviderConnection(prisma, { ...scope, provider });
+  if (!connection || connection.status !== "ACTIVE" || !isVerified(connection)) optionalProviderFail("integration-connection-not-ready", 409);
   const secrets = await readIntegrationSecrets(prisma, { organizationId: scope.organizationId, connectionId: connection.id, provider });
   if (!secrets) optionalProviderFail("integration-credentials-missing", 409);
   optionalProviderBaseUrl(secrets.baseUrl!);
