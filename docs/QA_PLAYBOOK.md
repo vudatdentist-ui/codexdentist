@@ -11,6 +11,28 @@ baseline -> implement -> audit -> classify -> fix -> re-audit -> repeat -> phase
 
 A passing build alone is not enough. Every changed high-risk boundary must pass its focused negative/regression tests before a phase can close.
 
+Optional-service changes require `npm run test:optional`, `NODE_ENV=test npm run
+test:optional-db` with explicit loopback `DATABASE_URL` and
+`CHATWOOT_TEST_DATABASE_URL`, and `NODE_ENV=test npm run browser:optional`.
+The browser runner creates/migrates/drops only a uniquely named disposable
+database and starts its own Next development server on port 3002. It exercises
+actual bank settings/vault/QR routes, unchanged receipt/payment ledgers, patient
+tools and auth/CSRF, in addition to isolated panel state/race tests.
+`python3 scripts/optional-services.test.py` enforces opt-in profiles, private
+database networks, loopback-only ports, resource bounds and credential files.
+
+Real provider acceptance uses only QA-specific accounts/projects projected into
+a private ignored file, with an owned SSH loopback tunnel. Run
+`NODE_ENV=test node scripts/optional-provider-live-acceptance.cjs` and the app
+runner with `--live-providers`. No mock-only result substitutes for this gate.
+Cover actual OAuth/conditional FHIR creation and stale-version rejection,
+Chatwoot opaque contact/conversation recovery without message POST, Novu in-app
+worker delivery, authenticated PACS/DICOMweb and OHIF pixels. The app runner
+also checks foreign-tenant viewer/frame/export denials and removes only its own
+synthetic PACS study. Inspect fresh 1440/390/320px evidence under
+`output/workspace-qa/optional-app`; restore drills use entirely separate volumes
+and start no API, mail or notification worker from restored records.
+
 Shared sign-in changes require `test:audit`, `test:tenant` and `browser:trial-signup`: verify root-host login/session, patient isolation between two organizations on the same host, ignored client-supplied organization scope, host-only cookies, shared recovery/setup links, legacy deep-link redirects, signup, re-login and expired-trial rejection. The trial browser maps the shared hostname to disposable loopback and captures desktop/mobile login and dashboard evidence under `output/workspace-qa/shared-login`.
 
 For clinic permissions, signup/recovery, scheduling, notification delivery, or mobile

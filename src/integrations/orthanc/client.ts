@@ -6,6 +6,8 @@ export type OrthancConnectionSecrets = {
   viewerAccessMode: "private" | "disabled";
   username: string | null;
   password: string | null;
+  /** Vault calls use the root-approved, bounded optional-provider transport. */
+  vault?: boolean;
 };
 
 export type OrthancStudyMetadata = {
@@ -33,9 +35,13 @@ export async function fetchOrthancStudy(
 
   let response: Response;
   try {
-    response = await fetch(`${secrets.baseUrl}/studies/${encodeURIComponent(studyId)}`, {
+    const providerFetch = secrets.vault
+      ? (await import("@/integrations/optional-http")).optionalProviderFetch
+      : fetch;
+    response = await providerFetch(`${secrets.baseUrl}/studies/${encodeURIComponent(studyId)}`, {
       headers,
       cache: "no-store",
+      redirect: "error",
       signal: AbortSignal.timeout(8000),
     });
   } catch {
@@ -49,6 +55,9 @@ export async function fetchOrthancStudy(
   return normalizeOrthancStudy(body, studyId);
 }
 
+/** @deprecated Legacy URL utility only. Application links use getImagingViewerCommand
+ * and the authenticated /imaging/ohif route; never link a browser to a private host.
+ */
 export function buildOhifStudyUrl(viewerBaseUrl: string | null, studyInstanceUid: string) {
   if (!viewerBaseUrl) return null;
   const url = new URL(viewerBaseUrl);
@@ -58,7 +67,7 @@ export function buildOhifStudyUrl(viewerBaseUrl: string | null, studyInstanceUid
 
 function normalizeOrthancId(value: string) {
   const normalized = value.trim();
-  if (!/^[A-Za-z0-9._-]{1,128}$/.test(normalized)) {
+  if (!/^[A-Za-z0-9._-]{1,128}$/.test(normalized) || normalized === "." || normalized === "..") {
     throw new OrthancProviderError("orthanc-study-id-invalid", 400);
   }
   return normalized;

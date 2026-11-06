@@ -1,0 +1,21 @@
+.panel { padding: 1rem; border: 1px solid var(--border, #d9e2e5); border-radius: .75rem; background: var(--surface, #fff); color: var(--text, #18383d); min-width: 0; display: grid; gap: .8rem; }
+.panel p, .panel h3 { margin: 0; }
+.panel p { line-height: 1.55; }
+.heading, .actions, .list li { display: flex; justify-content: space-between; gap: .75rem; flex-wrap: wrap; align-items: center; }
+.heading h3 { font-size: 1rem; }
+.heading span { font-size: .8rem; color: #49646a; }
+.panel button { padding: .6rem .85rem; border: 1px solid #b6c7c9; border-radius: .5rem; background: #f3f8f8; color: #18383d; cursor: pointer; font: inherit; }
+.panel button:disabled { opacity: .55; cursor: default; }
+.panel a { color: #006a70; text-decoration: underline; text-underline-offset: .15em; }
+.panel button:focus-visible, .panel input:focus-visible, .panel a:focus-visible, .panel summary:focus-visible { outline: 3px solid #13858e; outline-offset: 3px; }
+.confirm { display: flex; align-items: flex-start; gap: .5rem; line-height: 1.5; }
+.confirm input { margin-top: .25rem; flex-shrink: 0; }
+.list { display: grid; gap: .75rem; padding: 0; margin: 0; list-style: none; }
+.list li { padding: .75rem; border: 1px solid #d9e2e5; border-radius: .5rem; }
+.panel details { display: grid; min-width: 0; }
+.panel details[open] > :not(summary) { display: block; margin-top: .75rem; }
+.panel details input { box-sizing: border-box; width: 100%; padding: .65rem; border: 1px solid #b6c7c9; border-radius: .4rem; font: inherit; }
+.panel summary { cursor: pointer; line-height: 1.5; }
+.identifier { overflow-wrap: anywhere; }
+.actions { justify-content: flex-start; }
+@media (max-width: 400px) { .panel { padding: .8rem; } .actions > button { width: 100%; } }

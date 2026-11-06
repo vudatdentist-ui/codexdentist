@@ -35,7 +35,7 @@ export function OperationPatientSelect({ purpose }: { purpose: "lab" | "imaging"
   }, [purpose, query]);
   return <div className={styles.patientLookup}>
     <label>Tìm bệnh nhân<Input type="search" value={query} onChange={event => setQuery(event.target.value)} placeholder="Tên hoặc số điện thoại" maxLength={120} /></label>
-    <label>Bệnh nhân<Select key={query} name="patientId" required defaultValue="" aria-busy={loading}>
+    <label>Bệnh nhân<Select key={query} name="patientId" aria-label="Bệnh nhân" required defaultValue="" aria-busy={loading}>
       <option value="">{loading ? "Đang tìm…" : "Chọn bệnh nhân"}</option>
       {patients.map(patient => <option key={patient.id} value={patient.id}>{patient.fullName} · {patient.phone} · {patient.clinic.name}</option>)}
     </Select></label>
