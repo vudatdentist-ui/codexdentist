@@ -11,6 +11,21 @@ baseline -> implement -> audit -> classify -> fix -> re-audit -> repeat -> phase
 
 A passing build alone is not enough. Every changed high-risk boundary must pass its focused negative/regression tests before a phase can close.
 
+Owned email changes require `npm run test:owned-mail`, `python3
+scripts/owned-mail-services.test.py`, `NODE_ENV=test npm run test:owned-mail-db`
+and `NODE_ENV=test npm run browser:owned-mail`, with explicit loopback disposable
+PostgreSQL. The unit/HTTP gates use actual TLS SMTP with an isolated local
+certificate, signed requests and encrypted SQLite, not a cloud inbox. Cover
+header injection, foreign receipts, concurrent workers, credential redaction,
+lost SMTP acknowledgements without replay, corrupted payloads, expiry and
+networkless restoration of the idempotency state. Test-only SMTP must never
+pass a production readiness check. Re-run the same tests on the built Node 22
+Linux image; the fixture's recipients are restricted to `.test`/`.invalid`.
+Full-app acceptance requests a reset, consumes the actual captured one-time
+link, signs in again and inspects settings at 1440/390/320. No real user,
+patient message or external destination enters this test. DNS and actual MTA
+queue/delivery/backup acceptance are separate production gates.
+
 Durable storage changes require `test:durable-files`, `python3
 scripts/durable-files-ops.test.py`, `NODE_ENV=test npm run test:durable-files-db`
 and `NODE_ENV=test npm run browser:durable-files` with explicit disposable

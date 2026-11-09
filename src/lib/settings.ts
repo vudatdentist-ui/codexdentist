@@ -2,7 +2,7 @@ import { accessibleClinicIds as allowedClinicIds } from "@/lib/tenant-scope";
 import "server-only";
 
 import { clinics as demoClinics } from "@/lib/data";
-import { codexMedAiConfig, notificationDeliveryMode, resendEmailConfig } from "@/lib/env";
+import { codexMedAiConfig, notificationDeliveryMode, resendEmailConfig, ownedMailConfig } from "@/lib/env";
 import { canUseAllClinics, hasAnyRole, type AppRole } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import { assertDemoFallbackAllowed } from "@/lib/runtime-guards";
@@ -460,7 +460,7 @@ function demoSettingsWorkspace(session: AppSession): SettingsWorkspace {
 
 function safeResendFromEmail() {
   try {
-    return resendEmailConfig()?.from ?? null;
+    return resendEmailConfig()?.from ?? ownedMailConfig()?.from ?? null;
   } catch {
     return null;
   }

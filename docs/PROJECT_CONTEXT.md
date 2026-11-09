@@ -335,6 +335,22 @@ Issue #91 remains open for the remaining free-runtime cutovers, in order:
    complete consent reconciliation. Existing Documenso UI/connector tests are not
    evidence that a real signing service is already running.
 
+Owned email implementation is in progress: `owned-mail` is an opt-in transport,
+with private HTTPS/HMAC, a separately encrypted SQLite idempotency journal and
+TLS submission to the owned SMTP service. Existing notification records remain
+canonical. A lost acknowledgement keeps PROCESSING and only authenticated,
+organization-bound receipt reconciliation may finish it; no automatic replay.
+Credential bodies remain ephemeral in the core and are removed from the gateway
+after terminal acknowledgement/expiry. The SMTP acknowledgement means accepted
+by the owned MTA, not proof of placement in an external inbox. Test-only services
+cannot satisfy production readiness. The initial deployment has no public port,
+external network or core database access, and rejects external test recipients.
+Native SQLite worker races, actual TLS SMTP, PostgreSQL claim races and full-app
+password recovery/settings have passed locally, including 1440/390/320 UI.
+The Windows and actual Node 22 Linux runs agree. Full CI, server deployment,
+sender DNS, queue backup/restore and real delivery acceptance remain open;
+production continues using its existing email provider until those gates pass.
+
 Local AI is deployed in `2face1e` (PR #95), with the production configuration
 cutover independently verified on 2026-11-09. The owned VPS has Ollama 0.40.15 and
 Qwen3 4B pinned by image/model digests. Runtime has no published port or external

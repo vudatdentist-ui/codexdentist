@@ -8,7 +8,9 @@ import {
   notificationWebhookSecret,
   notificationWebhookUrl,
   resendEmailConfig,
+  ownedMailConfig,
 } from "@/lib/env";
+import { deliverOwnedMail, ownedMailStatus, OwnedMailError } from "@/integrations/owned-mail/client";
 import { prisma } from "@/lib/prisma";
 import { credentialNotificationTemplateKeys } from "@/lib/notification-templates";
 
@@ -31,6 +33,7 @@ export async function processDueNotifications(input: ProcessDueNotificationsInpu
   const now = input.now ?? new Date();
   const limit = sanitizeLimit(input.limit);
   const mode = notificationDeliveryMode();
+  if (mode === "owned-mail") await reconcileOwnedMailNotifications(limit);
   const notifications = await prisma.notification.findMany({
     where: {
       // Credential bodies are deliberately redacted at rest. Only the caller
@@ -139,6 +142,12 @@ export async function processNotificationNow(
       skipped: 0,
       results: [],
     };
+  }
+
+  if (mode === "owned-mail" && notification.channel === "EMAIL" && notification.status === "PROCESSING") {
+    const result = await reconcileOwnedMailNotification(notification);
+    return { mode, processed: 1, sent: result.status === "sent" ? 1 : 0, failed: result.status === "failed" ? 1 : 0,
+      skipped: result.status === "skipped" ? 1 : 0, results: [result] };
   }
 
   if (mode === "disabled") {
@@ -257,6 +266,22 @@ async function deliverNotification(
         if (delivery.state !== "SENT") return skipped("Novu delivery awaits authenticated reconciliation.");
       } else if (mode === "log") {
         console.info("notification.simulated", { id: notification.id, channel: notification.channel });
+      } else if (mode === "owned-mail") {
+        if (notification.channel !== "EMAIL") throw new Error("notification-channel-not-configured");
+        const config = ownedMailConfig();
+        if (!config) throw new OwnedMailError("owned-mail-configuration-invalid");
+        // Creation/schedule timestamps bind retries to the same finite envelope.
+        // A new credential intent creates its own notification and one-time link.
+        const origin = Math.max(notification.createdAt.getTime(), notification.scheduledAt?.getTime() ?? 0);
+        const receipt = await deliverOwnedMail(config, { id: notification.id, organizationId: notification.organizationId,
+          recipient: notification.recipient, subject: notification.subject, body: notification.body,
+          templateKey: notification.templateKey, expiresAt: origin + 24 * 60 * 60 * 1000 });
+        if (receipt.state === "REJECTED") throw new OwnedMailError("owned-mail-rejected", false);
+        if (receipt.state !== "SENT") throw new OwnedMailError("owned-mail-awaiting-reconciliation");
+        const sent = await prisma.notification.updateMany({ where: { id: notification.id, organizationId: notification.organizationId, status: "PROCESSING" },
+          data: { status: "SENT", sentAt: new Date(), failedReason: null } });
+        return sent.count === 1 ? { id: notification.id, channel: notification.channel, recipient: notification.recipient, status: "sent" }
+          : skipped("Notification has already been reconciled.");
       } else if (mode === "resend") {
         if (notification.channel === "EMAIL") {
           await deliverToResend(notification);
@@ -286,6 +311,9 @@ async function deliverNotification(
       status: "sent",
     };
   } catch (error) {
+    if (mode === "owned-mail" && error instanceof OwnedMailError && error.uncertain) {
+      return skipped("Email delivery awaits authenticated reconciliation.");
+    }
     const reason = error instanceof Error ? error.message : "Unknown delivery error";
 
     await prisma.notification.update({
@@ -306,6 +334,28 @@ async function deliverNotification(
       reason,
     };
   }
+}
+
+async function reconcileOwnedMailNotification(notification: Notification): Promise<NotificationDeliveryResult> {
+  const result = (status: NotificationDeliveryResult["status"], reason?: string): NotificationDeliveryResult =>
+    ({ id: notification.id, channel: notification.channel, recipient: notification.recipient, status, ...(reason ? { reason } : {}) });
+  try {
+    const config = ownedMailConfig();
+    if (!config) return result("skipped", "Email delivery awaits authenticated reconciliation.");
+    const receipt = await ownedMailStatus(config, { id: notification.id, organizationId: notification.organizationId });
+    // Missing evidence never releases a previous uncertain dispatch for resend.
+    if (!receipt || !["SENT", "REJECTED"].includes(receipt.state)) return result("skipped", "Email delivery awaits authenticated reconciliation.");
+    const changed = await prisma.notification.updateMany({ where: { id: notification.id, organizationId: notification.organizationId, status: "PROCESSING" },
+      data: receipt.state === "SENT" ? { status: "SENT", sentAt: new Date(), failedReason: null } : { status: "FAILED", failedReason: "owned-mail-rejected" } });
+    if (changed.count !== 1) return result("skipped", "Notification has already been reconciled.");
+    return result(receipt.state === "SENT" ? "sent" : "failed");
+  } catch { return result("skipped", "Email delivery awaits authenticated reconciliation."); }
+}
+
+async function reconcileOwnedMailNotifications(limit: number) {
+  const pending = await prisma.notification.findMany({ where: { channel: "EMAIL", status: "PROCESSING" },
+    orderBy: { updatedAt: "asc" }, take: limit });
+  for (const notification of pending) await reconcileOwnedMailNotification(notification);
 }
 
 async function deliverToResend(notification: Notification) {

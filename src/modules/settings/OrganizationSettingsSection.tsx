@@ -289,9 +289,9 @@ export function OrganizationSettingsSection(model: Pick<SettingsPanelModel, "acc
           </section>
 
           <section className="panel" data-settings-block="providers">
-            <PanelHeader icon={Bell} title={accountLabels.notificationSettings} action={notificationSettings?.deliveryMode ?? "-"}/>
+            <PanelHeader icon={Bell} title={accountLabels.notificationSettings} action={model.notificationMode === "owned-mail" ? (language === "vi" ? "Máy chủ phòng khám" : "Clinic mail server") : notificationSettings?.deliveryMode ?? "-"}/>
             <div className="record-grid">
-              <RecordTile title={accountLabels.notificationMode} value={notificationSettings?.deliveryMode ?? "-"}/>
+              <RecordTile title={accountLabels.notificationMode} value={model.notificationMode === "owned-mail" ? (language === "vi" ? "Máy chủ phòng khám" : "Clinic mail server") : notificationSettings?.deliveryMode ?? "-"}/>
               <RecordTile title={accountLabels.resendFrom} value={notificationSettings?.resendFromEmail ?? "-"}/>
               <RecordTile title={accountLabels.recentSent} value={String(notificationSettings?.recentSent ?? 0)}/>
               <RecordTile title={accountLabels.recentFailed} value={String(notificationSettings?.recentFailed ?? 0)}/>

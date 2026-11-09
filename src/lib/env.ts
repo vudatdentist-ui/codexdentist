@@ -18,7 +18,7 @@ const weakJobSecretValues = new Set([
   "replace-with-a-long-random-job-secret-before-production",
 ]);
 
-export type NotificationDeliveryMode = "disabled" | "log" | "webhook" | "resend" | "novu";
+export type NotificationDeliveryMode = "disabled" | "log" | "webhook" | "resend" | "novu" | "owned-mail";
 export type NotificationWebhookChannel = "EMAIL" | "SMS" | "ZALO" | "PUSH" | "IN_APP" | "PHONE";
 export type PatientFileStorageDriver = "local" | "r2";
 export type CodexMedAiProvider = "openai-compatible" | "ollama";
@@ -147,13 +147,27 @@ export function notificationDeliveryMode(): NotificationDeliveryMode {
   const value = (process.env.NOTIFICATION_DELIVERY_MODE?.trim().toLowerCase() ||
     (process.env.NODE_ENV === "production" ? "disabled" : "log")) as NotificationDeliveryMode;
 
-  if (!["disabled", "log", "webhook", "resend", "novu"].includes(value)) {
+  if (!["disabled", "log", "webhook", "resend", "novu", "owned-mail"].includes(value)) {
     throw new Error(
-      "NOTIFICATION_DELIVERY_MODE must be one of disabled, log, webhook, resend, or novu.",
+      "NOTIFICATION_DELIVERY_MODE must be disabled, log, webhook, resend, novu, or owned-mail.",
     );
   }
 
   return value;
+}
+
+export function ownedMailConfig() {
+  if (notificationDeliveryMode() !== "owned-mail") return null;
+  const baseUrl = process.env.OWNED_MAIL_BASE_URL?.trim() ?? "";
+  const secret = process.env.OWNED_MAIL_SIGNING_SECRET ?? "";
+  const from = process.env.OWNED_MAIL_FROM?.trim() ?? "";
+  let url: URL;
+  try { url = new URL(baseUrl); } catch { throw new Error("owned-mail-configuration-invalid"); }
+  if (url.protocol !== "https:" || !["codexdentist-mail-gateway", "127.0.0.1", "localhost", "[::1]"].includes(url.hostname) ||
+      url.username || url.password || url.search || url.hash || url.pathname !== "/" || secret.length < 32 ||
+      !/^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@(?:[A-Za-z0-9](?:[A-Za-z0-9-]{0,61}[A-Za-z0-9])?\.)+[A-Za-z]{2,63}$/.test(from) ||
+      from.length > 254 || /[\s\u0000-\u001f\u007f<>]/.test(from)) throw new Error("owned-mail-configuration-invalid");
+  return { baseUrl: url.origin, secret, from };
 }
 
 export function resendEmailConfig() {
