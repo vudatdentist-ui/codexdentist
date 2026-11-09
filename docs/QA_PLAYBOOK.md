@@ -11,6 +11,22 @@ baseline -> implement -> audit -> classify -> fix -> re-audit -> repeat -> phase
 
 A passing build alone is not enough. Every changed high-risk boundary must pass its focused negative/regression tests before a phase can close.
 
+Durable storage changes require `test:durable-files`, `python3
+scripts/durable-files-ops.test.py`, `NODE_ENV=test npm run test:durable-files-db`
+and `NODE_ENV=test npm run browser:durable-files` with explicit disposable
+loopback PostgreSQL. After building the Linux image, run `python3
+scripts/durable-files-linux.py --image codexdentist:ci --source "$PWD" --output
+output/durable-linux`. It creates only uniquely labelled, network-isolated test
+containers/volumes, exercises actual non-root mounted reads, stream cancellation,
+root/read-only/unmounted denials, S3-to-local CLI retries and checksum failures,
+then restores the snapshot into another networkless volume. The database gate
+checks one concurrent winner, stale/foreign rejection, unchanged clinical metadata
+and retention targeting the relocated stage. Inspect synthetic upload evidence
+at 1440/390/320px. An unauthenticated file request must redirect to `/login` without
+returning bytes; foreign-tenant requests remain 404. Production acceptance must
+verify the existing file's checksum through its protected route and prove a fresh
+database-plus-file restore, not only a successful empty-volume probe.
+
 Local inference changes require `npm run test:local-ai` and
 `python3 scripts/local-ai-services.test.py`. Use `NODE_ENV=test npm run
 browser:local-ai` with explicit disposable loopback PostgreSQL and an owned

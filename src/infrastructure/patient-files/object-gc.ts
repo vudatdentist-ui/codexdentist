@@ -11,6 +11,7 @@ import {
   r2StorageConfig,
 } from "@/lib/env";
 import type { PatientFileStageRow } from "@/infrastructure/patient-files/staging";
+import { durableLocalRootRequired, resolvePrivateStoragePath, verifyDurableLocalRoot } from "@/infrastructure/patient-files/durable-root";
 
 let r2Client: S3Client | null = null;
 
@@ -86,18 +87,11 @@ async function deleteLocalObject(storageKey: string) {
 }
 
 async function resolveLocalStoragePath(storageKey: string) {
-  const path = await import("node:path");
-  const root = await localStorageRoot();
-  const normalized = storageKey.replaceAll("\\", "/");
-  const relativePath = normalized.replace(/^patient-files\//, "");
-  const absolutePath = path.resolve(root, relativePath);
-  if (!absolutePath.startsWith(`${root}${path.sep}`)) {
-    throw new Error("patient-file-stage-invalid-storage-path");
-  }
-  return absolutePath;
+  return resolvePrivateStoragePath(await localStorageRoot(), storageKey);
 }
 
 async function localStorageRoot() {
+  if (durableLocalRootRequired()) return verifyDurableLocalRoot();
   const path = await import("node:path");
   const configured = patientFileStorageRoot();
   return configured
@@ -154,7 +148,7 @@ function getR2Client() {
 }
 
 function requiredR2Config() {
-  const config = r2StorageConfig();
+  const config = r2StorageConfig({ forExistingObject: true });
   if (!config) throw new Error("patient-file-stage-r2-not-configured");
   return config;
 }

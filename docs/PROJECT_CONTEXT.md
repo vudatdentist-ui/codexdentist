@@ -365,6 +365,18 @@ verify bytes before an audited, concurrency-fenced metadata change; retain the
 original R2 object. Keep file authorization, tenant/clinic isolation, upload
 validation and the staged cleanup lifecycle. Storage readiness/go-live must prove
 the selected durable backend, rather than accepting an ephemeral container path.
+The implementation uses explicit `PATIENT_FILE_LOCAL_DURABLE=true`, an exact
+Linux mount outside the release, app UID ownership and mode 0700. Files are 0600;
+path traversal and directory/leaf symlinks fail closed. Existing R2 reads are
+independent of the selected write backend. The operator relocation CLI journals
+and fsyncs its verified candidate before atomically moving both the file and its
+single cleanup stage; uncertain commits preserve evidence, never queue candidate
+deletion. It currently accepts checksummed originals without variants, matching
+the live inventory; files with variants require a separately reviewed migration.
+Mounted Linux, actual S3 reads, interrupted-commit recovery, native PostgreSQL
+races/retention and networkless file restoration have passed. Actual app PDF/image
+upload, previews and protected downloads pass at 1440/390/320px. Production cutover
+remains a separate gate; existing cloud objects and credentials stay available.
 
 ### Current delivery plan — 2026-11-05
 

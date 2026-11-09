@@ -2,6 +2,7 @@ import "server-only";
 
 import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { createHash, randomUUID } from "node:crypto";
+import { constants } from "node:fs";
 import { Readable } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import {
@@ -11,6 +12,7 @@ import {
 } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { createStorageObjectPurgeManifests } from "@/infrastructure/patient-files/purge-manifest";
+import { durableLocalRootRequired, resolvePrivateStoragePath, verifyDurableLocalRoot } from "@/infrastructure/patient-files/durable-root";
 
 const MB = 1024 * 1024;
 
@@ -423,17 +425,7 @@ export async function openStoredPatientFileStream(input: {
 }
 
 async function resolveStoredPatientFilePath(relativePath: string) {
-  const path = await import("node:path");
-  const normalized = relativePath.replaceAll("\\", "/");
-  const storageRelativePath = normalized.replace(/^patient-files\//, "");
-  const root = await localStorageRoot();
-  const absolutePath = path.resolve(root, storageRelativePath);
-
-  if (!absolutePath.startsWith(`${root}${path.sep}`)) {
-    throw new Error("Invalid patient file path");
-  }
-
-  return absolutePath;
+  return resolvePrivateStoragePath(await localStorageRoot(), relativePath);
 }
 
 function extensionFor(fileName: string, mimeType: string) {
@@ -651,19 +643,10 @@ async function* boundedUploadChunks(file: Pick<Blob, "size" | "stream">, expecte
 }
 
 async function storeLocalObject(storageKey: string, bytes: Buffer) {
-  const path = await import("node:path");
-  const { mkdir, writeFile } = await import("node:fs/promises");
-  const root = await localStorageRoot();
-  const storageRelativePath = storageKey.replace(/^patient-files\//, "");
-  const absolutePath = path.resolve(root, storageRelativePath);
-
-  if (!absolutePath.startsWith(`${root}${path.sep}`)) {
-    throw new Error("Invalid patient file path");
-  }
-
-  await mkdir(path.dirname(absolutePath), { recursive: true });
+  const { writeFile } = await import("node:fs/promises");
+  const absolutePath = await resolvePrivateStoragePath(await localStorageRoot(), storageKey, true);
   await writeFile(absolutePath, bytes, {
-    flag: "wx",
+    flag: "wx", mode: 0o600,
   });
 }
 
@@ -701,21 +684,11 @@ async function cleanupUploadObjects(organizationId: string, storageProvider: "lo
 }
 
 async function storeLocalFile(storageKey: string, file: File, checksumSha256: string) {
-  const path = await import("node:path");
   const { createWriteStream } = await import("node:fs");
-  const { mkdir } = await import("node:fs/promises");
-  const root = await localStorageRoot();
-  const storageRelativePath = storageKey.replace(/^patient-files\//, "");
-  const absolutePath = path.resolve(root, storageRelativePath);
-
-  if (!absolutePath.startsWith(`${root}${path.sep}`)) {
-    throw new Error("Invalid patient file path");
-  }
-
-  await mkdir(path.dirname(absolutePath), { recursive: true });
+  const absolutePath = await resolvePrivateStoragePath(await localStorageRoot(), storageKey, true);
   await pipeline(
     Readable.from(boundedUploadChunks(file, checksumSha256)),
-    createWriteStream(absolutePath, { flags: "wx" }),
+    createWriteStream(absolutePath, { flags: "wx", mode: 0o600 }),
   );
 }
 
@@ -836,25 +809,23 @@ async function createImageVariants(input: {
 }
 
 async function readLocalObject(storageKey: string) {
-  const { readFile } = await import("node:fs/promises");
-
-  return readFile(await resolveStoredPatientFilePath(storageKey));
+  const { open } = await import("node:fs/promises");
+  const file = await open(await resolveStoredPatientFilePath(storageKey), constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try { return await file.readFile(); } finally { await file.close(); }
 }
 
 async function openLocalObjectStream(storageKey: string): Promise<StoredPatientFileStream> {
-  const { createReadStream } = await import("node:fs");
-  const { stat } = await import("node:fs/promises");
+  const { open } = await import("node:fs/promises");
   const absolutePath = await resolveStoredPatientFilePath(storageKey);
-  const fileStat = await stat(absolutePath);
-  const nodeStream = createReadStream(absolutePath);
-
-  return {
-    body: Readable.toWeb(nodeStream) as ReadableStream<Uint8Array>,
-    contentLength: fileStat.size,
-  };
+  const file = await open(absolutePath, constants.O_RDONLY | (constants.O_NOFOLLOW ?? 0));
+  try {
+    const fileStat = await file.stat();
+    return { body: Readable.toWeb(file.createReadStream()) as ReadableStream<Uint8Array>, contentLength: fileStat.size };
+  } catch (error) { await file.close(); throw error; }
 }
 
 async function localStorageRoot() {
+  if (durableLocalRootRequired()) return verifyDurableLocalRoot();
   const path = await import("node:path");
   const configuredStorageRoot = patientFileStorageRoot();
 
@@ -967,7 +938,7 @@ function getR2Client() {
 }
 
 function requiredR2Config() {
-  const config = r2StorageConfig();
+  const config = r2StorageConfig({ forExistingObject: true });
 
   if (!config) {
     throw new Error("R2 storage is not configured.");

@@ -75,6 +75,12 @@ jobs:
         run: python3 scripts/optional-services.test.py
       - name: Local-only AI and provider response privacy
         run: npm run test:local-ai && python3 scripts/local-ai-services.test.py
+      - name: Private durable file storage and mixed-provider reads
+        run: npm run test:durable-files && python3 scripts/durable-files-ops.test.py
+      - name: Native file migration, concurrent commit and retention
+        run: npm run test:durable-files-db
+        env:
+          NODE_ENV: test
       - name: Maintainability regressions and budgets
         run: npm run test:maintainability
       - run: npm run encoding:check
@@ -255,6 +261,8 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
       - run: docker build -t codexdentist:ci .
+      - name: Native mounted file storage, migration recovery and isolated restore
+        run: python3 scripts/durable-files-linux.py --image codexdentist:ci --source "$PWD" --output output/durable-linux
       - name: Stop verification server
         shell: bash
         run: pkill -f 'next start' || true
@@ -270,6 +278,10 @@ jobs:
         run: npm run browser:optional
         env:
           NODE_ENV: test
+      - name: Private file upload and protected download in the full app
+        run: npm run browser:durable-files
+        env:
+          NODE_ENV: test
       - name: Upload payOS app evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -278,6 +290,8 @@ jobs:
           path: |
             output/workspace-qa/payos
             output/workspace-qa/documenso
+            output/workspace-qa/durable-files
+            output/durable-linux
           if-no-files-found: warn
           retention-days: 7
       - name: Build hosted production release

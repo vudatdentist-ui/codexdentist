@@ -11,6 +11,7 @@ import {
 import { verifyJobRequest } from "@/lib/job-auth";
 import { prisma } from "@/lib/prisma";
 import { reportApplicationError } from "@/lib/error-reporting";
+import { verifyDurableLocalRoot } from "@/infrastructure/patient-files/durable-root";
 
 export const dynamic = "force-dynamic";
 
@@ -83,10 +84,13 @@ export async function GET(request: Request) {
   }
 
   try {
+    const driver = patientFileStorageDriver();
+    const durable = process.env.PATIENT_FILE_LOCAL_DURABLE === "true";
+    if (durable) await verifyDurableLocalRoot({ probeWrite: true });
     checks.push({
       name: "patient-file-storage",
-      status: patientFileStorageDriver() === "local" ? "warn" : "ok",
-      details: patientFileStorageDriver(),
+      status: driver === "local" && !durable ? "warn" : "ok",
+      details: driver === "local" && durable ? "local:durable-mounted" : driver,
     });
   } catch (error) {
     reportApplicationError("readiness.storage_failed", error);

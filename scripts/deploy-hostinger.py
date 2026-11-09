@@ -78,6 +78,46 @@ def compose(*args, override=None):
     return command + list(args)
 
 
+def backup_operational_data(backup, environment):
+    durable_files = environment.get("PATIENT_FILE_LOCAL_DURABLE") == "true"
+    file_snapshot = backup / "patient-files"
+    if durable_files:
+        run(["docker", "pause", CONTAINER])
+    try:
+        with (backup / "database.dump").open("wb") as dump:
+            run(["docker", "exec", POSTGRES, "sh", "-c",
+                 'pg_dump -U "$POSTGRES_USER" -Fc --dbname ' + DATABASE], stdout=dump)
+        if durable_files:
+            run(["python3", str(ROOT / "patient-file-backup.py"), "backup", "--snapshot", str(file_snapshot)])
+    finally:
+        if durable_files:
+            run(["docker", "unpause", CONTAINER])
+    if durable_files:
+        run(["python3", str(ROOT / "patient-file-backup.py"), "drill", "--snapshot", str(file_snapshot)])
+
+
+def backup_current():
+    current = json.loads(capture(["docker", "inspect", CONTAINER]))[0]
+    sha = current["Config"].get("Labels", {}).get(REVISION, "")
+    environment = dict(item.split("=", 1) for item in current["Config"]["Env"])
+    database = urlparse(environment.get("DATABASE_URL", ""))
+    if not re.fullmatch(r"[a-f0-9]{40}", sha) or database.hostname != "nc-migration-postgres" or database.path != "/" + DATABASE:
+        raise RuntimeError("Unexpected production identity; aborting backup")
+    stamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    backup = ROOT / "backups" / f"{stamp}-periodic-{sha[:12]}"
+    backup.mkdir(mode=0o700)
+    for path in [COMPOSE, COMPOSE.parent / ".env", COMPOSE.parent / "env"]:
+        if path.is_dir():
+            shutil.copytree(path, backup / path.name)
+        elif path.exists():
+            shutil.copy2(path, backup / path.name)
+    backup_operational_data(backup, environment)
+    restore_drill(backup, current["Image"], "codexdentist-periodic-restore-" + stamp.lower())
+    wait_health("http://127.0.0.1:3100")
+    write_atomic(backup / "backup-verified.json", json.dumps({"sha": sha, "image": current["Image"], "time": stamp}).encode())
+    print("Current database and configured private files backed up and restored", backup, flush=True)
+
+
 def write_atomic(path, content):
     temporary = path.with_name(path.name + ".new")
     temporary.write_bytes(content)
@@ -290,9 +330,7 @@ def deploy(sha, main, reviewed_migrations=None):
     (backup / "previous-image-id").write_text(current["Image"] + "\n")
     rollback = f"codexdentist:rollback-{stamp.lower()}"
     run(["docker", "tag", current["Image"], rollback])
-    with (backup / "database.dump").open("wb") as dump:
-        run(["docker", "exec", POSTGRES, "sh", "-c",
-             'pg_dump -U "$POSTGRES_USER" -Fc --dbname ' + DATABASE], stdout=dump)
+    backup_operational_data(backup, environment)
     restore_drill(backup, image, "codexdentist-restore-" + stamp.lower())
     old_config = COMPOSE.read_bytes()
     new_config = replace_image(old_config.decode(), image).encode()
@@ -342,7 +380,7 @@ def deploy(sha, main, reviewed_migrations=None):
             print("Previous image restored; deployment marker retained", flush=True)
         raise
     finally:
-        # This container has no application data volume; never remove a database volume.
+        # Remove only this disposable candidate's anonymous volumes, never named data volumes.
         subprocess.run(["docker", "rm", "-f", candidate], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
@@ -352,13 +390,19 @@ def main():
     parser.add_argument("--sha", help="Optional exact main SHA; still requires successful push CI")
     parser.add_argument("--check", action="store_true", help="Read eligibility without deploying")
     parser.add_argument("--reviewed-migrations", help="Root-owned exact SHA/range/SQL hash review for a manual release")
+    parser.add_argument("--backup-only", action="store_true", help="Snapshot/restore the current runtime without deploying or requiring GitHub access")
     args = parser.parse_args()
+    if args.backup_only and (args.sha or args.check or args.reviewed_migrations):
+        parser.error("--backup-only cannot be combined with release options")
     os.umask(0o077)
     ROOT.mkdir(mode=0o700, exist_ok=True)
     for directory in ["releases", "backups"]:
         (ROOT / directory).mkdir(mode=0o700, exist_ok=True)
     with (ROOT / "deploy.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if args.backup_only:
+            backup_current()
+            return
         main_sha = api("git/ref/heads/main")["object"]["sha"]
         sha = args.sha or main_sha
         runs = api(f"actions/runs?head_sha={sha}&event=push&per_page=20")["workflow_runs"]

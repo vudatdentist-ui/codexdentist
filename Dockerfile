@@ -35,7 +35,8 @@ COPY --chown=node:node --from=builder /app/prisma ./prisma
 COPY --chown=node:node --from=builder /app/server.cjs ./server.cjs
 
 RUN mkdir -p /data/patient-files \
-  && chown -R node:node /data
+  && chown -R node:node /data \
+  && chmod 700 /data/patient-files
 
 USER node
 EXPOSE 3000

@@ -1,4 +1,5 @@
 import "server-only";
+import { durableLocalRootConfiguration } from "@/infrastructure/patient-files/durable-root";
 
 const developmentDatabaseUrl =
   "postgresql://postgres:postgres@localhost:5432/vietnam_dental_suite?schema=public";
@@ -245,12 +246,14 @@ export function patientFileStorageDriver(): PatientFileStorageDriver {
   if (
     value === "local" &&
     process.env.NODE_ENV === "production" &&
-    deploymentMode() !== "self-hosted"
+    deploymentMode() !== "self-hosted" && process.env.PATIENT_FILE_LOCAL_DURABLE !== "true"
   ) {
     throw new Error(
       "Local patient file storage is blocked in production. Use PATIENT_FILE_STORAGE_DRIVER=r2.",
     );
   }
+
+  if (value === "local" && process.env.PATIENT_FILE_LOCAL_DURABLE === "true") durableLocalRootConfiguration();
 
   return value as PatientFileStorageDriver;
 }
@@ -259,7 +262,7 @@ export function patientFileStorageRoot() {
   return process.env.PATIENT_FILE_STORAGE_ROOT?.trim() || "";
 }
 
-export function r2StorageConfig() {
+export function r2StorageConfig(options: { forExistingObject?: boolean } = {}) {
   const accountId = process.env.R2_ACCOUNT_ID?.trim();
   const endpoint =
     process.env.R2_ENDPOINT?.trim() ||
@@ -268,9 +271,11 @@ export function r2StorageConfig() {
   const accessKeyId = process.env.R2_ACCESS_KEY_ID?.trim();
   const secretAccessKey = process.env.R2_SECRET_ACCESS_KEY?.trim();
 
-  if (patientFileStorageDriver() !== "r2") {
+  if (!options.forExistingObject && patientFileStorageDriver() !== "r2") {
     return null;
   }
+
+  if (options.forExistingObject && !endpoint && !bucket && !accessKeyId && !secretAccessKey) return null;
 
   if (!endpoint || !bucket || !accessKeyId || !secretAccessKey) {
     throw new Error(
