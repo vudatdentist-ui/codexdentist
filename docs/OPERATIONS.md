@@ -490,6 +490,18 @@ configuration or silently fall back to a paid/cloud API. Verify private inferenc
 readiness, owner UI, core health under inference load and unchanged ledgers before
 claiming the switch. Keep mail/storage configuration and existing vault keys intact.
 
+Owned production cutover is complete for `2face1e`: its main push CI is
+`42617070713`, core backup is `20261109T124204Z-2face1eaf30c`, and the root-private
+environment rollback snapshot is under
+`/opt/codexdentist-deploy/local-ai-activation-20261109`. The model cache snapshot
+`/opt/codexdentist-local-ai/backups/20261109T121524Z-bcfd9e53` passed isolated
+restore, all-file SHA-256 comparison and pinned-model opening. Independent runtime
+inference returned the correct synthetic count in 53.4 seconds, with no cloud
+fallback or database writes. Owner Settings displays Ollama/Qwen3 4B ready at
+1440/390/320px; all four optional providers still verify. Health/readiness/go-live
+and the before/after zero-mismatch financial audit pass. The generated review
+session was revoked. Do not repeat the cutover over its retained rollback state.
+
 ### Free optional services
 
 `scripts/optional-services.py` prepares root-private configuration under
