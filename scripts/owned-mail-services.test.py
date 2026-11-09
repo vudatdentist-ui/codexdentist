@@ -9,9 +9,18 @@ spec=importlib.util.spec_from_file_location('owned_mail',Path(__file__).with_nam
 mail=importlib.util.module_from_spec(spec);spec.loader.exec_module(mail)
 spec=importlib.util.spec_from_file_location('mail_backup',Path(__file__).with_name('owned-mail-backup.py'))
 backup=importlib.util.module_from_spec(spec);spec.loader.exec_module(backup)
+spec=importlib.util.spec_from_file_location('mail_linux',Path(__file__).with_name('owned-mail-linux.py'))
+linux=importlib.util.module_from_spec(spec);spec.loader.exec_module(linux)
 
 
 class OwnedMailDeployment(unittest.TestCase):
+    def test_private_key_evidence_cannot_enter_the_build_tree(self):
+        with tempfile.TemporaryDirectory()as temp:
+            source=Path(temp)/'source';source.mkdir()
+            for output in [source,source/'output/mail',source/'output/../private-mail']:
+                with self.assertRaisesRegex(ValueError,'outside the source'):linux.private_output(source,output)
+            self.assertEqual(linux.private_output(source,Path(temp)/'private-mail'),Path(temp)/'private-mail')
+
     def test_initial_runtime_is_private_and_cannot_send_external_mail(self):
         config=mail.configuration('sha256:'+'a'*64)
         self.assertEqual(config['name'],'codexdentist-owned-mail')
