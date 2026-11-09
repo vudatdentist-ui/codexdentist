@@ -278,6 +278,8 @@ jobs:
           scripts/owned-mail.test.mjs scripts/owned-mail-http.test.mjs scripts/owned-mail-notifications.test.cjs
       - name: Build the private mail gateway from the exact compatible image
         run: docker build --network none --build-arg BASE_IMAGE=codexdentist:ci -f scripts/owned-mail/Dockerfile -t codexdentist-mail-gateway:ci .
+      - name: Real pinned MTA, DKIM and private mail restore
+        run: sudo -n python3 scripts/owned-mail-linux.py --image codexdentist:ci --source "$PWD" --output output/owned-mail-linux
       - name: Native mounted file storage, migration recovery and isolated restore
         run: python3 scripts/durable-files-linux.py --image codexdentist:ci --source "$PWD" --output output/durable-linux
       - name: Stop verification server

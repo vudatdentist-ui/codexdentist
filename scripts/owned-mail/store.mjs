@@ -19,7 +19,8 @@ export function openMailStore(filename, encryptionKey) {
       sealed_payload BLOB, state TEXT NOT NULL CHECK(state IN ('QUEUED','DISPATCHING','SENT','UNCERTAIN','REJECTED')),
       lease TEXT, receipt_id TEXT, safe_code TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
       expires_at INTEGER NOT NULL, dispatch_started_at INTEGER
-    );`);
+    );
+    CREATE TABLE IF NOT EXISTS mail_meta (name TEXT PRIMARY KEY, value BLOB NOT NULL);`);
   const context = row => Buffer.from(`${row.organization_id}\n${row.id}\n${row.payload_hash}`);
   function seal(row, envelope) {
     const iv = randomBytes(12), cipher = createCipheriv('aes-256-gcm', encryptionKey, iv);
@@ -34,6 +35,14 @@ export function openMailStore(filename, encryptionKey) {
     decipher.setAAD(context(row)); decipher.setAuthTag(bytes.subarray(13, 29));
     try { return JSON.parse(Buffer.concat([decipher.update(bytes.subarray(29)), decipher.final()]).toString('utf8')); }
     catch { throw new MailFault('mail-payload-unavailable', 503); }
+  }
+  const keyIdentity={id:'key-check',organization_id:'mail-store',payload_hash:'version-1'};
+  const probe=db.prepare("SELECT value FROM mail_meta WHERE name='key-check'").get();
+  if(probe){
+    try{if(unseal({...keyIdentity,sealed_payload:probe.value}).version!==1)throw Error();}
+    catch{db.close();throw new MailFault('mail-store-key-mismatch',503);}
+  }else{
+    db.prepare("INSERT INTO mail_meta(name,value) VALUES('key-check',?)").run(seal(keyIdentity,{version:1}));
   }
   function find(identity) {
     return db.prepare('SELECT * FROM mail_jobs WHERE id=? AND organization_id=?').get(identity.id, identity.organizationId);
@@ -85,6 +94,11 @@ export function openMailStore(filename, encryptionKey) {
       // Retain only the idempotency tombstone once a credential envelope expires.
       db.prepare(`UPDATE mail_jobs SET sealed_payload=NULL WHERE id=? AND organization_id=? AND expires_at<=?`).run(identity.id, identity.organizationId, now);
       return receipt(find(identity));
+    },
+    expire(now = Date.now()) {
+      db.prepare(`UPDATE mail_jobs SET state='REJECTED',safe_code='mail-smtp-rejected',updated_at=? WHERE state='QUEUED' AND expires_at<=?`).run(now,now);
+      db.prepare(`UPDATE mail_jobs SET state='UNCERTAIN',safe_code='mail-smtp-uncertain',updated_at=? WHERE state='DISPATCHING' AND dispatch_started_at<?`).run(now,now-120_000);
+      db.prepare(`UPDATE mail_jobs SET sealed_payload=NULL WHERE expires_at<=?`).run(now);
     },
     checkpoint() { db.exec('PRAGMA wal_checkpoint(FULL)'); },
     close() { db.close(); },

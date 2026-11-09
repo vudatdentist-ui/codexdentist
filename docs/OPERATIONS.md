@@ -129,8 +129,16 @@ separate payload-encryption key stay private, outside the app/vault master.
 `up` initially starts only isolated internal networks and test-restricted
 services, with no published SMTP/IMAP/HTTP port and no outgoing mail route.
 `status` verifies image pins, non-root/read-only isolation and network membership.
-The SMTP journal and queue require their own stopped-worker snapshot/restore
-before outgoing mail is enabled; core PostgreSQL backup alone is insufficient.
+Run `python3 scripts/owned-mail-backup.py backup` for the SMTP journal/queue and
+private keys/configuration. It stops only active mail producers, snapshots both
+labelled volumes, and attempts every previous service restart even on failure.
+It then verifies checksums/modes in separate networkless volumes and checks the
+restored SQLite integrity and encryption-key identity without mail workers.
+SQLite WAL recovery may write only the disposable restored volume as UID 1000.
+`drill --snapshot <completed-private-directory>` repeats recovery verification;
+never start a restored worker to test mail recovery. Keep the entire private
+snapshot with its keys, not just PostgreSQL; encrypt it for off-server custody.
+These gates must pass before outgoing mail is enabled.
 
 The app transport requires `NOTIFICATION_DELIVERY_MODE=owned-mail`,
 `OWNED_MAIL_BASE_URL=https://codexdentist-mail-gateway:3443`, the exact gateway

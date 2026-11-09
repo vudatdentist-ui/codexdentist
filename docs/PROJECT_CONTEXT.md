@@ -347,8 +347,14 @@ cannot satisfy production readiness. The initial deployment has no public port,
 external network or core database access, and rejects external test recipients.
 Native SQLite worker races, actual TLS SMTP, PostgreSQL claim races and full-app
 password recovery/settings have passed locally, including 1440/390/320 UI.
-The Windows and actual Node 22 Linux runs agree. Full CI, server deployment,
-sender DNS, queue backup/restore and real delivery acceptance remain open;
+The Windows and actual Node 22 Linux runs agree. Pinned real Maddy acceptance
+also verifies TLS submission, its durable queue, the DKIM signature and body
+hash, header-tamper rejection, sender denial and idempotent delivery inside a
+networkless synthetic namespace. Both mail volumes and private configuration/
+keys pass cold snapshot and worker-free restoration, including SQLite integrity
+and authenticated encryption-key identity. Expiry removes encrypted message
+payloads while retaining idempotency evidence. Full CI, server deployment,
+sender DNS and real external delivery acceptance remain open;
 production continues using its existing email provider until those gates pass.
 
 Local AI is deployed in `2face1e` (PR #95), with the production configuration

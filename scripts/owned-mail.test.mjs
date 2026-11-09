@@ -50,6 +50,7 @@ test('idempotent reservations bind organization and complete payload while SQLit
  assert.equal(store.status({...mail,organizationId:'foreign'},now),null);
  store.checkpoint();const bytes=await readFile(filename);
  assert.equal(bytes.includes(Buffer.from(mail.recipient)),false);assert.equal(bytes.includes(Buffer.from(mail.body)),false);
+ assert.throws(()=>openMailStore(filename,randomBytes(32)),/store-key-mismatch/,'wrong backup key must fail before claiming a queued message');
 }));
 
 test('two actual SQLite worker connections have one send lease and stale or foreign actors cannot finalize it',async()=>fixture(async({filename,key,store})=>{
@@ -94,4 +95,8 @@ test('expired reservations cannot send and damaged encrypted payloads become unc
  const db=new DatabaseSync(filename);try{db.prepare('UPDATE mail_jobs SET sealed_payload=? WHERE id=?').run(Buffer.alloc(48,5),damaged.id);}finally{db.close();}
  assert.throws(()=>store.claim(damaged,now),/payload-unavailable/);assert.equal(store.status(damaged,now).state,'UNCERTAIN');
  assert.equal(store.claim(damaged,now),null);
+ store.expire(now+121_000);
+ const observer=new DatabaseSync(filename);try{
+  assert.equal(observer.prepare('SELECT count(*) AS n FROM mail_jobs WHERE sealed_payload IS NOT NULL').get().n,0);
+ }finally{observer.close();}
 }));

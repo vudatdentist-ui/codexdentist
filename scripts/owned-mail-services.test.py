@@ -1,9 +1,14 @@
 import importlib.util
 from pathlib import Path
 import unittest
+import json
+import tempfile
+from unittest.mock import patch
 
 spec=importlib.util.spec_from_file_location('owned_mail',Path(__file__).with_name('owned-mail-services.py'))
 mail=importlib.util.module_from_spec(spec);spec.loader.exec_module(mail)
+spec=importlib.util.spec_from_file_location('mail_backup',Path(__file__).with_name('owned-mail-backup.py'))
+backup=importlib.util.module_from_spec(spec);spec.loader.exec_module(backup)
 
 
 class OwnedMailDeployment(unittest.TestCase):
@@ -42,6 +47,25 @@ class OwnedMailDeployment(unittest.TestCase):
         self.assertNotIn('tcp://0.0.0.0:25',text);self.assertNotIn('imap ',text)
         self.assertIn('source no-reply@codexdentist.com',text);self.assertIn('Sender not permitted',text)
         self.assertIn('requiretls_override no',text);self.assertIn('min_tls_level encrypted',text)
+
+    def test_backup_failure_restarts_every_previously_active_worker(self):
+        for restart_failure in [False,True]:
+            with self.subTest(restart_failure=restart_failure),tempfile.TemporaryDirectory()as temp:
+                root=Path(temp);(root/'secrets').mkdir()
+                for name in ['compose.json','maddy.conf']:(root/name).write_text('{}')
+                (root/'manifest.json').write_text(json.dumps({'gatewayImage':'sha256:'+'a'*64,'smtpImage':mail.MADDY}))
+                (root/'secrets/encryption.key').write_text('synthetic only')
+                def inspect(kind,name):
+                    if kind=='volume':return {'Labels':{'com.codexdentist.mail':name.split('_',1)[1]}}
+                    return {'Image':'sha256:'+'a'*64,'Config':{'Image':mail.MADDY},'State':{'Running':True}}
+                calls=[]
+                def run(args):
+                    calls.append(args)
+                    if restart_failure and args[:2]==['docker','start']and args[-1].endswith('-smtp-1'):raise RuntimeError('synthetic restart failure')
+                with patch.object(backup,'ROOT',root),patch.object(backup,'inspect',side_effect=inspect),patch.object(backup.files,'run',side_effect=run),patch.object(backup.files,'inventory',side_effect=RuntimeError('synthetic archive failure')):
+                    with self.assertRaisesRegex(RuntimeError,'restart failed'if restart_failure else'archive failure'):backup.backup()
+                self.assertEqual([args[-1]for args in calls if args[1]=='stop'],['codexdentist-owned-mail-gateway-1','codexdentist-owned-mail-smtp-1'])
+                self.assertEqual([args[-1]for args in calls if args[1]=='start'],['codexdentist-owned-mail-smtp-1','codexdentist-owned-mail-gateway-1'])
 
 
 if __name__=='__main__':unittest.main()

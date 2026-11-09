@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import { openMailStore } from './owned-mail/store.mjs';
 import { createOwnedMailService } from './owned-mail/service.mjs';
 
-export async function ownedMailFixture(){
+export async function ownedMailFixture({from='no-reply@example.test',storeRoot}={}){
   const base=await mkdtemp(path.join(os.tmpdir(),'codexdentist-mail-tls-'));
   const openssl=process.platform==='win32'?'C:/Program Files/Git/usr/bin/openssl.exe':'openssl';
   const keyPath=path.join(base,'tls.key'),certPath=path.join(base,'tls.cert');
@@ -49,8 +49,9 @@ export async function ownedMailFixture(){
   const transport=nodemailer.createTransport({host:'127.0.0.1',port:smtp.address().port,secure:true,
     tls:{ca:tls.cert,servername:'localhost',rejectUnauthorized:true},connectionTimeout:2000,greetingTimeout:2000,socketTimeout:3000,
     logger:false,debug:false,disableFileAccess:true,disableUrlAccess:true});
-  const store=openMailStore(path.join(base,'queue.sqlite'),randomBytes(32));
-  const secret=randomBytes(32).toString('hex'),from='no-reply@example.test';
+  const encryptionKey=randomBytes(32);
+  const store=openMailStore(path.join(storeRoot??base,'queue.sqlite'),encryptionKey);
+  const secret=randomBytes(32).toString('hex');
   const gateway=createOwnedMailService({tls,secret,sender:from,store,transport,testOnly:true});
   await new Promise(resolve=>gateway.listen(0,'127.0.0.1',resolve));
   const baseUrl='https://127.0.0.1:'+gateway.address().port;
@@ -63,7 +64,7 @@ export async function ownedMailFixture(){
       });req.on('error',reject);req.end(options.body);
     });
   }
-  return {baseUrl,secret,from,certPath,store,messages,base,transport,tls,trustedFetch,
+  return {baseUrl,secret,from,certPath,store,messages,base,transport,tls,trustedFetch,smtpPort:smtp.address().port,encryptionKey,
     setMode(value){assert.ok(['accept','lost','reject'].includes(value));mode=value;},
     verifications:()=>verifications,
     async close(){

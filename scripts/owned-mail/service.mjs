@@ -4,6 +4,7 @@ import { authenticateMailRequest, parseMailEnvelope, parseMailIdentity, parseMai
 
 export function createOwnedMailService({ tls, secret, sender, store, transport, testOnly = false, now = Date.now }) {
   let active = 0;
+  let maintenanceFailed = false;
   function reply(response, status, body) {
     response.writeHead(status, { 'content-type':'application/json', 'cache-control':'no-store', 'x-content-type-options':'nosniff' });
     response.end(JSON.stringify(body));
@@ -28,6 +29,7 @@ export function createOwnedMailService({ tls, secret, sender, store, transport, 
           timestamp:request.headers['x-codexdentist-timestamp'],signature:request.headers['x-codexdentist-signature']},now());
         if(request.url==='/ready'){
           if(key!=='readiness'||bytes.length)throw new MailFault('mail-request-invalid');
+          if(maintenanceFailed)throw new MailFault('mail-maintenance-unavailable',503);
           store.checkpoint();await transport.verify();reply(response,200,{ready:true,testOnly});return;
         }
         if(!request.headers['content-type']?.startsWith('application/json'))throw new MailFault('mail-json-required',415);
@@ -63,5 +65,10 @@ export function createOwnedMailService({ tls, secret, sender, store, transport, 
     }
   });
   server.requestTimeout=15_000;server.headersTimeout=10_000;server.keepAliveTimeout=5000;
+  const expiry=setInterval(()=>{
+    try{store.expire(now());maintenanceFailed=false;}
+    catch{if(!maintenanceFailed)console.error('owned-mail.expiry-unavailable');maintenanceFailed=true;}
+  },60_000);
+  expiry.unref();server.once('close',()=>clearInterval(expiry));
   return server;
 }
