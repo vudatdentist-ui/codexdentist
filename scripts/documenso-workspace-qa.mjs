@@ -187,7 +187,10 @@ try {
       recipientName: patient.fullName, recipientEmail: patient.email, creationUncertain: false }));
   await page.goto(`${base}/forms`, { waitUntil: 'networkidle' });
   const manualRow = page.locator('.billing-invoice-row').filter({ hasText: manualForm.formNo });
-  await manualRow.getByRole('button', { name: 'Ký qua Documenso', exact: true }).click();
+  await Promise.all([page.waitForResponse(response => {
+    const url = new URL(response.url());
+    return url.pathname === '/api/integrations/documenso/signing-requests' && url.searchParams.get('patientFormId') === manualForm.id && response.status() === 200;
+  }), manualRow.getByRole('button', { name: 'Ký qua Documenso', exact: true }).click()]);
   await dialog.getByText('Yêu cầu ký bị từ chối', { exact: true }).waitFor();
   assert.equal(await dialog.getByText('Đang chờ hoàn tất ký', { exact: true }).count(), 0);
   await dialog.getByRole('button', { name: 'Đóng', exact: true }).click();

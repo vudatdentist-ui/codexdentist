@@ -2,6 +2,20 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./audit-source-loader.cjs');
 
+test('server-rendered signing trigger stays disabled until its client handlers are ready', () => {
+  const React = require('react');
+  const { renderToStaticMarkup } = require('react-dom/server');
+  const { DocumensoConsentSigning } = load('src/workspaces/integrations/DocumensoConsentSigning.tsx', {
+    react: React, 'react/jsx-runtime': require('react/jsx-runtime'),
+    'next/navigation': { useRouter: () => ({ refresh() {} }) },
+    '@/shared/ui/WorkspaceDialog/WorkspaceDialog': { WorkspaceDialog: () => null },
+    './PayOSWorkspace.module.css': { secondary: 'secondary' },
+  });
+  const html = renderToStaticMarkup(React.createElement(DocumensoConsentSigning, { patientFormId: 'synthetic-form', language: 'vi' }));
+  assert.match(html, /<button[^>]*disabled=""/);
+  assert.match(html, /Ký qua Documenso/);
+});
+
 // Actual transports, commands, vault crypto and provider client run against
 // deterministic SQL/HTTP boundaries; no app, provider or operational data is used.
 function fixture({ configured = true, role = 'OWNER', demo = false } = {}) {

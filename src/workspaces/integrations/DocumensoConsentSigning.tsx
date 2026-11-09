@@ -12,12 +12,13 @@ export function DocumensoConsentSigning(props: { patientFormId: string; language
 function ConsentSigning({ patientFormId, language }: { patientFormId: string; language: "vi" | "en" }) {
   const vi = language === "vi", id = useId(), router = useRouter();
   const [open, setOpen] = useState(false), [loading, setLoading] = useState(false), [pending, setPending] = useState(false);
+  const [interactive, setInteractive] = useState(false);
   const [workspace, setWorkspace] = useState<DocumensoConsentWorkspace | null>(null);
   const [source, setSource] = useState(""), [confirmed, setConfirmed] = useState(false);
   const [error, setError] = useState(""), [notice, setNotice] = useState("");
   const busy = useRef(false), mounted = useRef(true), sequence = useRef(0), intent = useRef<string | null>(null);
   const lastStatus = useRef<string | null>(null);
-  useEffect(() => { mounted.current = true; return () => { mounted.current = false; sequence.current++; }; }, []);
+  useEffect(() => { mounted.current = true; setInteractive(true); return () => { mounted.current = false; sequence.current++; }; }, []);
   const load = useCallback(async () => {
     const current = ++sequence.current;
     setLoading(true); setError("");
@@ -75,7 +76,7 @@ function ConsentSigning({ patientFormId, language }: { patientFormId: string; la
     finally { busy.current = false; if (mounted.current) setPending(false); }
   }
   return <>
-    <button type="button" className={styles.secondary} onClick={() => setOpen(true)}>{vi ? "Ký qua Documenso" : "Sign with Documenso"}</button>
+    <button type="button" className={styles.secondary} disabled={!interactive} onClick={() => setOpen(true)}>{vi ? "Ký qua Documenso" : "Sign with Documenso"}</button>
     <WorkspaceDialog open={open} onClose={() => setOpen(false)} title={vi ? "Ký đồng thuận qua Documenso" : "Consent signing with Documenso"} closeLabel={vi ? "Đóng" : "Close"} className={styles.dialog}>
       <div className={styles.payment} aria-busy={loading || pending}>
         {loading && <p role="status">{vi ? "Đang tải trạng thái…" : "Loading status…"}</p>}
