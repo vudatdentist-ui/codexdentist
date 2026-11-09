@@ -401,6 +401,13 @@ before object I/O so interruption cannot erase its discovery record.
 
 ### Documenso
 
+Real-provider preflight must exercise the actual pinned community image, a
+synthetic PDF, captured private SMTP, API create/distribute, browser signature/
+completion and adapter download. Verify the PDF CMS signature against the exact
+owned test certificate and reject tampered bytes. Keep the provider's network
+internal; record core callback/import acceptance separately. Stop only the
+generated QA services after inspection and retain their labelled data/proof.
+
 Run `test:documenso` for real handler/command regressions and
 `NODE_ENV=test npm run test:documenso-db` for a newly created/migrated loopback
 database with credential/reservation, duplicate send and manual-action guards.

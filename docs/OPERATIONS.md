@@ -140,6 +140,27 @@ never start a restored worker to test mail recovery. Keep the entire private
 snapshot with its keys, not just PostgreSQL; encrypt it for off-server custody.
 These gates must pass before outgoing mail is enabled.
 
+The owned standby installation was accepted on 2026-11-09 using the compatible
+`725f1d6` image. It uses public forward-confirmed hostname
+`srv1907391.hstgr.cloud`, selector `cdx202611`, private TLS and separate labelled
+mail volumes. `standby-acceptance.json` records signed readiness, test-only mode
+and rejection of a bad signature; no message was sent. Public-only pending DNS
+values are in `/opt/codexdentist-owned-mail/sender-dns-records.json`. Browser
+access still reports disabled despite the owner's permission; do not claim that
+SPF/DKIM have been applied. Preserve the existing inbound MX/mail host.
+
+`codexdentist-mail-backup.timer` is enabled daily at 19:40 UTC with up to five
+minutes jitter, after its manual backup/restore/encryption acceptance. Reviewed
+operators and source hashes live under `/opt/codexdentist-owned-mail/operators`;
+`last-verified-backup.json` points to the last verified private snapshot and CMS
+archive. Snapshot `20261109T162221Z-a0ed7baa` passed both volume restores and
+public-recipient encryption using the existing recovery certificate. Its encrypted
+copy is on the owner's PC under the private backup `snapshots/owned-mail`
+directory, with an authenticated in-memory decryption/hash proof. No plaintext
+keys or queue were written there, and the recipient private key stays off-server.
+The timer creates server archives; PC transfer remains a separate operator step.
+Neither this standby acceptance nor the timer enables external email delivery.
+
 The app transport requires `NOTIFICATION_DELIVERY_MODE=owned-mail`,
 `OWNED_MAIL_BASE_URL=https://codexdentist-mail-gateway:3443`, the exact gateway
 signing secret and a plain sender in `OWNED_MAIL_FROM`. Mount only the public
