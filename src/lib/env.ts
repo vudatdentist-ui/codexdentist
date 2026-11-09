@@ -17,7 +17,7 @@ const weakJobSecretValues = new Set([
   "replace-with-a-long-random-job-secret-before-production",
 ]);
 
-export type NotificationDeliveryMode = "disabled" | "log" | "webhook" | "resend";
+export type NotificationDeliveryMode = "disabled" | "log" | "webhook" | "resend" | "novu";
 export type NotificationWebhookChannel = "EMAIL" | "SMS" | "ZALO" | "PUSH" | "IN_APP" | "PHONE";
 export type PatientFileStorageDriver = "local" | "r2";
 export type CodexMedAiProvider = "openai-compatible";
@@ -146,9 +146,9 @@ export function notificationDeliveryMode(): NotificationDeliveryMode {
   const value = (process.env.NOTIFICATION_DELIVERY_MODE?.trim().toLowerCase() ||
     (process.env.NODE_ENV === "production" ? "disabled" : "log")) as NotificationDeliveryMode;
 
-  if (!["disabled", "log", "webhook", "resend"].includes(value)) {
+  if (!["disabled", "log", "webhook", "resend", "novu"].includes(value)) {
     throw new Error(
-      "NOTIFICATION_DELIVERY_MODE must be one of disabled, log, webhook, or resend.",
+      "NOTIFICATION_DELIVERY_MODE must be one of disabled, log, webhook, resend, or novu.",
     );
   }
 

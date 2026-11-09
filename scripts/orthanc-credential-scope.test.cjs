@@ -14,7 +14,8 @@ function fixture() {
   const env = { NODE_ENV: 'production', DEPLOYMENT_MODE: 'hosted',
     ORTHANC_DEFAULT_ORGANIZATION_ID: 'org-a', ORTHANC_DEFAULT_BASE_URL: 'https://pacs.test',
     ORTHANC_DEFAULT_USERNAME: 'synthetic-user', ORTHANC_DEFAULT_PASSWORD: 'synthetic-password',
-    ORTHANC_DEFAULT_VIEWER_BASE_URL: 'https://viewer.test/viewer', ORTHANC_DEFAULT_VIEWER_ACCESS_MODE: 'private' };
+    ORTHANC_DEFAULT_VIEWER_BASE_URL: 'https://viewer.test/viewer', ORTHANC_DEFAULT_VIEWER_ACCESS_MODE: 'private',
+    OPTIONAL_OHIF_BASE_URL: 'https://static-viewer.test' };
   let session;
   const connections = [], studies = [], references = [], http = [], audits = [], queries = [];
   let transactions = 0;
@@ -142,7 +143,7 @@ test('bound organization retains import, list, stable patient mapping and privat
   assert.equal((await h.import()).status, 201); assert.equal(h.studies.length, 1);
   const listed = await h.list('patient-a'); assert.equal(listed.status, 200); assert.equal((await listed.json()).studies.length, 1);
   const viewer = await h.viewer(study.id); assert.equal(viewer.status, 200);
-  assert.equal((await viewer.json()).viewerUrl, 'https://viewer.test/viewer?StudyInstanceUIDs=1.2.826.0.1.999');
+  assert.equal((await viewer.json()).viewerUrl, `/imaging/ohif/viewer?studyId=${study.id}&StudyInstanceUIDs=1.2.826.0.1.999`);
   assert.equal(h.studies[0].availability, 'AVAILABLE');
 });
 
@@ -196,4 +197,16 @@ test('existing authorization, demo, clinic setup and disabled-viewer guards rema
   assert.equal((await h.configure()).status, 200); const study = (await (await h.import()).json()).study;
   h.env.ORTHANC_DEFAULT_VIEWER_ACCESS_MODE = 'disabled'; const before = h.http.length;
   assert.equal((await h.viewer(study.id)).status, 503); assert.equal(h.http.length, before);
+});
+
+test('malformed remote study UID is rejected before canonical linking or reference writes', async () => {
+  const h = fixture(); await h.configure();
+  const original = remoteStudy.MainDicomTags.StudyInstanceUID;
+  const before = h.transactions();
+  try {
+    remoteStudy.MainDicomTags.StudyInstanceUID = '1.2/3';
+    const response = await h.import(); assert.equal(response.status, 503);
+    assert.equal((await response.json()).error, 'orthanc-study-uid-missing');
+    assert.equal(h.studies.length, 0); assert.equal(h.references.length, 0); assert.equal(h.transactions(), before);
+  } finally { remoteStudy.MainDicomTags.StudyInstanceUID = original; }
 });

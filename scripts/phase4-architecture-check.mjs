@@ -10,6 +10,8 @@ const files = {
   connections: "src/app/api/integrations/connections/route.ts",
   studies: "src/app/api/imaging/studies/route.ts",
   viewer: "src/app/api/imaging/studies/[studyId]/viewer/route.ts",
+  privateViewer: "src/lib/application/imaging/ohif.ts",
+  dicomweb: "src/lib/application/imaging/dicomweb.ts",
 };
 
 const source = Object.fromEntries(
@@ -61,11 +63,18 @@ assert(
 assert(
     source.commands.includes("imaging-viewer-not-configured") &&
     source.commands.includes("orthanc-study-identity-mismatch") &&
-    source.commands.includes("buildOhifStudyUrl") &&
+    source.commands.includes('`/imaging/ohif/viewer?') &&
+    source.commands.includes('OPTIONAL_OHIF_BASE_URL') &&
     source.commands.includes("connection.organizationId !== session.organizationId") &&
     source.commands.includes("connection.clinicId !== study.clinicId"),
   "unavailable or unconfigured OHIF fails closed",
 );
+assert(source.privateViewer.includes('authorizeImagingStudy(session, studyId, uid)') &&
+  source.privateViewer.includes('`/api/imaging/dicomweb/${studyId}`') &&
+  source.privateViewer.includes('validateOhifAsset') && source.privateViewer.includes('serviceWorker') &&
+  source.dicomweb.includes('authorizeImagingStudy(session, studyId, requestedUid)') &&
+  source.dicomweb.includes('imagingPrivateHeaders()'),
+  "private viewer shell and every DICOM response retain study authorization and no-store boundaries");
 assert(source.connections.includes('"orthanc"'), "Orthanc connection configuration is explicit");
 
 console.log("phase4-architecture-check: ok");

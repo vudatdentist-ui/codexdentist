@@ -204,6 +204,9 @@ async function deliverNotification(
   if (credentialNotificationTemplateKeys.some((key) => key === notification.templateKey) && !hasCredentialContent) {
     return skipped("Credential delivery requires a fresh one-time link.");
   }
+  if (mode === "novu" && credentialNotificationTemplateKeys.some(key => key === notification.templateKey)) {
+    return skipped("Credential notifications cannot use Novu delivery.");
+  }
   // updateMany performs compare-and-set in the database. A stale batch read or
   // a concurrent immediate send cannot deliver a record already claimed/sent.
   const claim = await prisma.notification.updateMany({
@@ -245,7 +248,14 @@ async function deliverNotification(
 
     // IN_APP is delivered by the existing persisted inbox, without a vendor.
     if (notification.channel !== "IN_APP") {
-      if (mode === "log") {
+      if (mode === "novu") {
+        const { deliverNotificationToNovu } = await import("@/lib/application/integrations/novu-delivery");
+        const delivery = await deliverNotificationToNovu(notification);
+        if (delivery.state === "REJECTED") throw new Error("novu-delivery-rejected");
+        // Novu acknowledges queueing, not sending. Keep the atomic PROCESSING
+        // claim until authenticated reconciliation confirms the message status.
+        if (delivery.state !== "SENT") return skipped("Novu delivery awaits authenticated reconciliation.");
+      } else if (mode === "log") {
         console.info("notification.simulated", { id: notification.id, channel: notification.channel });
       } else if (mode === "resend") {
         if (notification.channel === "EMAIL") {

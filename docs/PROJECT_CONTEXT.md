@@ -238,6 +238,83 @@ If a test exposes an existing baseline defect unrelated to the change, document 
 
 ## 10. Phased Plan And Exit Criteria
 
+### Optional-service completion — 2026-11-06
+
+The owner requests completion of the remaining integration workflows, including
+their app interfaces and optional self-host deployment. Base release `b5ffb83`
+is already deployed and independently verified; do not redo its payment, consent,
+clinical or financial refactors. Work in the following dependency order:
+
+Cost constraint (owner clarification): no new paid API, cloud subscription or
+enterprise-license dependency. A limited cloud free tier is not equivalent to
+unrestricted free use. Prefer OSS community editions on the existing VPS and
+native functionality where a required feature is commercially gated. Add offline
+bank-transfer QR plus existing manual Revenue reconciliation; never imply a QR
+proves payment. Preserve previous gateway history. Cloud AI/mail/storage currently
+configured must be assessed for a self-host/local alternative without losing
+patient files or abruptly breaking existing workflows. Never publish secrets or
+claim an existing third-party account is free without billing evidence.
+
+1. Shared encrypted, organization/clinic-owned optional-provider settings and
+   root-approved outbound origins. Saved configuration remains disabled until a
+   real provider probe succeeds for the exact unchanged credential version.
+2. Orthanc/OHIF: private PACS and viewer, study-scoped authenticated DICOMweb,
+   actual synthetic DICOM ingestion/viewing and unavailable-provider recovery.
+3. Chatwoot/Novu: explicit scoped conversation and notification workflows, opaque
+   stable external identities, minimized payloads, safe replay/uncertainty and
+   disabled-provider fallback. Never send real patient messages in agent tests.
+4. Medplum: discoverable, explicit one-way Patient synchronization using stable
+   identifiers and the lossless FHIR mapper. No inbound clinical overwrite or
+   second source of truth. Verify identity, retries and tenant/clinic denials.
+5. Optional deployment/activation: separate persistent service storage, private
+   networking, generated service secrets, pinned upstream images, restore checks,
+   controlled synthetic acceptance and exact-main release. Existing core clinic
+   behavior must work when every optional service is disabled.
+
+Exit evidence must include real handler/native races, provider-contract tests,
+rendered app states at 1440/390/320px, independent audit/fixes and deployed health.
+An API-only connector or unstarted Compose profile is partial, not live acceptance.
+The previous payOS gateway remains dormant unless separately configured; no
+merchant account is required for the new offline bank-transfer path. Never
+substitute fabricated cloud credentials. Self-hosted
+service-generated credentials are valid only for those owned instances. Preserve
+real records, current mail/AI/R2 configuration and existing deployment rollback.
+Do not enable outbound patient jobs or delete files under an inferred policy.
+
+Current evidence for issue #91 (release still pending): the branch implements
+offline NAPAS bank QR in Settings/Billing, four encrypted optional-provider
+panels and patient-scoped Chatwoot/Medplum/Novu tools. Shared provider accounts
+are atomically owned by one organization; disabled clinic overrides never fall
+back to an organization account. Configuration versions fence concurrent save,
+disable, rotation and provider operations even with identical timestamps.
+Medplum uses conditional creation and version-matched updates so a late export
+cannot overwrite newer remote demographics. Novu defaults to a self-hosted
+in-app workflow, provisions opaque bound recipients without email, and requires
+authenticated sent evidence; queue acceptance is insufficient.
+
+The owned VPS now runs separate private community services. Actual adapter and
+full Next/PostgreSQL acceptance exercised all four providers using synthetic QA
+accounts/projects; no real patient messages or bank transfers were made. OHIF
+3.13.14 is built from pinned commit `e4cd86153a1aaa429ef749330eaeefd4df96a88a`
+at `/imaging/ohif/`; its reviewed responsive adaptation preserves provider
+onboarding and investigational-use notices. Synthetic DICOM pixels rendered at
+1440/390/320px; foreign-organization metadata/viewer requests were denied.
+The optional stack cold snapshot `20261106T143908Z-fe9661d2` was restored into
+separate volumes/networks with matching PostgreSQL/MongoDB counts and an
+authenticated PACS index. Original core/sidecar volumes were not restore targets.
+
+Do not report this branch as deployed: exact-head CI, main release, production
+organization bindings and independent go-live proof remain required. A real bank
+receiving account is an owner-entered clinic setting; never substitute the test
+account. Existing cloud mail/AI/file configuration remains preserved pending a
+verified free migration; its current billing plan is not established.
+Chatwoot's public staff login has separate HTTPS browser/API origins and was
+rendered at 1440/390/320px. Publication additionally proves the installation form
+is closed; an account API response alone is insufficient. Main and synthetic
+accounts now use distinct ordinary service agents, with real cross-account
+requests denied in both directions. The installation administrator's token is
+not exported as an application credential.
+
 ### Current delivery plan — 2026-11-05
 
 User-facing completion loop: plan a complete operational path, implement it,
