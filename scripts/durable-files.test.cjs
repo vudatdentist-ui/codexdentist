@@ -6,6 +6,18 @@ const config={NODE_ENV:'production',DEPLOYMENT_MODE:'hosted',PATIENT_FILE_STORAG
  PATIENT_FILE_LOCAL_DURABLE:'true',PATIENT_FILE_STORAGE_ROOT:'/data/patient-files'};
 const legacy={R2_ENDPOINT:'https://owned-storage.example.test',R2_BUCKET_NAME:'synthetic',R2_ACCESS_KEY_ID:'synthetic-key',R2_SECRET_ACCESS_KEY:'synthetic-secret'};
 
+test('relocation rejects invalid sizes and non-leaf destinations before any database access',async()=>{
+ const {commitLocalFileMigration}=load('src/infrastructure/patient-files/local-migration.ts');
+ let calls=0;const db={$transaction:()=>{calls++;throw Error('must not access persistence')}};
+ const file={id:'file',organizationId:'org',patientId:'patient',checksumSha256:'a'.repeat(64),sizeBytes:9};
+ const key='patient-files/org/patient/file-migration-12345678';
+ for(const sizeBytes of [-1,0,1.5,NaN,Infinity,null,100*1024*1024+1])await assert.rejects(commitLocalFileMigration(db,{...file,sizeBytes},key),/input-invalid/);
+ for(const destination of [key+'/extra',key+'/../other',key+'\\other',key.replace('/org/','/foreign/'),key.slice(0,-4)]){
+  await assert.rejects(commitLocalFileMigration(db,file,destination),/input-invalid/);
+ }
+ assert.equal(calls,0);
+});
+
 test('hosted local writes require explicit durable configuration outside code and temporary paths',()=>{
  const p=policy();assert.equal(p.durableLocalRootConfiguration(config,'/app','linux'),'/data/patient-files');
  for(const root of ['', 'relative/files','/','/app','/app/public/files','/app/../tmp/files','/var/tmp/files','/run/files','/proc/files']){

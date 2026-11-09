@@ -5,11 +5,11 @@ import type { PatientFileStageRow } from "@/infrastructure/patient-files/staging
 // Operator-only storage relocation. Upload, retention and purge still own the
 // lifecycle; this transaction moves their single canonical stage with the file.
 export async function commitLocalFileMigration(db: PrismaClient, original: PatientFile, storageKey: string) {
+  const prefix = `patient-files/${original.organizationId}/${original.patientId}/${original.id}-migration-`;
   if (![original.id, original.organizationId, original.patientId].every(id => /^[a-zA-Z0-9_-]+$/.test(id)) ||
-    !storageKey.startsWith(`patient-files/${original.organizationId}/${original.patientId}/${original.id}-migration-`) ||
-    /[\\\u0000-\u001f]/.test(storageKey) || storageKey.includes("..") ||
+    !storageKey.startsWith(prefix) || !/^[a-zA-Z0-9_-]{8,80}$/.test(storageKey.slice(prefix.length)) ||
     !original.checksumSha256 || !/^[a-f0-9]{64}$/.test(original.checksumSha256) ||
-    !original.sizeBytes || original.sizeBytes > 100 * 1024 * 1024) throw new Error("patient-file-migration-input-invalid");
+    !Number.isSafeInteger(original.sizeBytes) || (original.sizeBytes ?? 0) <= 0 || original.sizeBytes! > 100 * 1024 * 1024) throw new Error("patient-file-migration-input-invalid");
   return db.$transaction(async tx => {
     await tx.$executeRawUnsafe(`SELECT pg_advisory_xact_lock(hashtext($1))`, `patient-file-organization:${original.organizationId}`);
     const files = await tx.$queryRawUnsafe<PatientFile[]>(
