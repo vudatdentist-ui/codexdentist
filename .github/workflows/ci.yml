@@ -77,6 +77,12 @@ jobs:
         run: npm run test:local-ai && python3 scripts/local-ai-services.test.py
       - name: Private durable file storage and mixed-provider reads
         run: npm run test:durable-files && python3 scripts/durable-files-ops.test.py
+      - name: Owned TLS mail and encrypted idempotency regressions
+        run: npm run test:owned-mail && python3 scripts/owned-mail-services.test.py
+      - name: Native owned email delivery and uncertainty races
+        run: npm run test:owned-mail-db
+        env:
+          NODE_ENV: test
       - name: Native file migration, concurrent commit and retention
         run: npm run test:durable-files-db
         env:
@@ -261,6 +267,19 @@ jobs:
           if-no-files-found: warn
           retention-days: 7
       - run: docker build -t codexdentist:ci .
+      - name: Owned mail compatibility on the exact Linux runtime
+        run: >-
+          docker run --rm --network none --read-only --user 1000:1000
+          --cap-drop ALL --security-opt no-new-privileges --memory 512m --cpus 1
+          --tmpfs /tmp:rw,nosuid,size=64m,uid=1000,gid=1000,mode=0700
+          --mount type=bind,source="$PWD/scripts",target=/app/scripts,readonly
+          --mount type=bind,source="$PWD/src",target=/app/src,readonly
+          --entrypoint node codexdentist:ci --test
+          scripts/owned-mail.test.mjs scripts/owned-mail-http.test.mjs scripts/owned-mail-notifications.test.cjs
+      - name: Build the private mail gateway from the exact compatible image
+        run: docker build --network none --build-arg BASE_IMAGE=codexdentist:ci -f scripts/owned-mail/Dockerfile -t codexdentist-mail-gateway:ci .
+      - name: Real pinned MTA, DKIM and private mail restore
+        run: sudo -n python3 scripts/owned-mail-linux.py --image codexdentist:ci --source "$PWD" --output "$RUNNER_TEMP/codexdentist-owned-mail"
       - name: Native mounted file storage, migration recovery and isolated restore
         run: python3 scripts/durable-files-linux.py --image codexdentist:ci --source "$PWD" --output output/durable-linux
       - name: Stop verification server
@@ -282,6 +301,10 @@ jobs:
         run: npm run browser:durable-files
         env:
           NODE_ENV: test
+      - name: Owned SMTP password recovery and settings in the full app
+        run: npm run browser:owned-mail
+        env:
+          NODE_ENV: test
       - name: Upload payOS app evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -291,6 +314,7 @@ jobs:
             output/workspace-qa/payos
             output/workspace-qa/documenso
             output/workspace-qa/durable-files
+            output/workspace-qa/owned-mail
             output/durable-linux
           if-no-files-found: warn
           retention-days: 7

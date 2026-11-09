@@ -282,7 +282,7 @@ export function useSettingsPanelModel({ settingsWorkspace, }: {
         ? [
             {
                 label: "Chế độ hiện tại",
-                value: notificationMode,
+                value: notificationMode === "owned-mail" ? "Máy chủ phòng khám" : notificationMode,
                 status: notificationMode === "disabled"
                     ? "Cần cấu hình"
                     : notificationMode === "log" || notificationMode === "demo"
@@ -290,9 +290,9 @@ export function useSettingsPanelModel({ settingsWorkspace, }: {
                         : "Sẵn sàng gửi",
             },
             {
-                label: "Email Resend",
+                label: notificationMode === "owned-mail" ? "Email của phòng khám" : "Email Resend",
                 value: notificationSettings?.resendFromEmail ?? "Chưa cấu hình",
-                status: notificationMode === "resend" && notificationSettings?.resendFromEmail
+                status: ["resend", "owned-mail"].includes(notificationMode) && notificationSettings?.resendFromEmail
                     ? "Sẵn sàng"
                     : "Không dùng",
             },
@@ -305,7 +305,7 @@ export function useSettingsPanelModel({ settingsWorkspace, }: {
         : [
             {
                 label: "Current mode",
-                value: notificationMode,
+                value: notificationMode === "owned-mail" ? "Clinic mail server" : notificationMode,
                 status: notificationMode === "disabled"
                     ? "Needs config"
                     : notificationMode === "log" || notificationMode === "demo"
@@ -313,9 +313,9 @@ export function useSettingsPanelModel({ settingsWorkspace, }: {
                         : "Delivery ready",
             },
             {
-                label: "Resend email",
+                label: notificationMode === "owned-mail" ? "Clinic email" : "Resend email",
                 value: notificationSettings?.resendFromEmail ?? "Not configured",
-                status: notificationMode === "resend" && notificationSettings?.resendFromEmail
+                status: ["resend", "owned-mail"].includes(notificationMode) && notificationSettings?.resendFromEmail
                     ? "Ready"
                     : "Unused",
             },

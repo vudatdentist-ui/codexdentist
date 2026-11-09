@@ -7,7 +7,9 @@ import {
   notificationDeliveryMode,
   patientFileStorageDriver,
   resendEmailConfig,
+  ownedMailConfig,
 } from "@/lib/env";
+import { verifyOwnedMail } from "@/integrations/owned-mail/client";
 import { verifyJobRequest } from "@/lib/job-auth";
 import { prisma } from "@/lib/prisma";
 import { reportApplicationError } from "@/lib/error-reporting";
@@ -104,6 +106,11 @@ export async function GET(request: Request) {
   try {
     const mode = notificationDeliveryMode();
     const resend = resendEmailConfig();
+    if (mode === "owned-mail") {
+      const config = ownedMailConfig();
+      if (!config) throw new Error("owned-mail-configuration-invalid");
+      await verifyOwnedMail(config);
+    }
     checks.push({
       name: "notifications",
       status: mode === "disabled" ? "warn" : "ok",

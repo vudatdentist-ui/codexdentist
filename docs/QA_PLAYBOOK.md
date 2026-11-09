@@ -11,6 +11,32 @@ baseline -> implement -> audit -> classify -> fix -> re-audit -> repeat -> phase
 
 A passing build alone is not enough. Every changed high-risk boundary must pass its focused negative/regression tests before a phase can close.
 
+Owned email changes require `npm run test:owned-mail`, `python3
+scripts/owned-mail-services.test.py`, `NODE_ENV=test npm run test:owned-mail-db`
+and `NODE_ENV=test npm run browser:owned-mail`, with explicit loopback disposable
+PostgreSQL. The unit/HTTP gates use actual TLS SMTP with an isolated local
+certificate, signed requests and encrypted SQLite, not a cloud inbox. Cover
+header injection, foreign receipts, concurrent workers, credential redaction,
+lost SMTP acknowledgements without replay, corrupted payloads, expiry and
+networkless restoration of the idempotency state. Test-only SMTP must never
+pass a production readiness check. Re-run the same tests on the built Node 22
+Linux image; the fixture's recipients are restricted to `.test`/`.invalid`.
+Full-app acceptance requests a reset, consumes the actual captured one-time
+link, signs in again and inspects settings at 1440/390/320. No real user,
+patient message or external destination enters this test. DNS and actual MTA
+queue/delivery/backup acceptance are separate production gates. Run `sudo -n
+python3 scripts/owned-mail-linux.py --image codexdentist:ci --source "$PWD"
+--output /tmp/codexdentist-mail-proof` for pinned real Maddy with no external network.
+It checks actual DKIM cryptography/tampering, sender restrictions and idempotency,
+then cold-snapshots both disposable volumes and restores them without workers.
+Verify private modes, every checksum, SQLite integrity and the encryption-key
+probe; corrupted archives/keys must fail before recovery. Backup-failure tests
+must prove all previously active services get a restart attempt. These private
+test outputs contain synthetic keys and must not be uploaded as public artifacts.
+They must remain outside the source/build tree (CI uses `RUNNER_TEMP`); the
+operator rejects an in-tree destination. Never broaden their private permissions
+to let a build tool scan them.
+
 Durable storage changes require `test:durable-files`, `python3
 scripts/durable-files-ops.test.py`, `NODE_ENV=test npm run test:durable-files-db`
 and `NODE_ENV=test npm run browser:durable-files` with explicit disposable

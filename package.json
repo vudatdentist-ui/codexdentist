@@ -13,6 +13,9 @@
     "url": "https://github.com/vudatdentist-ui/codexdentist/issues"
   },
   "scripts": {
+    "test:owned-mail": "node --test scripts/owned-mail.test.mjs scripts/owned-mail-http.test.mjs scripts/owned-mail-notifications.test.cjs",
+    "test:owned-mail-db": "node scripts/owned-mail-postgres.cjs",
+    "browser:owned-mail": "node scripts/owned-mail-app-qa.cjs",
     "dev": "npm run fonts:assets && codexdentist-odontogram-assets public/odontogram-assets && next dev --webpack",
     "prebuild": "npm run typecheck",
     "build": "npm run fonts:assets && codexdentist-odontogram-assets public/odontogram-assets && next build",
@@ -117,6 +120,7 @@
     "codexdentist-odontogram": "https://github.com/vudatdentist-ui/codexdentist-odontogram/releases/download/v0.8.2/codexdentist-odontogram-0.8.2.tgz",
     "lucide-react": "1.11.0",
     "next": "16.4.2",
+    "nodemailer": "10.4.0",
     "pg": "8.20.0",
     "qrcode": "1.5.4",
     "react": "19.2.8",

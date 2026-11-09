@@ -120,6 +120,47 @@ temporary cookie exports removed; existing user sessions/passwords were preserve
 
 ## Hosted Deployment
 
+Owned email (pending production activation): `scripts/owned-mail-services.py`
+prepares an explicit exact-release gateway image plus pinned Maddy 0.9.6 under
+`/opt/codexdentist-owned-mail`. `prepare --base-image codexdentist:<40-hex-SHA>
+--hostname <verified-outbound-hostname>` refuses an existing installation or
+volume instead of overwriting state. TLS keys, a separate signing secret and
+separate payload-encryption key stay private, outside the app/vault master.
+`up` initially starts only isolated internal networks and test-restricted
+services, with no published SMTP/IMAP/HTTP port and no outgoing mail route.
+`status` verifies image pins, non-root/read-only isolation and network membership.
+Run `python3 scripts/owned-mail-backup.py backup` for the SMTP journal/queue and
+private keys/configuration. It stops only active mail producers, snapshots both
+labelled volumes, and attempts every previous service restart even on failure.
+It then verifies checksums/modes in separate networkless volumes and checks the
+restored SQLite integrity and encryption-key identity without mail workers.
+SQLite WAL recovery may write only the disposable restored volume as UID 1000.
+`drill --snapshot <completed-private-directory>` repeats recovery verification;
+never start a restored worker to test mail recovery. Keep the entire private
+snapshot with its keys, not just PostgreSQL; encrypt it for off-server custody.
+These gates must pass before outgoing mail is enabled.
+
+The app transport requires `NOTIFICATION_DELIVERY_MODE=owned-mail`,
+`OWNED_MAIL_BASE_URL=https://codexdentist-mail-gateway:3443`, the exact gateway
+signing secret and a plain sender in `OWNED_MAIL_FROM`. Mount only the public
+gateway certificate into the core and set `NODE_EXTRA_CA_CERTS` before Node
+starts; never disable certificate validation. Preserve Resend and the existing
+mail/DNS configuration until sender SPF/DKIM, queue restore, credential recovery
+and delivery are accepted. The existing `mail.codexdentist.com`/MX records serve
+the older inbound mailbox and must not be overwritten to add outgoing mail.
+The VPS's public forward-confirmed PTR hostname can be used for outbound HELO
+without replacing inbound DNS. Add the VPS IP to the existing SPF rather than
+creating a second SPF record, and add only the new DKIM selector's public key.
+
+Gateway receipts bind organization and notification IDs. The core keeps an
+uncertain request PROCESSING; subsequent immediate/batch processing reads its
+authenticated status without re-posting content. SENT means the MTA accepted
+the message, as with the previous provider's acceptance; external inbox
+placement is verified separately. A lost SMTP DATA acknowledgement remains
+UNCERTAIN and needs operator evidence. Preserve that journal/lease; do not
+delete it or resend manually under a new ID to hide uncertainty. Restores run
+without workers/network and must not resume ambiguous jobs automatically.
+
 ### Hostinger migration observed 2026-10-21
 
 The public domain currently points through Cloudflare to the Hostinger VPS at
