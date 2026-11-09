@@ -26,13 +26,16 @@ link, signs in again and inspects settings at 1440/390/320. No real user,
 patient message or external destination enters this test. DNS and actual MTA
 queue/delivery/backup acceptance are separate production gates. Run `sudo -n
 python3 scripts/owned-mail-linux.py --image codexdentist:ci --source "$PWD"
---output output/owned-mail-linux` for pinned real Maddy with no external network.
+--output /tmp/codexdentist-mail-proof` for pinned real Maddy with no external network.
 It checks actual DKIM cryptography/tampering, sender restrictions and idempotency,
 then cold-snapshots both disposable volumes and restores them without workers.
 Verify private modes, every checksum, SQLite integrity and the encryption-key
 probe; corrupted archives/keys must fail before recovery. Backup-failure tests
 must prove all previously active services get a restart attempt. These private
 test outputs contain synthetic keys and must not be uploaded as public artifacts.
+They must remain outside the source/build tree (CI uses `RUNNER_TEMP`); the
+operator rejects an in-tree destination. Never broaden their private permissions
+to let a build tool scan them.
 
 Durable storage changes require `test:durable-files`, `python3
 scripts/durable-files-ops.test.py`, `NODE_ENV=test npm run test:durable-files-db`

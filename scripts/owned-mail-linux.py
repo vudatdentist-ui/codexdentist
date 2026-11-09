@@ -19,11 +19,18 @@ def run(args):
     return result.stdout
 
 
+def private_output(source,output):
+    source=Path(source).resolve();output=Path(output).resolve()
+    if source==output or source in output.parents:
+        raise ValueError('Private mail evidence must stay outside the source/build tree')
+    return output
+
+
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--image',required=True);parser.add_argument('--source',required=True);parser.add_argument('--output',required=True);args=parser.parse_args()
     source=Path(args.source).resolve();assert(source/'scripts/owned-mail-maddy-native.mjs').is_file()
     if not hasattr(os,'geteuid')or os.geteuid()!=0:raise ValueError('Run this disposable Linux backup/restore gate as root; no production credentials are used')
-    output=Path(args.output).resolve()/uuid.uuid4().hex;output.mkdir(parents=True,mode=0o700)
+    output=private_output(source,args.output)/uuid.uuid4().hex;output.mkdir(parents=True,mode=0o700)
     image=json.loads(run(['docker','image','inspect',args.image]))[0]['Id'];run(['docker','pull',mail.MADDY])
     token=uuid.uuid4().hex;project='cdx-mail-'+token
     names={'accept':project+'_gateway-data','data':project+'_smtp-data'};containers=[];volumes=[]
