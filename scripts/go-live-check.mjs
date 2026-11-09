@@ -4,6 +4,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
 import { notificationConfigurationErrors } from "./lib/notification-readiness.mjs";
 import { migrationChecksumMatches } from "../src/infrastructure/migrations/checksums.ts";
+import { verifyDurableLocalRoot } from "../src/infrastructure/patient-files/durable-root.ts";
 
 loadDotEnv();
 
@@ -31,7 +32,7 @@ const prisma = new PrismaClient({
 });
 
 async function main() {
-  checkEnvironment();
+  await checkEnvironment();
   checkSecretHygiene();
   await checkDatabase();
   checkScripts();
@@ -51,7 +52,7 @@ async function main() {
   console.log("Go-live check passed.");
 }
 
-function checkEnvironment() {
+async function checkEnvironment() {
   if (env("NODE_ENV") !== "production") {
     errors.push("Set NODE_ENV=production for go-live.");
   }
@@ -86,22 +87,19 @@ function checkEnvironment() {
     errors.push("DATABASE_URL points to localhost; use managed production PostgreSQL for go-live.");
   }
 
-  if (env("PATIENT_FILE_STORAGE_DRIVER") !== "r2") {
-    errors.push("Set PATIENT_FILE_STORAGE_DRIVER=r2.");
+  const driver = env("PATIENT_FILE_STORAGE_DRIVER");
+  if (driver === "local" || env("PATIENT_FILE_LOCAL_DURABLE") === "true") {
+    try { await verifyDurableLocalRoot({ probeWrite: true }); }
+    catch { errors.push("Local patient files require a private writable durable volume mounted outside the application as its unprivileged runtime user."); }
   }
-
-  if (!env("R2_ACCOUNT_ID") && !env("R2_ENDPOINT")) {
-    errors.push("Set R2_ACCOUNT_ID or R2_ENDPOINT.");
-  }
-
-  for (const name of requiredR2Env) {
-    if (!env(name)) {
-      errors.push(`Set ${name}.`);
+  if (driver === "r2") {
+    if (!env("R2_ACCOUNT_ID") && !env("R2_ENDPOINT")) errors.push("Set R2_ACCOUNT_ID or R2_ENDPOINT.");
+    for (const name of requiredR2Env) {
+      if (!env(name)) errors.push(`Set ${name}.`);
     }
-  }
-
-  if (env("R2_ENDPOINT") && !isHttps(env("R2_ENDPOINT"))) {
-    errors.push("R2_ENDPOINT must be HTTPS.");
+    if (env("R2_ENDPOINT") && !isHttps(env("R2_ENDPOINT"))) errors.push("R2_ENDPOINT must be HTTPS.");
+  } else if (driver !== "local") {
+    errors.push("Set PATIENT_FILE_STORAGE_DRIVER to r2 or verified durable local storage.");
   }
 
   errors.push(...notificationConfigurationErrors(process.env));

@@ -47,6 +47,45 @@ Self-host storage:
 - Backups: `backups/codexdentist-<timestamp>/`.
 - Copy backups off the server and run a restore drill before storing real patient data.
 
+Hosted private local storage is opt-in: set `PATIENT_FILE_LOCAL_DURABLE=true`,
+`PATIENT_FILE_STORAGE_ROOT=/data/patient-files` and, only after acceptance,
+`PATIENT_FILE_STORAGE_DRIVER=local`. Mount one named volume with label
+`com.codexdentist.storage=patient-files`, owned by UID/GID 1000 and mode 0700,
+using Compose long-form `volume: { nocopy: true }`. Docker can otherwise copy
+image-directory permissions over an empty volume on its next attachment. The
+application rejects root-owned, public, read-only, symlinked, temporary or
+unmounted durable roots. Never put the file root in a release or public directory.
+
+Install reviewed copies of `scripts/patient-file-backup.py`,
+`scripts/deploy-hostinger.py` and `scripts/production-go-live.py` outside release
+checkouts before enabling the flag. The deployer briefly pauses only the clinic
+app for its coordinated database/file snapshot and always unpauses it after a
+dump/archive failure. Restore verification runs afterward without workers or
+network access. The file helper checks volume ownership, private modes, archive
+paths and every restored checksum; it removes only its labelled disposable
+restore volume. Retain the original release backup and private snapshots. The
+independent go-live process uses the exact image, resolved environment and app
+UID, mounting only the patient's named file volume for its write probe. Never
+use root or an ephemeral image path to make this check pass.
+
+For the reviewed R2 original, run `scripts/migrate-owned-patient-file.mjs` through
+the TypeScript alias loader as the app UID, with explicit `--organization <id>`
+and `--file <id>`. Without `--apply` it only reports eligibility. The apply path
+preserves the R2 source, fsyncs a private `.migrations` journal and checked local
+copy, then transactionally changes storage metadata, the single cleanup stage
+and the audit record. A failed or uncertain commit retains its candidate for a
+reviewed retry; do not delete it or mark it for GC. The current command rejects
+unchecksummed files and originals with variants. Preserve historical R2 keys for
+mixed reads until all asset classes and rollback are accepted. Rollback must keep
+the durable root/volume mounted whenever any record references local bytes;
+changing the default write driver back to R2 does not relocate those records.
+Use the reviewed deployer's `--backup-only` under the same deployment lock for
+nightly snapshots. It backs up the actual running revision even if GitHub is
+unavailable or a newer main exists, verifies isolated database and file restores,
+and writes `backup-verified.json` only after success. It never changes the release
+marker, application configuration or image. Install a dedicated root-owned systemd
+timer after a successful manual run; preserve all existing backups and deploy timers.
+
 ## Hosted Deployment
 
 ### Hostinger migration observed 2026-10-21
