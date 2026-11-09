@@ -323,9 +323,9 @@ not exported as an application credential.
 
 Issue #91 remains open for the remaining free-runtime cutovers, in order:
 
-1. Replace cloud AI with a resource-bounded private local model; verify structured
-   Vietnamese operational drafts in the app, with no cloud fallback or autonomous
-   clinical/financial writes.
+1. Completed: cloud AI replaced by a resource-bounded private local model;
+   structured Vietnamese operational drafts are verified in the app, with no cloud
+   fallback or autonomous clinical/financial writes.
 2. Add durable self-host file storage with a verified backup/restore path. One
    patient file currently uses R2; preserve its protected reads and checksum until
    a verified migration, and do not delete the original under an inferred policy.
@@ -335,7 +335,8 @@ Issue #91 remains open for the remaining free-runtime cutovers, in order:
    complete consent reconciliation. Existing Documenso UI/connector tests are not
    evidence that a real signing service is already running.
 
-Local AI candidate (not yet deployed): the owned VPS has Ollama 0.40.15 and
+Local AI is deployed in `2face1e` (PR #95), with the production configuration
+cutover independently verified on 2026-11-09. The owned VPS has Ollama 0.40.15 and
 Qwen3 4B pinned by image/model digests. Runtime has no published port or external
 network, cloud features disabled, a read-only model cache and bounded CPU/memory.
 The native adapter needs no API key and never falls back to a cloud endpoint.
@@ -347,8 +348,23 @@ lengths. The assistant remains draft-only and cannot write clinical/financial da
 Full Next/PostgreSQL/owned-model acceptance now covers grounded zero-appointment
 data, Vietnamese structured output, pending/disabled submit, unavailable-model
 feedback and unchanged clinical/financial tables at 1440/390/320px. Production
-AI remains on the previous configuration until exact-main release and a separate
-verified configuration cutover; do not call local provisioning a production switch.
+AI now uses `ollama:qwen3:4b`, with the old environment retained privately for
+rollback. Exact-main push CI, core backup/restore, go-live/readiness, effective
+runtime inference, owner UI and unchanged financial audit pass. The independent
+production inference used only synthetic data and made no database writes.
+Model cache snapshot `20261109T121524Z-bcfd9e53` passed isolated restoration with
+matching SHA-256 for every file and the pinned model metadata. Mail remains Resend
+and patient files remain R2 until their own verified cutovers.
+
+Next phase: durable private filesystem storage on the existing VPS. Inventory
+finds one R2 file (41,744 bytes with a stored SHA-256), no previews/thumbnails,
+stages, purge manifests or accounting attachments. Use the protected local driver
+with explicit production durability configuration, a mounted private volume and
+backup/restore checks. Preserve mixed-provider reads during migration. Copy and
+verify bytes before an audited, concurrency-fenced metadata change; retain the
+original R2 object. Keep file authorization, tenant/clinic isolation, upload
+validation and the staged cleanup lifecycle. Storage readiness/go-live must prove
+the selected durable backend, rather than accepting an ephemeral container path.
 
 ### Current delivery plan — 2026-11-05
 
