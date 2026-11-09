@@ -335,6 +335,21 @@ Issue #91 remains open for the remaining free-runtime cutovers, in order:
    complete consent reconciliation. Existing Documenso UI/connector tests are not
    evidence that a real signing service is already running.
 
+Local AI candidate (not yet deployed): the owned VPS has Ollama 0.40.15 and
+Qwen3 4B pinned by image/model digests. Runtime has no published port or external
+network, cloud features disabled, a read-only model cache and bounded CPU/memory.
+The native adapter needs no API key and never falls back to a cloud endpoint.
+Structured schemas constrain operational/accounting output; the application
+rejects input echoes or malformed answers before recording success. Provider
+failure bodies are not persisted in errors. Dashboard context uses the same
+complete clinic aggregates as the screen, not capped previews or metric-array
+lengths. The assistant remains draft-only and cannot write clinical/financial data.
+Full Next/PostgreSQL/owned-model acceptance now covers grounded zero-appointment
+data, Vietnamese structured output, pending/disabled submit, unavailable-model
+feedback and unchanged clinical/financial tables at 1440/390/320px. Production
+AI remains on the previous configuration until exact-main release and a separate
+verified configuration cutover; do not call local provisioning a production switch.
+
 ### Current delivery plan — 2026-11-05
 
 User-facing completion loop: plan a complete operational path, implement it,

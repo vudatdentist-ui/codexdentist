@@ -5,7 +5,9 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireViewSession } from "@/lib/auth";
 import { databaseActorId, requiredString } from "@/lib/form-validation";
-import { aiEnabled, generateAiJson } from "@/lib/ai-provider";
+import { aiEnabled, aiRuntimeIdentity, generateAiJson } from "@/lib/ai-provider";
+import { moduleAiOutputSchema, validateModuleAiOutput } from "@/features/ai/module-output";
+import { moduleAiSystemPrompt } from "@/features/ai/module-prompt";
 import { canAccessView, viewRoutes, type ViewKey } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import {
@@ -108,22 +110,15 @@ export async function chatModuleWithAiAction(formData: FormData) {
     const result = await generateAiJson([
       {
         role: "system",
-        content: [
-      "You are CodexMed AI inside Codexdentist, a Vietnamese dental clinic operating system.",
-          "Answer the user's module-specific operations task using only the provided module context.",
-          "Do not invent data. If the context is insufficient, say exactly what is missing.",
-          "For clinical, journey, pharmacy, and patient-related modules: do not diagnose, prescribe, or replace clinician judgement. Summarize records, flag missing information, and suggest operational next steps only.",
-          "For finance, billing, accounting, reports: provide management analysis only, not tax/legal advice.",
-          "Return valid JSON only with this shape:",
-          '{"answer":"...","takeaways":["..."],"suggestedActions":["..."],"caveats":["..."]}',
-          "Write all user-facing text in Vietnamese.",
-        ].join("\n"),
+        content: moduleAiSystemPrompt,
       },
       {
         role: "user",
         content: JSON.stringify(input),
       },
-    ]);
+    ], { schema: moduleAiOutputSchema });
+
+    validateModuleAiOutput(result.output);
 
     await prisma.aiRun.create({
       data: {
@@ -172,14 +167,15 @@ async function createFailedModuleAiRun({
   module: ViewKey;
   session: Awaited<ReturnType<typeof requireViewSession>>;
 }) {
+  const identity = aiRuntimeIdentity();
   await prisma.aiRun.create({
     data: {
       organizationId: session.organizationId,
       actorId: databaseActorId(session.userId),
       module,
       action: "MODULE_TASK_CHAT",
-      provider: "openai-compatible",
-      model,
+      provider: identity.provider,
+      model: model === "unknown" ? identity.model : model,
       status: "FAILED",
       input: input as Prisma.InputJsonValue,
       error: error.slice(0, 2000),

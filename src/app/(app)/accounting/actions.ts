@@ -17,7 +17,9 @@ import {
   requiredString,
 } from "@/lib/form-validation";
 import { ensureAccountingCategories, getAccountingWorkspace } from "@/lib/accounting";
-import { aiEnabled, generateAiJson } from "@/lib/ai-provider";
+import { aiEnabled, aiRuntimeIdentity, generateAiJson } from "@/lib/ai-provider";
+import { moduleAiOutputSchema, validateModuleAiOutput } from "@/features/ai/module-output";
+import { accountingAiAnalysisSchema, validateAccountingAiAnalysis } from "@/features/accounting/ai-output";
 import {
   isUploadedPatientFile,
   storeAccountingUpload,
@@ -289,6 +291,7 @@ export async function analyzeAccountingWithAiAction(formData: FormData) {
         content: [
           "You are CodexMed AI, a management accounting assistant for a Vietnamese dental clinic chain.",
           "Analyze operating P&L, budget percentages, and controllable clinic costs.",
+          "Keep the summary concise and return at most two brief items in each array.",
           "Do not provide tax/legal accounting advice. Do not invent missing data.",
           "Return valid JSON only with this shape:",
           '{"summary":"...","alerts":[{"severity":"info|watch|critical","title":"...","detail":"...","metric":"..."}],"actions":[{"priority":"high|medium|low","title":"...","detail":"..."}],"questions":["..."],"caveats":["..."]}',
@@ -299,7 +302,9 @@ export async function analyzeAccountingWithAiAction(formData: FormData) {
         role: "user",
         content: JSON.stringify(input),
       },
-    ]);
+    ], { schema: accountingAiAnalysisSchema });
+
+    validateAccountingAiAnalysis(result.output);
 
     await prisma.aiRun.create({
       data: {
@@ -327,8 +332,7 @@ export async function analyzeAccountingWithAiAction(formData: FormData) {
         actorId: databaseActorId(session.userId),
         module: "accounting",
         action: "PNL_ANALYSIS",
-        provider: "openai-compatible",
-        model: "unknown",
+        ...aiRuntimeIdentity(),
         status: "FAILED",
         input: input as Prisma.InputJsonValue,
         error: error instanceof Error ? error.message.slice(0, 2000) : "Unknown AI error",
@@ -376,6 +380,7 @@ export async function chatAccountingWithAiAction(formData: FormData) {
         content: [
           "You are CodexMed AI, a task-focused management accounting assistant for a Vietnamese dental clinic chain.",
           "Use only the JSON workspace data provided by the app. If the data is insufficient, say what is missing.",
+          "Keep the answer concise and return at most two brief items in each array.",
           "Do not provide tax/legal accounting advice. Do not invent transactions, vendors, or clinical facts.",
           "Return valid JSON only with this shape:",
           '{"answer":"...","takeaways":["..."],"suggestedActions":["..."],"caveats":["..."]}',
@@ -386,7 +391,9 @@ export async function chatAccountingWithAiAction(formData: FormData) {
         role: "user",
         content: JSON.stringify(input),
       },
-    ]);
+    ], { schema: moduleAiOutputSchema });
+
+    validateModuleAiOutput(result.output);
 
     await prisma.aiRun.create({
       data: {
@@ -414,8 +421,7 @@ export async function chatAccountingWithAiAction(formData: FormData) {
         actorId: databaseActorId(session.userId),
         module: "accounting",
         action: "TASK_CHAT",
-        provider: "openai-compatible",
-        model: "unknown",
+        ...aiRuntimeIdentity(),
         status: "FAILED",
         input: input as Prisma.InputJsonValue,
         error: error instanceof Error ? error.message.slice(0, 2000) : "Unknown AI error",

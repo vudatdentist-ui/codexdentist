@@ -357,6 +357,7 @@ export function useDentalSuiteModel({ activeView, staffDirectory = [], accountin
     const moduleAiContextJson = useMemo(() => {
         const context = buildModuleAiContext({
             activeView,
+            visibleClinicIds,
             accountingWorkspace,
             billingWorkspace,
             clinicalWorkspace,
@@ -383,6 +384,7 @@ export function useDentalSuiteModel({ activeView, staffDirectory = [], accountin
         return stringifyAiContext(context);
     }, [
         activeView,
+        visibleClinicIds,
         accountingWorkspace,
         billingWorkspace,
         clinicalWorkspace,
@@ -413,7 +415,7 @@ export function useDentalSuiteModel({ activeView, staffDirectory = [], accountin
             caveats: "Giới hạn",
             close: "Đóng",
             empty: "Nhập task cụ thể để AI phân tích mục đang mở.",
-            failed: "Lần gọi AI gần nhất bị lỗi",
+            failed: "Chưa tạo được gợi ý. Hãy thử lại sau hoặc chọn ít hồ sơ hơn.",
             history: "Lịch sử gần đây",
             open: "Mở AI",
             patientContext: "Ngữ cảnh bệnh nhân",
@@ -431,7 +433,7 @@ export function useDentalSuiteModel({ activeView, staffDirectory = [], accountin
             caveats: "Caveats",
             close: "Close",
             empty: "Enter a specific task for AI to analyze the current module.",
-            failed: "Latest AI call failed",
+            failed: "Could not create a suggestion. Retry later or select fewer records.",
             history: "Recent history",
             open: "Open AI",
             patientContext: "Patient context",

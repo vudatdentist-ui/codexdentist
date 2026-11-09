@@ -1,11 +1,13 @@
 "use client";
 import { MessageSquareText, PanelRightOpen } from "lucide-react";
 import { chatModuleWithAiAction } from "@/app/(app)/ai/actions";
+import { AiSubmitButton } from "@/workspaces/assistant/AiSubmitButton";
 import { LanguageContext } from "@/components/AppLanguage";
 import { AppSidebar, AppTopbar, ModuleAiFloatingShell } from "@/components/AppShell";
 import { viewRoutes } from "@/lib/permissions";
 import { EmptyState } from "@/components/suite-primitives";
-import { Dashboard, ScheduleBoard, PatientsPanel, PatientJourneyPanel, BillingPanel, AccountingPanel, CrmPanel, ReportsPanel, CommunityPanel, PatientAppPanel, EmployeeAppPanel, ServicesPanel, PharmacyPanel, FormsPanel, InventoryPanel, LearningPanel, StaffPayrollPanel, SettingsPanel, workspaceText, titleFor, patientSearchDisplayLabel, PatientSearchCombobox, JourneyPatientMenu, journeyTopbarText, billingTopbarText, StatusPill } from "./suite-shared";
+import { StatusPill as AiStatusPill } from "@/components/suite-primitives";
+import { Dashboard, ScheduleBoard, PatientsPanel, PatientJourneyPanel, BillingPanel, AccountingPanel, CrmPanel, ReportsPanel, CommunityPanel, PatientAppPanel, EmployeeAppPanel, ServicesPanel, PharmacyPanel, FormsPanel, InventoryPanel, LearningPanel, StaffPayrollPanel, SettingsPanel, workspaceText, titleFor, patientSearchDisplayLabel, PatientSearchCombobox, JourneyPatientMenu, journeyTopbarText, billingTopbarText } from "./suite-shared";
 import type { DentalSuiteModel } from "./suite-model";
 export function DentalSuiteView(model: Pick<DentalSuiteModel, "language" | "t" | "activeView" | "permittedViews" | "chainOptions" | "chainScopeId" | "taskInboxWorkspace" | "setChainScopeId" | "setPatientFilterId" | "setLanguage" | "session" | "hasTopbarControls" | "usesJourneyControls" | "setJourneyPatientMenuOpen" | "journeyChartSearch" | "setJourneyChartSearch" | "setJourneySearchShowsSelectedPatientLabel" | "journeyPatientSearchMatches" | "journeySelectedPatient" | "journeyRecordPatientId" | "journeySearchShowsSelectedPatientLabel" | "selectJourneyPatient" | "visibleAppointments" | "billingWorkspace" | "visibleClinics" | "openPatientRoute" | "journeyPatientMenuOpen" | "visiblePatients" | "billingSearch" | "setBillingSearch" | "billingPatientSearchMatches" | "billingSelectedPatient" | "patientFilterId" | "patientLookupSearch" | "setPatientLookupSearch" | "patientLookupSearchMatches" | "selectedSharedPatient" | "moduleAiSupported" | "moduleAiText" | "moduleAiModalOpen" | "setModuleAiModalOpen" | "moduleAiContextJson" | "moduleAiMeta" | "showModuleAiResult" | "latestModuleAiRun" | "latestModuleAiOutput" | "moduleAiRuns" | "collection" | "production" | "todayVisits" | "utilization" | "patientScopedAppointments" | "dashboardWorkspace" | "scheduleWorkspace" | "scheduleScopedAppointments" | "patientWorkspace" | "clinicalWorkspace" | "crmWorkspace" | "formsWorkspace" | "journeyRecordsWorkspace" | "patientFilesWorkspace" | "pharmacyWorkspace" | "servicesWorkspace" | "staffDirectory" | "treatmentWorkspace" | "journeyReceipts" | "visibleInvoices" | "visiblePlans" | "journeyInvoiceIds" | "visibleClinicIds" | "patientScopedInvoices" | "patientScopedPatients" | "accountingWorkspace" | "reportsWorkspace" | "communityWorkspace" | "patientPortalWorkspace" | "staffPayrollWorkspace" | "inventoryWorkspace" | "learningWorkspace" | "settingsWorkspace">) {
     const { language, t, activeView, permittedViews, chainOptions, chainScopeId, taskInboxWorkspace, setChainScopeId, setPatientFilterId, setLanguage, session, hasTopbarControls, usesJourneyControls, setJourneyPatientMenuOpen, journeyChartSearch, setJourneyChartSearch, setJourneySearchShowsSelectedPatientLabel, journeyPatientSearchMatches, journeySelectedPatient, journeyRecordPatientId, journeySearchShowsSelectedPatientLabel, selectJourneyPatient, visibleAppointments, billingWorkspace, visibleClinics, openPatientRoute, journeyPatientMenuOpen, visiblePatients, billingSearch, setBillingSearch, billingPatientSearchMatches, billingSelectedPatient, patientFilterId, patientLookupSearch, setPatientLookupSearch, patientLookupSearchMatches, selectedSharedPatient, moduleAiSupported, moduleAiText, moduleAiModalOpen, setModuleAiModalOpen, moduleAiContextJson, moduleAiMeta, showModuleAiResult, latestModuleAiRun, latestModuleAiOutput, moduleAiRuns, collection, production, todayVisits, utilization, patientScopedAppointments, dashboardWorkspace, scheduleWorkspace, scheduleScopedAppointments, patientWorkspace, clinicalWorkspace, crmWorkspace, formsWorkspace, journeyRecordsWorkspace, patientFilesWorkspace, pharmacyWorkspace, servicesWorkspace, staffDirectory, treatmentWorkspace, journeyReceipts, visibleInvoices, visiblePlans, journeyInvoiceIds, visibleClinicIds, patientScopedInvoices, patientScopedPatients, accountingWorkspace, reportsWorkspace, communityWorkspace, patientPortalWorkspace, staffPayrollWorkspace, inventoryWorkspace, learningWorkspace, settingsWorkspace } = model;
@@ -89,16 +91,15 @@ export function DentalSuiteView(model: Pick<DentalSuiteModel, "language" | "t" |
                   <textarea name="task" placeholder={moduleAiText.placeholder} rows={4} maxLength={1200} required/>
                 </label>
                 <div className="accounting-ai-action">
-                  <button className="primary-button compact-button" type="submit">
+                  <AiSubmitButton pendingLabel={language === "vi" ? "Đang phân tích…" : "Analyzing…"}>
                     <MessageSquareText size={16}/>
                     {moduleAiText.action}
-                  </button>
+                  </AiSubmitButton>
                   {moduleAiMeta && <span>{moduleAiMeta}</span>}
                 </div>
               </form>
               {showModuleAiResult && latestModuleAiRun?.status === "FAILED" ? (<div className="schedule-alert accounting-warning">
                   {moduleAiText.failed}
-                  {latestModuleAiRun.error ? `: ${latestModuleAiRun.error}` : ""}
                 </div>) : showModuleAiResult && latestModuleAiOutput ? (<div className="accounting-ai-result">
                   <p>{latestModuleAiOutput.answer}</p>
                   {latestModuleAiOutput.takeaways.length > 0 && (<div>
@@ -130,7 +131,10 @@ export function DentalSuiteView(model: Pick<DentalSuiteModel, "language" | "t" |
                           {run.totalTokens ? ` · ${run.totalTokens} ${moduleAiText.tokens}` : ""}
                         </small>
                       </div>
-                      <StatusPill status={run.status}/>
+                      <AiStatusPill status={run.status} label={run.status === "SUCCEEDED"
+                        ? (language === "vi" ? "Đã có gợi ý" : "Suggestion ready")
+                        : run.status === "FAILED" ? (language === "vi" ? "Chưa có gợi ý" : "No suggestion yet")
+                          : (language === "vi" ? "Đang xử lý" : "Processing")}/>
                     </article>))}
                 </div>)}
               </>) : null}

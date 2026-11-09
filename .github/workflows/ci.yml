@@ -73,6 +73,8 @@ jobs:
         run: npm run test:optional
       - name: Optional service deployment isolation and resource bounds
         run: python3 scripts/optional-services.test.py
+      - name: Local-only AI and provider response privacy
+        run: npm run test:local-ai && python3 scripts/local-ai-services.test.py
       - name: Maintainability regressions and budgets
         run: npm run test:maintainability
       - run: npm run encoding:check

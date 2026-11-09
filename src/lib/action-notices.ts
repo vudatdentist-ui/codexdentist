@@ -8,6 +8,9 @@ export function shouldKeepActionNotice(notice: string) {
 }
 
 export function visibleActionNoticeParam(notice: string | null) {
+  // Assistant results are rendered by their own dialog. Passing a successful
+  // assistant notice into a module's action map produced a false failure banner.
+  if (notice === "module-ai-ready" || notice === "module-ai-failed") return null;
   if (!notice) {
     return null;
   }
