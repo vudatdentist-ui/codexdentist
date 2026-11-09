@@ -11,6 +11,19 @@ baseline -> implement -> audit -> classify -> fix -> re-audit -> repeat -> phase
 
 A passing build alone is not enough. Every changed high-risk boundary must pass its focused negative/regression tests before a phase can close.
 
+Local inference changes require `npm run test:local-ai` and
+`python3 scripts/local-ai-services.test.py`. Use `NODE_ENV=test npm run
+browser:local-ai` with explicit disposable loopback PostgreSQL and an owned
+preloaded Ollama server tunneled to `LOCAL_AI_QA_BASE_URL` (default
+`http://127.0.0.1:24806`). It creates/migrates/drops only its unique test database,
+exercises actual Next actions and the provider, verifies grounded numbers rather
+than merely valid JSON, and captures pending/success/unavailable states at
+1440/390/320px. No operational records or cloud credentials enter the test.
+Dashboard AI counts must match complete visible-clinic aggregates; array metadata
+and capped previews cannot become appointment counts. Input echoes and malformed
+module/accounting answers cannot be recorded as successful runs. Review generated
+Vietnamese content as well as schema, resource use and screenshots before cutover.
+
 Optional-service changes require `npm run test:optional`, `NODE_ENV=test npm run
 test:optional-db` with explicit loopback `DATABASE_URL` and
 `CHATWOOT_TEST_DATABASE_URL`, and `NODE_ENV=test npm run browser:optional`.

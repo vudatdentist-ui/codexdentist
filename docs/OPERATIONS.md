@@ -452,6 +452,44 @@ through an operator-reviewed correction.
 
 ## Go-Live Gate
 
+### Private local inference
+
+`scripts/local-ai-services.py bootstrap` downloads the explicitly selected
+Qwen3 4B model through a temporary, resource-bounded container with outbound
+networking and no core database or patient mounts. The image is Ollama 0.40.15;
+both image and model resolve to immutable digests in root-private
+`/opt/codexdentist-local-ai/model-lock.json`. Subsequent bootstrap refuses to
+replace an existing pin. Review model changes explicitly; retain the previous pin
+and cache until the replacement is accepted. The accepted model uses
+[Apache 2.0](https://ollama.com/library/qwen3:4b).
+
+`local-ai-services.py up` starts only that service; `status` checks its model pin,
+read-only model mount and root filesystem, local-only configuration and internal
+network. The runtime publishes no ports and has no external network. It allows
+one generation at a time, a queue of two, at most three CPU cores and 5 GiB RAM;
+the owned VPS has four cores. Model keep-alive is two minutes. Back up the model
+pin and immutable cache separately; neither is part of the four-service cold
+snapshot. Never include prompt logs in model backups. Application AI run auditing
+remains in the existing protected core database.
+
+Join the core to external Docker network `codexdentist-local-ai_private`, then
+select `CODEXMED_AI_PROVIDER=ollama`, `CODEXMED_AI_BASE_URL=http://codexdentist-ollama:11434`,
+`CODEXMED_AI_MODEL=qwen3:4b` and `CODEXMED_AI_ENABLED=true`. No API key is needed;
+the adapter never forwards an old cloud key. Only the owned private origin or an
+explicit loopback origin is supported; cloud model names are rejected. Requests
+do not follow redirects, cap context/response sizes and have a 90-second budget.
+[Ollama cloud features](https://docs.ollama.com/faq#how-do-i-disable-ollamas-cloud-features)
+are disabled explicitly in addition to network isolation.
+
+For an upgrade, deploy the compatible application with its old AI configuration
+first, then perform the local-only environment cutover after verifying that exact
+revision. Save the previous environment privately and hold the deployment lock.
+If cutover checks fail, restore only that environment and recreate the same new
+compatible image. Do not roll an old image into an unsupported `ollama`
+configuration or silently fall back to a paid/cloud API. Verify private inference,
+readiness, owner UI, core health under inference load and unchanged ledgers before
+claiming the switch. Keep mail/storage configuration and existing vault keys intact.
+
 ### Free optional services
 
 `scripts/optional-services.py` prepares root-private configuration under

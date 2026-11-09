@@ -20,7 +20,7 @@ const weakJobSecretValues = new Set([
 export type NotificationDeliveryMode = "disabled" | "log" | "webhook" | "resend" | "novu";
 export type NotificationWebhookChannel = "EMAIL" | "SMS" | "ZALO" | "PUSH" | "IN_APP" | "PHONE";
 export type PatientFileStorageDriver = "local" | "r2";
-export type CodexMedAiProvider = "openai-compatible";
+export type CodexMedAiProvider = "openai-compatible" | "ollama";
 export type DeploymentMode = "hosted" | "self-hosted";
 export type TrustedProxyProvider = "none" | "cloudflare" | "reverse-proxy";
 
@@ -296,12 +296,12 @@ export function codexMedAiConfig() {
   const enabled = process.env.CODEXMED_AI_ENABLED === "true";
   const provider =
     (process.env.CODEXMED_AI_PROVIDER?.trim().toLowerCase() || "openai-compatible") as CodexMedAiProvider;
-  const baseUrl = process.env.CODEXMED_AI_BASE_URL?.trim() || "";
+  const baseUrl = process.env.CODEXMED_AI_BASE_URL?.trim() || (provider === "ollama" ? "http://codexdentist-ollama:11434" : "");
   const apiKey = process.env.CODEXMED_AI_API_KEY?.trim() || "";
-  const model = process.env.CODEXMED_AI_MODEL?.trim() || "cx/gpt-5.5";
+  const model = process.env.CODEXMED_AI_MODEL?.trim() || (provider === "ollama" ? "qwen3:4b" : "cx/gpt-5.5");
 
-  if (provider !== "openai-compatible") {
-    throw new Error("CODEXMED_AI_PROVIDER must be openai-compatible.");
+  if (provider !== "openai-compatible" && provider !== "ollama") {
+    throw new Error("CODEXMED_AI_PROVIDER must be openai-compatible or ollama.");
   }
 
   if (!enabled) {
@@ -318,11 +318,23 @@ export function codexMedAiConfig() {
     throw new Error("CODEXMED_AI_BASE_URL is required when CODEXMED_AI_ENABLED=true.");
   }
 
-  if (!apiKey) {
+  if (provider !== "ollama" && !apiKey) {
     throw new Error("CODEXMED_AI_API_KEY is required when CODEXMED_AI_ENABLED=true.");
   }
 
   const parsedBaseUrl = new URL(baseUrl);
+
+  if (provider === "ollama") {
+    if (parsedBaseUrl.username || parsedBaseUrl.password || parsedBaseUrl.search || parsedBaseUrl.hash ||
+        parsedBaseUrl.pathname !== "/" || parsedBaseUrl.protocol !== "http:" ||
+        (!isLoopbackUrl(parsedBaseUrl) && parsedBaseUrl.origin !== "http://codexdentist-ollama:11434")) {
+      throw new Error("Ollama requires the private owned service or a loopback HTTP origin.");
+    }
+    if (!/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(model) || model.toLowerCase().includes("cloud")) {
+      throw new Error("Ollama requires a preloaded local model; cloud models are unavailable.");
+    }
+    return { enabled, provider, baseUrl: parsedBaseUrl.origin, apiKey: "", model };
+  }
 
   if (
     process.env.NODE_ENV === "production" &&
@@ -342,7 +354,7 @@ export function codexMedAiConfig() {
 }
 
 function isLoopbackUrl(url: URL) {
-  return ["localhost", "127.0.0.1", "::1"].includes(url.hostname);
+  return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname);
 }
 
 function normalizeNotificationChannel(channel?: string): NotificationWebhookChannel | null {

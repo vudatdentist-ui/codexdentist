@@ -1,24 +1,10 @@
 import "server-only";
 
 import { codexMedAiConfig } from "@/lib/env";
-
-export type AiChatMessage = {
-  role: "system" | "user" | "assistant";
-  content: string;
-};
-
-export type AiJsonResult = {
-  baseUrl: string;
-  content: string;
-  model: string;
-  output: unknown;
-  provider: string;
-  usage: {
-    completionTokens: number | null;
-    promptTokens: number | null;
-    totalTokens: number | null;
-  };
-};
+import { readAiProviderJson } from "@/integrations/ai-http";
+import { generateLocalAiJson } from "@/integrations/ollama/client";
+import type { AiChatMessage, AiJsonResult } from "@/features/ai/provider";
+export type { AiChatMessage, AiJsonResult } from "@/features/ai/provider";
 
 type ChatCompletionResponse = {
   choices?: Array<{
@@ -36,8 +22,12 @@ type ChatCompletionResponse = {
 export function aiEnabled() {
   return codexMedAiConfig().enabled;
 }
+export function aiRuntimeIdentity() {
+  const { provider, model } = codexMedAiConfig();
+  return { provider, model };
+}
 
-export async function generateAiJson(messages: AiChatMessage[]): Promise<AiJsonResult> {
+export async function generateAiJson(messages: AiChatMessage[], options?: { schema: Record<string, unknown> }): Promise<AiJsonResult> {
   const config = codexMedAiConfig();
 
   if (!config.enabled) {
@@ -45,11 +35,18 @@ export async function generateAiJson(messages: AiChatMessage[]): Promise<AiJsonR
   }
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60_000);
+  const timeout = setTimeout(() => controller.abort(), config.provider === "ollama" ? 90_000 : 60_000);
 
   try {
+    if (config.provider === "ollama") {
+      const result = await generateLocalAiJson(config, messages, controller.signal, options?.schema);
+      return { ...result, baseUrl: config.baseUrl, model: config.model, provider: config.provider,
+        output: parseJsonFromModelContent(result.content) };
+    }
     const response = await fetch(`${config.baseUrl}/chat/completions`, {
       method: "POST",
+      redirect: "error",
+      cache: "no-store",
       headers: {
         "Authorization": `Bearer ${config.apiKey}`,
         "Content-Type": "application/json",
@@ -61,26 +58,7 @@ export async function generateAiJson(messages: AiChatMessage[]): Promise<AiJsonR
       signal: controller.signal,
     });
 
-    const bodyText = await response.text();
-    const contentType = response.headers.get("content-type") ?? "";
-
-    if (!response.ok) {
-      if (contentType.includes("text/html") || bodyText.trimStart().startsWith("<!DOCTYPE html")) {
-        throw new Error(
-          `AI provider returned HTTP ${response.status} with an HTML page. Check CODEXMED_AI_BASE_URL; current endpoint is ${config.baseUrl}/chat/completions.`,
-        );
-      }
-
-      if (!bodyText.trim()) {
-        throw new Error(
-          `AI provider returned HTTP ${response.status} with an empty response body. The provider may have rejected the request or failed internally.`,
-        );
-      }
-
-      throw new Error(`AI provider returned HTTP ${response.status}: ${bodyText.slice(0, 500)}`);
-    }
-
-    const body = JSON.parse(bodyText) as ChatCompletionResponse;
+    const body = await readAiProviderJson(response) as ChatCompletionResponse;
     const content = normalizeAssistantContent(body.choices?.[0]?.message?.content);
 
     if (!content) {

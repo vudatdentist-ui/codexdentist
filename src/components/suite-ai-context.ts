@@ -22,6 +22,7 @@ import type { CommunityWorkspace as CommunityWorkspaceData } from "@/lib/communi
 import type { DashboardWorkspace } from "@/lib/dashboard-types";
 import type { TreatmentWorkspace } from "@/lib/treatment-types";
 import type { TaskInboxWorkspace } from "@/lib/task-inbox-types";
+import { summarizeClinicDay } from "@/workspaces/clinic-day";
 export type AccountingChatOutput = {
     answer: string;
     takeaways: string[];
@@ -49,6 +50,7 @@ export function moduleAiOutput(value: unknown): AccountingChatOutput | null {
 }
 export type ModuleAiContextInput = {
     activeView: ViewKey;
+    visibleClinicIds?: Iterable<string>;
     accountingWorkspace?: AccountingWorkspace | null;
     billingWorkspace?: BillingWorkspace | null;
     clinicalWorkspace?: ClinicalWorkspaceData | null;
@@ -76,10 +78,7 @@ export function buildModuleAiContext(input: ModuleAiContextInput) {
     const workspace = (() => {
         switch (input.activeView) {
             case "dashboard":
-                return {
-                    dashboardWorkspace: input.dashboardWorkspace,
-                    taskInboxWorkspace: input.taskInboxWorkspace,
-                };
+                return dashboardAiFacts(input);
             case "accounting":
                 return { accountingWorkspace: input.accountingWorkspace };
             case "schedule":
@@ -157,6 +156,25 @@ export function buildModuleAiContext(input: ModuleAiContextInput) {
         generatedAt: new Date().toISOString(),
         workspace,
     });
+}
+function dashboardAiFacts(input: ModuleAiContextInput) {
+    const workspace = input.dashboardWorkspace;
+    if (!workspace || workspace.message) return { dashboardFacts: { available: false } };
+    const scope = new Set(input.visibleClinicIds ?? workspace.clinicSummaries.map(clinic => clinic.clinicId));
+    const day = summarizeClinicDay(workspace.clinicSummaries, scope);
+    return { dashboardFacts: {
+        available: true,
+        generatedAt: workspace.generatedAt,
+        appointmentCountToday: day.appointments,
+        inChairAppointmentCount: day.inChair,
+        completedAppointmentCountToday: day.completed,
+        collectedAmountVndToday: day.collected,
+        countSource: "Complete aggregates for the selected clinics; not preview lengths or number of metric labels.",
+    }, workQueue: {
+        availablePreviewItemCount: input.taskInboxWorkspace?.items.length ?? null,
+        preview: input.taskInboxWorkspace?.items.slice(0, 8).map(item => ({ title: item.title, detail: item.detail, priority: item.priority })) ?? [],
+        countMeaning: "Work item preview across actor-accessible clinics, not an appointment count. Preview may be incomplete.",
+    } };
 }
 export function settingsAiContext(workspace?: SettingsWorkspace | null) {
     if (!workspace) {
