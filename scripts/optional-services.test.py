@@ -9,6 +9,31 @@ from unittest.mock import patch
 spec=importlib.util.spec_from_file_location('optional_services',Path(__file__).with_name('optional-services.py'))
 module=importlib.util.module_from_spec(spec)
 spec.loader.exec_module(module)
+runner_spec=importlib.util.spec_from_file_location('owned_app_runner',Path(__file__).with_name('run-owned-app-command.py'))
+runner=importlib.util.module_from_spec(runner_spec)
+runner_spec.loader.exec_module(runner)
+
+class RunningEnvironmentTests(unittest.TestCase):
+    def configuration(self):
+        return {'Id':'b'*64,'Image':'sha256:'+'c'*64,'State':{'Running':True},
+                'Config':{'Labels':{'org.opencontainers.image.revision':'a'*40},
+                          'Env':['AUTH_SECRET=resolved-secret-$-value','QUOTED="intentional-quotes"','EMPTY=']}}
+
+    def test_resolved_secrets_are_lossless_and_absent_from_argv(self):
+        value=self.configuration()
+        argv,pipe=runner.command_plan(value,'a'*40,Path('/review-source'),['node','scripts/probe.mjs'])
+        self.assertEqual(pipe,b'AUTH_SECRET=resolved-secret-$-value\nQUOTED="intentional-quotes"\nEMPTY=\n')
+        self.assertNotIn('resolved-secret',' '.join(argv))
+        self.assertIn('/dev/stdin',argv)
+        self.assertIn('container:'+'b'*64,argv)
+        self.assertIn('sha256:'+'c'*64,argv)
+        self.assertNotIn('--privileged',argv)
+
+    def test_multiline_values_and_wrong_revision_fail_before_running(self):
+        value=self.configuration()
+        with self.assertRaises(ValueError):runner.command_plan(value,'d'*40,Path('/source'),['node'])
+        value['Config']['Env']=['AUTH_SECRET=first\nSECOND=injected']
+        with self.assertRaises(ValueError):runner.command_plan(value,'a'*40,Path('/source'),['node'])
 
 class ServiceConfigurationTests(unittest.TestCase):
     def setUp(self):

@@ -1,6 +1,6 @@
 # Codexdentist Canonical Product Context
 
-Last updated: 2026-11-06
+Last updated: 2026-11-09
 Status: ACTIVE / CANONICAL
 
 > This file replaces every previous product direction, refactor queue, migration-route plan, and architecture context. Git history is an archive, not an active instruction source. Do not revive an older plan merely because it appears in a previous commit, chat, issue, or deleted document.
@@ -281,7 +281,9 @@ service-generated credentials are valid only for those owned instances. Preserve
 real records, current mail/AI/R2 configuration and existing deployment rollback.
 Do not enable outbound patient jobs or delete files under an inferred policy.
 
-Current evidence for issue #91 (release still pending): the branch implements
+Current evidence for issue #91: release `87f06bd` (PR #92) is deployed after
+successful exact-main push CI, core backup/isolated restore, candidate/public
+checks and independent go-live verification. It implements
 offline NAPAS bank QR in Settings/Billing, four encrypted optional-provider
 panels and patient-scoped Chatwoot/Medplum/Novu tools. Shared provider accounts
 are atomically owned by one organization; disabled clinic overrides never fall
@@ -299,12 +301,16 @@ accounts/projects; no real patient messages or bank transfers were made. OHIF
 at `/imaging/ohif/`; its reviewed responsive adaptation preserves provider
 onboarding and investigational-use notices. Synthetic DICOM pixels rendered at
 1440/390/320px; foreign-organization metadata/viewer requests were denied.
-The optional stack cold snapshot `20261106T143908Z-fe9661d2` was restored into
+The optional stack cold snapshot `20261109T111052Z-123500b2` was restored into
 separate volumes/networks with matching PostgreSQL/MongoDB counts and an
 authenticated PACS index. Original core/sidecar volumes were not restore targets.
 
-Do not report this branch as deployed: exact-head CI, main release, production
-organization bindings and independent go-live proof remain required. A real bank
+The four production connections are enabled and verified for the existing
+`phuongthao` organization. Deployed owner Settings, Billing, Patients and Imaging
+were exercised at 1440/390/320px; a marked synthetic Novu in-app test reached
+authenticated `SENT` evidence. No real patient message or transfer was sent.
+The financial audit is identical before/after deployment with zero mismatches.
+A real bank
 receiving account is an owner-entered clinic setting; never substitute the test
 account. Existing cloud mail/AI/file configuration remains preserved pending a
 verified free migration; its current billing plan is not established.
@@ -314,6 +320,20 @@ is closed; an account API response alone is insufficient. Main and synthetic
 accounts now use distinct ordinary service agents, with real cross-account
 requests denied in both directions. The installation administrator's token is
 not exported as an application credential.
+
+Issue #91 remains open for the remaining free-runtime cutovers, in order:
+
+1. Replace cloud AI with a resource-bounded private local model; verify structured
+   Vietnamese operational drafts in the app, with no cloud fallback or autonomous
+   clinical/financial writes.
+2. Add durable self-host file storage with a verified backup/restore path. One
+   patient file currently uses R2; preserve its protected reads and checksum until
+   a verified migration, and do not delete the original under an inferred policy.
+3. Replace cloud email only after self-host SMTP, sender identity, credential-mail
+   recovery and delivery are verified. Novu in-app delivery is not email delivery.
+4. Activate the free self-host signing engine with synthetic protected PDFs and
+   complete consent reconciliation. Existing Documenso UI/connector tests are not
+   evidence that a real signing service is already running.
 
 ### Current delivery plan — 2026-11-05
 
