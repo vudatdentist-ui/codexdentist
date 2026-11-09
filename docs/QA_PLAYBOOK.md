@@ -24,6 +24,11 @@ and capped previews cannot become appointment counts. Input echoes and malformed
 module/accounting answers cannot be recorded as successful runs. Review generated
 Vietnamese content as well as schema, resource use and screenshots before cutover.
 
+Client-only signing triggers remain disabled in server HTML until their click
+handlers mount. The consent browser gate must observe the successful workspace
+GET for the exact newly selected form before asserting its rejection state;
+visible server markup or a previous form's dialog is insufficient readiness.
+
 Optional-service changes require `npm run test:optional`, `NODE_ENV=test npm run
 test:optional-db` with explicit loopback `DATABASE_URL` and
 `CHATWOOT_TEST_DATABASE_URL`, and `NODE_ENV=test npm run browser:optional`.
