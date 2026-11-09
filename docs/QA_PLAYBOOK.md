@@ -11,6 +11,11 @@ baseline -> implement -> audit -> classify -> fix -> re-audit -> repeat -> phase
 
 A passing build alone is not enough. Every changed high-risk boundary must pass its focused negative/regression tests before a phase can close.
 
+Client-only signing triggers remain disabled in server HTML until their click
+handlers mount. The consent browser gate must observe the successful workspace
+GET for the exact newly selected form before asserting its rejection state;
+visible server markup or a previous form's dialog is insufficient readiness.
+
 Optional-service changes require `npm run test:optional`, `NODE_ENV=test npm run
 test:optional-db` with explicit loopback `DATABASE_URL` and
 `CHATWOOT_TEST_DATABASE_URL`, and `NODE_ENV=test npm run browser:optional`.
