@@ -326,9 +326,9 @@ Issue #91 remains open for the remaining free-runtime cutovers, in order:
 1. Completed: cloud AI replaced by a resource-bounded private local model;
    structured Vietnamese operational drafts are verified in the app, with no cloud
    fallback or autonomous clinical/financial writes.
-2. Add durable self-host file storage with a verified backup/restore path. One
-   patient file currently uses R2; preserve its protected reads and checksum until
-   a verified migration, and do not delete the original under an inferred policy.
+2. Completed: durable private file storage on the existing VPS, checksummed
+   relocation of the existing original, coordinated database/file restoration,
+   encrypted off-server recovery copy and a verified nightly backup timer.
 3. Replace cloud email only after self-host SMTP, sender identity, credential-mail
    recovery and delivery are verified. Novu in-app delivery is not email delivery.
 4. Activate the free self-host signing engine with synthetic protected PDFs and
@@ -370,17 +370,16 @@ runtime inference, owner UI and unchanged financial audit pass. The independent
 production inference used only synthetic data and made no database writes.
 Model cache snapshot `20261109T121524Z-bcfd9e53` passed isolated restoration with
 matching SHA-256 for every file and the pinned model metadata. Mail remains Resend
-and patient files remain R2 until their own verified cutovers.
+until its own verified SMTP cutover; private files now use the owned volume below.
 
-Next phase: durable private filesystem storage on the existing VPS. Inventory
-finds one R2 file (41,744 bytes with a stored SHA-256), no previews/thumbnails,
-stages, purge manifests or accounting attachments. Use the protected local driver
-with explicit production durability configuration, a mounted private volume and
-backup/restore checks. Preserve mixed-provider reads during migration. Copy and
-verify bytes before an audited, concurrency-fenced metadata change; retain the
-original R2 object. Keep file authorization, tenant/clinic isolation, upload
-validation and the staged cleanup lifecycle. Storage readiness/go-live must prove
-the selected durable backend, rather than accepting an ephemeral container path.
+Durable private filesystem storage is deployed in `88a6244` (PR #97), with exact
+main CI `42630373297` passing. Production writes to `local` on the private named
+volume; its one original (41,744 bytes) was copied and checked before an audited,
+concurrency-fenced metadata/stage transaction. The protected download and retained
+R2 original both match the stored SHA-256. Clinical metadata and organization/
+clinic scope are unchanged. Final inventory has one local file, one matching
+COMMITTED local stage, no R2 file references and no learning/staff/accounting
+assets. Historical R2 credentials/objects remain available for reviewed rollback.
 The implementation uses explicit `PATIENT_FILE_LOCAL_DURABLE=true`, an exact
 Linux mount outside the release, app UID ownership and mode 0700. Files are 0600;
 path traversal and directory/leaf symlinks fail closed. Existing R2 reads are
@@ -391,8 +390,16 @@ deletion. It currently accepts checksummed originals without variants, matching
 the live inventory; files with variants require a separately reviewed migration.
 Mounted Linux, actual S3 reads, interrupted-commit recovery, native PostgreSQL
 races/retention and networkless file restoration have passed. Actual app PDF/image
-upload, previews and protected downloads pass at 1440/390/320px. Production cutover
-remains a separate gate; existing cloud objects and credentials stay available.
+upload, previews and protected downloads pass at 1440/390/320px. Fresh production
+owner UI, all five readiness checks, the independent go-live verifier and the
+unchanged financial/login-mapping audit pass after cutover. The mobile timeline
+status no longer overlaps its author/title; the frozen legacy CSS remains intact.
+Snapshot `20261109T142337Z-periodic-88a6244b84d8` passed separate database and
+file-volume restoration. Its encrypted copy was downloaded to the owned PC and
+authenticated/decrypted in memory, checking every private file and dump archive
+without writing plaintext patient data there. The root-owned nightly timer is
+enabled only after that complete acceptance. Next: free SMTP with authenticated
+sender/DNS and credential recovery, then real self-hosted consent signing.
 
 ### Current delivery plan — 2026-11-05
 

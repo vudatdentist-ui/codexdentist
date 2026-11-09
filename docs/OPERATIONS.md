@@ -86,6 +86,38 @@ and writes `backup-verified.json` only after success. It never changes the relea
 marker, application configuration or image. Install a dedicated root-owned systemd
 timer after a successful manual run; preserve all existing backups and deploy timers.
 
+Production acceptance (2026-11-09, `88a6244`, PR #97): the active writer is local,
+with `codexdentist-private-patient-files` mounted at `/data/patient-files`.
+The existing 41,744-byte original and its cleanup stage moved together; protected
+downloads, unchanged clinical metadata and the retained R2 checksum were verified
+before and after changing the default writer. Go-live/public HTTP/readiness and
+the financial/login-mapping audit passed. Release rollback snapshot:
+`/opt/codexdentist-deploy/backups/20261109T141550Z-88a6244b84d8`.
+The pre-migration coordinated snapshot is `20261109T141951Z-periodic-88a6244b84d8`;
+the complete local-data snapshot is `20261109T142337Z-periodic-88a6244b84d8`.
+Both have isolated database/file restore evidence. Keep the durable mount and
+flag during rollback whenever current records reference local storage.
+
+`codexdentist-data-backup.timer` runs daily from 19:30 UTC (about 02:30 Bangkok),
+with up to five minutes of randomized delay. Its first manual service run passed
+before enabling the timer. The reviewed wrapper and public-recipient sealing
+helpers live under `/opt/codexdentist-deploy/durable-files-review-20261109`;
+`/opt/codexdentist-deploy/last-periodic-sealed-backup.json` identifies the latest
+successful archive. They call the canonical `--backup-only`, then create a
+streamed CMS AES-256-GCM/RSA-OAEP-SHA256 envelope using only the public recipient
+certificate. Logs and source backups stay root-private. The private recipient
+key is retained in an ACL-protected directory on the owned Windows PC, outside
+Git, and was never uploaded to the VPS. Preserve it separately from the encrypted
+archives. Cross-version decryption and a modified-ciphertext rejection were tested.
+
+The complete encrypted snapshot was copied off-server and decrypted only in
+memory: the dump header, exact archive hash and every private object's SHA-256,
+size, ownership and mode match. The local private backup directory also contains
+a non-sensitive `.restore-proof.json`. The timer creates encrypted server copies;
+off-server transfer is a separate operator step and is not scheduled on the PC.
+Review sessions created for acceptance were revoked individually, and their
+temporary cookie exports removed; existing user sessions/passwords were preserved.
+
 ## Hosted Deployment
 
 Owned email (pending production activation): `scripts/owned-mail-services.py`
