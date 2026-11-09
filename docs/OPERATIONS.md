@@ -1,6 +1,6 @@
 # Operations
 
-Last updated: 2026-11-06
+Last updated: 2026-11-09
 
 ## Local PC
 
@@ -507,6 +507,25 @@ direct access to the external Chatwoot workspace.
 Use the private gateway URL for Chatwoot API calls and the separate approved
 `publicBaseUrl` for staff browser links; service credentials never need to traverse
 the public edge proxy. Both configured origins must be operator-approved.
+
+Production release `87f06bd` has all four organization-owned connections enabled
+for `phuongthao`. Core joins `codexdentist-optional_gateway`; private origins and
+`OPTIONAL_OHIF_BASE_URL` are approved explicitly. The latest optional snapshot
+`20261109T111052Z-123500b2` passed isolated restoration of both PostgreSQL stores,
+MongoDB counts and authenticated PACS startup. Core release backup is
+`/opt/codexdentist-deploy/backups/20261109T111235Z-87f06bd716e6`.
+
+For reviewed maintenance commands, use `scripts/run-owned-app-command.py` with
+the exact running revision, a root-owned source directory and an explicit command.
+It pins the running image/network namespace and forwards the resolved container
+environment through a private pipe. Do not pass Compose source dotenv files to
+`docker run --env-file`: Docker preserves literal quotes that Compose removes.
+This difference can seal new vault credentials under the wrong key while still
+passing an isolated provider probe. Never rotate the shared authentication/vault
+master to repair such an activation. Verify actual app reads after configuration,
+not only connection metadata. The November activation repaired only its four new,
+unconsumed configurations after proving the original credentials and the exact
+quote-only discrepancy; existing credentials and the shared key were preserved.
 
 Cold snapshots: run `optional-services-backup.py backup --profiles imaging
 medplum chatwoot novu`. This briefly stops only the selected optional services,

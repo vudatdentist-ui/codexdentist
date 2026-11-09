@@ -1,6 +1,6 @@
 # Codexdentist QA Playbook
 
-Last updated: 2026-11-06
+Last updated: 2026-11-09
 Status: ACTIVE
 
 This playbook implements the closed-loop quality process defined in `docs/PROJECT_CONTEXT.md`:
@@ -20,6 +20,14 @@ actual bank settings/vault/QR routes, unchanged receipt/payment ledgers, patient
 tools and auth/CSRF, in addition to isolated panel state/race tests.
 `python3 scripts/optional-services.test.py` enforces opt-in profiles, private
 database networks, loopback-only ports, resource bounds and credential files.
+It also tests lossless forwarding of the running app environment for maintenance
+commands, including literal quotes, dollar signs, empty values and rejected
+multiline injection. The runner was exercised against all four live providers.
+After production activation, an enabled badge alone is insufficient: exercise
+an authenticated consumer that decrypts the vault using the app's actual runtime
+key, verify the Novu operator GET and marked synthetic delivery through `SENT`,
+and inspect error alerts as well as console errors at 1440/390/320px. Revoke only
+the short-lived review session afterward; never replace existing owner sessions.
 
 Real provider acceptance uses only QA-specific accounts/projects projected into
 a private ignored file, with an owned SSH loopback tunnel. Run
