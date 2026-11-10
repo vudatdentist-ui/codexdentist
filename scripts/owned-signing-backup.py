@@ -1,0 +1,252 @@
+#!/usr/bin/env python3
+"""Cold signing recovery. Restored app, mail and BullMQ workers never start."""
+import argparse
+import datetime
+import hashlib
+import importlib.util
+import json
+import os
+from pathlib import Path, PurePosixPath
+import shutil
+import subprocess
+import tarfile
+import tempfile
+import time
+import uuid
+
+spec = importlib.util.spec_from_file_location('signing', Path(__file__).with_name('owned-signing-services.py'))
+signing = importlib.util.module_from_spec(spec); spec.loader.exec_module(signing)
+ROOT = signing.ROOT
+CONFIG = ['compose.json', 'manifest.json', 'keys.json', 'certificate.pass', 'signing.key.pem',
+    'signing.cert.pem', 'signing.p12', 'license-cache.json']
+TREE = r'''const fs=require('fs'),path=require('path'),crypto=require('crypto'),rows=[];
+function walk(p){const s=fs.lstatSync(p);if(s.isSymbolicLink()||(!s.isFile()&&!s.isDirectory()))throw Error();
+rows.push([path.relative('/snapshot',p),s.isDirectory()?'directory':crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'),s.size*(s.isFile()?1:0),s.uid,s.gid,s.mode&0o777]);
+if(s.isDirectory())for(const name of fs.readdirSync(p).sort())walk(path.join(p,name));}walk('/snapshot');console.log(JSON.stringify(rows));'''
+
+
+def inspect(kind, name): return json.loads(signing.run(['docker', kind, 'inspect', name]))[0]
+
+
+def checksum(path):
+    digest = hashlib.sha256()
+    with path.open('rb') as source:
+        for block in iter(lambda: source.read(1024 * 1024), b''): digest.update(block)
+    return digest.hexdigest()
+
+
+def volume_command(volume, writable=False):
+    return ['docker', 'run', '--rm', '--network', 'none', '--read-only', '--user', '0:0', '--cap-drop', 'ALL',
+        '--cap-add', 'DAC_OVERRIDE', *(['--cap-add', 'CHOWN', '--cap-add', 'FOWNER', '-i'] if writable else []),
+        '--security-opt', 'no-new-privileges', '--memory', '256m', '--cpus', '0.5',
+        '--mount', 'type=volume,source=' + volume + ',target=/snapshot,volume-nocopy' + ('' if writable else ',readonly')]
+
+
+def inventory(volume):
+    return json.loads(signing.run(volume_command(volume) + ['--entrypoint', 'node', signing.IMAGES['app'], '-e', TREE]))
+
+
+def validate_archive(archive):
+    for member in archive.getmembers():
+        path = PurePosixPath(member.name)
+        if path.is_absolute() or '..' in path.parts or not (member.isfile() or member.isdir()):
+            raise ValueError('Unsafe signing archive entry')
+
+
+def sql(container, password, query):
+    return signing.run(['docker', 'exec', '-i', container, 'sh', '-c',
+        'IFS= read -r PGPASSWORD; export PGPASSWORD; exec psql -h 127.0.0.1 -U signing -d signing -At -v ON_ERROR_STOP=1 -c "$1"',
+        'sh', query], input=(password + '\n').encode()).decode().strip()
+
+
+def counts(container, password):
+    tables = sql(container, password, "SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename").splitlines()
+    result = {}
+    for table in tables:
+        if not table or any(char not in 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_' for char in table):
+            raise ValueError('Unexpected signing table name')
+        result[table] = int(sql(container, password, 'SELECT count(*) FROM "' + table + '"'))
+    if '_prisma_migrations' not in result or result['_prisma_migrations'] == 0: raise ValueError('Signing schema missing')
+    return result
+
+
+def backup():
+    signing.status(ROOT)
+    for name in ['database', 'cache']:
+        if inspect('volume', signing.PROJECT + '_' + name).get('Labels', {}).get('com.codexdentist.signing') != name:
+            raise ValueError('Signing volume ownership differs')
+    active = [name for name in ['app', 'capture', 'cache', 'database'] if inspect('container', signing.PROJECT + '-' + name + '-1')['State']['Running']]
+    parent = ROOT / 'backups'; parent.mkdir(mode=0o700, exist_ok=True)
+    snapshot = parent / (datetime.datetime.now(datetime.timezone.utc).strftime('%Y%m%dT%H%M%SZ') + '-' + uuid.uuid4().hex[:8])
+    snapshot.mkdir(mode=0o700)
+    manifest = {'version': 1, 'images': signing.IMAGES, 'files': {}, 'fileMetadata': {}, 'volumes': {}}
+    try:
+        signing.run(['docker', 'stop', '--time', '30', signing.PROJECT + '-app-1'])
+        password = json.loads((ROOT / 'keys.json').read_text())['database']
+        manifest['databaseCounts'] = counts(signing.PROJECT + '-database-1', password)
+        for name in active:
+            if name != 'app': signing.run(['docker', 'stop', '--time', '30', signing.PROJECT + '-' + name + '-1'])
+        for name in CONFIG:
+            source = ROOT / name
+            if source.is_symlink() or not source.is_file(): raise ValueError('Unsafe signing configuration')
+            metadata = source.stat()
+            owner = 1001 if name in ['signing.p12', 'license-cache.json'] else 0
+            if metadata.st_uid != owner or metadata.st_gid != owner or metadata.st_mode & 0o777 != 0o600:
+                raise ValueError('Signing configuration ownership/private modes differ')
+            shutil.copyfile(source, snapshot / name); (snapshot / name).chmod(0o600)
+            manifest['files'][name] = checksum(snapshot / name)
+            manifest['fileMetadata'][name] = {'uid': metadata.st_uid, 'gid': metadata.st_gid, 'mode': metadata.st_mode & 0o777}
+        for name in ['database', 'cache']:
+            volume = signing.PROJECT + '_' + name; before = inventory(volume); target = snapshot / (name + '.tar')
+            with target.open('xb') as output:
+                result = subprocess.run(volume_command(volume) + ['--entrypoint', 'tar', signing.IMAGES['app'], '--numeric-owner', '-cpf', '-', '-C', '/snapshot', '.'], stdout=output, stderr=subprocess.PIPE)
+                if result.returncode: raise RuntimeError('Signing volume archive failed')
+            target.chmod(0o600)
+            with tarfile.open(target) as archive: validate_archive(archive)
+            if inventory(volume) != before: raise ValueError('Cold signing volume changed')
+            manifest['volumes'][name] = {'sha256': checksum(target), 'entries': before}
+        signing.private(snapshot / 'backup-manifest.json', json.dumps(manifest).encode())
+    finally:
+        failures = []
+        for name in reversed(active):
+            try: signing.run(['docker', 'start', signing.PROJECT + '-' + name + '-1'])
+            except Exception as error: failures.append(error)
+        if failures: raise RuntimeError('Signing service restart failed; preserve snapshot and review every service') from failures[0]
+    signing.status(ROOT); signing.health(ROOT)
+    return snapshot
+
+
+def validate_snapshot(snapshot):
+    if snapshot.resolve() != snapshot or snapshot.parent != ROOT / 'backups' or snapshot.is_symlink() or snapshot.stat().st_uid != 0 or snapshot.stat().st_mode & 0o077:
+        raise ValueError('Exact private signing snapshot required')
+    manifest = json.loads((snapshot / 'backup-manifest.json').read_text())
+    if manifest.get('version') != 1 or manifest.get('images') != signing.IMAGES or set(manifest.get('files', {})) != set(CONFIG) or set(manifest.get('fileMetadata', {})) != set(CONFIG) or set(manifest.get('volumes', {})) != {'database', 'cache'}:
+        raise ValueError('Signing recovery manifest differs')
+    for name, digest in manifest['files'].items():
+        if (snapshot / name).is_symlink() or checksum(snapshot / name) != digest: raise ValueError('Signing configuration/key checksum differs')
+        owner = 1001 if name in ['signing.p12', 'license-cache.json'] else 0
+        if manifest['fileMetadata'][name] != {'uid': owner, 'gid': owner, 'mode': 0o600}:
+            raise ValueError('Signing restore configuration ownership/mode differs')
+    for name, record in manifest['volumes'].items():
+        target = snapshot / (name + '.tar')
+        if target.is_symlink() or checksum(target) != record['sha256']: raise ValueError('Signing archive checksum differs')
+        with tarfile.open(target) as archive: validate_archive(archive)
+    return manifest
+
+
+def database_probe(volume, password, expected):
+    name = 'codexdentist-signing-restore-' + uuid.uuid4().hex
+    # Alpine PostgreSQL's exact pinned image owns data as UID/GID 70. Verify
+    # that identity before using it; never relax source or restored permissions.
+    uid = signing.run(['docker', 'run', '--rm', '--network', 'none', '--read-only', '--cap-drop', 'ALL',
+        '--entrypoint', 'id', signing.IMAGES['database'], '-u', 'postgres']).decode().strip()
+    if uid != '70': raise ValueError('Pinned PostgreSQL identity differs')
+    try:
+        signing.run(['docker', 'run', '-d', '--name', name, '--label', 'com.codexdentist.restore=' + name,
+            '--network', 'none', '--read-only', '--user', '70:70', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
+            '--memory', '512m', '--cpus', '0.5', '--log-driver', 'none', '--tmpfs', '/var/run/postgresql:rw,nosuid,size=8m,uid=70,gid=70,mode=0700',
+            '--mount', 'type=volume,source=' + volume + ',target=/var/lib/postgresql/data,volume-nocopy', signing.IMAGES['database'],
+            'postgres', '-c', 'listen_addresses=127.0.0.1'])
+        for attempt in range(60):
+            try:
+                sql(name, password, 'SELECT 1'); break
+            except RuntimeError:
+                if attempt == 59: raise
+                time.sleep(0.5)
+        if counts(name, password) != expected: raise ValueError('Restored signing database counts differ')
+    finally:
+        probe = subprocess.run(['docker', 'inspect', name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        if probe.returncode == 0:
+            if json.loads(probe.stdout)[0].get('Config', {}).get('Labels', {}).get('com.codexdentist.restore') != name:
+                raise ValueError('Restore container ownership differs')
+            signing.run(['docker', 'rm', '-f', name])
+
+
+def cache_probe(volume, password):
+    name = 'codexdentist-signing-cache-restore-' + uuid.uuid4().hex
+    with tempfile.TemporaryDirectory(prefix='signing-cache-restore-') as temporary:
+        config = Path(temporary) / 'valkey.conf'
+        signing.private(config, ('bind 127.0.0.1\nport 6379\nrequirepass ' + password + '\nappendonly yes\ndir /data\nmaxmemory 96mb\nmaxmemory-policy noeviction\n').encode())
+        os.chown(config, 999, 1000)
+        try:
+            signing.run(['docker', 'run', '-d', '--name', name, '--label', 'com.codexdentist.restore=' + name,
+                '--network', 'none', '--read-only', '--user', '999:1000', '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges',
+                '--memory', '160m', '--cpus', '0.5', '--log-driver', 'none',
+                '--mount', 'type=volume,source=' + volume + ',target=/data,volume-nocopy',
+                '--mount', 'type=bind,source=' + str(config) + ',target=/secrets/valkey.conf,readonly',
+                '--entrypoint', 'valkey-server', signing.IMAGES['cache'], '/secrets/valkey.conf'])
+            for attempt in range(30):
+                try:
+                    reply = signing.run(['docker', 'exec', '-i', name, 'sh', '-c',
+                        'IFS= read -r REDISCLI_AUTH; export REDISCLI_AUTH; exec valkey-cli --no-auth-warning PING'], input=(password + '\n').encode())
+                    if reply.strip() != b'PONG': raise RuntimeError('Restored signing cache unavailable')
+                    break
+                except RuntimeError:
+                    if attempt == 29: raise
+                    time.sleep(0.5)
+        finally:
+            probe = subprocess.run(['docker', 'inspect', name], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            if probe.returncode == 0:
+                if json.loads(probe.stdout)[0].get('Config', {}).get('Labels', {}).get('com.codexdentist.restore') != name:
+                    raise ValueError('Restored cache container ownership differs')
+                signing.run(['docker', 'rm', '-f', name])
+
+
+def configuration_probe(snapshot, metadata):
+    # Snapshot files stay root-only in custody. Recreate deployment ownership
+    # only on disposable copies and prove the actual app UID can use them.
+    with tempfile.TemporaryDirectory(prefix='signing-config-restore-') as temporary:
+        restored = Path(temporary)
+        for name in CONFIG:
+            shutil.copyfile(snapshot / name, restored / name)
+            row = metadata[name]; os.chown(restored / name, row['uid'], row['gid']); (restored / name).chmod(row['mode'])
+        signing.run(['docker', 'run', '--rm', '--network', 'none', '--read-only', '--user', '1001:1001',
+            '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--memory', '128m', '--cpus', '0.5',
+            '--mount', 'type=bind,source=' + str(restored / 'signing.p12') + ',target=/secrets/signing.p12,readonly',
+            '--mount', 'type=bind,source=' + str(restored / 'license-cache.json') + ',target=/app/.documenso-license.json',
+            '--entrypoint', 'node', signing.IMAGES['app'], '-e',
+            "const fs=require('fs');if(!fs.readFileSync('/secrets/signing.p12').length)throw Error();const p='/app/.documenso-license.json';const value=fs.readFileSync(p);fs.writeFileSync(p,value)"])
+
+
+def drill(snapshot):
+    manifest = validate_snapshot(snapshot)
+    signing.run(['openssl', 'pkcs12', '-in', str(snapshot / 'signing.p12'), '-passin', 'file:' + str(snapshot / 'certificate.pass'), '-noout'])
+    configuration_probe(snapshot, manifest['fileMetadata'])
+    for name, record in manifest['volumes'].items():
+        volume = 'codexdentist-signing-restore-' + uuid.uuid4().hex
+        signing.run(['docker', 'volume', 'create', '--label', 'com.codexdentist.restore=' + volume, volume])
+        try:
+            with (snapshot / (name + '.tar')).open('rb') as source:
+                signing.run(volume_command(volume, True) + ['--entrypoint', 'tar', signing.IMAGES['app'], '--numeric-owner', '-xpf', '-', '-C', '/snapshot'], stdin=source)
+            if inventory(volume) != record['entries']: raise ValueError('Restored signing bytes/ownership/modes differ')
+            keys = json.loads((snapshot / 'keys.json').read_text())
+            if name == 'database': database_probe(volume, keys['database'], manifest['databaseCounts'])
+            else: cache_probe(volume, keys['cache'])
+        finally:
+            if inspect('volume', volume).get('Labels', {}).get('com.codexdentist.restore') != volume: raise ValueError('Restore volume ownership differs')
+            signing.run(['docker', 'volume', 'rm', volume])
+    proof = json.dumps({'allHashes': True, 'ownershipAndModes': True, 'applicationConfigurationUsable': True, 'databaseCounts': True, 'cacheAuthenticationAndAof': True,
+        'certificatePassphrase': True, 'appOrMailWorkersStarted': False}).encode()
+    target = snapshot / 'restore-verified.json'
+    if target.exists():
+        if target.is_symlink() or target.read_bytes() != proof: raise ValueError('Preserve changed signing restore evidence')
+    else: signing.private(target, proof)
+    print('PASS isolated signing restore: all bytes/modes/keys and PostgreSQL counts; no app, mail or job workers.')
+
+
+def main():
+    parser = argparse.ArgumentParser(); parser.add_argument('action', choices=['backup', 'drill']); parser.add_argument('--snapshot'); args = parser.parse_args()
+    if not hasattr(os, 'geteuid') or os.geteuid() != 0: raise ValueError('Root-owned recovery operator required')
+    os.umask(0o077); signing.installation(ROOT)
+    import fcntl
+    with (ROOT / 'operations.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if args.action == 'backup':
+            if args.snapshot: raise ValueError('Backup creates its own unique snapshot')
+            snapshot = backup(); drill(snapshot); print(snapshot)
+        else:
+            if not args.snapshot: raise ValueError('Explicit private snapshot required')
+            drill(Path(args.snapshot))
+
+
+if __name__ == '__main__': main()

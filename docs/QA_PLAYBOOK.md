@@ -37,6 +37,20 @@ They must remain outside the source/build tree (CI uses `RUNNER_TEMP`); the
 operator rejects an in-tree destination. Never broaden their private permissions
 to let a build tool scan them.
 
+Owned signing runtime changes require `python3 scripts/owned-signing-services.test.py`
+and the actual Linux gate `sudo -n python3 scripts/owned-signing-linux.py --source
+"$PWD" --output "$RUNNER_TEMP/codexdentist-owned-signing"`. Use a fresh private
+output outside the source/build tree; never upload its keys/captured mail as CI
+artifacts. The gate creates only unique labelled private services, verifies
+database/certificate health and the actual disabled signup API, then restarts
+the app/cache after private AOF files exist. Assert authenticated Valkey PING;
+`Running=true` during a restart loop is failure. Cold restoration checks every
+byte, UID/GID/mode, PostgreSQL table count, certificate passphrase and cache AOF
+load/authentication; repeated drills must pass. Restored app/mail/BullMQ workers
+never start. Corrupted key/archive copies must fail before a restore starts.
+Keep the standalone provider ceremony and core consent/webhook/replay gates:
+private runtime readiness is not operational signing acceptance.
+
 Mail activation regressions must deny duplicate SPF, a foreign persistent DKIM
 key, wrong forward/reverse identity, edited configuration, failed backup and
 nonempty initial queues. Startup/readiness failure must restore both original
