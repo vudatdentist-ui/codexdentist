@@ -159,6 +159,11 @@ async function run(raw) {
         const config = listing.data?.result?.data?.json;
         if (listing.status !== 200 || config?.data?.length !== 1 || config.data[0].id !== transport[0].id || !same(config.data[0].config, SMTP))
           throw Error('Provider SMTP config cannot be decrypted or differs');
+        if (input.action === 'inspect') {
+          if (process.env.NODE_EXTRA_CA_CERTS !== '/secrets/provider-trust.cert.pem') throw Error('Reviewed SMTP CA bundle required');
+          const smtp = require('nodemailer').createTransport({ ...SMTP, connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 10000 });
+          try { await smtp.verify(); } finally { smtp.close(); }
+        }
       }
     }
     return { pass: true, ...acknowledged, ordinaryPrincipalsPreserved: true, globalAndQaMailCaptured: true, externalMailSent: false };

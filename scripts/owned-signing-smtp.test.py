@@ -11,6 +11,19 @@ smtp = importlib.util.module_from_spec(spec); spec.loader.exec_module(smtp)
 
 
 class MainOnlySigningSmtp(unittest.TestCase):
+    def test_smtp_network_rejects_external_or_foreign_members(self):
+        for mutation in [None, 'external', 'foreign']:
+            network = {'Internal': mutation != 'external', 'Containers': {'mail-gateway': {}, 'mail-smtp': {}, 'app': {}}}
+            if mutation == 'foreign': network['Containers']['foreign'] = {}
+            def run(args):
+                if args[1] == 'network': return json.dumps([network]).encode()
+                return json.dumps([{'Id': {'codexdentist-owned-mail-gateway-1': 'mail-gateway',
+                    'codexdentist-owned-mail-smtp-1': 'mail-smtp', smtp.signing.PROJECT + '-app-1': 'app'}[args[-1]]}]).encode()
+            with patch.object(smtp.signing, 'run', side_effect=run):
+                if mutation:
+                    with self.assertRaises(ValueError): smtp.smtp_network(True)
+                else: smtp.smtp_network(True)
+
     def test_smtp_stage_adds_only_app_internal_network_and_public_trust_while_global_mail_stays_capture(self):
         keys = {name: format(index, '064x') for index, name in enumerate(['database', 'cache', 'auth', 'encryption', 'secondary', 'certificate'], 1)}
         before = smtp.signing.configuration(keys, True); after = smtp.signing.configuration(keys, True, True)

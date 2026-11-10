@@ -64,8 +64,8 @@ also creates a dedicated admin, configures encrypted main-only SMTP and sends
 synthetic main/QA envelopes to a private TLS receiver/capture respectively.
 It denies an untrusted SMTP certificate and cold-restores the resulting trust
 and provider configuration without starting workers. No public mail is sent.
-The runtime gate additionally requires
-and the actual Linux gate `sudo -n python3 scripts/owned-signing-linux.py --source
+The runtime gate additionally requires the actual Linux gate
+`sudo -n python3 scripts/owned-signing-linux.py --source
 "$PWD" --output "$RUNNER_TEMP/codexdentist-owned-signing"`. Use a fresh private
 output outside the source/build tree; never upload its keys/captured mail as CI
 artifacts. The gate creates only unique labelled private services, verifies

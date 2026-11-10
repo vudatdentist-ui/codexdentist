@@ -14,6 +14,7 @@ def exercise(load, signing, recovery, bootstrap, gateway, callback, directory):
     smtp.MAIL_ROOT = fixture
     signing.SMTP_NETWORK = signing.PROJECT + '-synthetic-smtp'
     network = signing.SMTP_NETWORK; container = network + '-receiver'
+    smtp.SMTP_MEMBERS = [container]
     command = ['docker', 'compose', '--project-directory', str(directory), '-f', str(directory / 'compose.json')]
     signing.run(['docker', 'network', 'create', '--internal', '--label', 'com.codexdentist.smtp-proof=' + signing.PROJECT, network])
     try:

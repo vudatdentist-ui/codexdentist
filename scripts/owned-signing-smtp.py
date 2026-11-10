@@ -22,6 +22,7 @@ bootstrap = load('smtp_bootstrap', 'owned-signing-bootstrap.py')
 MAIL_ROOT = Path('/opt/codexdentist-owned-mail')
 GATEWAY_PROJECT = 'codexdentist-owned-signing-gateway'
 CALLBACK_PROJECT = 'codexdentist-signing-callback'
+SMTP_MEMBERS = ['codexdentist-owned-mail-gateway-1', 'codexdentist-owned-mail-smtp-1']
 ADMIN_RECORDS = ['smtp-admin.intent.json', 'smtp-admin.api-result.json', 'smtp-admin.completed.json']
 SMTP_RECORDS = ['smtp.intent.json', 'smtp.api-result.json', 'smtp.completed.json']
 
@@ -59,6 +60,14 @@ def members():
 def recreate():
     signing.run(['docker', 'compose', '--project-directory', str(signing.ROOT), '-f', str(signing.ROOT / 'compose.json'),
         'up', '-d', '--no-deps', '--force-recreate', '--pull', 'never', 'app'])
+
+
+def smtp_network(add_app=False):
+    network = json.loads(signing.run(['docker', 'network', 'inspect', signing.SMTP_NETWORK]))[0]
+    names = SMTP_MEMBERS + ([signing.PROJECT + '-app-1'] if add_app else [])
+    wanted = {json.loads(signing.run(['docker', 'inspect', name]))[0]['Id'] for name in names}
+    if network['Internal'] is not True or set(network.get('Containers', {})) != wanted:
+        raise ValueError('Preserve unexpected SMTP network exposure or membership')
 
 
 def prepare_admin():
@@ -115,8 +124,7 @@ def enable():
     certificate = MAIL_ROOT / 'secrets/smtp.cert.pem'
     if certificate.is_symlink() or not certificate.is_file(): raise ValueError('Owned SMTP public certificate required')
     signing.run(['openssl', 'x509', '-in', str(certificate), '-noout', '-checkend', '86400', '-checkhost', 'codexdentist-mail-smtp'])
-    network = json.loads(signing.run(['docker', 'network', 'inspect', signing.SMTP_NETWORK]))[0]
-    if network['Internal'] is not True: raise ValueError('SMTP must use the existing internal network')
+    smtp_network()
     before = (directory / 'compose.json').read_bytes(); before_manifest = (directory / 'manifest.json').read_bytes()
     recovery.signing = signing; recovery.ROOT = directory
     snapshot = recovery.backup(); recovery.drill(snapshot)
@@ -134,7 +142,7 @@ def enable():
         signing.private(directory / 'smtp-trust.cert.pem', public, True)
         signing.private(directory / 'provider-trust.cert.pem', bundle, True)
         bootstrap.replace(directory / 'compose.json', proposed); bootstrap.replace(directory / 'manifest.json', proposed_manifest)
-        recreate(); signing.status(directory); signing.health(directory)
+        recreate(); signing.status(directory); signing.health(directory); smtp_network(True)
         # After this boundary provider mutations may have committed even if
         # their response was lost. Preserve the trust/network and inspect; do
         # not roll back a committed transport or automatically release jobs.
@@ -168,7 +176,7 @@ def main():
         if args.action == 'prepare-admin': prepare_admin()
         elif args.action == 'enable': enable()
         else:
-            signing.status(signing.ROOT); signing.health(signing.ROOT); client(admin_input(signing.ROOT, 'inspect'))
+            signing.status(signing.ROOT); signing.health(signing.ROOT); smtp_network(True); client(admin_input(signing.ROOT, 'inspect'))
             print('PASS encrypted main-only SMTP and separate ordinary main/QA provider identities.')
 
 
