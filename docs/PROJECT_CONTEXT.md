@@ -1,6 +1,6 @@
 # Codexdentist Canonical Product Context
 
-Last updated: 2026-11-09
+Last updated: 2026-11-10
 Status: ACTIVE / CANONICAL
 
 > This file replaces every previous product direction, refactor queue, migration-route plan, and architecture context. Git history is an archive, not an active instruction source. Do not revive an older plan merely because it appears in a previous commit, chat, issue, or deleted document.
@@ -359,9 +359,28 @@ hash, header-tamper rejection, sender denial and idempotent delivery inside a
 networkless synthetic namespace. Both mail volumes and private configuration/
 keys pass cold snapshot and worker-free restoration, including SQLite integrity
 and authenticated encryption-key identity. Expiry removes encrypted message
-payloads while retaining idempotency evidence. Full CI, server deployment,
-sender DNS and real external delivery acceptance remain open;
-production continues using its existing email provider until those gates pass.
+payloads while retaining idempotency evidence. PR #99 passed full CI and merged
+as `725f1d6`. Its isolated VPS mail installation is now prepared and accepted:
+private TLS/HMAC/SMTP readiness, invalid-signature rejection, both persistent
+volumes and keys restored without workers, and an authenticated encrypted
+off-server recovery copy. Its verified nightly backup timer is enabled. The
+persistent DKIM selector is `cdx202611`. On 2026-11-10, the existing single SPF
+record was updated with the VPS IP and the persistent DKIM public key was added
+through the owner's Cloudflare session; both exact TXT values match public DNS.
+Inbound MX/mail records are preserved. External delivery acceptance and the
+application mail cutover remain open. Production continues using Resend.
+
+Signing preflight also passed against actual Documenso 2.21.1 CE in a separate
+synthetic installation: the reviewed adapter created/distributed a PDF, the
+browser inserted a signature and completed it, and the adapter downloaded the
+sealed result. Its CMS signature verifies against the owned test certificate;
+tampered bytes fail verification. Completed screens were inspected at desktop
+and phone sizes. SMTP stayed in a private capture service with no external
+network, paid key or patient data. Those four QA services were stopped afterwards;
+their private proof/volumes are retained. This is not operational activation:
+owned deployment/recovery, explicit Vietnamese date/time presentation, minimal
+provider logging, core webhook/reconciliation and real recipient delivery remain
+part of the signing gate after mail is accepted.
 
 Local AI is deployed in `2face1e` (PR #95), with the production configuration
 cutover independently verified on 2026-11-09. The owned VPS has Ollama 0.40.15 and
