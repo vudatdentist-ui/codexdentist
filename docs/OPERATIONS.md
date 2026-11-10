@@ -183,6 +183,14 @@ successful **push CI for the exact current main SHA**, and grants no GitHub or
 inbound webhook access to the VPS. The installed deployer never updates itself;
 review and explicitly install changes to deployment policy.
 
+Restore readiness must use PostgreSQL TCP on `127.0.0.1`, as must the following
+restore and permission probes. The image's temporary initdb server accepts Unix
+sockets before shutting down; that socket is not proof that the final server is
+ready. The November 2026 deployment audit reproduced this startup race with a
+delayed init script and verified restore/migrations only after the main TCP
+listener started. A pre-cutover restore failure preserves the running app and
+backup; diagnose it before retrying rather than bypassing the restore gate.
+
 Each release builds an image from a clean exact-commit checkout, validates the
 entire migration range since the deployed revision, saves the existing Compose,
 environment files and a custom-format PostgreSQL dump in a private timestamped

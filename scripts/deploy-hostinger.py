@@ -249,7 +249,10 @@ def restore_drill(backup, image, name):
          "-e", "POSTGRES_HOST_AUTH_METHOD=trust", "postgres:17-alpine"], stdout=subprocess.DEVNULL)
     try:
         for attempt in range(30):
-            ready = subprocess.run(["docker", "exec", name, "pg_isready", "-U", "postgres"],
+            # The image's initdb server accepts Unix sockets before shutting
+            # down and starting the main server. TCP is disabled on that
+            # temporary server, so only the final listener satisfies this gate.
+            ready = subprocess.run(["docker", "exec", name, "pg_isready", "-h", "127.0.0.1", "-U", "postgres"],
                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             if ready.returncode == 0:
                 break
@@ -258,8 +261,8 @@ def restore_drill(backup, image, name):
             raise RuntimeError("Restore database did not start")
         with (backup / "database.dump").open("rb") as dump:
             run(["docker", "exec", "-i", name, "pg_restore", "--exit-on-error", "--no-owner",
-                 "--no-acl", "-U", "postgres", "-d", "postgres"], stdin=dump)
-        run(["docker", "exec", "-i", name, "psql", "-q", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres"],
+                 "--no-acl", "-h", "127.0.0.1", "-U", "postgres", "-d", "postgres"], stdin=dump)
+        run(["docker", "exec", "-i", name, "psql", "-h", "127.0.0.1", "-q", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres"],
             input=b"CREATE ROLE codexdentist_restore_runtime NOLOGIN;\n"
                   b"GRANT USAGE ON SCHEMA public TO codexdentist_restore_runtime;\n"
                   b"GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO codexdentist_restore_runtime;\n"
@@ -269,7 +272,7 @@ def restore_drill(backup, image, name):
         run(["docker", "run", "--rm", "--network", f"container:{name}",
              "-e", "DATABASE_URL=postgresql://postgres@127.0.0.1:5432/postgres",
              "--entrypoint", "npx", image, "prisma", "migrate", "deploy"])
-        run(["docker", "exec", "-i", name, "psql", "-q", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres"],
+        run(["docker", "exec", "-i", name, "psql", "-h", "127.0.0.1", "-q", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "postgres"],
             input=b"SET ROLE codexdentist_restore_runtime;\nDO $$ BEGIN IF EXISTS ("
                   b"SELECT 1 FROM pg_tables t CROSS JOIN (VALUES ('SELECT'),('INSERT'),('UPDATE'),('DELETE')) p(privilege) "
                   b"WHERE t.schemaname='public' AND NOT has_table_privilege(current_user,format('%I.%I',t.schemaname,t.tablename),p.privilege)) "

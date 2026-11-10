@@ -178,6 +178,25 @@ class DeploymentGuards(unittest.TestCase):
             self.assertTrue(any(b"SET ROLE codexdentist_restore_runtime" in data and b"has_table_privilege" in data for data in inputs))
             self.assertIn("limited runtime CRUD", (backup / "restore-verified").read_text())
 
+    def test_restore_does_not_accept_the_temporary_initdb_socket(self):
+        import subprocess
+        probes=[]
+        def probe(args,**kwargs):
+            probes.append(args)
+            # The temporary server is already accepting Unix sockets; only the
+            # second TCP probe sees the final server after initdb shuts down.
+            tcp='-h'in args and args[args.index('-h')+1]=='127.0.0.1'
+            return subprocess.CompletedProcess(args,0 if not tcp or len(probes)>1 else 1)
+        def run(args,**kwargs):
+            if 'pg_restore'in args or 'psql'in args:
+                self.assertEqual(len(probes),2,'restore must wait for the final server')
+                self.assertEqual(args[args.index('-h')+1],'127.0.0.1')
+        with tempfile.TemporaryDirectory()as temp:
+            backup=Path(temp);(backup/'database.dump').write_bytes(b'synthetic')
+            with patch.object(deploy,'run',side_effect=run),patch.object(deploy.subprocess,'run',side_effect=probe),patch.object(deploy.time,'sleep'):
+                deploy.restore_drill(backup,'codexdentist:'+SHA,'isolated-test')
+            self.assertTrue((backup/'restore-verified').exists())
+
     def test_public_probes_have_identified_agent_and_verify_schema(self):
         import io
         import json
