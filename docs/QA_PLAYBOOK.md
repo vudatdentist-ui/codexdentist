@@ -74,6 +74,15 @@ downloaded CMS/tamper denial. Private loopback-origin QA is separate evidence
 from eventual public-hostname and core consent/webhook acceptance. New envelopes
 must explicitly carry Vietnam timezone and day/month/24-hour presentation; old
 reserved ceremonies retain their original source/recipient identity.
+Recipient publication additionally runs `python3 scripts/owned-signing-recipient.test.py`.
+The native gate creates a distinct recipient process on a unique internal edge,
+without reaching the shared production proxy. Verify only its HTTP configuration
+is mounted, administrative/API routes fail and port 3443 refuses connections.
+Combined recovery includes all four recipient files and networkless Nginx syntax
+acceptance; incomplete sets or missing restoration proof must fail authenticated
+off-server verification. Publication rollback tests cover public probe/runtime
+failure and concurrent foreign route changes. Public HTTPS ceremony acceptance
+remains separate from this isolated edge gate.
 Bootstrap changes also run `python3 scripts/owned-signing-bootstrap.test.py`,
 `node --test scripts/owned-signing-bootstrap-client.test.cjs` and
 `python3 scripts/owned-signing-seal.test.py`. Native CE acceptance must create

@@ -472,7 +472,24 @@ PC custody. The initial fresh gateway fixture exposed a generated 64-character
 upstream DNS label; using the scoped Compose `app` alias fixes that failure without
 changing TLS or the isolated provider network. The reviewed private upgrade
 preserves exact previous files and refuses unrelated/concurrent edits. Final
-native/CI acceptance and public/core gates remain required; signing stays open.
+native acceptance passed on a fresh isolated CE stack, including both API owners,
+TLS/route denials, repeated combined restoration, corruption denial and authenticated
+encrypted recovery. Owned snapshot `20261110T094026Z-f13bc1d7` preserves the upgraded
+DNS configuration and passed restoration plus authenticated PC recovery. Exact-head
+CI and public/core gates remain required; signing stays open.
+
+The next recipient operator separates the HTTP ceremony into its own unprivileged
+process. Its only bind is the allowlisted HTTP configuration: no API TLS listener,
+private key, provider credentials or host port. Only this process may join the
+existing proxy edge; the private API gateway retains internal-only networks.
+It reaches the existing allowlisted recipient listener on its isolated ceremony
+network and never joins the provider's application/database network directly.
+The dedicated `sign.codexdentist.com` router disables access logs and tracing for
+both HTTP/HTTPS without changing other routers. Publication requires the exact
+four-file recipient configuration in a completed combined restoration. Failure
+removes only its own unchanged router and restores its own manifest; foreign
+concurrent changes require review. Native acceptance and actual public-hostname
+ceremony are still pending; implementation alone does not activate core signing.
 
 Next activation sequence: keep private API and public recipient frontends on
 separate processes/networks before attaching only the recipient frontend to the

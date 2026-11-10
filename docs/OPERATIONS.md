@@ -629,6 +629,30 @@ partial gateway identity is refused. Preserve the whole encrypted snapshot for
 later recovery. Publication still needs public-hostname ceremony acceptance,
 per-router token-log protection and the tenant-bound core/webhook cutover.
 
+`owned-signing-recipient.py prepare|up|status|probe|publish` prepares a separate
+recipient-only process under `/opt/codexdentist-signing-recipient`. It mounts only
+`nginx.conf`, has no TLS/API listener, keys, credentials, host ports or logs, and
+joins the isolated gateway recipient network plus the existing `coolify` proxy edge.
+It proxies only to the gateway's allowlisted HTTP recipient listener, never
+directly joining the provider application/database network.
+The private gateway never joins that edge. `probe` checks health, administrative
+and bulk API denials and actual connection refusal on port 3443 from the edge.
+The fixed short edge alias avoids generated project names exceeding DNS limits.
+
+Combined recovery includes exactly four `recipient/` files: Compose, manifest,
+HTTP configuration and the dedicated router. The provider/gateway/recipient
+operation locks protect their snapshot; restore checks exact configuration and
+networkless `nginx -t` as UID 101, without starting recipient/proxy/app/mail workers.
+Encrypt and verify this combined snapshot on the owned PC before publication.
+`publish --snapshot <exact-restored-snapshot>` requires its current four hashes
+and actual restore proof, refuses an existing route, then atomically adds only
+`/data/coolify/proxy/dynamic/codexdentist-signing.yaml`. Both signing routers disable
+access logs/tracing; global proxy configuration and other applications stay intact.
+The HTTPS health/denial probes must pass before recording publication. Failure
+rolls back only exact own route/manifest; retained intent blocks blind retries.
+Keep the public-hostname ceremony, core webhook/tenant bindings, owned SMTP and
+final recovery/timer acceptance gates open until independently verified.
+
 Owned CE runtime: `scripts/owned-signing-services.py prepare|up|status` uses
 `/opt/codexdentist-owned-signing`, pinned Documenso 2.21.1 CE and independent
 PostgreSQL/Valkey volumes/keys. Pull the exact `IMAGES` references in the script

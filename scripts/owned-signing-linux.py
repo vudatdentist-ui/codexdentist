@@ -29,6 +29,7 @@ def exercise(directory, app_image=None):
     bootstrap = load('signing_bootstrap_linux', 'owned-signing-bootstrap.py')
     seal = load('signing_seal_linux', 'owned-signing-seal.py')
     gateway = load('signing_gateway_linux', 'owned-signing-gateway.py')
+    recipient = load('signing_recipient_linux', 'owned-signing-recipient.py')
     project = 'codexdentist-signing-test-' + uuid.uuid4().hex
     signing.PROJECT = project; signing.ROOT = directory
     recovery.signing = signing; recovery.ROOT = directory
@@ -37,6 +38,10 @@ def exercise(directory, app_image=None):
     gateway.ROOT = directory.parent / (project + '-gateway'); gateway.PROJECT = project + '-gateway'
     gateway.PROVIDER = directory; gateway.PROVIDER_PROJECT = project; gateway.PROBE_IMAGE = app_image
     recovery.GATEWAY_ROOT = gateway.ROOT
+    recipient.gateway = gateway; recipient.ROOT = directory.parent / (project + '-recipient')
+    recipient.PROJECT = project + '-recipient'; recipient.PROVIDER_PROJECT = project
+    recipient.EDGE = recipient.PROJECT + '-edge'
+    recovery.RECIPIENT_ROOT = recipient.ROOT
     command = ['docker', 'compose', '--project-directory', str(directory), '-f', str(directory / 'compose.json')]
     try:
         for image in signing.IMAGES.values(): signing.run(['docker', 'pull', image])
@@ -59,6 +64,10 @@ def exercise(directory, app_image=None):
         gateway.prepare(); gateway.installation()
         signing.run(['docker', 'compose', '--project-directory', str(gateway.ROOT), '-f', str(gateway.ROOT / 'compose.json'), 'up', '-d', '--pull', 'never'])
         gateway.status(); gateway.probe()
+        signing.run(['docker', 'network', 'create', '--internal', '--label', 'com.codexdentist.recipient-proof=' + project, recipient.EDGE])
+        recipient.prepare()
+        signing.run(['docker', 'compose', '--project-directory', str(recipient.ROOT), '-f', str(recipient.ROOT / 'compose.json'), 'up', '-d', '--pull', 'never'])
+        recipient.status(); recipient.probe()
         snapshot = recovery.backup(); recovery.drill(snapshot); recovery.drill(snapshot)
         # Synthetic recipient keys belong only to this private test namespace;
         # no real owner's recovery private key is ever uploaded to a server.
@@ -85,11 +94,18 @@ def exercise(directory, app_image=None):
             'crossOwnerApiTokenSubstitutionDenied': True,
             'encryptedRecoveryAndAuthenticatedDecryption': True,
             'privateGatewayTlsAndRecipientSurface': True,
+            'separateRecipientProcessAndRecovery': True,
             'authenticatedCache': True, 'allHashesAndModes': True, 'databaseCounts': True, 'cacheAofRecovery': True,
             'corruptedKeysAndArchiveDenied': True, 'externalMailSent': False, 'coreAccess': False, 'published': False}
         signing.private(directory / 'acceptance.json', json.dumps(proof).encode())
         print(json.dumps(proof))
     finally:
+        if (recipient.ROOT / 'compose.json').is_file():
+            signing.run(['docker', 'compose', '--project-directory', str(recipient.ROOT), '-f', str(recipient.ROOT / 'compose.json'), 'down', '--remove-orphans'])
+        edge = __import__('subprocess').run(['docker', 'network', 'inspect', recipient.EDGE], capture_output=True)
+        if edge.returncode == 0:
+            if json.loads(edge.stdout)[0].get('Labels', {}).get('com.codexdentist.recipient-proof') != project: raise ValueError('Synthetic edge ownership differs')
+            signing.run(['docker', 'network', 'rm', recipient.EDGE])
         if (gateway.ROOT / 'compose.json').is_file():
             signing.run(['docker', 'compose', '--project-directory', str(gateway.ROOT), '-f', str(gateway.ROOT / 'compose.json'), 'down', '--remove-orphans'])
         # Only this unique project's containers/volumes are eligible for cleanup.
