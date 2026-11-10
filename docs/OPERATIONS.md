@@ -566,6 +566,39 @@ until the owner supplies and verifies their actual credentials.
 
 ## Documenso operator setup
 
+Owned CE runtime: `scripts/owned-signing-services.py prepare|up|status` uses
+`/opt/codexdentist-owned-signing`, pinned Documenso 2.21.1 CE and independent
+PostgreSQL/Valkey volumes/keys. Pull the exact `IMAGES` references in the script
+before preparation; `up` never pulls an update. Preparation refuses existing
+installation directories or volumes. It creates a local PKCS#12 signing
+certificate, not a qualified/trusted public signing identity. Preserve its
+private key, passphrase, app encryption keys and database together.
+
+This stage deliberately has no public port, external network, core database
+connection or outgoing mail. Signup is disabled; mail stays in an isolated
+capture service until separately reviewed activation. The app runs as UID 1001,
+Valkey as its pinned UID 999/GID 1000, with private AOF files and no capability
+expansion to repair restarts. The only writable app bind is the upstream license
+cache; no paid license is supplied. Container logging is disabled to prevent
+upstream job payloads, emails and signing URLs entering persistent runtime logs;
+status/health and bounded acceptance records remain available. Inspect private
+state deliberately when diagnosing failures; never enable raw provider logs
+after patient use without a reviewed redaction strategy.
+
+`python3 scripts/owned-signing-backup.py backup` stops only the signing producer
+and its private services, captures both volumes plus configuration/keys, and
+attempts every previously active restart on failure. Its drill checks checksums,
+ownership/modes, the PKCS#12 passphrase and actual PostgreSQL table counts in a
+new networkless database; a separate networkless Valkey loads its restored AOF
+and answers authenticated PING. No restored application, email or job worker is
+started. `drill --snapshot <exact-completed-private-path>` repeats the check.
+Encrypt the complete snapshot for off-server custody before publication; never
+export plaintext private keys or resume a restored queue blindly. The existing
+synthetic preflight is evidence for the provider ceremony, not permission to
+connect this standby to real patients. Bootstrap, publication, Vietnamese
+ceremony dates/timezone, core webhook/reconciliation and recipient delivery
+remain separate activation gates.
+
 Use **Settings → Tích hợp & AI → Documenso** to save the clinic's API Token and
 Webhook Secret in the same tenant-bound credential vault. In Documenso, register
 the displayed result URL with that secret and enable document-completion events.

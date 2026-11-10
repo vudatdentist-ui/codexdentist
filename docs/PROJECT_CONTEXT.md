@@ -367,8 +367,15 @@ off-server recovery copy. Its verified nightly backup timer is enabled. The
 persistent DKIM selector is `cdx202611`. On 2026-11-10, the existing single SPF
 record was updated with the VPS IP and the persistent DKIM public key was added
 through the owner's Cloudflare session; both exact TXT values match public DNS.
-Inbound MX/mail records are preserved. External delivery acceptance and the
-application mail cutover remain open. Production continues using Resend.
+Inbound MX/mail records are preserved. PR #103 passed full exact-head CI and
+merged as `7063012`. Its guarded initial outbound transition passed on the VPS:
+fresh cold snapshot `20261110T022155Z-df893958`, worker-free restoration and
+encryption, empty original queues, exact private configuration and signed TLS
+readiness. Only the SMTP service gained outbound networking. A connection from
+that namespace reached Gmail's MX on TCP 25 and received its SMTP banner, then
+quit without submitting mail. The encrypted snapshot also passed authenticated
+off-server decryption/checksums on the owned PC. External inbox acceptance and
+the application mail cutover remain open; production continues using Resend.
 
 Signing preflight also passed against actual Documenso 2.21.1 CE in a separate
 synthetic installation: the reviewed adapter created/distributed a PDF, the
@@ -381,6 +388,22 @@ their private proof/volumes are retained. This is not operational activation:
 owned deployment/recovery, explicit Vietnamese date/time presentation, minimal
 provider logging, core webhook/reconciliation and real recipient delivery remain
 part of the signing gate after mail is accepted.
+
+The separate owned signing standby now runs pinned CE with its own database,
+Valkey and internal mail capture, closed signup and no public route/core access.
+Actual health validates both database and certificate; a valid signup request
+must return `SIGNUP_DISABLED`. Runtime logs are disabled because upstream job
+errors can contain recipient addresses/tokens. Valkey runs directly as its
+image's unprivileged UID: restart acceptance found that the root entrypoint
+could not traverse its private AOF directory with capabilities dropped. The fix
+preserves permissions and adds authenticated PING/restart checks; Docker's
+`Running=true` while restarting cannot satisfy status. Cold snapshot
+`20261110T022102Z-26de05ec` restored all bytes/ownership/modes, every PostgreSQL
+table count, Valkey AOF/authentication and the certificate passphrase without
+starting restored application, mail or job workers. This remains a private
+standby, not activation of consent signing. Operator bootstrap, encrypted
+off-server custody, recipient publication and core ceremony/webhook acceptance
+are still required.
 
 Local AI is deployed in `2face1e` (PR #95), with the production configuration
 cutover independently verified on 2026-11-09. The owned VPS has Ollama 0.40.15 and

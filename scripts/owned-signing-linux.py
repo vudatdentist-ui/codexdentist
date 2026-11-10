@@ -1,0 +1,84 @@
+#!/usr/bin/env python3
+"""Actual pinned CE startup, restart, cold restore and corruption denial in isolation."""
+import argparse
+import importlib.util
+import json
+import os
+from pathlib import Path
+import shutil
+import uuid
+
+
+def load(name, filename):
+    spec = importlib.util.spec_from_file_location(name, Path(__file__).with_name(filename))
+    module = importlib.util.module_from_spec(spec); spec.loader.exec_module(module)
+    return module
+
+
+def private_output(source, output):
+    source, output = source.resolve(), output.resolve()
+    if output == source or source in output.parents: raise ValueError('Keep private signing evidence outside the source/build tree')
+    if output.exists(): raise ValueError('Preserve existing signing proof; choose a fresh private output')
+    return output
+
+
+def exercise(directory):
+    signing = load('signing_linux', 'owned-signing-services.py')
+    recovery = load('signing_recovery_linux', 'owned-signing-backup.py')
+    project = 'codexdentist-signing-test-' + uuid.uuid4().hex
+    signing.PROJECT = project; signing.ROOT = directory
+    recovery.signing = signing; recovery.ROOT = directory
+    command = ['docker', 'compose', '--project-directory', str(directory), '-f', str(directory / 'compose.json')]
+    try:
+        for image in signing.IMAGES.values(): signing.run(['docker', 'pull', image])
+        signing.prepare(directory)
+        signing.run(command + ['up', '-d', '--pull', 'never'])
+        signing.status(directory); signing.health(directory)
+        # Restart after Valkey has written private AOF files. The old root
+        # entrypoint failed here despite Docker reporting Running=true.
+        signing.run(['docker', 'stop', '--time', '30', project + '-app-1'])
+        signing.run(['docker', 'restart', project + '-cache-1'])
+        signing.run(['docker', 'start', project + '-app-1'])
+        signing.status(directory); signing.health(directory)
+        snapshot = recovery.backup(); recovery.drill(snapshot); recovery.drill(snapshot)
+        # Corrupted keys or archives must fail before any restored service starts.
+        for kind in ['key', 'archive']:
+            target = directory / 'backups' / ('corrupt-' + kind); target.mkdir(mode=0o700)
+            for name in recovery.CONFIG + ['backup-manifest.json']:
+                shutil.copyfile(snapshot / name, target / name); (target / name).chmod(0o600)
+            if kind == 'key': (target / 'keys.json').write_bytes(b'corrupted private key copy')
+            else: (target / 'database.tar').write_bytes(b'corrupted archive copy')
+            try: recovery.validate_snapshot(target)
+            except ValueError: pass
+            else: raise RuntimeError('Corrupted signing recovery was accepted')
+        signing.status(directory); signing.health(directory)
+        proof = {'pass': True, 'images': signing.IMAGES, 'closedSignupApi': True, 'privateRestart': True,
+            'authenticatedCache': True, 'allHashesAndModes': True, 'databaseCounts': True, 'cacheAofRecovery': True,
+            'corruptedKeysAndArchiveDenied': True, 'externalMailSent': False, 'coreAccess': False, 'published': False}
+        signing.private(directory / 'acceptance.json', json.dumps(proof).encode())
+        print(json.dumps(proof))
+    finally:
+        # Only this unique project's containers/volumes are eligible for cleanup.
+        # Private evidence stays outside the build and is never an uploaded artifact.
+        if (directory / 'compose.json').is_file():
+            signing.run(command + ['down', '--remove-orphans'])
+            for name in ['database', 'cache']:
+                volume = project + '_' + name
+                result = __import__('subprocess').run(['docker', 'volume', 'inspect', volume], capture_output=True)
+                if result.returncode == 0:
+                    info = json.loads(result.stdout)[0]
+                    if info.get('Labels', {}).get('com.codexdentist.signing') != name: raise ValueError('Test volume ownership differs')
+                    signing.run(['docker', 'volume', 'rm', volume])
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument('--source', required=True); parser.add_argument('--output', required=True)
+    args = parser.parse_args()
+    if not hasattr(os, 'geteuid') or os.geteuid() != 0: raise ValueError('Isolated signing Linux proof requires root')
+    os.umask(0o077)
+    directory = private_output(Path(args.source), Path(args.output))
+    directory.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+    exercise(directory)
+
+
+if __name__ == '__main__': main()
