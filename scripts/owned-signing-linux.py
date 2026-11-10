@@ -71,12 +71,12 @@ def exercise(directory, app_image=None):
         snapshot = recovery.backup(); recovery.drill(snapshot); recovery.drill(snapshot)
         # Synthetic recipient keys belong only to this private test namespace;
         # no real owner's recovery private key is ever uploaded to a server.
-        recipient, private_key = directory / 'test-recipient.cert.pem', directory / 'test-recipient.key.pem'
+        recipient_certificate, private_key = directory / 'test-recipient.cert.pem', directory / 'test-recipient.key.pem'
         signing.run(['openssl', 'req', '-x509', '-newkey', 'rsa:3072', '-nodes', '-sha256', '-days', '1',
-            '-subj', '/CN=Synthetic CI recovery recipient', '-keyout', str(private_key), '-out', str(recipient)])
-        pin = hashlib.sha256(signing.run(['openssl', 'x509', '-in', str(recipient), '-outform', 'DER'])).hexdigest().upper()
-        seal.seal(snapshot, recipient, pin, 'openssl')
-        seal.verify(directory / 'sealed-snapshots' / (snapshot.name + '.cms'), recipient, private_key, pin, 'openssl')
+            '-subj', '/CN=Synthetic CI recovery recipient', '-keyout', str(private_key), '-out', str(recipient_certificate)])
+        pin = hashlib.sha256(signing.run(['openssl', 'x509', '-in', str(recipient_certificate), '-outform', 'DER'])).hexdigest().upper()
+        seal.seal(snapshot, recipient_certificate, pin, 'openssl')
+        seal.verify(directory / 'sealed-snapshots' / (snapshot.name + '.cms'), recipient_certificate, private_key, pin, 'openssl')
         # Corrupted keys or archives must fail before any restored service starts.
         for kind in ['key', 'archive']:
             target = directory / 'backups' / ('corrupt-' + kind); target.mkdir(mode=0o700)
