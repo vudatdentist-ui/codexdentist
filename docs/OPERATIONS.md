@@ -1,6 +1,6 @@
 # Operations
 
-Last updated: 2026-11-09
+Last updated: 2026-11-10
 
 ## Local PC
 
@@ -144,10 +144,12 @@ The owned standby installation was accepted on 2026-11-09 using the compatible
 `725f1d6` image. It uses public forward-confirmed hostname
 `srv1907391.hstgr.cloud`, selector `cdx202611`, private TLS and separate labelled
 mail volumes. `standby-acceptance.json` records signed readiness, test-only mode
-and rejection of a bad signature; no message was sent. Public-only pending DNS
+and rejection of a bad signature; no message was sent. Public-only sender DNS
 values are in `/opt/codexdentist-owned-mail/sender-dns-records.json`. Browser
-access still reports disabled despite the owner's permission; do not claim that
-SPF/DKIM have been applied. Preserve the existing inbound MX/mail host.
+access became available on 2026-11-10: the existing single SPF record and new
+DKIM TXT selector were saved through Cloudflare and both exact values verified
+against public DNS. Existing inbound MX/mail records were preserved. External
+recipient acceptance and the app transport switch remain separate gates.
 
 `codexdentist-mail-backup.timer` is enabled daily at 19:40 UTC with up to five
 minutes jitter, after its manual backup/restore/encryption acceptance. Reviewed

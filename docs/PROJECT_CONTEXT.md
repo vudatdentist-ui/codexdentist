@@ -1,6 +1,6 @@
 # Codexdentist Canonical Product Context
 
-Last updated: 2026-11-09
+Last updated: 2026-11-10
 Status: ACTIVE / CANONICAL
 
 > This file replaces every previous product direction, refactor queue, migration-route plan, and architecture context. Git history is an archive, not an active instruction source. Do not revive an older plan merely because it appears in a previous commit, chat, issue, or deleted document.
@@ -335,6 +335,12 @@ Issue #91 remains open for the remaining free-runtime cutovers, in order:
    complete consent reconciliation. Existing Documenso UI/connector tests are not
    evidence that a real signing service is already running.
 
+Signing activation audit: signed-result import must verify the provider's returned
+envelope ID before downloading any item. Provider requests reject redirects,
+JSON responses are bounded to 64 KiB, and raw provider failure text is excluded
+from application errors. These checks preserve the existing ceremony reservation,
+protected-file staging and consent reconciliation; they do not activate signing.
+
 Owned email implementation is in progress: `owned-mail` is an opt-in transport,
 with private HTTPS/HMAC, a separately encrypted SQLite idempotency journal and
 TLS submission to the owned SMTP service. Existing notification records remain
@@ -358,8 +364,11 @@ as `725f1d6`. Its isolated VPS mail installation is now prepared and accepted:
 private TLS/HMAC/SMTP readiness, invalid-signature rejection, both persistent
 volumes and keys restored without workers, and an authenticated encrypted
 off-server recovery copy. Its verified nightly backup timer is enabled. The
-persistent DKIM selector is `cdx202611`; sender DNS, external delivery acceptance
-and application mail cutover remain open. Production continues using Resend.
+persistent DKIM selector is `cdx202611`. On 2026-11-10, the existing single SPF
+record was updated with the VPS IP and the persistent DKIM public key was added
+through the owner's Cloudflare session; both exact TXT values match public DNS.
+Inbound MX/mail records are preserved. External delivery acceptance and the
+application mail cutover remain open. Production continues using Resend.
 
 Signing preflight also passed against actual Documenso 2.21.1 CE in a separate
 synthetic installation: the reviewed adapter created/distributed a PDF, the

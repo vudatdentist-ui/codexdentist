@@ -1,6 +1,6 @@
 # Codexdentist QA Playbook
 
-Last updated: 2026-11-09
+Last updated: 2026-11-10
 Status: ACTIVE
 
 This playbook implements the closed-loop quality process defined in `docs/PROJECT_CONTEXT.md`:
@@ -407,6 +407,11 @@ completion and adapter download. Verify the PDF CMS signature against the exact
 owned test certificate and reject tampered bytes. Keep the provider's network
 internal; record core callback/import acceptance separately. Stop only the
 generated QA services after inspection and retain their labelled data/proof.
+
+Before activation, reject a foreign completed-envelope response before any PDF
+download; enforce the JSON size bound on chunked responses as well as declared
+lengths. A real loopback HTTP redirect must receive zero forwarded PDF requests,
+and provider error details must not enter application exception messages.
 
 Run `test:documenso` for real handler/command regressions and
 `NODE_ENV=test npm run test:documenso-db` for a newly created/migrated loopback

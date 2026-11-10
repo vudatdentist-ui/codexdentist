@@ -2,6 +2,44 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./audit-source-loader.cjs');
 
+test('signed PDF import rejects a foreign completed envelope before downloading any file', async () => {
+  let requests=0;
+  const client=load('src/integrations/documenso/client.ts',{}, {Response,fetch:async()=>{
+    requests++;return Response.json({id:'foreign-envelope',status:'COMPLETED',envelopeItems:[{id:'foreign-file'}]});
+  }});
+  await assert.rejects(client.downloadDocumensoSignedPdf({baseUrl:'https://sign.example.test/api/v2',apiToken:'synthetic',webhookSecret:'synthetic'},'expected-envelope'),error=>error.code==='documenso-envelope-id-mismatch');
+  assert.equal(requests,1);
+});
+
+test('provider JSON has a streaming size limit and provider error details never enter thrown messages', async () => {
+  let cancelled=false,pulls=0;
+  const client=load('src/integrations/documenso/client.ts',{}, {Response,fetch:async()=>new Response(new ReadableStream({
+    pull(controller){pulls++;controller.enqueue(new Uint8Array(16*1024));},cancel(){cancelled=true;},
+  }))});
+  const secrets={baseUrl:'https://sign.example.test/api/v2',apiToken:'synthetic',webhookSecret:'synthetic'};
+  await assert.rejects(client.downloadDocumensoSignedPdf(secrets,'expected'),error=>error.code==='documenso-response-too-large');
+  assert.equal(cancelled,true);assert.ok(pulls<10);
+  const rejected=load('src/integrations/documenso/client.ts',{}, {Response,fetch:async()=>Response.json({message:'Synthetic private body must stay upstream'},{status:403})});
+  await assert.rejects(rejected.downloadDocumensoSignedPdf(secrets,'expected'),error=>error.code==='documenso-envelope-fetch-failed'&&!error.message.includes('private body'));
+});
+
+test('an actual HTTP redirect cannot forward a source PDF to another destination', async () => {
+  const http=require('node:http');let forwarded=0;
+  const destination=http.createServer((request,response)=>{forwarded++;response.end('{}');});
+  const listen=server=>new Promise(resolve=>server.listen(0,'127.0.0.1',resolve));
+  await listen(destination);
+  const origin=http.createServer((request,response)=>{request.resume();response.writeHead(307,{location:`http://127.0.0.1:${destination.address().port}/unexpected`});response.end();});
+  await listen(origin);
+  try{
+    const client=load('src/integrations/documenso/client.ts',{}, {fetch,Response,FormData,Blob});
+    await assert.rejects(client.createDocumensoSigningEnvelope({baseUrl:`http://127.0.0.1:${origin.address().port}/api/v2`,apiToken:'synthetic',webhookSecret:'synthetic'},
+      {externalId:'synthetic',title:'Synthetic PDF',pdfBytes:Buffer.from('%PDF-1.4\nSynthetic only'),fileName:'synthetic.pdf',recipientEmail:'synthetic@example.test',recipientName:'Synthetic signer'}));
+    assert.equal(forwarded,0);
+  }finally{
+    await Promise.all([origin,destination].map(server=>new Promise(resolve=>server.close(resolve))));
+  }
+});
+
 test('server-rendered signing trigger stays disabled until its client handlers are ready', () => {
   const React = require('react');
   const { renderToStaticMarkup } = require('react-dom/server');
