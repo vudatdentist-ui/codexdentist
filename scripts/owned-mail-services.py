@@ -21,7 +21,8 @@ def run(args, **kwargs):
     return result.stdout
 
 
-def configuration(gateway_image):
+def configuration(gateway_image,outbound=False):
+    if type(outbound)is not bool:raise ValueError('Explicit boolean outbound stage required')
     if not re.fullmatch(r'sha256:[a-f0-9]{64}', gateway_image):
         raise ValueError('Pin the built gateway image by its exact local digest')
     limits = dict(restart='unless-stopped', user='1000:1000', read_only=True, cap_drop=['ALL'],
@@ -31,7 +32,7 @@ def configuration(gateway_image):
     secrets_names=['signing.secret','encryption.key','gateway.key.pem','gateway.cert.pem','smtp.cert.pem']
     gateway = {**limits, 'image':gateway_image, 'environment':{
         'OWNED_MAIL_DATA_ROOT':'/data/mail', 'OWNED_MAIL_FROM':'no-reply@codexdentist.com',
-        'OWNED_MAIL_TEST_ONLY':'true', 'OWNED_MAIL_SMTP_HOST':'codexdentist-mail-smtp', 'OWNED_MAIL_SMTP_PORT':'2465',
+        'OWNED_MAIL_TEST_ONLY':'false'if outbound else'true', 'OWNED_MAIL_SMTP_HOST':'codexdentist-mail-smtp', 'OWNED_MAIL_SMTP_PORT':'2465',
         'OWNED_MAIL_SIGNING_SECRET_FILE':'/secrets/signing.secret', 'OWNED_MAIL_ENCRYPTION_KEY_FILE':'/secrets/encryption.key',
         'OWNED_MAIL_TLS_KEY_FILE':'/secrets/gateway.key.pem', 'OWNED_MAIL_TLS_CERT_FILE':'/secrets/gateway.cert.pem',
         'OWNED_MAIL_SMTP_CA_FILE':'/secrets/smtp.cert.pem'},
@@ -42,11 +43,14 @@ def configuration(gateway_image):
         'volumes':[{'type':'volume','source':'smtp-data','target':'/data','volume':{'nocopy':True}},
             {'type':'bind','source':'./maddy.conf','target':'/conf/maddy.conf','read_only':True}] + [
             {'type':'bind','source':'./secrets/'+name,'target':'/secrets/'+name,'read_only':True} for name in ['smtp.key.pem','smtp.cert.pem']],
-        # No outbound network until a separate DNS/delivery review. Prepare/up
-        # cannot send messages out of this isolated private mail network.
+        # Preparation has no outbound route. Explicit activation owns that
+        # separate stage; up preserves an already reviewed deployment stage.
         'networks':{'smtp':{'aliases':['codexdentist-mail-smtp']}}}
+    networks={'gateway':{'internal':True},'smtp':{'internal':True}}
+    if outbound:
+        networks['outbound']={'internal':False};smtp['networks']['outbound']={}
     return {'name':PROJECT,'services':{'gateway':gateway,'smtp':smtp},
-        'networks':{'gateway':{'internal':True},'smtp':{'internal':True}},
+        'networks':networks,
         'volumes':{name:{'name':PROJECT+'_'+name,'labels':{'com.codexdentist.mail':name}}for name in ['gateway-data','smtp-data']}}
 
 
@@ -117,8 +121,9 @@ def main():
     if directory.is_symlink()or directory.stat().st_uid!=0 or directory.stat().st_mode&0o077:
         raise ValueError('Private owned installation required')
     pin=json.loads((directory/'manifest.json').read_text())
-    expected=configuration(pin['gatewayImage'])
-    if json.loads((directory/'compose.json').read_text())!=expected or pin['outboundEnabled']:
+    if type(pin['outboundEnabled'])is not bool:raise ValueError('Explicit mail deployment stage required')
+    expected=configuration(pin['gatewayImage'],pin['outboundEnabled'])
+    if json.loads((directory/'compose.json').read_text())!=expected:
         raise ValueError('Prepared configuration changed; requires a separately reviewed activation')
     if args.action=='up':
         source=Path('/opt/codexdentist-deploy/releases')/pin['revision']
@@ -126,21 +131,28 @@ def main():
         if hashlib.sha256(original.encode()).hexdigest()!=pin['sourceConfigSha256'] or (directory/'maddy.conf').read_text()!=original.replace('hostname mail.codexdentist.com','hostname '+pin['outboundHostname']):
             raise ValueError('Preserve changed SMTP configuration for review')
         run(['docker','compose','--project-directory',str(directory),'-f',str(directory/'compose.json'),'up','-d','--pull','never'])
-        print('Started only private test-restricted mail services; no published ports, external network or core configuration change.')
+        print('Started pinned owned mail services; deployment stage preserved, no public port or core configuration change.')
     else:
         for name in ['gateway','smtp']:
             info=json.loads(run(['docker','inspect',PROJECT+'-'+name+'-1']))[0]
             if not info['State']['Running'] or info['HostConfig'].get('PortBindings') or not info['HostConfig']['ReadonlyRootfs'] or info['Config']['User']!='1000:1000':
                 raise ValueError('Mail isolation/runtime guard failed')
+            if info['HostConfig'].get('Privileged')or 'ALL'not in(info['HostConfig'].get('CapDrop')or[])or not any(value.startswith('no-new-privileges')for value in info['HostConfig'].get('SecurityOpt',[])):
+                raise ValueError('Mail capability/security guard differs')
             if info['Config']['Image']!=expected['services'][name]['image']:
                 raise ValueError('Running mail image differs from its reviewed pin')
+            if name=='gateway':
+                environment=dict(value.split('=',1)for value in info['Config']['Env'])
+                if any(environment.get(key)!=value for key,value in expected['services'][name]['environment'].items()):
+                    raise ValueError('Gateway environment differs from its reviewed stage')
             wanted={PROJECT+'_'+key for key in expected['services'][name]['networks']}
             if set(info['NetworkSettings']['Networks'])!=wanted:
                 raise ValueError('Unexpected mail network membership')
-            for network in info['NetworkSettings']['Networks']:
-                if not json.loads(run(['docker','network','inspect',network]))[0]['Internal']:
-                    raise ValueError('Unexpected outbound mail network before activation')
-        print('PASS prepared private mail services: unprivileged, read-only root, no public port or outbound network.')
+            for key in expected['services'][name]['networks']:
+                network=PROJECT+'_'+key
+                if json.loads(run(['docker','network','inspect',network]))[0]['Internal']!=expected['networks'][key]['internal']:
+                    raise ValueError('Mail network isolation differs from its reviewed stage')
+        print('PASS owned mail stage: pinned, unprivileged, read-only root, no public port; outbound='+str(pin['outboundEnabled']))
 
 
 if __name__=='__main__':main()

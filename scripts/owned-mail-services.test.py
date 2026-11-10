@@ -3,6 +3,7 @@ from pathlib import Path
 import unittest
 import json
 import tempfile
+import hashlib
 from unittest.mock import patch
 
 spec=importlib.util.spec_from_file_location('owned_mail',Path(__file__).with_name('owned-mail-services.py'))
@@ -11,9 +12,86 @@ spec=importlib.util.spec_from_file_location('mail_backup',Path(__file__).with_na
 backup=importlib.util.module_from_spec(spec);spec.loader.exec_module(backup)
 spec=importlib.util.spec_from_file_location('mail_linux',Path(__file__).with_name('owned-mail-linux.py'))
 linux=importlib.util.module_from_spec(spec);spec.loader.exec_module(linux)
+spec=importlib.util.spec_from_file_location('mail_activation',Path(__file__).with_name('owned-mail-activation.py'))
+activation=importlib.util.module_from_spec(spec);spec.loader.exec_module(activation)
 
 
 class OwnedMailDeployment(unittest.TestCase):
+    def test_only_smtp_gets_an_outbound_route_after_explicit_activation(self):
+        config=mail.configuration('sha256:'+'a'*64,True)
+        self.assertFalse(config['networks']['outbound']['internal'])
+        self.assertEqual(set(config['services']['smtp']['networks']),{'smtp','outbound'})
+        self.assertEqual(set(config['services']['gateway']['networks']),{'smtp','gateway'})
+        self.assertEqual(config['services']['gateway']['environment']['OWNED_MAIL_TEST_ONLY'],'false')
+        self.assertTrue(config['networks']['gateway']['internal']);self.assertTrue(config['networks']['smtp']['internal'])
+        for value in ['false',1,None]:
+            with self.assertRaises(ValueError):mail.configuration('sha256:'+'a'*64,value)
+
+    def sender_fixture(self):
+        records=[{'name':'codexdentist.com','type':'TXT','value':'v=spf1 ip4:187.127.116.53 ~all'},
+            {'name':'cdx202611._domainkey.codexdentist.com','type':'TXT','value':'v=DKIM1; k=rsa; p=synthetic-key'}]
+        answers={('codexdentist.com',16):[json.dumps(records[0]['value'])],('cdx202611._domainkey.codexdentist.com',16):[json.dumps(records[1]['value'])],
+            ('srv1907391.hstgr.cloud',1):['187.127.116.53'],('53.116.127.187.in-addr.arpa',12):['srv1907391.hstgr.cloud.']}
+        return records,answers
+
+    def test_public_sender_requires_one_spf_exact_dkim_key_and_forward_reverse_identity(self):
+        records,answers=self.sender_fixture();lookup=lambda name,kind:answers[(name,kind)]
+        self.assertEqual(activation.verify_sender(records,'synthetic-key','srv1907391.hstgr.cloud',lookup),{'spf':True,'dkim':True,'forwardReverse':True})
+        for key,value in [(('codexdentist.com',16),answers[('codexdentist.com',16)]*2),
+                (('cdx202611._domainkey.codexdentist.com',16),['"v=DKIM1; k=rsa; p=foreign-key"']),
+                (('srv1907391.hstgr.cloud',1),['127.0.1.1']),
+                (('53.116.127.187.in-addr.arpa',12),['foreign.example.'])]:
+            changed={**answers,key:value}
+            with self.subTest(key=key),self.assertRaises(ValueError):activation.verify_sender(records,'synthetic-key','srv1907391.hstgr.cloud',lambda name,kind:changed[(name,kind)])
+        with self.assertRaises(ValueError):activation.verify_sender(records,'wrong-persistent-key','srv1907391.hstgr.cloud',lookup)
+        self.assertEqual(activation.txt('"first " "second"'),'first second')
+
+    def activation_fixture(self,root):
+        revision='a'*40;source=root/'releases'/revision/'scripts/owned-mail';source.mkdir(parents=True)
+        template=(Path(__file__).parent/'owned-mail/maddy.conf').read_text();(source/'maddy.conf').write_text(template)
+        pin={'version':1,'revision':revision,'gatewayImage':'sha256:'+'a'*64,'smtpImage':mail.MADDY,'outboundHostname':'srv1907391.hstgr.cloud',
+            'outboundEnabled':False,'sourceConfigSha256':hashlib.sha256(template.encode()).hexdigest()}
+        directory=root/'installation';directory.mkdir()
+        (directory/'maddy.conf').write_text(template.replace('hostname mail.codexdentist.com','hostname '+pin['outboundHostname']))
+        (directory/'manifest.json').write_text(json.dumps(pin));(directory/'compose.json').write_text(json.dumps(mail.configuration(pin['gatewayImage'])))
+        return directory,pin
+
+    def test_initial_activation_failures_preserve_config_and_restart_the_original_stage(self):
+        from contextlib import ExitStack
+        for failure in ['dns','backup','queue','start','readiness',None]:
+            with self.subTest(failure=failure),tempfile.TemporaryDirectory()as temp:
+                root=Path(temp);directory,pin=self.activation_fixture(root);before={name:(directory/name).read_bytes()for name in ['compose.json','manifest.json']};events=[]
+                def step(name):
+                    def action(*args):
+                        events.append(name)
+                        if failure==name and events.count(name)==1:raise RuntimeError('synthetic '+name)
+                        return {'verified':True}if name=='dns'else root/'snapshot'
+                    return action
+                with ExitStack()as stack:
+                    stack.enter_context(patch.object(activation,'RELEASES',root/'releases'))
+                    for name,method in [('dns','sender_dns'),('backup','cold_snapshot'),('queue','empty_initial_queues'),('start','apply'),('readiness','ready')]:
+                        stack.enter_context(patch.object(activation,method,side_effect=step(name)))
+                    stack.enter_context(patch.object(activation,'status'))
+                    stack.enter_context(patch.object(activation.mail,'run',side_effect=lambda args:events.append('stop')))
+                    # Replace the Linux O_NOFOLLOW I/O boundary only; preserve
+                    # exclusive creation while exercising rollback on Windows.
+                    def write(path,value,app_readable=False):
+                        with path.open('xb')as output:output.write(value)
+                    stack.enter_context(patch.object(activation.mail,'write_private',side_effect=write))
+                    stack.enter_context(patch.object(activation,'replace_private',side_effect=lambda path,value:path.write_bytes(value)))
+                    if failure:
+                        with self.assertRaisesRegex(RuntimeError,'synthetic '+failure):activation.activate(directory)
+                        self.assertEqual({name:(directory/name).read_bytes()for name in before},before)
+                        self.assertFalse((directory/'outbound-stage-verified.json').exists())
+                        if failure in ['queue','start','readiness']:self.assertEqual(events[-1],'start')
+                        if failure in ['dns','backup']:self.assertNotIn('stop',events)
+                    else:
+                        activation.activate(directory)
+                        self.assertLess(events.index('dns'),events.index('backup'));self.assertLess(events.index('backup'),events.index('stop'))
+                        self.assertTrue(json.loads((directory/'manifest.json').read_text())['outboundEnabled'])
+                        proof=json.loads((directory/'outbound-stage-verified.json').read_text());self.assertFalse(proof['externalDeliveryAccepted']);self.assertFalse(proof['coreConfigurationChanged'])
+                        with self.assertRaises(ValueError):activation.activate(directory)
+
     def test_private_key_evidence_cannot_enter_the_build_tree(self):
         with tempfile.TemporaryDirectory()as temp:
             source=Path(temp)/'source';source.mkdir()
