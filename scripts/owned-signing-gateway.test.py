@@ -45,5 +45,14 @@ class SigningGateway(unittest.TestCase):
         for name in recovery.GATEWAY:
             self.assertEqual(recovery.config_owner(name), 0 if name.endswith(('compose.json', 'manifest.json')) else 101)
 
+    def test_long_fixture_project_names_never_become_upstream_dns_labels(self):
+        project = 'codexdentist-signing-test-' + 'a' * 32
+        self.assertGreater(len(project + '-app-1'), 63)
+        with patch.object(gateway, 'PROVIDER_PROJECT', project):
+            config = gateway.template().decode()
+            self.assertEqual(config.count('http://app:3000'), 2)
+            self.assertNotIn(project + '-app-1', config)
+            self.assertEqual(gateway.configuration()['networks']['provider']['name'], project + '_private')
+
 
 if __name__ == '__main__': unittest.main()

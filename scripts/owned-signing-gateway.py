@@ -19,7 +19,9 @@ TEMPLATE = Path(__file__).parent / 'owned-signing-gateway/nginx.conf'
 def template():
     if not __import__('re').fullmatch(r'codexdentist-(?:owned-signing|signing-test-[a-f0-9]{32})', PROVIDER_PROJECT):
         raise ValueError('Explicit owned or unique synthetic provider identity required')
-    return TEMPLATE.read_text().replace('codexdentist-owned-signing-app-1', PROVIDER_PROJECT + '-app-1').encode()
+    # Compose's service alias is scoped to this one provider network. Generated
+    # project/container names can exceed DNS's 63-byte single-label limit.
+    return TEMPLATE.read_text().encode()
 
 
 def run(args, **kwargs):
