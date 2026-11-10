@@ -516,8 +516,11 @@ reviewed exact-config upgrade preserves TLS identity/router and both original
 configurations, rolls back failed probes and refuses foreign changes. A 220-way
 static regression probe plus the complete real phone ceremony pass after the fix.
 The Linux gate includes that load check and final pass evidence follows cleanup.
-Exact-head CI and final upgraded recovery remain required. Core connection,
-private callbacks, actual SMTP and full app reconciliation gates remain open.
+PR #108 passed exact-head CI `42826092701` and merged as `14d80a1`; exact-main CI
+`42829500299`, deployment, independent go-live/readiness and unchanged financial/
+login-mapping baseline pass. Upgraded snapshot `20261110T133748Z-50c69196` passed
+combined restoration and authenticated PC recovery. Production core binding,
+owned signing SMTP and final operational acceptance remain open.
 
 The next core-connection stage now implements a separate internal TLS callback
 boundary. It accepts only POST to the existing connection-scoped Documenso
@@ -537,7 +540,10 @@ The transition takes a cold snapshot/restoration first, retains exact originals,
 rolls back failed probes and preserves concurrent edits. Recovery includes the
 callback identity/configuration and app-readable public trust with checksums,
 networkless syntax/identity proof and authenticated encryption. Combined real CE
-acceptance, exact-head CI and full app/tenant webhook/replay gates remain required.
+acceptance passed on the exact reviewed source, including actual provider TLS and
+both scoped webhook APIs. PR #109 passed exact-head CI `42830111055`, merged as
+`54677ce` and passed exact-main CI `42833629842`. The owned callback/trust is staged;
+production core attachment and signing SMTP remain disabled/captured respectively.
 The provisioning client creates only completion webhooks through the existing
 owned service accounts' authenticated APIs, with distinct main/QA teams, connection
 IDs and secrets. It records intent before any call and durable acknowledgements
@@ -546,17 +552,36 @@ Its callback origin/path is fixed internally; no arbitrary outbound URL or real
 owner password enters this operator. These bindings remain synthetic in native
 acceptance until a separate core cutover validates the actual tenant connections.
 
-Next activation sequence: keep private API and public recipient frontends on
-separate processes/networks before attaching only the recipient frontend to the
-existing proxy. Publish only a dedicated signing router with token-safe access
-logging, then repeat the actual ceremony on the real HTTPS hostname. Add a private
-authenticated callback route and verified owned SMTP submission, bind distinct
-provider accounts to the real main/test organizations and exercise the complete
-core consent/PDF/webhook/import/replay flow with synthetic fixtures. Drain and
-review captured jobs before switching SMTP; never release old synthetic jobs or
-use a real patient/credential email for QA. Snapshot/restore/encrypt the final
-configuration before closing signing. Existing other VPS applications and inbound
-mail remain outside this change.
+Actual full-app acceptance now also passes on a separate production-build core
+with its own fresh PostgreSQL/files/auth keys and disabled core notifications.
+The app saved its real encrypted QA provider credentials, attached a protected
+synthetic PDF and created one real envelope through the private TLS API. An
+anonymous phone signer completed it on the real HTTPS recipient hostname. Core
+redirect metadata returns an anonymous signer to login; that expected navigation
+is distinct from the standalone ceremony's final completion screen.
+
+The real provider callback initially failed against the isolated core's hostname
+guard. Explicitly trusting only the callback's fixed `codexdentist.com` Host in
+that QA core preserved hostname validation. Actual authenticated provider resend
+then delivered successfully. Two further provider resends produced three processed
+core events with exactly one signed file, Journey comment and reconciliation
+audit. The app displayed signed/stored state at 1440/390/320; owner PDF download
+passed, while foreign/anonymous access failed. The 271859-byte stored PDF's owned
+certificate CMS verifies and changed signed bytes fail. This proves actual owned
+service integration in a disposable core, not activation of real clinic records.
+`owned-signing-core-acceptance.py` independently rechecks both live databases,
+stored bytes, reference/scope/replay counts and CMS integrity without mutating them.
+Owned snapshot `20261110T145109Z-da1c5fa0` also preserves callback TLS identity,
+provider trust and the QA webhook intent/acknowledgements; combined worker-free
+restoration and authenticated encrypted recovery on the owned PC pass.
+
+Remaining activation sequence: preserve combined encrypted recovery, configure
+verified owned SMTP with QA capture kept separate, and bind main/test provider
+accounts to the real organizations through their encrypted core settings. Review
+pending/captured jobs before any SMTP transition; never release old synthetic jobs
+or use a real patient/credential email for QA. Verify the final same-image core
+network/CA cutover, scoped consent/webhook/import/replay behavior and backup timer
+before closing signing. Other VPS applications and inbound mail remain preserved.
 
 Local AI is deployed in `2face1e` (PR #95), with the production configuration
 cutover independently verified on 2026-11-09. The owned VPS has Ollama 0.40.15 and
