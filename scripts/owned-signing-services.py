@@ -27,8 +27,12 @@ def run(args, **kwargs):
     return result.stdout
 
 
-def configuration(keys, callback_enabled=False):
-    if type(callback_enabled) is not bool: raise ValueError('Explicit callback stage required')
+SMTP_NETWORK = 'codexdentist-owned-mail_smtp'
+
+
+def configuration(keys, callback_enabled=False, smtp_enabled=False):
+    if type(callback_enabled) is not bool or type(smtp_enabled) is not bool or (smtp_enabled and not callback_enabled):
+        raise ValueError('Explicit ordered callback/SMTP stage required')
     required = {'database', 'cache', 'auth', 'encryption', 'secondary', 'certificate'}
     if set(keys) != required or any(not isinstance(value, str) or len(value) != 64 or
             any(char not in '0123456789abcdef' for char in value) for value in keys.values()):
@@ -75,8 +79,17 @@ def configuration(keys, callback_enabled=False):
         app['environment'].update({'NEXT_PRIVATE_WEBHOOK_SSRF_BYPASS_HOSTS': 'codexdentist-signing-callback',
             'NODE_EXTRA_CA_CERTS': '/secrets/callback-trust.cert.pem'})
         app['volumes'].append({'type': 'bind', 'source': './callback-trust.cert.pem', 'target': '/secrets/callback-trust.cert.pem', 'read_only': True})
+    networks = {'private': {'internal': True}}
+    if smtp_enabled:
+        # The global transport intentionally remains capture. Only the main
+        # organization's encrypted provider transport may use owned SMTP.
+        app['environment']['NODE_EXTRA_CA_CERTS'] = '/secrets/provider-trust.cert.pem'
+        for name in ['smtp-trust.cert.pem', 'provider-trust.cert.pem']:
+            app['volumes'].append({'type': 'bind', 'source': './' + name, 'target': '/secrets/' + name, 'read_only': True})
+        app['networks'] = ['private', 'smtp']
+        networks['smtp'] = {'external': True, 'name': SMTP_NETWORK}
     return {'name': PROJECT, 'services': {'app': app, 'database': database, 'cache': cache, 'capture': capture},
-        'networks': {'private': {'internal': True}}, 'volumes': {name: {'name': PROJECT + '_' + name,
+        'networks': networks, 'volumes': {name: {'name': PROJECT + '_' + name,
             'labels': {'com.codexdentist.signing': name}} for name in ['database', 'cache']}}
 
 
@@ -130,9 +143,22 @@ def installation(directory):
         if not isinstance(callback_hash, str) or not __import__('re').fullmatch('[a-f0-9]{64}',callback_hash) or certificate.is_symlink() or not certificate.is_file() or certificate.stat().st_uid != 1001 or certificate.stat().st_gid != 1001 or certificate.stat().st_mode & 0o777 != 0o600 or hashlib.sha256(certificate.read_bytes()).hexdigest() != callback_hash:
             raise ValueError('Exact private callback public-certificate custody required')
     elif (directory / 'callback-trust.cert.pem').exists(): raise ValueError('Review unexpected provider callback trust')
-    expected = configuration(json.loads((directory / 'keys.json').read_text()), callback_hash is not None)
-    if manifest.get('version') != 1 or manifest.get('upstream') != SOURCE or manifest.get('images') != IMAGES or any(
-            manifest.get(key) is not False for key in ['published', 'externalMail', 'applicationConnected']):
+    smtp_hash = manifest.get('smtpCertificateSha256')
+    if smtp_hash is not None:
+        certificate = directory / 'smtp-trust.cert.pem'
+        bundle = directory / 'provider-trust.cert.pem'
+        if callback_hash is None or not isinstance(smtp_hash, str) or not __import__('re').fullmatch('[a-f0-9]{64}', smtp_hash):
+            raise ValueError('Ordered SMTP certificate stage required')
+        for path in [certificate, bundle]:
+            if path.is_symlink() or not path.is_file() or (path.stat().st_uid, path.stat().st_gid, path.stat().st_mode & 0o777) != (1001, 1001, 0o600):
+                raise ValueError('Exact private SMTP public-certificate custody required')
+        if hashlib.sha256(certificate.read_bytes()).hexdigest() != smtp_hash or bundle.read_bytes() != (directory / 'callback-trust.cert.pem').read_bytes().rstrip() + b'\n' + certificate.read_bytes():
+            raise ValueError('Exact callback and SMTP certificate bundle required')
+    elif any((directory / name).exists() for name in ['smtp-trust.cert.pem', 'provider-trust.cert.pem']):
+        raise ValueError('Review unexpected SMTP trust')
+    expected = configuration(json.loads((directory / 'keys.json').read_text()), callback_hash is not None, smtp_hash is not None)
+    if manifest.get('version') != 1 or manifest.get('upstream') != SOURCE or manifest.get('images') != IMAGES or manifest.get('externalMail') is not (smtp_hash is not None) or any(
+            manifest.get(key) is not False for key in ['published', 'applicationConnected']):
         raise ValueError('Reviewed private signing stage required')
     if json.loads((directory / 'compose.json').read_text()) != expected:
         raise ValueError('Signing configuration differs; preserve it for review')
@@ -148,7 +174,8 @@ def status(directory):
         host = info['HostConfig']
         if not info['State']['Running'] or any(info['State'].get(key) for key in ['Restarting', 'Paused', 'Dead', 'OOMKilled']) or info['Config']['Image'] != service['image'] or host.get('PortBindings') or host.get('Privileged'):
             raise ValueError('Signing runtime identity or isolation differs')
-        if set(info['NetworkSettings']['Networks']) != {PROJECT + '_private'}:
+        wanted_networks = {expected['networks'][key].get('name', PROJECT + '_' + key) for key in service['networks']}
+        if set(info['NetworkSettings']['Networks']) != wanted_networks:
             raise ValueError('Signing runtime has unexpected network access')
         if service.get('read_only') and not host['ReadonlyRootfs']:
             raise ValueError('Signing read-only root required')
@@ -159,9 +186,10 @@ def status(directory):
         if any(environment.get(key) != value for key, value in service.get('environment', {}).items()):
             raise ValueError('Signing environment differs')
         if service.get('user') and info['Config']['User'] != service['user']: raise ValueError('Unprivileged signing service required')
-    if json.loads(run(['docker', 'network', 'inspect', PROJECT + '_private']))[0]['Internal'] is not True:
-        raise ValueError('Private signing network required')
-    print('PASS private pinned signing runtime: closed signup, captured mail, no public ports/core connection.')
+    for key, network in expected['networks'].items():
+        if json.loads(run(['docker', 'network', 'inspect', network.get('name', PROJECT + '_' + key)]))[0]['Internal'] is not True:
+            raise ValueError('Private signing network required')
+    print('PASS private pinned signing runtime: closed signup, global mail captured, only reviewed internal networks.')
 
 
 def health(directory=ROOT):

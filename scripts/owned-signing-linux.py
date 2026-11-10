@@ -31,6 +31,7 @@ def exercise(directory, app_image=None):
     gateway = load('signing_gateway_linux', 'owned-signing-gateway.py')
     recipient = load('signing_recipient_linux', 'owned-signing-recipient.py')
     callback = load('signing_callback_linux','owned-signing-callback.py')
+    smtp = load('signing_smtp_linux', 'owned-signing-smtp-linux.py')
     project = 'codexdentist-signing-test-' + uuid.uuid4().hex
     signing.PROJECT = project; signing.ROOT = directory
     recovery.signing = signing; recovery.ROOT = directory
@@ -76,6 +77,7 @@ def exercise(directory, app_image=None):
         callback.enable_provider(signing,recovery)
         callback.provision_webhooks(signing,[{'purpose':purpose,'connectionId':'synthetic_'+purpose+'_'+uuid.uuid4().hex,
             'secret':__import__('secrets').token_hex(32)} for purpose in ['main','qa']])
+        smtp_proof = smtp.exercise(load, signing, recovery, bootstrap, gateway, callback, directory)
         snapshot = recovery.backup(); recovery.drill(snapshot); recovery.drill(snapshot)
         # Synthetic recipient keys belong only to this private test namespace;
         # no real owner's recovery private key is ever uploaded to a server.
@@ -98,6 +100,7 @@ def exercise(directory, app_image=None):
             else: raise RuntimeError('Corrupted signing recovery was accepted')
         signing.status(directory); signing.health(directory)
         proof = {'pass': True, 'images': signing.IMAGES, 'closedSignupApi': True, 'privateRestart': True,
+            **smtp_proof,
             'separateVerifiedMainAndQaApis': True,
             'crossOwnerApiTokenSubstitutionDenied': True,
             'encryptedRecoveryAndAuthenticatedDecryption': True,
@@ -107,6 +110,7 @@ def exercise(directory, app_image=None):
             'authenticatedCache': True, 'allHashesAndModes': True, 'databaseCounts': True, 'cacheAofRecovery': True,
             'corruptedKeysAndArchiveDenied': True, 'externalMailSent': False, 'coreAccess': False, 'published': False}
     finally:
+        smtp.cleanup(signing, directory)
         if (callback.ROOT/'compose.json').is_file():
             signing.run(['docker','compose','--project-directory',str(callback.ROOT),'-f',str(callback.ROOT/'compose.json'),'down','--remove-orphans'])
         if (recipient.ROOT / 'compose.json').is_file():

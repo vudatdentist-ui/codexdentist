@@ -58,6 +58,13 @@ submitting another email. Password reset/consume/signin remains covered by the
 disposable full-app actual TLS gate, not by changing a real owner's password.
 
 Owned signing runtime changes require `python3 scripts/owned-signing-services.test.py`
+and `python3 scripts/owned-signing-smtp.test.py` plus
+`node --test scripts/owned-signing-smtp-client.test.cjs`. The native CE gate
+also creates a dedicated admin, configures encrypted main-only SMTP and sends
+synthetic main/QA envelopes to a private TLS receiver/capture respectively.
+It denies an untrusted SMTP certificate and cold-restores the resulting trust
+and provider configuration without starting workers. No public mail is sent.
+The runtime gate additionally requires
 and the actual Linux gate `sudo -n python3 scripts/owned-signing-linux.py --source
 "$PWD" --output "$RUNNER_TEMP/codexdentist-owned-signing"`. Use a fresh private
 output outside the source/build tree; never upload its keys/captured mail as CI
