@@ -161,6 +161,21 @@ UNCERTAIN and needs operator evidence. Preserve that journal/lease; do not
 delete it or resend manually under a new ID to hide uncertainty. Restores run
 without workers/network and must not resume ambiguous jobs automatically.
 
+Use `python3 scripts/owned-mail-activation.py inspect` to compare public SPF,
+DKIM and forward-confirmed PTR against the persistent owned key and reviewed
+sender records. It uses certificate-verified, bounded
+[public DNS-over-HTTPS](https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-https/make-api-requests/dns-json/)
+lookups and never writes DNS. `enable-outbound` is a separate initial transition:
+it requires that review, takes/restores/encrypts a fresh cold snapshot, stops
+both producers and refuses existing journal jobs or SMTP queue files. It adds
+an outbound network only to SMTP; the gateway and submission network remain
+internal, with no published port. Signed TLS readiness must pass after startup.
+Failure restores the exact previous configuration and restarts its private stage;
+retained transition evidence blocks blind retries. Existing keys/volumes are
+never replaced or queues purged. The transition sends no mail and does not change
+core settings. Obtain explicit recipient approval before one external acceptance
+message, and verify its arrival separately before the app transport cutover.
+
 ### Hostinger migration observed 2026-10-21
 
 The public domain currently points through Cloudflare to the Hostinger VPS at

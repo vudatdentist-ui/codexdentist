@@ -37,6 +37,12 @@ They must remain outside the source/build tree (CI uses `RUNNER_TEMP`); the
 operator rejects an in-tree destination. Never broaden their private permissions
 to let a build tool scan them.
 
+Mail activation regressions must deny duplicate SPF, a foreign persistent DKIM
+key, wrong forward/reverse identity, edited configuration, failed backup and
+nonempty initial queues. Startup/readiness failure must restore both original
+files and restart the original stage. Assert that only SMTP gains egress and
+that this transition neither sends mail nor changes core transport settings.
+
 Durable storage changes require `test:durable-files`, `python3
 scripts/durable-files-ops.test.py`, `NODE_ENV=test npm run test:durable-files-db`
 and `NODE_ENV=test npm run browser:durable-files` with explicit disposable
