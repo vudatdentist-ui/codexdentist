@@ -80,7 +80,7 @@ jobs:
       - name: Owned TLS mail and encrypted idempotency regressions
         run: npm run test:owned-mail && python3 scripts/owned-mail-services.test.py
       - name: Private signing runtime and recovery contracts
-        run: python3 scripts/owned-signing-services.test.py
+        run: python3 scripts/owned-signing-services.test.py && python3 scripts/owned-signing-bootstrap.test.py && node --test scripts/owned-signing-bootstrap-client.test.cjs && python3 scripts/owned-signing-seal.test.py
       - name: Native owned email delivery and uncertainty races
         run: npm run test:owned-mail-db
         env:

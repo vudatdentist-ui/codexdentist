@@ -4,6 +4,7 @@ import argparse
 import importlib.util
 import json
 import os
+import hashlib
 from pathlib import Path
 import shutil
 import uuid
@@ -25,9 +26,13 @@ def private_output(source, output):
 def exercise(directory):
     signing = load('signing_linux', 'owned-signing-services.py')
     recovery = load('signing_recovery_linux', 'owned-signing-backup.py')
+    bootstrap = load('signing_bootstrap_linux', 'owned-signing-bootstrap.py')
+    seal = load('signing_seal_linux', 'owned-signing-seal.py')
     project = 'codexdentist-signing-test-' + uuid.uuid4().hex
     signing.PROJECT = project; signing.ROOT = directory
     recovery.signing = signing; recovery.ROOT = directory
+    bootstrap.signing = signing; bootstrap.recovery = recovery; bootstrap.ROOT = directory
+    seal.recovery_module = lambda: recovery
     command = ['docker', 'compose', '--project-directory', str(directory), '-f', str(directory / 'compose.json')]
     try:
         for image in signing.IMAGES.values(): signing.run(['docker', 'pull', image])
@@ -40,11 +45,25 @@ def exercise(directory):
         signing.run(['docker', 'restart', project + '-cache-1'])
         signing.run(['docker', 'start', project + '-app-1'])
         signing.status(directory); signing.health(directory)
+        bootstrap.bootstrap(directory)
+        wrong = json.loads((directory / 'bootstrap.credentials.json').read_text())
+        wrong[0]['apiToken'], wrong[1]['apiToken'] = wrong[1]['apiToken'], wrong[0]['apiToken']
+        try: bootstrap.client({'action': 'inspect', 'credentials': wrong})
+        except RuntimeError: pass
+        else: raise ValueError('Cross-owner signing API token substitution accepted')
         snapshot = recovery.backup(); recovery.drill(snapshot); recovery.drill(snapshot)
+        # Synthetic recipient keys belong only to this private test namespace;
+        # no real owner's recovery private key is ever uploaded to a server.
+        recipient, private_key = directory / 'test-recipient.cert.pem', directory / 'test-recipient.key.pem'
+        signing.run(['openssl', 'req', '-x509', '-newkey', 'rsa:3072', '-nodes', '-sha256', '-days', '1',
+            '-subj', '/CN=Synthetic CI recovery recipient', '-keyout', str(private_key), '-out', str(recipient)])
+        pin = hashlib.sha256(signing.run(['openssl', 'x509', '-in', str(recipient), '-outform', 'DER'])).hexdigest().upper()
+        seal.seal(snapshot, recipient, pin, 'openssl')
+        seal.verify(directory / 'sealed-snapshots' / (snapshot.name + '.cms'), recipient, private_key, pin, 'openssl')
         # Corrupted keys or archives must fail before any restored service starts.
         for kind in ['key', 'archive']:
             target = directory / 'backups' / ('corrupt-' + kind); target.mkdir(mode=0o700)
-            for name in recovery.CONFIG + ['backup-manifest.json']:
+            for name in list(json.loads((snapshot / 'backup-manifest.json').read_text())['files']) + ['backup-manifest.json']:
                 shutil.copyfile(snapshot / name, target / name); (target / name).chmod(0o600)
             if kind == 'key': (target / 'keys.json').write_bytes(b'corrupted private key copy')
             else: (target / 'database.tar').write_bytes(b'corrupted archive copy')
@@ -53,6 +72,9 @@ def exercise(directory):
             else: raise RuntimeError('Corrupted signing recovery was accepted')
         signing.status(directory); signing.health(directory)
         proof = {'pass': True, 'images': signing.IMAGES, 'closedSignupApi': True, 'privateRestart': True,
+            'separateVerifiedMainAndQaApis': True,
+            'crossOwnerApiTokenSubstitutionDenied': True,
+            'encryptedRecoveryAndAuthenticatedDecryption': True,
             'authenticatedCache': True, 'allHashesAndModes': True, 'databaseCounts': True, 'cacheAofRecovery': True,
             'corruptedKeysAndArchiveDenied': True, 'externalMailSent': False, 'coreAccess': False, 'published': False}
         signing.private(directory / 'acceptance.json', json.dumps(proof).encode())

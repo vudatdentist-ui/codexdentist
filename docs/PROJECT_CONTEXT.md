@@ -401,9 +401,28 @@ preserves permissions and adds authenticated PING/restart checks; Docker's
 `20261110T022102Z-26de05ec` restored all bytes/ownership/modes, every PostgreSQL
 table count, Valkey AOF/authentication and the certificate passphrase without
 starting restored application, mail or job workers. This remains a private
-standby, not activation of consent signing. Operator bootstrap, encrypted
-off-server custody, recipient publication and core ceremony/webhook acceptance
-are still required.
+standby, not activation of consent signing. Service-account provisioning,
+recipient publication and core ceremony/webhook acceptance remain separate gates.
+
+The private foundation is merged in PR #104 and deployed as `31210f1` after
+exact-main CI `42746106360`, core backup/restore, independent go-live/readiness
+and unchanged ledger. Snapshot `20261110T023256Z-34bb70da` additionally verifies
+restored deployment configuration ownership and actual app-UID key/cache access.
+Its CMS AES-256-GCM/RSA-OAEP-SHA256 copy is on the owned PC; authenticated
+decryption verified every volume/configuration/key checksum in memory. The real
+recipient private key remains only on that PC. Off-server transfer is manual.
+
+`owned-signing-bootstrap.py` implements the next private stage: it requires only
+the two seeded CE placeholder users and zero envelopes, snapshots/restores first,
+temporarily permits signup only within the four-service internal network, then
+creates separate main/QA identities through actual verification/signin/token
+APIs. It restores the exact closed configuration even on failure. A retained
+intent/partial acknowledgement prevents replay; API keys bind to their stored
+user/team/token hash, not merely a successful API response. Both identities have
+passed creation and authenticated API acceptance on fresh isolated CE. Rollout
+to the owned standby and a new encrypted recovery copy covering these account
+credentials remain pending. No public route, recipient email or core signing
+connection has been enabled.
 
 Local AI is deployed in `2face1e` (PR #95), with the production configuration
 cutover independently verified on 2026-11-09. The owned VPS has Ollama 0.40.15 and
