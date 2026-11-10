@@ -69,18 +69,19 @@ def prepare():
         'certificateSha256': hashlib.sha256((ROOT / 'gateway.cert.pem').read_bytes()).hexdigest()}).encode())
 
 
-def installation():
+def installation(expected_template=None):
     if ROOT.is_symlink() or ROOT.stat().st_uid != 0 or ROOT.stat().st_mode & 0o077: raise ValueError('Private root-owned gateway installation required')
     pin = json.loads((ROOT / 'manifest.json').read_text())
     if pin.get('version') != 1 or pin.get('image') != IMAGE or pin.get('published') is not False or pin.get('coreConnected') is not False:
         raise ValueError('Reviewed private gateway stage required')
-    if json.loads((ROOT / 'compose.json').read_text()) != configuration() or pin['configSha256'] != hashlib.sha256(template()).hexdigest() or pin['configSha256'] != hashlib.sha256((ROOT / 'nginx.conf').read_bytes()).hexdigest():
+    expected_template = template() if expected_template is None else expected_template
+    if json.loads((ROOT / 'compose.json').read_text()) != configuration() or pin['configSha256'] != hashlib.sha256(expected_template).hexdigest() or pin['configSha256'] != hashlib.sha256((ROOT / 'nginx.conf').read_bytes()).hexdigest():
         raise ValueError('Preserve changed gateway configuration')
     if pin['certificateSha256'] != hashlib.sha256((ROOT / 'gateway.cert.pem').read_bytes()).hexdigest(): raise ValueError('Gateway certificate identity differs')
 
 
-def status():
-    installation()
+def status(expected_template=None):
+    installation(expected_template)
     info = json.loads(run(['docker', 'inspect', PROJECT + '-proxy-1']))[0]; host = info['HostConfig']
     if not info['State']['Running'] or info['State'].get('Restarting') or info['Config']['Image'] != IMAGE or info['Config']['User'] != '101:101' or host.get('PortBindings') or not host['ReadonlyRootfs'] or host.get('Privileged'):
         raise ValueError('Gateway runtime isolation differs')
@@ -129,15 +130,59 @@ console.log(JSON.stringify({pass:true,strictTls:true,untrustedCaDenied:true,sepa
     print('PASS actual signing gateway TLS, provider APIs and recipient-surface isolation; no message or core write.')
 
 
+def replace(path, value, uid=0):
+    temporary = path.with_name(path.name + '.' + __import__('uuid').uuid4().hex + '.new')
+    private(temporary, value, uid); os.replace(temporary, path)
+    descriptor = os.open(path.parent, os.O_RDONLY)
+    try: os.fsync(descriptor)
+    finally: os.close(descriptor)
+
+
+def recreate():
+    run(['docker', 'compose', '--project-directory', str(ROOT), '-f', str(ROOT / 'compose.json'),
+        'up', '-d', '--no-deps', '--force-recreate', '--pull', 'never', 'proxy'])
+
+
+def upgrade_private():
+    desired = template(); before = (ROOT / 'nginx.conf').read_bytes()
+    if before == desired: status(); probe(); return
+    # One explicit source transition only. Never rewrite an operator's edited
+    # routes, images, certificates or a future public deployment implicitly.
+    expected_old = desired.replace(b'http://app:3000', ('http://' + PROVIDER_PROJECT + '-app-1:3000').encode())
+    if before != expected_old: raise ValueError('Preserve unexpected gateway configuration for review')
+    installation(expected_old)
+    record = ROOT / 'dns-config-upgrade-before'
+    if record.exists(): raise ValueError('Retained DNS upgrade evidence requires review')
+    record.mkdir(mode=0o700)
+    original_manifest = (ROOT / 'manifest.json').read_bytes()
+    private(record / 'nginx.conf', before); private(record / 'manifest.json', original_manifest)
+    pin = json.loads(original_manifest); pin['configSha256'] = hashlib.sha256(desired).hexdigest()
+    proposed_manifest = json.dumps(pin).encode()
+    try:
+        replace(ROOT / 'nginx.conf', desired, 101); replace(ROOT / 'manifest.json', proposed_manifest)
+        recreate(); status(); probe()
+    except BaseException:
+        if (ROOT / 'nginx.conf').read_bytes() not in [before, desired] or (ROOT / 'manifest.json').read_bytes() not in [original_manifest, proposed_manifest]:
+            raise ValueError('Preserve unexpected concurrent gateway configuration')
+        replace(ROOT / 'nginx.conf', before, 101); replace(ROOT / 'manifest.json', original_manifest)
+        recreate(); status(expected_old)
+        raise
+    private(ROOT / 'dns-config-upgrade-accepted.json', json.dumps({'serviceAlias': 'app', 'tlsIdentityPreserved': True,
+        'published': False, 'coreConnected': False}).encode())
+    print('PASS private gateway service-DNS upgrade; TLS keys, routes, networks and core preserved.')
+
+
 def main():
-    parser = argparse.ArgumentParser(); parser.add_argument('action', choices=['prepare', 'up', 'status', 'probe']); args = parser.parse_args()
+    parser = argparse.ArgumentParser(); parser.add_argument('action', choices=['prepare', 'up', 'status', 'probe', 'upgrade-private']); args = parser.parse_args()
     if not hasattr(os, 'geteuid') or os.geteuid() != 0: raise ValueError('Root-owned gateway operator required')
     os.umask(0o077)
     if args.action == 'prepare': prepare(); return
-    installation()
+    if ROOT.is_symlink() or ROOT.stat().st_uid != 0 or ROOT.stat().st_mode & 0o077: raise ValueError('Private root-owned gateway installation required')
     import fcntl
     with (ROOT / 'operations.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if args.action == 'upgrade-private': upgrade_private(); return
+        installation()
         if args.action == 'up': run(['docker', 'compose', '--project-directory', str(ROOT), '-f', str(ROOT / 'compose.json'), 'up', '-d', '--pull', 'never'])
         status()
         if args.action == 'probe': probe()

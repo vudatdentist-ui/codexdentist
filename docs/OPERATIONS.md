@@ -608,6 +608,14 @@ invalid-token denial and blocked administrative/auth/bulk/batched procedures on
 the recipient listener. Credentials enter only private stdin; no token/body/URL
 is logged or exported to the core. Preparation refuses existing gateway keys.
 The public recipient hostname is not yet routed to this stage.
+`upgrade-private` permits only the reviewed substitution of a generated container
+hostname with the provider network's short `app` service alias. It preserves
+TLS identity, routes, networks and original files, requires private stage, recreates
+only the private proxy and re-runs actual probes. Failure restores the original
+configuration unless a concurrent edit requires review; retained evidence blocks
+blind retries. Generated fixture names can exceed DNS's 63-byte label limit even
+when Docker accepts the container name. Do not repair that by weakening TLS or
+joining an unrelated network.
 
 Gateway configuration and TLS identity are included with subsequent signing
 snapshots under `gateway/`. Backup takes the provider then gateway operation

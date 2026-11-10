@@ -3,6 +3,9 @@ from pathlib import Path
 import tempfile
 import unittest
 from unittest.mock import patch
+from contextlib import ExitStack
+import json
+import hashlib
 
 spec = importlib.util.spec_from_file_location('gateway', Path(__file__).with_name('owned-signing-gateway.py'))
 gateway = importlib.util.module_from_spec(spec); spec.loader.exec_module(gateway)
@@ -53,6 +56,41 @@ class SigningGateway(unittest.TestCase):
             self.assertEqual(config.count('http://app:3000'), 2)
             self.assertNotIn(project + '-app-1', config)
             self.assertEqual(gateway.configuration()['networks']['provider']['name'], project + '_private')
+
+    def test_private_dns_upgrade_preserves_originals_and_refuses_concurrent_rewrites(self):
+        desired = gateway.template(); before = desired.replace(b'http://app:3000', b'http://codexdentist-owned-signing-app-1:3000')
+        for failure in [None, 'recreate', 'status', 'probe', 'concurrent']:
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temporary, ExitStack() as stack:
+                root = Path(temporary); (root / 'nginx.conf').write_bytes(before)
+                original_manifest = json.dumps({'configSha256': hashlib.sha256(before).hexdigest()}).encode()
+                (root / 'manifest.json').write_bytes(original_manifest); (root / 'gateway.key.pem').write_bytes(b'preserved synthetic identity')
+                events = []
+                def step(name):
+                    def action(*args):
+                        events.append(name)
+                        if failure == 'concurrent' and name == 'probe':
+                            (root / 'nginx.conf').write_bytes(b'concurrent configuration'); raise RuntimeError('Synthetic concurrent change')
+                        if failure == name and events.count(name) == 1: raise RuntimeError('Synthetic ' + name)
+                    return action
+                def write(path, value, uid=0):
+                    with path.open('xb') as output: output.write(value)
+                stack.enter_context(patch.object(gateway, 'ROOT', root)); stack.enter_context(patch.object(gateway, 'installation'))
+                stack.enter_context(patch.object(gateway, 'private', side_effect=write))
+                stack.enter_context(patch.object(gateway, 'replace', side_effect=lambda path, value, uid=0: path.write_bytes(value)))
+                for name in ['recreate', 'status', 'probe']: stack.enter_context(patch.object(gateway, name, side_effect=step(name)))
+                if failure:
+                    with self.assertRaises((RuntimeError, ValueError)): gateway.upgrade_private()
+                    if failure == 'concurrent': self.assertEqual((root / 'nginx.conf').read_bytes(), b'concurrent configuration')
+                    else:
+                        self.assertEqual((root / 'nginx.conf').read_bytes(), before)
+                        self.assertEqual((root / 'manifest.json').read_bytes(), original_manifest)
+                    self.assertFalse((root / 'dns-config-upgrade-accepted.json').exists())
+                else:
+                    gateway.upgrade_private(); self.assertEqual((root / 'nginx.conf').read_bytes(), desired)
+                    self.assertTrue((root / 'dns-config-upgrade-accepted.json').exists())
+                self.assertEqual((root / 'gateway.key.pem').read_bytes(), b'preserved synthetic identity')
+                self.assertEqual((root / 'dns-config-upgrade-before/nginx.conf').read_bytes(), before)
+                self.assertEqual((root / 'dns-config-upgrade-before/manifest.json').read_bytes(), original_manifest)
 
 
 if __name__ == '__main__': unittest.main()
