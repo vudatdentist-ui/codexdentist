@@ -74,6 +74,8 @@ export async function createDocumensoSigningEnvelope(
       },
     ],
     meta: {
+      timezone: "Asia/Ho_Chi_Minh",
+      dateFormat: "dd/MM/yyyy HH:mm",
       ...(input.redirectUrl ? { redirectUrl: input.redirectUrl } : {}),
       subject: "Vui lòng ký xác nhận tài liệu",
       message: "Vui lòng xem lại và ký tài liệu được gửi từ phòng khám.",

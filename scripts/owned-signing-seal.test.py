@@ -19,23 +19,27 @@ class SigningRecoveryEncryption(unittest.TestCase):
         cls.openssl = shutil.which('openssl') or str(Path('C:/Program Files/Git/mingw64/bin/openssl.exe'))
         if not Path(cls.openssl).is_file(): raise RuntimeError('Installed OpenSSL is required; do not skip recovery verification')
 
-    def fixture(self, root):
+    def fixture(self, root, gateway=None):
         key, cert = root / 'synthetic.key.pem', root / 'synthetic.cert.pem'
         subprocess.run([self.openssl, 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-sha256', '-days', '1',
             '-subj', '/CN=Synthetic recovery unit fixture', '-keyout', str(key), '-out', str(cert)], check=True, capture_output=True)
         der = subprocess.check_output([self.openssl, 'x509', '-in', str(cert), '-outform', 'DER'])
         pin = hashlib.sha256(der).hexdigest().upper(); recovery = seal.recovery_module()
         files = {name: ('Synthetic private fixture ' + name).encode() for name in recovery.CONFIG}
+        if gateway:
+            names = recovery.GATEWAY if gateway == 'complete' else recovery.GATEWAY[:-1]
+            files.update({name: ('Synthetic private gateway fixture ' + name).encode() for name in names})
         volumes = {name: ('Synthetic archive fixture ' + name).encode() for name in ['database', 'cache']}
         manifest = {'version': 1, 'images': recovery.signing.IMAGES, 'files': {name: hashlib.sha256(value).hexdigest() for name, value in files.items()},
-            'fileMetadata': {name: {'uid': 1001 if name in ['signing.p12', 'license-cache.json'] else 0,
-                'gid': 1001 if name in ['signing.p12', 'license-cache.json'] else 0, 'mode': 0o600} for name in files},
+            'fileMetadata': {name: {'uid': recovery.config_owner(name), 'gid': recovery.config_owner(name), 'mode': 0o600} for name in files},
             'volumes': {name: {'sha256': hashlib.sha256(value).hexdigest()} for name, value in volumes.items()}}
         files.update({name + '.tar': value for name, value in volumes.items()})
         files['backup-manifest.json'] = json.dumps(manifest).encode()
-        files['restore-verified.json'] = json.dumps({name: True for name in ['allHashes', 'ownershipAndModes',
-            'applicationConfigurationUsable', 'databaseCounts', 'cacheAuthenticationAndAof', 'certificatePassphrase']} |
-            {'appOrMailWorkersStarted': False}).encode()
+        proof = {name: True for name in ['allHashes', 'ownershipAndModes',
+            'applicationConfigurationUsable', 'databaseCounts', 'cacheAuthenticationAndAof', 'certificatePassphrase']}
+        proof['appOrMailWorkersStarted'] = False
+        if gateway: proof['gatewayConfigurationUsable'] = True
+        files['restore-verified.json'] = json.dumps(proof).encode()
         snapshot = '20261110T000000Z-a1b2c3d4'; source = io.BytesIO()
         with tarfile.open(fileobj=source, mode='w') as archive:
             for name, value in files.items():
@@ -82,6 +86,15 @@ class SigningRecoveryEncryption(unittest.TestCase):
             metadata['cipherSha256'] = seal.checksum(target); target.with_suffix('.cms.json').write_text(json.dumps(metadata))
             with self.assertRaisesRegex(ValueError, 'Authenticated CMS envelope required'): seal.verify(target, cert, key, pin, self.openssl)
             self.assertFalse(target.with_suffix('.restore-proof.json').exists())
+
+    def test_gateway_recovery_requires_complete_private_identity_and_all_hashes(self):
+        for stage in ['complete', 'partial']:
+            with self.subTest(stage=stage), tempfile.TemporaryDirectory() as temporary:
+                target, cert, key, pin, metadata = self.fixture(Path(temporary), gateway=stage)
+                if stage == 'complete': seal.verify(target, cert, key, pin, self.openssl)
+                else:
+                    with self.assertRaisesRegex(ValueError, 'Recovered signing manifest differs'): seal.verify(target, cert, key, pin, self.openssl)
+                    self.assertFalse(target.with_suffix('.restore-proof.json').exists())
 
 
 if __name__ == '__main__': unittest.main()

@@ -148,14 +148,15 @@ and rejection of a bad signature; no message was sent. Public-only sender DNS
 values are in `/opt/codexdentist-owned-mail/sender-dns-records.json`. Browser
 access became available on 2026-11-10: the existing single SPF record and new
 DKIM TXT selector were saved through Cloudflare and both exact values verified
-against public DNS. Existing inbound MX/mail records were preserved. External
-recipient acceptance and the app transport switch remain separate gates.
+against public DNS. Existing inbound MX/mail records were preserved. The later
+approved external recipient acceptance and app transport switch are recorded
+below; the original standby proof remains historical and must not be replayed.
 
 `codexdentist-mail-backup.timer` is enabled daily at 19:40 UTC with up to five
 minutes jitter, after its manual backup/restore/encryption acceptance. Reviewed
 operators and source hashes live under `/opt/codexdentist-owned-mail/operators`;
 `last-verified-backup.json` points to the last verified private snapshot and CMS
-archive. Snapshot `20261109T162221Z-a0ed7baa` passed both volume restores and
+archive. Post-cutover snapshot `20261110T085642Z-2d52bd3f` passed both volume restores and
 public-recipient encryption using the existing recovery certificate. Its encrypted
 copy is on the owner's PC under the private backup `snapshots/owned-mail`
 directory, with an authenticated in-memory decryption/hash proof. No plaintext
@@ -598,6 +599,36 @@ until the owner supplies and verifies their actual credentials.
 
 ## Documenso operator setup
 
+The private gateway operator is `owned-signing-gateway.py prepare|up|status|probe`
+at `/opt/codexdentist-owned-signing-gateway`. It pins unprivileged Nginx by digest,
+uses a distinct TLS key/certificate, internal API/recipient networks and the
+existing provider's internal network, with no published port or external route.
+`probe` checks actual strict TLS/CA denial, both existing scoped provider tokens,
+invalid-token denial and blocked administrative/auth/bulk/batched procedures on
+the recipient listener. Credentials enter only private stdin; no token/body/URL
+is logged or exported to the core. Preparation refuses existing gateway keys.
+The public recipient hostname is not yet routed to this stage.
+`upgrade-private` permits only the reviewed substitution of a generated container
+hostname with the provider network's short `app` service alias. It preserves
+TLS identity, routes, networks and original files, requires private stage, recreates
+only the private proxy and re-runs actual probes. Failure restores the original
+configuration unless a concurrent edit requires review; retained evidence blocks
+blind retries. Generated fixture names can exceed DNS's 63-byte label limit even
+when Docker accepts the container name. Do not repair that by weakening TLS or
+joining an unrelated network.
+
+Gateway configuration and TLS identity are included with subsequent signing
+snapshots under `gateway/`. Backup takes the provider then gateway operation
+lock, copies only five declared configuration/key files with original ownership,
+and never captures arbitrary gateway QA artifacts or logs. Restore verifies its
+key/certificate pair and Nginx syntax/configuration as UID 101 in a networkless
+container without starting proxy workers. This private restore stage rejects a
+published/connected manifest until that future stage has its own reviewed policy.
+Encrypted recovery requires all five gateway files and their ownership/checksums;
+partial gateway identity is refused. Preserve the whole encrypted snapshot for
+later recovery. Publication still needs public-hostname ceremony acceptance,
+per-router token-log protection and the tenant-bound core/webhook cutover.
+
 Owned CE runtime: `scripts/owned-signing-services.py prepare|up|status` uses
 `/opt/codexdentist-owned-signing`, pinned Documenso 2.21.1 CE and independent
 PostgreSQL/Valkey volumes/keys. Pull the exact `IMAGES` references in the script
@@ -860,8 +891,9 @@ apply. Review and install deployer changes explicitly outside the release checko
 Optional payOS, Documenso and Orthanc/OHIF stay disabled without real configuration.
 Private OHIF/PACS access must enforce study authorization independently of knowing
 a viewer URL; desktop/mobile integration evidence must be collected before enabling it.
-Production notification readiness accepts configured Resend email or validated
-HTTPS webhook delivery. Unsupported channels must never be reported as sent.
+Production notification readiness accepts the signed live owned-mail gateway,
+configured Resend email or validated HTTPS webhook delivery. Current email uses
+owned-mail. Unsupported channels must never be reported as sent.
 
 Run before connecting real patient data:
 

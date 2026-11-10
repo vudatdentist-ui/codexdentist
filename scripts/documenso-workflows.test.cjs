@@ -2,6 +2,17 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const { load } = require('./audit-source-loader.cjs');
 
+test('new signing envelopes explicitly use Vietnamese calendar presentation and timezone', async () => {
+  let payload;
+  const client=load('src/integrations/documenso/client.ts',{}, {Response,FormData,Blob,fetch:async(url,init)=>{
+    if(url.endsWith('/envelope/create')){payload=JSON.parse(init.body.get('payload'));return Response.json({id:'synthetic-envelope'});}
+    return Response.json({id:'synthetic-envelope',recipients:[{signingUrl:'https://sign.example.test/sign/synthetic'}]});
+  }});
+  await client.createDocumensoSigningEnvelope({baseUrl:'https://sign.example.test/api/v2',apiToken:'synthetic',webhookSecret:'synthetic'},
+    {externalId:'synthetic',title:'Synthetic PDF',pdfBytes:Buffer.from('%PDF-1.4\nSynthetic only'),fileName:'synthetic.pdf',recipientEmail:'synthetic@example.test',recipientName:'Synthetic signer'});
+  assert.equal(payload.meta.timezone,'Asia/Ho_Chi_Minh');assert.equal(payload.meta.dateFormat,'dd/MM/yyyy HH:mm');
+});
+
 test('signed PDF import rejects a foreign completed envelope before downloading any file', async () => {
   let requests=0;
   const client=load('src/integrations/documenso/client.ts',{}, {Response,fetch:async()=>{

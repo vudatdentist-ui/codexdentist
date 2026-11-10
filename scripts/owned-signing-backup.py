@@ -21,6 +21,16 @@ CONFIG = ['compose.json', 'manifest.json', 'keys.json', 'certificate.pass', 'sig
     'signing.cert.pem', 'signing.p12', 'license-cache.json']
 BOOTSTRAP = ['bootstrap.intent.json', 'bootstrap.before.json', 'bootstrap.api-result.json',
     'bootstrap.credentials.json', 'bootstrap.completed.json']
+GATEWAY = ['gateway/compose.json', 'gateway/manifest.json', 'gateway/nginx.conf', 'gateway/gateway.cert.pem', 'gateway/gateway.key.pem']
+GATEWAY_ROOT = Path('/opt/codexdentist-owned-signing-gateway')
+GATEWAY_IMAGE = 'ghcr.io/nginx/nginx-unprivileged@sha256:e333a5b95605942b5e495645ee54fab02b112081de6dbe45d2ead3ef38e03e31'
+
+
+def config_owner(name):
+    if name.startswith('gateway/'):
+        return 0 if name.endswith(('compose.json', 'manifest.json')) else 101
+    return 1001 if name in ['signing.p12', 'license-cache.json'] else 0
+
 TREE = r'''const fs=require('fs'),path=require('path'),crypto=require('crypto'),rows=[];
 function walk(p){const s=fs.lstatSync(p);if(s.isSymbolicLink()||(!s.isFile()&&!s.isDirectory()))throw Error();
 rows.push([path.relative('/snapshot',p),s.isDirectory()?'directory':crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'),s.size*(s.isFile()?1:0),s.uid,s.gid,s.mode&0o777]);
@@ -72,7 +82,7 @@ def counts(container, password):
     return result
 
 
-def backup():
+def backup_data():
     signing.status(ROOT)
     for name in ['database', 'cache']:
         if inspect('volume', signing.PROJECT + '_' + name).get('Labels', {}).get('com.codexdentist.signing') != name:
@@ -88,11 +98,17 @@ def backup():
         manifest['databaseCounts'] = counts(signing.PROJECT + '-database-1', password)
         for name in active:
             if name != 'app': signing.run(['docker', 'stop', '--time', '30', signing.PROJECT + '-' + name + '-1'])
-        for name in CONFIG + [name for name in BOOTSTRAP if (ROOT / name).exists()]:
-            source = ROOT / name
+        gateway_files = []
+        if GATEWAY_ROOT.exists():
+            if GATEWAY_ROOT.is_symlink() or GATEWAY_ROOT.stat().st_uid != 0 or GATEWAY_ROOT.stat().st_mode & 0o077:
+                raise ValueError('Private owned gateway recovery required')
+            gateway_files = GATEWAY
+            (snapshot / 'gateway').mkdir(mode=0o700)
+        for name in CONFIG + [name for name in BOOTSTRAP if (ROOT / name).exists()] + gateway_files:
+            source = GATEWAY_ROOT / name.removeprefix('gateway/') if name in GATEWAY else ROOT / name
             if source.is_symlink() or not source.is_file(): raise ValueError('Unsafe signing configuration')
             metadata = source.stat()
-            owner = 1001 if name in ['signing.p12', 'license-cache.json'] else 0
+            owner = config_owner(name)
             if metadata.st_uid != owner or metadata.st_gid != owner or metadata.st_mode & 0o777 != 0o600:
                 raise ValueError('Signing configuration ownership/private modes differ')
             shutil.copyfile(source, snapshot / name); (snapshot / name).chmod(0o600)
@@ -118,18 +134,34 @@ def backup():
     return snapshot
 
 
+def backup():
+    from contextlib import ExitStack
+    with ExitStack() as locks:
+        if GATEWAY_ROOT.exists():
+            if GATEWAY_ROOT.is_symlink() or GATEWAY_ROOT.stat().st_uid != 0 or GATEWAY_ROOT.stat().st_mode & 0o077:
+                raise ValueError('Private owned gateway recovery required')
+            import fcntl
+            lock = locks.enter_context((GATEWAY_ROOT / 'operations.lock').open('a'))
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        return backup_data()
+
+
 def validate_snapshot(snapshot):
     if snapshot.resolve() != snapshot or snapshot.parent != ROOT / 'backups' or snapshot.is_symlink() or snapshot.stat().st_uid != 0 or snapshot.stat().st_mode & 0o077:
         raise ValueError('Exact private signing snapshot required')
     manifest = json.loads((snapshot / 'backup-manifest.json').read_text())
     present = set(manifest.get('files', {}))
-    if manifest.get('version') != 1 or manifest.get('images') != signing.IMAGES or not set(CONFIG) <= present or not present <= set(CONFIG + BOOTSTRAP) or set(manifest.get('fileMetadata', {})) != present or set(manifest.get('volumes', {})) != {'database', 'cache'}:
+    if manifest.get('version') != 1 or manifest.get('images') != signing.IMAGES or not set(CONFIG) <= present or not present <= set(CONFIG + BOOTSTRAP + GATEWAY) or set(manifest.get('fileMetadata', {})) != present or set(manifest.get('volumes', {})) != {'database', 'cache'} or (present & set(GATEWAY) and not set(GATEWAY) <= present):
         raise ValueError('Signing recovery manifest differs')
     for name, digest in manifest['files'].items():
         if (snapshot / name).is_symlink() or checksum(snapshot / name) != digest: raise ValueError('Signing configuration/key checksum differs')
-        owner = 1001 if name in ['signing.p12', 'license-cache.json'] else 0
+        owner = config_owner(name)
         if manifest['fileMetadata'][name] != {'uid': owner, 'gid': owner, 'mode': 0o600}:
             raise ValueError('Signing restore configuration ownership/mode differs')
+    if present & set(GATEWAY):
+        directory = snapshot / 'gateway'
+        if directory.is_symlink() or not directory.is_dir() or directory.stat().st_uid != 0 or directory.stat().st_mode & 0o077:
+            raise ValueError('Private gateway snapshot directory required')
     for name, record in manifest['volumes'].items():
         target = snapshot / (name + '.tar')
         if target.is_symlink() or checksum(target) != record['sha256']: raise ValueError('Signing archive checksum differs')
@@ -211,10 +243,33 @@ def configuration_probe(snapshot, metadata):
             "const fs=require('fs');if(!fs.readFileSync('/secrets/signing.p12').length)throw Error();const p='/app/.documenso-license.json';const value=fs.readFileSync(p);fs.writeFileSync(p,value)"])
 
 
+def gateway_probe(snapshot):
+    directory = snapshot / 'gateway'
+    manifest = json.loads((directory / 'manifest.json').read_text())
+    if manifest.get('image') != GATEWAY_IMAGE or manifest.get('published') is not False or manifest.get('coreConnected') is not False:
+        raise ValueError('Only the accepted private gateway restore stage is supported')
+    if checksum(directory / 'nginx.conf') != manifest['configSha256'] or checksum(directory / 'gateway.cert.pem') != manifest['certificateSha256']:
+        raise ValueError('Gateway restore identity differs')
+    public = signing.run(['openssl', 'x509', '-in', str(directory / 'gateway.cert.pem'), '-pubkey', '-noout'])
+    key_public = signing.run(['openssl', 'pkey', '-in', str(directory / 'gateway.key.pem'), '-pubout'])
+    if public != key_public: raise ValueError('Restored gateway TLS key/certificate differ')
+    with tempfile.TemporaryDirectory(prefix='signing-gateway-restore-') as temporary:
+        root = Path(temporary)
+        for name in ['nginx.conf', 'gateway.key.pem', 'gateway.cert.pem']:
+            shutil.copyfile(directory / name, root / name); os.chown(root / name, 101, 101); (root / name).chmod(0o600)
+        mounts = []
+        for name, target in [('nginx.conf', '/etc/nginx/nginx.conf'), ('gateway.key.pem', '/secrets/gateway.key.pem'), ('gateway.cert.pem', '/secrets/gateway.cert.pem')]:
+            mounts += ['--mount', 'type=bind,source=' + str(root / name) + ',target=' + target + ',readonly']
+        signing.run(['docker', 'run', '--rm', '--network', 'none', '--read-only', '--user', '101:101', '--cap-drop', 'ALL',
+            '--security-opt', 'no-new-privileges', '--memory', '128m', '--cpus', '0.5', '--tmpfs', '/tmp:rw,nosuid,size=16m,uid=101,gid=101,mode=0700',
+            *mounts, '--entrypoint', 'nginx', GATEWAY_IMAGE, '-t'])
+
+
 def drill(snapshot):
     manifest = validate_snapshot(snapshot)
     signing.run(['openssl', 'pkcs12', '-in', str(snapshot / 'signing.p12'), '-passin', 'file:' + str(snapshot / 'certificate.pass'), '-noout'])
     configuration_probe(snapshot, manifest['fileMetadata'])
+    if set(GATEWAY) <= set(manifest['files']): gateway_probe(snapshot)
     for name, record in manifest['volumes'].items():
         volume = 'codexdentist-signing-restore-' + uuid.uuid4().hex
         signing.run(['docker', 'volume', 'create', '--label', 'com.codexdentist.restore=' + volume, volume])
@@ -228,8 +283,10 @@ def drill(snapshot):
         finally:
             if inspect('volume', volume).get('Labels', {}).get('com.codexdentist.restore') != volume: raise ValueError('Restore volume ownership differs')
             signing.run(['docker', 'volume', 'rm', volume])
-    proof = json.dumps({'allHashes': True, 'ownershipAndModes': True, 'applicationConfigurationUsable': True, 'databaseCounts': True, 'cacheAuthenticationAndAof': True,
-        'certificatePassphrase': True, 'appOrMailWorkersStarted': False}).encode()
+    proof = {'allHashes': True, 'ownershipAndModes': True, 'applicationConfigurationUsable': True, 'databaseCounts': True, 'cacheAuthenticationAndAof': True,
+        'certificatePassphrase': True, 'appOrMailWorkersStarted': False}
+    if set(GATEWAY) <= set(manifest['files']): proof['gatewayConfigurationUsable'] = True
+    proof = json.dumps(proof).encode()
     target = snapshot / 'restore-verified.json'
     if target.exists():
         if target.is_symlink() or target.read_bytes() != proof: raise ValueError('Preserve changed signing restore evidence')

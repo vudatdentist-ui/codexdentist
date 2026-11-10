@@ -61,6 +61,19 @@ load/authentication; repeated drills must pass. Restored app/mail/BullMQ workers
 never start. Corrupted key/archive copies must fail before a restore starts.
 Keep the standalone provider ceremony and core consent/webhook/replay gates:
 private runtime readiness is not operational signing acceptance.
+Gateway changes additionally run `python3 scripts/owned-signing-gateway.test.py`.
+The Linux signing gate takes `--image codexdentist:ci`, starts a fresh uniquely
+named private proxy and checks real TLS, both scoped API tokens, invalid tokens,
+administrative/auth/bulk API denials and batched procedure smuggling. Its combined
+snapshot must restore the exact gateway TLS pair/configuration as UID 101 with
+`nginx -t` and no restored workers, then pass authenticated encrypted recovery.
+Use real synthetic PDF ceremony QA for route changes: wait for the rendered
+canvas and final exact "Everyone has signed" status, not a substring in text
+about future completion. Inspect final desktop/phone screenshots and verify the
+downloaded CMS/tamper denial. Private loopback-origin QA is separate evidence
+from eventual public-hostname and core consent/webhook acceptance. New envelopes
+must explicitly carry Vietnam timezone and day/month/24-hour presentation; old
+reserved ceremonies retain their original source/recipient identity.
 Bootstrap changes also run `python3 scripts/owned-signing-bootstrap.test.py`,
 `node --test scripts/owned-signing-bootstrap-client.test.cjs` and
 `python3 scripts/owned-signing-seal.test.py`. Native CE acceptance must create

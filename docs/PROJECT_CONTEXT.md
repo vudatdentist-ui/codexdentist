@@ -312,8 +312,8 @@ authenticated `SENT` evidence. No real patient message or transfer was sent.
 The financial audit is identical before/after deployment with zero mismatches.
 A real bank
 receiving account is an owner-entered clinic setting; never substitute the test
-account. Existing cloud mail/AI/file configuration remains preserved pending a
-verified free migration; its current billing plan is not established.
+account. AI, private files and email now use the verified owned runtimes described
+below; previous cloud credentials/original files remain private rollback custody.
 Chatwoot's public staff login has separate HTTPS browser/API origins and was
 rendered at 1440/390/320px. Publication additionally proves the installation form
 is closed; an account API response alone is insufficient. Main and synthetic
@@ -393,6 +393,10 @@ mail. A failed pre-cutover comparison exercised exact rollback before activation
 its evidence is retained. Further work remains under signing below, not SMTP
 transport activation. Inbox delivery to one approved Gmail account is evidence
 for that acceptance, not a promise about every future destination.
+PR #106 is merged and deployed as `e0f1f96` after exact-main CI `42789283529`,
+fresh backup/restore, independent go-live/readiness and unchanged ledger. The
+post-cutover mail snapshot `20261110T085642Z-2d52bd3f` passed authenticated encrypted
+PC recovery, including the existing mail receipt/journal state.
 
 Signing preflight also passed against actual Documenso 2.21.1 CE in a separate
 synthetic installation: the reviewed adapter created/distributed a PDF, the
@@ -445,6 +449,43 @@ and its encrypted copy passed authenticated recovery on the owned PC. No public
 route, recipient email or core signing connection has been enabled. Those
 publication and full-app ceremony/webhook/replay gates remain open.
 
+The next signing gateway is implemented and running privately: pinned
+unprivileged Nginx exposes a strict-TLS API listener only on an internal network
+and a separate recipient surface. Recipient routes allow required assets,
+read-only session status and token-scoped PDF retrieval, plus enumerated signing
+procedures; admin/signup/signin/API-key/bulk-API and batched-procedure smuggling
+are denied. Access/error logs are disabled to keep signing tokens out of logs.
+Actual TLS/API/route-denial probes pass. No published port, external network,
+public router or core connection has been enabled.
+
+A synthetic QA ceremony used the reviewed adapter through the TLS gateway,
+inserted/completed a browser signature and downloaded the sealed PDF. Its CMS
+verifies against the owned certificate and tampered bytes fail; its stored
+metadata is explicitly `Asia/Ho_Chi_Minh` and `dd/MM/yyyy HH:mm`. Final exact
+"Everyone has signed" screens were inspected at 1440/390/320. Browser QA used a
+temporary private loopback origin through an SSH tunnel because the real hostname
+is not published; the exact original provider Compose/origin was restored and
+the tunnel closed afterwards. This does not satisfy public-hostname or core
+consent/webhook acceptance. Owned snapshot `20261110T092919Z-9bd9f71b` also passed
+combined provider/gateway key/configuration recovery and authenticated encrypted
+PC custody. The initial fresh gateway fixture exposed a generated 64-character
+upstream DNS label; using the scoped Compose `app` alias fixes that failure without
+changing TLS or the isolated provider network. The reviewed private upgrade
+preserves exact previous files and refuses unrelated/concurrent edits. Final
+native/CI acceptance and public/core gates remain required; signing stays open.
+
+Next activation sequence: keep private API and public recipient frontends on
+separate processes/networks before attaching only the recipient frontend to the
+existing proxy. Publish only a dedicated signing router with token-safe access
+logging, then repeat the actual ceremony on the real HTTPS hostname. Add a private
+authenticated callback route and verified owned SMTP submission, bind distinct
+provider accounts to the real main/test organizations and exercise the complete
+core consent/PDF/webhook/import/replay flow with synthetic fixtures. Drain and
+review captured jobs before switching SMTP; never release old synthetic jobs or
+use a real patient/credential email for QA. Snapshot/restore/encrypt the final
+configuration before closing signing. Existing other VPS applications and inbound
+mail remain outside this change.
+
 Local AI is deployed in `2face1e` (PR #95), with the production configuration
 cutover independently verified on 2026-11-09. The owned VPS has Ollama 0.40.15 and
 Qwen3 4B pinned by image/model digests. Runtime has no published port or external
@@ -463,8 +504,8 @@ rollback. Exact-main push CI, core backup/restore, go-live/readiness, effective
 runtime inference, owner UI and unchanged financial audit pass. The independent
 production inference used only synthetic data and made no database writes.
 Model cache snapshot `20261109T121524Z-bcfd9e53` passed isolated restoration with
-matching SHA-256 for every file and the pinned model metadata. Mail remains Resend
-until its own verified SMTP cutover; private files now use the owned volume below.
+matching SHA-256 for every file and the pinned model metadata. Email has completed
+its separate owned SMTP cutover; private files use the owned volume below.
 
 Durable private filesystem storage is deployed in `88a6244` (PR #97), with exact
 main CI `42630373297` passing. Production writes to `local` on the private named
