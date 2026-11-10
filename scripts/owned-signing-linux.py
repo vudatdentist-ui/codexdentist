@@ -30,6 +30,7 @@ def exercise(directory, app_image=None):
     seal = load('signing_seal_linux', 'owned-signing-seal.py')
     gateway = load('signing_gateway_linux', 'owned-signing-gateway.py')
     recipient = load('signing_recipient_linux', 'owned-signing-recipient.py')
+    callback = load('signing_callback_linux','owned-signing-callback.py')
     project = 'codexdentist-signing-test-' + uuid.uuid4().hex
     signing.PROJECT = project; signing.ROOT = directory
     recovery.signing = signing; recovery.ROOT = directory
@@ -42,6 +43,8 @@ def exercise(directory, app_image=None):
     recipient.PROJECT = project + '-recipient'; recipient.PROVIDER_PROJECT = project
     recipient.EDGE = recipient.PROJECT + '-edge'
     recovery.RECIPIENT_ROOT = recipient.ROOT
+    callback.ROOT=directory.parent/(project+'-callback');callback.PROJECT=project+'-callback';callback.PROVIDER_PROJECT=project
+    recovery.CALLBACK_ROOT=callback.ROOT
     command = ['docker', 'compose', '--project-directory', str(directory), '-f', str(directory / 'compose.json')]
     try:
         for image in signing.IMAGES.values(): signing.run(['docker', 'pull', image])
@@ -68,6 +71,11 @@ def exercise(directory, app_image=None):
         recipient.prepare()
         signing.run(['docker', 'compose', '--project-directory', str(recipient.ROOT), '-f', str(recipient.ROOT / 'compose.json'), 'up', '-d', '--pull', 'never'])
         recipient.status(); recipient.probe(); recipient.concurrent_probe()
+        callback.prepare()
+        signing.run(['docker','compose','--project-directory',str(callback.ROOT),'-f',str(callback.ROOT/'compose.json'),'up','-d','--pull','never'])
+        callback.enable_provider(signing,recovery)
+        callback.provision_webhooks(signing,[{'purpose':purpose,'connectionId':'synthetic_'+purpose+'_'+uuid.uuid4().hex,
+            'secret':__import__('secrets').token_hex(32)} for purpose in ['main','qa']])
         snapshot = recovery.backup(); recovery.drill(snapshot); recovery.drill(snapshot)
         # Synthetic recipient keys belong only to this private test namespace;
         # no real owner's recovery private key is ever uploaded to a server.
@@ -95,9 +103,12 @@ def exercise(directory, app_image=None):
             'encryptedRecoveryAndAuthenticatedDecryption': True,
             'privateGatewayTlsAndRecipientSurface': True,
             'separateRecipientProcessAndRecovery': True,
+            'privateCallbackTrustAndRecovery':True,
             'authenticatedCache': True, 'allHashesAndModes': True, 'databaseCounts': True, 'cacheAofRecovery': True,
             'corruptedKeysAndArchiveDenied': True, 'externalMailSent': False, 'coreAccess': False, 'published': False}
     finally:
+        if (callback.ROOT/'compose.json').is_file():
+            signing.run(['docker','compose','--project-directory',str(callback.ROOT),'-f',str(callback.ROOT/'compose.json'),'down','--remove-orphans'])
         if (recipient.ROOT / 'compose.json').is_file():
             signing.run(['docker', 'compose', '--project-directory', str(recipient.ROOT), '-f', str(recipient.ROOT / 'compose.json'), 'down', '--remove-orphans'])
         edge = __import__('subprocess').run(['docker', 'network', 'inspect', recipient.EDGE], capture_output=True)

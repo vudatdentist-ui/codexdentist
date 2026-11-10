@@ -512,6 +512,33 @@ The Linux gate includes that load check and final pass evidence follows cleanup.
 Exact-head CI and final upgraded recovery remain required. Core connection,
 private callbacks, actual SMTP and full app reconciliation gates remain open.
 
+The next core-connection stage now implements a separate internal TLS callback
+boundary. It accepts only POST to the existing connection-scoped Documenso
+webhook route, forwards the provider's secret header unchanged for core validation,
+and denies other paths/methods without logging bodies or URLs. It has no public
+route, core/database credentials or provider key mounts. Actual isolated Nginx
+transport acceptance passes strict TLS, unknown-CA rejection, path/method denials
+and preserved secret headers; its small HTTP receiver is explicitly a transport
+fixture, not full core reconciliation evidence. Read-only Nginx startup initially
+exposed default FastCGI/temp paths; all temporary paths now use the bounded tmpfs.
+
+Provider callback trust is an explicit reviewed stage: only the callback hostname
+is exempted from upstream private-address webhook rejection, and only its public
+certificate is mounted read-only for Node TLS. SMTP remains captured, networks and
+signup remain private/closed, and core bindings are not enabled by this change.
+The transition takes a cold snapshot/restoration first, retains exact originals,
+rolls back failed probes and preserves concurrent edits. Recovery includes the
+callback identity/configuration and app-readable public trust with checksums,
+networkless syntax/identity proof and authenticated encryption. Combined real CE
+acceptance, exact-head CI and full app/tenant webhook/replay gates remain required.
+The provisioning client creates only completion webhooks through the existing
+owned service accounts' authenticated APIs, with distinct main/QA teams, connection
+IDs and secrets. It records intent before any call and durable acknowledgements
+after each create, verifies exact stored ownership, and refuses creation replay.
+Its callback origin/path is fixed internally; no arbitrary outbound URL or real
+owner password enters this operator. These bindings remain synthetic in native
+acceptance until a separate core cutover validates the actual tenant connections.
+
 Next activation sequence: keep private API and public recipient frontends on
 separate processes/networks before attaching only the recipient frontend to the
 existing proxy. Publish only a dedicated signing router with token-safe access

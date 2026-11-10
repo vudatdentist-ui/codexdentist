@@ -87,6 +87,23 @@ Cold phone loads must finish all application chunks without 502/reset failures;
 serial health alone missed the initial 256-connection bottleneck. Native acceptance
 now checks 220 simultaneous static requests through both proxy hops, exact 1024
 worker/4096-descriptor capacity, and rollback of both configuration sets on failure.
+Callback changes additionally run `python3 scripts/owned-signing-callback.test.py`
+and `sudo -n python3 scripts/owned-signing-callback-linux.py --source "$PWD/scripts"
+--output "$RUNNER_TEMP/codexdentist-signing-callback" --image codexdentist:ci`.
+The isolated fixture proves real Nginx TLS, CA rejection, POST-only path routing,
+preserved secret headers and complete cleanup. It does not prove core webhook
+authorization/reconciliation. The full CE Linux gate also enables callback trust
+with a pre-change restored snapshot, verifies actual provider TLS/unknown-CA
+denial, then cold-restores callback keys/configuration and app-readable public
+trust without starting restored workers. Unit regressions cover rollback and
+foreign concurrent edits; encrypted recovery rejects partial callback identities
+or missing callback restore proof. Full application signing remains a separate gate.
+Run `node --test scripts/owned-signing-webhook-client.test.cjs` for principal,
+connection-path and secret rejection. Native CE acceptance must create and inspect
+separate main/QA completion webhooks through the actual authenticated APIs, preserve
+their intent/acknowledgements with recovery, and perform no synthetic event delivery
+to a production core. Actual core authorization, reconciliation and replay require
+the later full-app fixture, not the small transport receiver.
 Bootstrap changes also run `python3 scripts/owned-signing-bootstrap.test.py`,
 `node --test scripts/owned-signing-bootstrap-client.test.cjs` and
 `python3 scripts/owned-signing-seal.test.py`. Native CE acceptance must create

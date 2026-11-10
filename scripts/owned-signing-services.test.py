@@ -57,6 +57,17 @@ class OwnedSigningRuntime(unittest.TestCase):
             self.assertEqual(volume['labels'], {'com.codexdentist.signing': name})
             self.assertEqual(volume['name'], signing.PROJECT + '_' + name)
 
+    def test_callback_trust_permits_only_one_internal_host_and_read_only_public_certificate(self):
+        original=signing.configuration(self.keys());enabled=signing.configuration(self.keys(),True)
+        self.assertEqual(original['networks'],enabled['networks'])
+        for name in ['database','cache','capture']:self.assertEqual(original['services'][name],enabled['services'][name])
+        app=enabled['services']['app'];env=app['environment']
+        self.assertEqual(env['NEXT_PRIVATE_WEBHOOK_SSRF_BYPASS_HOSTS'],'codexdentist-signing-callback')
+        self.assertEqual(env['NODE_EXTRA_CA_CERTS'],'/secrets/callback-trust.cert.pem')
+        self.assertEqual(env['NEXT_PRIVATE_SMTP_HOST'],'capture');self.assertEqual(app['networks'],['private'])
+        self.assertEqual(app['volumes'][-1],{'type':'bind','source':'./callback-trust.cert.pem','target':'/secrets/callback-trust.cert.pem','read_only':True})
+        with self.assertRaises(ValueError):signing.configuration(self.keys(),'true')
+
     def test_prepare_refuses_existing_directory_or_volume_before_writing_keys(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -129,7 +140,7 @@ class OwnedSigningRuntime(unittest.TestCase):
                     if failed_restart and args[:2] == ['docker', 'start'] and args[-1].endswith('-database-1'):
                         raise RuntimeError('Synthetic database restart failure')
                     return b''
-                with patch.object(recovery, 'ROOT', root), patch.object(recovery, 'GATEWAY_ROOT', root / 'absent-gateway'), patch.object(recovery, 'RECIPIENT_ROOT', root / 'absent-recipient'), \
+                with patch.object(recovery, 'ROOT', root), patch.object(recovery, 'GATEWAY_ROOT', root / 'absent-gateway'), patch.object(recovery, 'RECIPIENT_ROOT', root / 'absent-recipient'), patch.object(recovery,'CALLBACK_ROOT',root/'absent-callback'), \
                         patch.object(recovery, 'inspect', side_effect=inspect), \
                         patch.object(recovery.signing, 'status'), patch.object(recovery.signing, 'run', side_effect=run), \
                         patch.object(recovery, 'counts', side_effect=RuntimeError('Synthetic snapshot failure')):

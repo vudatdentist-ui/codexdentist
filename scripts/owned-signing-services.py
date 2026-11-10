@@ -27,7 +27,8 @@ def run(args, **kwargs):
     return result.stdout
 
 
-def configuration(keys):
+def configuration(keys, callback_enabled=False):
+    if type(callback_enabled) is not bool: raise ValueError('Explicit callback stage required')
     required = {'database', 'cache', 'auth', 'encryption', 'secondary', 'certificate'}
     if set(keys) != required or any(not isinstance(value, str) or len(value) != 64 or
             any(char not in '0123456789abcdef' for char in value) for value in keys.values()):
@@ -70,6 +71,10 @@ def configuration(keys):
     capture = {**limits, 'image': IMAGES['capture'], 'read_only': True, 'mem_limit': '128m',
         'tmpfs': ['/tmp:rw,nosuid,size=32m'], 'environment': {'MP_MAX_MESSAGES': '100',
             'MP_SMTP_AUTH_ACCEPT_ANY': 'false', 'MP_DISABLE_VERSION_CHECK': 'true'}}
+    if callback_enabled:
+        app['environment'].update({'NEXT_PRIVATE_WEBHOOK_SSRF_BYPASS_HOSTS': 'codexdentist-signing-callback',
+            'NODE_EXTRA_CA_CERTS': '/secrets/callback-trust.cert.pem'})
+        app['volumes'].append({'type': 'bind', 'source': './callback-trust.cert.pem', 'target': '/secrets/callback-trust.cert.pem', 'read_only': True})
     return {'name': PROJECT, 'services': {'app': app, 'database': database, 'cache': cache, 'capture': capture},
         'networks': {'private': {'internal': True}}, 'volumes': {name: {'name': PROJECT + '_' + name,
             'labels': {'com.codexdentist.signing': name}} for name in ['database', 'cache']}}
@@ -119,7 +124,13 @@ def installation(directory):
     if directory.is_symlink() or directory.stat().st_uid != 0 or directory.stat().st_mode & 0o077:
         raise ValueError('Private root-owned signing installation required')
     manifest = json.loads((directory / 'manifest.json').read_text())
-    expected = configuration(json.loads((directory / 'keys.json').read_text()))
+    callback_hash = manifest.get('callbackCertificateSha256')
+    if callback_hash is not None:
+        certificate = directory / 'callback-trust.cert.pem'
+        if not isinstance(callback_hash, str) or not __import__('re').fullmatch('[a-f0-9]{64}',callback_hash) or certificate.is_symlink() or not certificate.is_file() or certificate.stat().st_uid != 1001 or certificate.stat().st_gid != 1001 or certificate.stat().st_mode & 0o777 != 0o600 or hashlib.sha256(certificate.read_bytes()).hexdigest() != callback_hash:
+            raise ValueError('Exact private callback public-certificate custody required')
+    elif (directory / 'callback-trust.cert.pem').exists(): raise ValueError('Review unexpected provider callback trust')
+    expected = configuration(json.loads((directory / 'keys.json').read_text()), callback_hash is not None)
     if manifest.get('version') != 1 or manifest.get('upstream') != SOURCE or manifest.get('images') != IMAGES or any(
             manifest.get(key) is not False for key in ['published', 'externalMail', 'applicationConnected']):
         raise ValueError('Reviewed private signing stage required')

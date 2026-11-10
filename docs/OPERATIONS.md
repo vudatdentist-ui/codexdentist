@@ -652,6 +652,29 @@ The HTTPS health/denial probes must pass before recording publication. Failure
 rolls back only exact own route/manifest; retained intent blocks blind retries.
 Keep the public-hostname ceremony, core webhook/tenant bindings, owned SMTP and
 final recovery/timer acceptance gates open until independently verified.
+
+`owned-signing-callback.py prepare|up|status` stages the private callback under
+`/opt/codexdentist-signing-callback`, with only provider-private and separate
+internal core networks. No host port, proxy-edge membership, secret-header logging
+or core database credentials are permitted. Its TLS listener allows only POST to
+`/api/integrations/documenso/webhooks/<connectionId>`; the application remains
+responsible for tenant/secret/event authorization. `enable-provider` holds the
+provider lock, snapshots/restores first and takes the callback lock before changing
+the provider. It permits only `NEXT_PRIVATE_WEBHOOK_SSRF_BYPASS_HOSTS=codexdentist-signing-callback`
+and a read-only `callback-trust.cert.pem` public-certificate mount. Actual provider
+fetch must pass strict TLS, while a process without that CA must fail. The exact
+old Compose/manifest and pre-transition snapshot are retained; a failed probe
+restores them unless foreign edits require review. SMTP stays in capture.
+This stage does not attach the production core network, create a webhook, bind
+tenant credentials or claim full signing integration. Combined recovery includes
+five callback files and the optional provider public certificate; restore starts
+no app/callback/mail workers and checks actual UID access, key pairing and syntax.
+`owned-signing-webhook-client.cjs` uses the verified service signin/CSRF API and
+team-scoped webhook API, not direct provider/core table writes. The private caller
+must retain `webhook.intent.json`, per-create `webhook.api-result.jsonl` and final
+`webhook.bindings.json`; all are included in combined encrypted recovery. Only
+`DOCUMENT_COMPLETED` and the exact internal connection callback URL are allowed.
+Preserve uncertain/partial results and inspect state instead of repeating create.
 The recipient `upgrade-capacity` action permits only the exact 256-to-1024
 worker-connection and 4096 descriptor-limit transition in both proxy configurations.
 It takes provider/gateway/recipient locks, preserves six original files, recreates

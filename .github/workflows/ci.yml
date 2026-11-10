@@ -80,7 +80,7 @@ jobs:
       - name: Owned TLS mail and encrypted idempotency regressions
         run: npm run test:owned-mail && python3 scripts/owned-mail-services.test.py && python3 scripts/owned-mail-app-cutover.test.py
       - name: Private signing runtime and recovery contracts
-        run: python3 scripts/owned-signing-services.test.py && python3 scripts/owned-signing-bootstrap.test.py && node --test scripts/owned-signing-bootstrap-client.test.cjs && python3 scripts/owned-signing-seal.test.py && python3 scripts/owned-signing-gateway.test.py && python3 scripts/owned-signing-recipient.test.py
+        run: python3 scripts/owned-signing-services.test.py && python3 scripts/owned-signing-bootstrap.test.py && node --test scripts/owned-signing-bootstrap-client.test.cjs scripts/owned-signing-webhook-client.test.cjs && python3 scripts/owned-signing-seal.test.py && python3 scripts/owned-signing-gateway.test.py && python3 scripts/owned-signing-recipient.test.py && python3 scripts/owned-signing-callback.test.py
       - name: Native owned email delivery and uncertainty races
         run: npm run test:owned-mail-db
         env:
@@ -284,6 +284,8 @@ jobs:
         run: sudo -n python3 scripts/owned-mail-linux.py --image codexdentist:ci --source "$PWD" --output "$RUNNER_TEMP/codexdentist-owned-mail"
       - name: Real pinned signing CE, closed signup and private recovery
         run: sudo -n python3 scripts/owned-signing-linux.py --source "$PWD" --output "$RUNNER_TEMP/codexdentist-owned-signing" --image codexdentist:ci
+      - name: Private signing callback TLS and path boundary
+        run: sudo -n python3 scripts/owned-signing-callback-linux.py --source "$PWD/scripts" --output "$RUNNER_TEMP/codexdentist-signing-callback" --image codexdentist:ci
       - name: Native mounted file storage, migration recovery and isolated restore
         run: python3 scripts/durable-files-linux.py --image codexdentist:ci --source "$PWD" --output output/durable-linux
       - name: Stop verification server
