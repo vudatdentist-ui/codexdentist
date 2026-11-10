@@ -652,6 +652,13 @@ The HTTPS health/denial probes must pass before recording publication. Failure
 rolls back only exact own route/manifest; retained intent blocks blind retries.
 Keep the public-hostname ceremony, core webhook/tenant bindings, owned SMTP and
 final recovery/timer acceptance gates open until independently verified.
+The recipient `upgrade-capacity` action permits only the exact 256-to-1024
+worker-connection and 4096 descriptor-limit transition in both proxy configurations.
+It takes provider/gateway/recipient locks, preserves six original files, recreates
+only those proxies, checks private TLS/API isolation, 220 concurrent static
+requests and public health/denials. It preserves certificate identity and the
+dedicated router. Probe failure restores exact originals; concurrent changes fail
+closed with evidence retained. Never infer capacity from a serial readiness check.
 
 Owned CE runtime: `scripts/owned-signing-services.py prepare|up|status` uses
 `/opt/codexdentist-owned-signing`, pinned Documenso 2.21.1 CE and independent

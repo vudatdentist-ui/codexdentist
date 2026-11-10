@@ -108,5 +108,33 @@ class RecipientBoundary(unittest.TestCase):
                     self.assertTrue(json.loads((root / 'manifest.json').read_text())['published'])
                 self.assertTrue((root / 'publication.intent.json').exists())
 
+    def test_capacity_failure_restores_both_exact_proxy_configurations(self):
+        for failure in [False, True]:
+            with self.subTest(failure=failure), tempfile.TemporaryDirectory() as temporary, ExitStack() as stack:
+                root=Path(temporary); api=root/'api'; public=root/'public'; api.mkdir(); public.mkdir()
+                originals={}
+                for folder,template,config in [(api,recipient.gateway.template(),recipient.gateway.configuration()),(public,recipient.template(),recipient.configuration())]:
+                    old=template.replace(b'worker_connections 1024;',b'worker_connections 256;')
+                    config=json.loads(json.dumps(config));next(iter(config['services'].values())).pop('ulimits')
+                    for name,value in [('nginx.conf',old),('compose.json',json.dumps(config).encode()),('manifest.json',json.dumps({'configSha256':hashlib.sha256(old).hexdigest()}).encode())]:
+                        (folder/name).write_bytes(value);originals[folder/name]=value
+                stack.enter_context(patch.object(recipient,'ROOT',public));stack.enter_context(patch.object(recipient.gateway,'ROOT',api))
+                def private(path,value,uid=0):
+                    with path.open('xb') as output: output.write(value)
+                stack.enter_context(patch.object(recipient.gateway,'private',side_effect=private))
+                stack.enter_context(patch.object(recipient.gateway,'replace',side_effect=lambda path,value,uid=0:path.write_bytes(value)))
+                for module,name in [(recipient,'installation'),(recipient.gateway,'installation'),(recipient.gateway,'recreate'),(recipient.gateway,'run'),(recipient,'status'),(recipient.gateway,'probe'),(recipient,'probe')]:
+                    stack.enter_context(patch.object(module,name))
+                probe=stack.enter_context(patch.object(recipient,'concurrent_probe',side_effect=ValueError('Synthetic load failure') if failure else None))
+                if failure:
+                    with self.assertRaises(ValueError):recipient.upgrade_capacity()
+                    for path,value in originals.items():self.assertEqual(path.read_bytes(),value)
+                    self.assertFalse((public/'capacity-upgrade-accepted.json').exists())
+                else:
+                    recipient.upgrade_capacity();self.assertTrue((public/'capacity-upgrade-accepted.json').exists())
+                    for folder in [api,public]:
+                        self.assertIn(b'worker_connections 1024;',(folder/'nginx.conf').read_bytes())
+                        self.assertEqual(next(iter(json.loads((folder/'compose.json').read_text())['services'].values()))['ulimits']['nofile'],{'soft':4096,'hard':4096})
+
 
 if __name__ == '__main__': unittest.main()

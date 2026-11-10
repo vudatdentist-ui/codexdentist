@@ -83,6 +83,10 @@ acceptance; incomplete sets or missing restoration proof must fail authenticated
 off-server verification. Publication rollback tests cover public probe/runtime
 failure and concurrent foreign route changes. Public HTTPS ceremony acceptance
 remains separate from this isolated edge gate.
+Cold phone loads must finish all application chunks without 502/reset failures;
+serial health alone missed the initial 256-connection bottleneck. Native acceptance
+now checks 220 simultaneous static requests through both proxy hops, exact 1024
+worker/4096-descriptor capacity, and rollback of both configuration sets on failure.
 Bootstrap changes also run `python3 scripts/owned-signing-bootstrap.test.py`,
 `node --test scripts/owned-signing-bootstrap-client.test.cjs` and
 `python3 scripts/owned-signing-seal.test.py`. Native CE acceptance must create

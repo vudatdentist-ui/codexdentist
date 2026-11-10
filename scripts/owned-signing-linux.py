@@ -67,7 +67,7 @@ def exercise(directory, app_image=None):
         signing.run(['docker', 'network', 'create', '--internal', '--label', 'com.codexdentist.recipient-proof=' + project, recipient.EDGE])
         recipient.prepare()
         signing.run(['docker', 'compose', '--project-directory', str(recipient.ROOT), '-f', str(recipient.ROOT / 'compose.json'), 'up', '-d', '--pull', 'never'])
-        recipient.status(); recipient.probe()
+        recipient.status(); recipient.probe(); recipient.concurrent_probe()
         snapshot = recovery.backup(); recovery.drill(snapshot); recovery.drill(snapshot)
         # Synthetic recipient keys belong only to this private test namespace;
         # no real owner's recovery private key is ever uploaded to a server.

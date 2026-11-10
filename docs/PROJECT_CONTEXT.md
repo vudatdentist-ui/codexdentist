@@ -477,7 +477,8 @@ TLS/route denials, repeated combined restoration, corruption denial and authenti
 encrypted recovery. Owned snapshot `20261110T094026Z-f13bc1d7` preserves the upgraded
 DNS configuration and passed restoration plus authenticated PC recovery. Exact-head
 CI `42792874203` passed for PR #107, which merged as `953910c`; exact-main
-verification/deployment and public/core gates remain required; signing stays open.
+CI `42795772883` and deployed `953910c` passed independent production go-live and
+unchanged financial/login-mapping baseline; public/core gates remain required.
 
 The next recipient operator separates the HTTP ceremony into its own unprivileged
 process. Its only bind is the allowlisted HTTP configuration: no API TLS listener,
@@ -493,9 +494,23 @@ concurrent changes require review. Fresh native proof `signing-recipient-proof-v
 passed its actual edge/port denials, repeated restoration, authenticated encryption
 and complete labelled cleanup. An initial cleanup variable collision was fixed;
 the gate now writes its final pass artifact only after cleanup succeeds. The owned
-frontend is staged with no public router, email or core connection. Exact-head CI,
-combined owned recovery and actual public-hostname ceremony remain required;
-implementation alone does not activate core signing.
+frontend was snapshotted/restored in `20261110T100815Z-d96d5c29`, then its encrypted
+copy passed authenticated recovery on the owned PC before publication. Its exact
+HTTPS router now passes health/admin/API-denial probes. A synthetic `.test` QA
+envelope completed from a 390-wide browser on the real HTTPS hostname, with final
+1440/390/320 screens inspected, zero browser/request errors and exact completed
+status. The 243317-byte PDF's CMS verifies against the owned certificate; changed
+signed bytes fail. No external email or core clinical record was involved.
+
+Actual phone cold-load QA exposed insufficient proxy connection capacity: 220
+concurrent static requests produced resets with 256 worker connections. Both
+proxies now use 1024 connections and explicit 4096 file-descriptor limits. A
+reviewed exact-config upgrade preserves TLS identity/router and both original
+configurations, rolls back failed probes and refuses foreign changes. A 220-way
+static regression probe plus the complete real phone ceremony pass after the fix.
+The Linux gate includes that load check and final pass evidence follows cleanup.
+Exact-head CI and final upgraded recovery remain required. Core connection,
+private callbacks, actual SMTP and full app reconciliation gates remain open.
 
 Next activation sequence: keep private API and public recipient frontends on
 separate processes/networks before attaching only the recipient frontend to the

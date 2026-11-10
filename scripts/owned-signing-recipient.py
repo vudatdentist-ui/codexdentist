@@ -42,6 +42,7 @@ def configuration():
         'image': IMAGE, 'entrypoint': ['nginx', '-g', 'daemon off;'], 'restart': 'unless-stopped',
         'user': '101:101', 'read_only': True, 'cap_drop': ['ALL'], 'security_opt': ['no-new-privileges:true'],
         'cpus': 0.5, 'mem_limit': '128m', 'pids_limit': 64, 'logging': {'driver': 'none'},
+        'ulimits': {'nofile': {'soft': 4096, 'hard': 4096}},
         'tmpfs': ['/tmp:rw,nosuid,noexec,size=80m,uid=101,gid=101,mode=0700'],
         'networks': {'ceremony': {}, 'edge': {'aliases': ['codexdentist-signing-recipient']}},
         'volumes': [{'type': 'bind', 'source': './nginx.conf', 'target': '/etc/nginx/nginx.conf', 'read_only': True}]}},
@@ -74,17 +75,18 @@ def prepare():
         'configSha256': hashlib.sha256(template()).hexdigest(), 'published': False, 'coreConnected': False}).encode())
 
 
-def installation():
+def installation(expected_template=None, expected_configuration=None):
     if ROOT.is_symlink() or ROOT.stat().st_uid != 0 or ROOT.stat().st_mode & 0o077: raise ValueError('Private recipient custody required')
     for name in ['nginx.conf', 'compose.json', 'router.json', 'manifest.json']:
         path = ROOT / name; owner = 101 if name == 'nginx.conf' else 0
         if path.is_symlink() or not path.is_file() or path.stat().st_uid != owner or path.stat().st_gid != owner or path.stat().st_mode & 0o777 != 0o600:
             raise ValueError('Recipient configuration custody differs')
     pin = json.loads((ROOT / 'manifest.json').read_text())
-    if pin != {'version': 1, 'image': IMAGE, 'configSha256': hashlib.sha256(template()).hexdigest(),
+    expected_template = template() if expected_template is None else expected_template
+    if pin != {'version': 1, 'image': IMAGE, 'configSha256': hashlib.sha256(expected_template).hexdigest(),
                'published': pin.get('published'), 'coreConnected': False} or type(pin.get('published')) is not bool:
         raise ValueError('Reviewed recipient identity required')
-    if (ROOT / 'nginx.conf').read_bytes() != template() or json.loads((ROOT / 'compose.json').read_text()) != configuration() or json.loads((ROOT / 'router.json').read_text()) != router():
+    if (ROOT / 'nginx.conf').read_bytes() != expected_template or json.loads((ROOT / 'compose.json').read_text()) != (configuration() if expected_configuration is None else expected_configuration) or json.loads((ROOT / 'router.json').read_text()) != router():
         raise ValueError('Preserve changed recipient configuration')
     return pin
 
@@ -96,6 +98,8 @@ def status():
         raise ValueError('Recipient process isolation differs')
     if set(info['NetworkSettings']['Networks']) != {PROVIDER_PROJECT + '-gateway_recipient', EDGE} or host.get('LogConfig', {}).get('Type') != 'none' or 'ALL' not in host.get('CapDrop', []) or not any(x.startswith('no-new-privileges') for x in host.get('SecurityOpt', [])):
         raise ValueError('Recipient network/log/capability isolation differs')
+    if not any(row == {'Name': 'nofile', 'Soft': 4096, 'Hard': 4096} for row in host.get('Ulimits') or []):
+        raise ValueError('Recipient descriptor capacity differs')
     mounts = info['Mounts']
     if len(mounts) != 1 or mounts[0]['Source'] != str(ROOT / 'nginx.conf') or mounts[0]['Destination'] != '/etc/nginx/nginx.conf' or mounts[0]['RW']:
         raise ValueError('Recipient must mount only its read-only HTTP configuration')
@@ -193,11 +197,62 @@ def publish(snapshot):
         'privateApiExposed': False, 'externalMailSent': False, 'coreConnected': False}).encode())
 
 
+def concurrent_probe():
+    image = gateway.PROBE_IMAGE or 'codexdentist:' + json.loads(Path('/opt/codexdentist-deploy/current.json').read_text())['sha']
+    if not re.fullmatch(r'codexdentist:(?:ci|[a-f0-9]{40})', image): raise ValueError('Exact compatible image required')
+    # A small synthetic static response still opens both proxy hops. No token,
+    # patient file or mutation is involved in this capacity regression gate.
+    code = "const http=require('http');function req(){return new Promise((ok,bad)=>{const r=http.get({hostname:'codexdentist-signing-recipient',port:8080,path:'/fonts/nonexistent-synthetic-capacity-probe.woff2'},s=>{s.resume();s.on('end',()=>s.statusCode===404?ok():bad(Error()))});r.setTimeout(10000,()=>r.destroy(Error()));r.on('error',bad)})}Promise.all(Array.from({length:220},req)).then(()=>console.log('PASS 220 concurrent recipient static requests without resets or 502')).catch(()=>process.exit(1));"
+    gateway.run(['docker', 'run', '--rm', '--network', EDGE, '--read-only', '--cap-drop', 'ALL', '--memory', '128m',
+                 '--cpus', '0.5', '--entrypoint', 'node', image, '-e', code])
+
+
+def upgrade_capacity():
+    pairs = [(gateway.ROOT, gateway.template(), gateway.configuration(), gateway.installation),
+             (ROOT, template(), configuration(), installation)]
+    changes = []
+    for root, desired, config, validate in pairs:
+        old = desired.replace(b'worker_connections 1024;', b'worker_connections 256;')
+        old_config = json.loads(json.dumps(config)); next(iter(old_config['services'].values())).pop('ulimits')
+        if (root / 'nginx.conf').read_bytes() != old: raise ValueError('Only exact reviewed capacity transition allowed')
+        validate(old, old_config)
+        for name, after in [('nginx.conf', desired), ('compose.json', json.dumps(config).encode())]:
+            changes.append((root / name, (root / name).read_bytes(), after, 101 if name == 'nginx.conf' else 0))
+        pin = json.loads((root / 'manifest.json').read_text()); pin['configSha256'] = hashlib.sha256(desired).hexdigest()
+        changes.append((root / 'manifest.json', (root / 'manifest.json').read_bytes(), json.dumps(pin).encode(), 0))
+    record = ROOT / 'capacity-upgrade-before'; record.mkdir(mode=0o700)
+    for index, (path, before, after, uid) in enumerate(changes): gateway.private(record / str(index), before)
+    def recreate():
+        gateway.recreate()
+        gateway.run(['docker', 'compose', '--project-directory', str(ROOT), '-f', str(ROOT / 'compose.json'),
+            'up', '-d', '--no-deps', '--force-recreate', '--pull', 'never', 'web'])
+    try:
+        for path, before, after, uid in changes: gateway.replace(path, after, uid)
+        recreate(); status(); gateway.probe(); probe(); concurrent_probe(); probe(True)
+    except BaseException:
+        if any(path.is_symlink() or path.read_bytes() not in [before, after] for path,before,after,uid in changes):
+            raise ValueError('Preserve concurrent capacity configuration changes')
+        for path,before,after,uid in changes: gateway.replace(path,before,uid)
+        recreate()
+        raise
+    gateway.private(ROOT / 'capacity-upgrade-accepted.json', json.dumps({'workerConnections': 1024,
+        'nofile': 4096, 'concurrentStaticRequests': 220, 'tlsIdentityPreserved': True, 'routerPreserved': True}).encode())
+
+
 def main():
-    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument('action', choices=['prepare', 'up', 'status', 'probe', 'publish']); parser.add_argument('--snapshot'); args = parser.parse_args()
+    parser = argparse.ArgumentParser(description=__doc__); parser.add_argument('action', choices=['prepare', 'up', 'status', 'probe', 'publish', 'upgrade-capacity']); parser.add_argument('--snapshot'); args = parser.parse_args()
     if not hasattr(os, 'geteuid') or os.geteuid() != 0: raise ValueError('Root-owned recipient operator required')
     os.umask(0o077)
     if args.action == 'prepare': prepare(); return
+    if args.action == 'upgrade-capacity':
+        import fcntl
+        from contextlib import ExitStack
+        with ExitStack() as stack:
+            for root in [gateway.PROVIDER, gateway.ROOT, ROOT]:
+                if root.is_symlink() or root.stat().st_uid != 0 or root.stat().st_mode & 0o077: raise ValueError('Private installation required')
+                lock = stack.enter_context((root / 'operations.lock').open('a')); fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            upgrade_capacity()
+        return
     installation()
     import fcntl
     with (ROOT / 'operations.lock').open('a') as lock:
