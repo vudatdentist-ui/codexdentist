@@ -89,6 +89,7 @@ export async function createDocumensoSigningEnvelope(
 
   const createResponse = await fetch(`${secrets.baseUrl}/envelope/create`, {
     method: "POST",
+    redirect: "error",
     headers: { Authorization: secrets.apiToken },
     body: form,
     cache: "no-store",
@@ -99,7 +100,6 @@ export async function createDocumensoSigningEnvelope(
     throw providerResponseError(
       "documenso-envelope-create-failed",
       createResponse.status,
-      created,
     );
   }
   const envelopeId = requiredString(
@@ -124,6 +124,7 @@ export async function resumeDocumensoSigningEnvelope(
 ): Promise<DocumensoSigningEnvelope> {
   try {
     const response = await fetch(`${secrets.baseUrl}/envelope/${encodeURIComponent(envelopeId)}`, {
+      redirect: "error",
       headers: { Authorization: secrets.apiToken },
       cache: "no-store",
       signal: AbortSignal.timeout(15_000),
@@ -159,6 +160,7 @@ async function distributeDocumensoSigningEnvelope(
   try {
     const distributeResponse = await fetch(`${secrets.baseUrl}/envelope/distribute`, {
       method: "POST",
+      redirect: "error",
       headers: {
         Authorization: secrets.apiToken,
         "Content-Type": "application/json",
@@ -172,7 +174,7 @@ async function distributeDocumensoSigningEnvelope(
       throw new DocumensoProviderError(
         "documenso-envelope-distribute-failed",
         distributeResponse.status,
-        String(distributed.message ?? distributed.error ?? distributed.errorCode ?? "documenso-envelope-distribute-failed"),
+        "Unable to distribute the existing envelope",
         envelopeId,
       );
     }
@@ -246,6 +248,7 @@ export async function downloadDocumensoSignedPdf(
   const envelopeResponse = await fetch(
     `${secrets.baseUrl}/envelope/${encodeURIComponent(envelopeId)}`,
     {
+      redirect: "error",
       headers: { Authorization: secrets.apiToken },
       cache: "no-store",
       signal: AbortSignal.timeout(20_000),
@@ -256,8 +259,11 @@ export async function downloadDocumensoSignedPdf(
     throw providerResponseError(
       "documenso-envelope-fetch-failed",
       envelopeResponse.status,
-      envelope,
     );
+  }
+  if (envelope.id !== envelopeId) {
+    throw new DocumensoProviderError("documenso-envelope-id-mismatch", 502,
+      "Unexpected envelope returned by provider", envelopeId);
   }
   if (String(envelope.status ?? "").toUpperCase() !== "COMPLETED") {
     throw new DocumensoProviderError(
@@ -280,6 +286,7 @@ export async function downloadDocumensoSignedPdf(
   const downloadResponse = await fetch(
     `${secrets.baseUrl}/envelope/item/${encodeURIComponent(String(itemId))}/download?version=signed`,
     {
+      redirect: "error",
       headers: { Authorization: secrets.apiToken },
       cache: "no-store",
       signal: AbortSignal.timeout(20_000),
@@ -310,16 +317,16 @@ export async function downloadDocumensoSignedPdf(
   };
 }
 
-async function readBoundedBytes(response: Response, maxBytes: number) {
+async function readBoundedBytes(response: Response, maxBytes: number, kind = "signed-pdf") {
   const contentLength = Number(response.headers.get("content-length") ?? "");
   if (Number.isFinite(contentLength) && contentLength > maxBytes) {
     throw new DocumensoProviderError(
-      "documenso-signed-pdf-too-large",
+      `documenso-${kind}-too-large`,
       502,
-      "Documenso signed document exceeds the permitted size",
+      "Documenso response exceeds the permitted size",
     );
   }
-  if (!response.body) throw new DocumensoProviderError("documenso-signed-pdf-empty", 502, "Empty signed document");
+  if (!response.body) throw new DocumensoProviderError(`documenso-${kind}-empty`, 502, "Empty provider response");
   const reader = response.body.getReader();
   const chunks: Buffer[] = [];
   let total = 0;
@@ -330,7 +337,7 @@ async function readBoundedBytes(response: Response, maxBytes: number) {
       total += next.value.byteLength;
       if (total > maxBytes) {
         await reader.cancel();
-        throw new DocumensoProviderError("documenso-signed-pdf-too-large", 502, "Documenso signed document exceeds the permitted size");
+        throw new DocumensoProviderError(`documenso-${kind}-too-large`, 502, "Documenso response exceeds the permitted size");
       }
       chunks.push(Buffer.from(next.value));
     }
@@ -364,10 +371,11 @@ function deepSort(value: unknown): unknown {
 }
 
 async function safeJson(response: Response): Promise<Record<string, any>> {
+  const bytes = await readBoundedBytes(response, 64 * 1024, "response");
   try {
-    return asRecord(await response.json());
+    return asRecord(JSON.parse(bytes.toString("utf8")));
   } catch {
-    return {};
+    throw new DocumensoProviderError("documenso-response-invalid", 502, "Invalid provider response");
   }
 }
 
@@ -395,12 +403,11 @@ function sanitizePdfName(value: string) {
 function providerResponseError(
   code: string,
   status: number,
-  body: Record<string, any>,
 ) {
   return new DocumensoProviderError(
     code,
     status,
-    String(body.message ?? body.error ?? body.errorCode ?? code),
+    code,
   );
 }
 

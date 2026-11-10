@@ -335,6 +335,12 @@ Issue #91 remains open for the remaining free-runtime cutovers, in order:
    complete consent reconciliation. Existing Documenso UI/connector tests are not
    evidence that a real signing service is already running.
 
+Signing activation audit: signed-result import must verify the provider's returned
+envelope ID before downloading any item. Provider requests reject redirects,
+JSON responses are bounded to 64 KiB, and raw provider failure text is excluded
+from application errors. These checks preserve the existing ceremony reservation,
+protected-file staging and consent reconciliation; they do not activate signing.
+
 Owned email implementation is in progress: `owned-mail` is an opt-in transport,
 with private HTTPS/HMAC, a separately encrypted SQLite idempotency journal and
 TLS submission to the owned SMTP service. Existing notification records remain

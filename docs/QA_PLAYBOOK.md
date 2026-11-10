@@ -401,6 +401,11 @@ before object I/O so interruption cannot erase its discovery record.
 
 ### Documenso
 
+Before activation, reject a foreign completed-envelope response before any PDF
+download; enforce the JSON size bound on chunked responses as well as declared
+lengths. A real loopback HTTP redirect must receive zero forwarded PDF requests,
+and provider error details must not enter application exception messages.
+
 Run `test:documenso` for real handler/command regressions and
 `NODE_ENV=test npm run test:documenso-db` for a newly created/migrated loopback
 database with credential/reservation, duplicate send and manual-action guards.
