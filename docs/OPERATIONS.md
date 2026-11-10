@@ -598,6 +598,28 @@ until the owner supplies and verifies their actual credentials.
 
 ## Documenso operator setup
 
+The private gateway operator is `owned-signing-gateway.py prepare|up|status|probe`
+at `/opt/codexdentist-owned-signing-gateway`. It pins unprivileged Nginx by digest,
+uses a distinct TLS key/certificate, internal API/recipient networks and the
+existing provider's internal network, with no published port or external route.
+`probe` checks actual strict TLS/CA denial, both existing scoped provider tokens,
+invalid-token denial and blocked administrative/auth/bulk/batched procedures on
+the recipient listener. Credentials enter only private stdin; no token/body/URL
+is logged or exported to the core. Preparation refuses existing gateway keys.
+The public recipient hostname is not yet routed to this stage.
+
+Gateway configuration and TLS identity are included with subsequent signing
+snapshots under `gateway/`. Backup takes the provider then gateway operation
+lock, copies only five declared configuration/key files with original ownership,
+and never captures arbitrary gateway QA artifacts or logs. Restore verifies its
+key/certificate pair and Nginx syntax/configuration as UID 101 in a networkless
+container without starting proxy workers. This private restore stage rejects a
+published/connected manifest until that future stage has its own reviewed policy.
+Encrypted recovery requires all five gateway files and their ownership/checksums;
+partial gateway identity is refused. Preserve the whole encrypted snapshot for
+later recovery. Publication still needs public-hostname ceremony acceptance,
+per-router token-log protection and the tenant-bound core/webhook cutover.
+
 Owned CE runtime: `scripts/owned-signing-services.py prepare|up|status` uses
 `/opt/codexdentist-owned-signing`, pinned Documenso 2.21.1 CE and independent
 PostgreSQL/Valkey volumes/keys. Pull the exact `IMAGES` references in the script

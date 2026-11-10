@@ -55,9 +55,12 @@ def seal(snapshot, recipient, pin, openssl):
     for name in ['allHashes', 'ownershipAndModes', 'applicationConfigurationUsable', 'databaseCounts', 'cacheAuthenticationAndAof', 'certificatePassphrase']:
         if proof.get(name) is not True: raise ValueError('Complete signing restoration must precede encryption')
     if proof.get('appOrMailWorkersStarted') is not False: raise ValueError('Restored workers must never start')
+    if set(recovery.GATEWAY) <= set(manifest['files']) and proof.get('gatewayConfigurationUsable') is not True:
+        raise ValueError('Gateway key/configuration recovery must pass too')
     certificate(openssl, recipient, pin)
     allowed = set(manifest['files']) | {'database.tar', 'cache.tar', 'backup-manifest.json', 'restore-verified.json'}
-    if {path.name for path in snapshot.iterdir()} != allowed or any(path.is_symlink() or not path.is_file() for path in snapshot.iterdir()):
+    actual = {path.relative_to(snapshot).as_posix() for path in snapshot.rglob('*') if path.is_file()}
+    if actual != allowed or any(path.is_symlink() or not (path.is_file() or path.is_dir() and path == snapshot / 'gateway') for path in snapshot.rglob('*')):
         raise ValueError('Unexpected signing snapshot content; preserve for review')
     root = recovery.ROOT / 'sealed-snapshots'; root.mkdir(mode=0o700, exist_ok=True)
     target = root / (snapshot.name + '.cms'); partial = target.with_suffix('.cms.partial'); metadata = target.with_suffix('.cms.json')
@@ -130,7 +133,7 @@ def verify(target, recipient, private_key, pin, openssl):
     if total != metadata['plaintextBytes'] or digest.hexdigest() != metadata['plaintextTarSha256'] or not manifest or not proof:
         raise ValueError('Recovered signing archive differs')
     recovery = recovery_module(); present = set(manifest.get('files', {}))
-    if manifest.get('version') != 1 or manifest.get('images') != metadata['images'] or manifest['images'] != recovery.signing.IMAGES or set(manifest.get('volumes', {})) != {'database', 'cache'} or not set(recovery.CONFIG) <= present or not present <= set(recovery.CONFIG + recovery.BOOTSTRAP):
+    if manifest.get('version') != 1 or manifest.get('images') != metadata['images'] or manifest['images'] != recovery.signing.IMAGES or set(manifest.get('volumes', {})) != {'database', 'cache'} or not set(recovery.CONFIG) <= present or not present <= set(recovery.CONFIG + recovery.BOOTSTRAP + recovery.GATEWAY) or (present & set(recovery.GATEWAY) and not set(recovery.GATEWAY) <= present):
         raise ValueError('Recovered signing manifest differs')
     if set(hashes) != present | {'database.tar', 'cache.tar', 'backup-manifest.json', 'restore-verified.json'}:
         raise ValueError('Recovered signing files differ')
@@ -139,12 +142,14 @@ def verify(target, recipient, private_key, pin, openssl):
         if hashes.get(name + '.tar') != record['sha256']: raise ValueError('Recovered volume checksum differs')
     for name, expected in manifest['files'].items():
         if hashes.get(name) != expected: raise ValueError('Recovered private configuration/key checksum differs')
-        owner = 1001 if name in ['signing.p12', 'license-cache.json'] else 0
+        owner = recovery.config_owner(name)
         if manifest['fileMetadata'][name] != {'uid': owner, 'gid': owner, 'mode': 0o600}:
             raise ValueError('Recovered configuration custody differs')
     for name in ['allHashes', 'ownershipAndModes', 'applicationConfigurationUsable', 'databaseCounts', 'cacheAuthenticationAndAof', 'certificatePassphrase']:
         if proof.get(name) is not True: raise ValueError('Signing recovery acceptance missing')
     if proof.get('appOrMailWorkersStarted') is not False: raise ValueError('Signing recovery worker isolation differs')
+    if present & set(recovery.GATEWAY) and proof.get('gatewayConfigurationUsable') is not True:
+        raise ValueError('Gateway recovery acceptance missing')
     accepted = {'pass': True, 'authenticatedDecryption': True, 'allVolumeAndPrivateKeyChecksums': True,
         'plaintextStoredOnDisk': False, 'snapshot': metadata['snapshot']}
     destination = target.with_suffix('.restore-proof.json')

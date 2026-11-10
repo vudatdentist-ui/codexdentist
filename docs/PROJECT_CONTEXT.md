@@ -445,6 +445,26 @@ and its encrypted copy passed authenticated recovery on the owned PC. No public
 route, recipient email or core signing connection has been enabled. Those
 publication and full-app ceremony/webhook/replay gates remain open.
 
+The next signing gateway is implemented and running privately: pinned
+unprivileged Nginx exposes a strict-TLS API listener only on an internal network
+and a separate recipient surface. Recipient routes allow required assets,
+read-only session status and token-scoped PDF retrieval, plus enumerated signing
+procedures; admin/signup/signin/API-key/bulk-API and batched-procedure smuggling
+are denied. Access/error logs are disabled to keep signing tokens out of logs.
+Actual TLS/API/route-denial probes pass. No published port, external network,
+public router or core connection has been enabled.
+
+A synthetic QA ceremony used the reviewed adapter through the TLS gateway,
+inserted/completed a browser signature and downloaded the sealed PDF. Its CMS
+verifies against the owned certificate and tampered bytes fail; its stored
+metadata is explicitly `Asia/Ho_Chi_Minh` and `dd/MM/yyyy HH:mm`. Final exact
+"Everyone has signed" screens were inspected at 1440/390/320. Browser QA used a
+temporary private loopback origin through an SSH tunnel because the real hostname
+is not published; the exact original provider Compose/origin was restored and
+the tunnel closed afterwards. This does not satisfy public-hostname or core
+consent/webhook acceptance. Gateway TLS identity/configuration recovery and
+native CI acceptance precede publication; the full signing gate stays open.
+
 Local AI is deployed in `2face1e` (PR #95), with the production configuration
 cutover independently verified on 2026-11-09. The owned VPS has Ollama 0.40.15 and
 Qwen3 4B pinned by image/model digests. Runtime has no published port or external
