@@ -35,7 +35,7 @@ def exercise(load, signing, recovery, bootstrap, gateway, callback, directory):
         if accepted.get('globalAndQaMailCaptured') is not True: raise ValueError('SMTP tenant separation failed')
         # The actual provider process can verify strict SMTP TLS; withholding
         # the reviewed public trust must reject the same receiver.
-        denied = "require('nodemailer').createTransport({host:'codexdentist-mail-smtp',port:2465,secure:true,connectionTimeout:5000}).verify().then(()=>process.exit(1)).catch(e=>process.exit(['DEPTH_ZERO_SELF_SIGNED_CERT','UNABLE_TO_VERIFY_LEAF_SIGNATURE','SELF_SIGNED_CERT_IN_CHAIN'].includes(e.code)?0:1))"
+        denied = "setTimeout(()=>process.exit(1),10000);require('node:tls').connect({host:'codexdentist-mail-smtp',servername:'codexdentist-mail-smtp',port:2465,rejectUnauthorized:true},()=>process.exit(1)).on('error',e=>process.exit(['DEPTH_ZERO_SELF_SIGNED_CERT','UNABLE_TO_VERIFY_LEAF_SIGNATURE','SELF_SIGNED_CERT_IN_CHAIN'].includes(e.code)?0:1))"
         signing.run(['docker', 'exec', '-e', 'NODE_EXTRA_CA_CERTS=', signing.PROJECT + '-app-1', 'node', '-e', denied])
         credentials = json.loads((directory / 'bootstrap.credentials.json').read_text())
         source = Path(__file__).with_name('owned-signing-smtp-envelopes.cjs').read_text()
