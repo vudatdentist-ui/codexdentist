@@ -129,7 +129,7 @@ class OwnedSigningRuntime(unittest.TestCase):
                     if failed_restart and args[:2] == ['docker', 'start'] and args[-1].endswith('-database-1'):
                         raise RuntimeError('Synthetic database restart failure')
                     return b''
-                with patch.object(recovery, 'ROOT', root), patch.object(recovery, 'GATEWAY_ROOT', root / 'absent-gateway'), \
+                with patch.object(recovery, 'ROOT', root), patch.object(recovery, 'GATEWAY_ROOT', root / 'absent-gateway'), patch.object(recovery, 'RECIPIENT_ROOT', root / 'absent-recipient'), \
                         patch.object(recovery, 'inspect', side_effect=inspect), \
                         patch.object(recovery.signing, 'status'), patch.object(recovery.signing, 'run', side_effect=run), \
                         patch.object(recovery, 'counts', side_effect=RuntimeError('Synthetic snapshot failure')):

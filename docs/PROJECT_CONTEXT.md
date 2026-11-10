@@ -472,7 +472,45 @@ PC custody. The initial fresh gateway fixture exposed a generated 64-character
 upstream DNS label; using the scoped Compose `app` alias fixes that failure without
 changing TLS or the isolated provider network. The reviewed private upgrade
 preserves exact previous files and refuses unrelated/concurrent edits. Final
-native/CI acceptance and public/core gates remain required; signing stays open.
+native acceptance passed on a fresh isolated CE stack, including both API owners,
+TLS/route denials, repeated combined restoration, corruption denial and authenticated
+encrypted recovery. Owned snapshot `20261110T094026Z-f13bc1d7` preserves the upgraded
+DNS configuration and passed restoration plus authenticated PC recovery. Exact-head
+CI `42792874203` passed for PR #107, which merged as `953910c`; exact-main
+CI `42795772883` and deployed `953910c` passed independent production go-live and
+unchanged financial/login-mapping baseline; public/core gates remain required.
+
+The next recipient operator separates the HTTP ceremony into its own unprivileged
+process. Its only bind is the allowlisted HTTP configuration: no API TLS listener,
+private key, provider credentials or host port. Only this process may join the
+existing proxy edge; the private API gateway retains internal-only networks.
+It reaches the existing allowlisted recipient listener on its isolated ceremony
+network and never joins the provider's application/database network directly.
+The dedicated `sign.codexdentist.com` router disables access logs and tracing for
+both HTTP/HTTPS without changing other routers. Publication requires the exact
+four-file recipient configuration in a completed combined restoration. Failure
+removes only its own unchanged router and restores its own manifest; foreign
+concurrent changes require review. Fresh native proof `signing-recipient-proof-v2-20261110`
+passed its actual edge/port denials, repeated restoration, authenticated encryption
+and complete labelled cleanup. An initial cleanup variable collision was fixed;
+the gate now writes its final pass artifact only after cleanup succeeds. The owned
+frontend was snapshotted/restored in `20261110T100815Z-d96d5c29`, then its encrypted
+copy passed authenticated recovery on the owned PC before publication. Its exact
+HTTPS router now passes health/admin/API-denial probes. A synthetic `.test` QA
+envelope completed from a 390-wide browser on the real HTTPS hostname, with final
+1440/390/320 screens inspected, zero browser/request errors and exact completed
+status. The 243317-byte PDF's CMS verifies against the owned certificate; changed
+signed bytes fail. No external email or core clinical record was involved.
+
+Actual phone cold-load QA exposed insufficient proxy connection capacity: 220
+concurrent static requests produced resets with 256 worker connections. Both
+proxies now use 1024 connections and explicit 4096 file-descriptor limits. A
+reviewed exact-config upgrade preserves TLS identity/router and both original
+configurations, rolls back failed probes and refuses foreign changes. A 220-way
+static regression probe plus the complete real phone ceremony pass after the fix.
+The Linux gate includes that load check and final pass evidence follows cleanup.
+Exact-head CI and final upgraded recovery remain required. Core connection,
+private callbacks, actual SMTP and full app reconciliation gates remain open.
 
 Next activation sequence: keep private API and public recipient frontends on
 separate processes/networks before attaching only the recipient frontend to the

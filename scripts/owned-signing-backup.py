@@ -23,10 +23,13 @@ BOOTSTRAP = ['bootstrap.intent.json', 'bootstrap.before.json', 'bootstrap.api-re
     'bootstrap.credentials.json', 'bootstrap.completed.json']
 GATEWAY = ['gateway/compose.json', 'gateway/manifest.json', 'gateway/nginx.conf', 'gateway/gateway.cert.pem', 'gateway/gateway.key.pem']
 GATEWAY_ROOT = Path('/opt/codexdentist-owned-signing-gateway')
+RECIPIENT = ['recipient/' + name for name in ['compose.json', 'manifest.json', 'nginx.conf', 'router.json']]
+RECIPIENT_ROOT = Path('/opt/codexdentist-signing-recipient')
 GATEWAY_IMAGE = 'ghcr.io/nginx/nginx-unprivileged@sha256:e333a5b95605942b5e495645ee54fab02b112081de6dbe45d2ead3ef38e03e31'
 
 
 def config_owner(name):
+    if name.startswith('recipient/'): return 101 if name.endswith('/nginx.conf') else 0
     if name.startswith('gateway/'):
         return 0 if name.endswith(('compose.json', 'manifest.json')) else 101
     return 1001 if name in ['signing.p12', 'license-cache.json'] else 0
@@ -104,8 +107,23 @@ def backup_data():
                 raise ValueError('Private owned gateway recovery required')
             gateway_files = GATEWAY
             (snapshot / 'gateway').mkdir(mode=0o700)
-        for name in CONFIG + [name for name in BOOTSTRAP if (ROOT / name).exists()] + gateway_files:
-            source = GATEWAY_ROOT / name.removeprefix('gateway/') if name in GATEWAY else ROOT / name
+        recipient_files = []
+        if RECIPIENT_ROOT.exists():
+            if RECIPIENT_ROOT.is_symlink() or RECIPIENT_ROOT.stat().st_uid != 0 or RECIPIENT_ROOT.stat().st_mode & 0o077:
+                raise ValueError('Private owned recipient recovery required')
+            spec = importlib.util.spec_from_file_location('live_recipient_recovery', Path(__file__).with_name('owned-signing-recipient.py'))
+            recipient = importlib.util.module_from_spec(spec); spec.loader.exec_module(recipient)
+            recipient.ROOT = RECIPIENT_ROOT; recipient.PROVIDER_PROJECT = signing.PROJECT
+            if signing.PROJECT != 'codexdentist-owned-signing':
+                recipient.PROJECT = signing.PROJECT + '-recipient'; recipient.EDGE = recipient.PROJECT + '-edge'
+            pin = recipient.installation()
+            if pin['published'] and (recipient.ROUTE.is_symlink() or not recipient.ROUTE.is_file() or recipient.ROUTE.read_bytes() != (RECIPIENT_ROOT / 'router.json').read_bytes()):
+                raise ValueError('Preserve changed published recipient route before recovery')
+            recipient_files = RECIPIENT
+            (snapshot / 'recipient').mkdir(mode=0o700)
+        for name in CONFIG + [name for name in BOOTSTRAP if (ROOT / name).exists()] + gateway_files + recipient_files:
+            source = (GATEWAY_ROOT / name.removeprefix('gateway/') if name in GATEWAY else
+                      RECIPIENT_ROOT / name.removeprefix('recipient/') if name in RECIPIENT else ROOT / name)
             if source.is_symlink() or not source.is_file(): raise ValueError('Unsafe signing configuration')
             metadata = source.stat()
             owner = config_owner(name)
@@ -143,6 +161,12 @@ def backup():
             import fcntl
             lock = locks.enter_context((GATEWAY_ROOT / 'operations.lock').open('a'))
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if RECIPIENT_ROOT.exists():
+            if RECIPIENT_ROOT.is_symlink() or RECIPIENT_ROOT.stat().st_uid != 0 or RECIPIENT_ROOT.stat().st_mode & 0o077:
+                raise ValueError('Private owned recipient recovery required')
+            import fcntl
+            lock = locks.enter_context((RECIPIENT_ROOT / 'operations.lock').open('a'))
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         return backup_data()
 
 
@@ -151,7 +175,7 @@ def validate_snapshot(snapshot):
         raise ValueError('Exact private signing snapshot required')
     manifest = json.loads((snapshot / 'backup-manifest.json').read_text())
     present = set(manifest.get('files', {}))
-    if manifest.get('version') != 1 or manifest.get('images') != signing.IMAGES or not set(CONFIG) <= present or not present <= set(CONFIG + BOOTSTRAP + GATEWAY) or set(manifest.get('fileMetadata', {})) != present or set(manifest.get('volumes', {})) != {'database', 'cache'} or (present & set(GATEWAY) and not set(GATEWAY) <= present):
+    if manifest.get('version') != 1 or manifest.get('images') != signing.IMAGES or not set(CONFIG) <= present or not present <= set(CONFIG + BOOTSTRAP + GATEWAY + RECIPIENT) or set(manifest.get('fileMetadata', {})) != present or set(manifest.get('volumes', {})) != {'database', 'cache'} or (present & set(GATEWAY) and not set(GATEWAY) <= present) or (present & set(RECIPIENT) and not set(RECIPIENT) <= present):
         raise ValueError('Signing recovery manifest differs')
     for name, digest in manifest['files'].items():
         if (snapshot / name).is_symlink() or checksum(snapshot / name) != digest: raise ValueError('Signing configuration/key checksum differs')
@@ -162,6 +186,10 @@ def validate_snapshot(snapshot):
         directory = snapshot / 'gateway'
         if directory.is_symlink() or not directory.is_dir() or directory.stat().st_uid != 0 or directory.stat().st_mode & 0o077:
             raise ValueError('Private gateway snapshot directory required')
+    if present & set(RECIPIENT):
+        directory = snapshot / 'recipient'
+        if directory.is_symlink() or not directory.is_dir() or directory.stat().st_uid != 0 or directory.stat().st_mode & 0o077:
+            raise ValueError('Private recipient snapshot directory required')
     for name, record in manifest['volumes'].items():
         target = snapshot / (name + '.tar')
         if target.is_symlink() or checksum(target) != record['sha256']: raise ValueError('Signing archive checksum differs')
@@ -265,11 +293,34 @@ def gateway_probe(snapshot):
             *mounts, '--entrypoint', 'nginx', GATEWAY_IMAGE, '-t'])
 
 
+def recipient_probe(snapshot):
+    spec = importlib.util.spec_from_file_location('restored_recipient', Path(__file__).with_name('owned-signing-recipient.py'))
+    recipient = importlib.util.module_from_spec(spec); spec.loader.exec_module(recipient)
+    directory = snapshot / 'recipient'
+    config = json.loads((directory / 'compose.json').read_text())
+    recipient.PROJECT = config['name']
+    recipient.PROVIDER_PROJECT = config['networks']['ceremony']['name'].removesuffix('-gateway_recipient')
+    recipient.EDGE = config['networks']['edge']['name']
+    pin = json.loads((directory / 'manifest.json').read_text())
+    if config != recipient.configuration() or json.loads((directory / 'router.json').read_text()) != recipient.router() or (directory / 'nginx.conf').read_bytes() != recipient.template() or pin != {
+        'version': 1, 'image': GATEWAY_IMAGE, 'configSha256': hashlib.sha256(recipient.template()).hexdigest(),
+        'published': pin.get('published'), 'coreConnected': False} or type(pin.get('published')) is not bool:
+        raise ValueError('Restored recipient configuration differs')
+    with tempfile.TemporaryDirectory(prefix='signing-recipient-restore-') as temporary:
+        config_path = Path(temporary) / 'nginx.conf'
+        shutil.copyfile(directory / 'nginx.conf', config_path); os.chown(config_path, 101, 101); config_path.chmod(0o600)
+        signing.run(['docker', 'run', '--rm', '--network', 'none', '--read-only', '--user', '101:101', '--cap-drop', 'ALL',
+            '--security-opt', 'no-new-privileges', '--memory', '128m', '--cpus', '0.5', '--tmpfs', '/tmp:rw,nosuid,size=16m,uid=101,gid=101,mode=0700',
+            '--mount', 'type=bind,source=' + str(config_path) + ',target=/etc/nginx/nginx.conf,readonly',
+            '--entrypoint', 'nginx', GATEWAY_IMAGE, '-t'])
+
+
 def drill(snapshot):
     manifest = validate_snapshot(snapshot)
     signing.run(['openssl', 'pkcs12', '-in', str(snapshot / 'signing.p12'), '-passin', 'file:' + str(snapshot / 'certificate.pass'), '-noout'])
     configuration_probe(snapshot, manifest['fileMetadata'])
     if set(GATEWAY) <= set(manifest['files']): gateway_probe(snapshot)
+    if set(RECIPIENT) <= set(manifest['files']): recipient_probe(snapshot)
     for name, record in manifest['volumes'].items():
         volume = 'codexdentist-signing-restore-' + uuid.uuid4().hex
         signing.run(['docker', 'volume', 'create', '--label', 'com.codexdentist.restore=' + volume, volume])
@@ -286,6 +337,7 @@ def drill(snapshot):
     proof = {'allHashes': True, 'ownershipAndModes': True, 'applicationConfigurationUsable': True, 'databaseCounts': True, 'cacheAuthenticationAndAof': True,
         'certificatePassphrase': True, 'appOrMailWorkersStarted': False}
     if set(GATEWAY) <= set(manifest['files']): proof['gatewayConfigurationUsable'] = True
+    if set(RECIPIENT) <= set(manifest['files']): proof['recipientConfigurationUsable'] = True
     proof = json.dumps(proof).encode()
     target = snapshot / 'restore-verified.json'
     if target.exists():

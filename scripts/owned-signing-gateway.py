@@ -34,6 +34,7 @@ def configuration():
     service = {'image': IMAGE, 'entrypoint': ['nginx', '-g', 'daemon off;'], 'restart': 'unless-stopped',
         'user': '101:101', 'read_only': True, 'cap_drop': ['ALL'], 'security_opt': ['no-new-privileges:true'],
         'cpus': 0.5, 'mem_limit': '128m', 'pids_limit': 64, 'logging': {'driver': 'none'},
+        'ulimits': {'nofile': {'soft': 4096, 'hard': 4096}},
         'tmpfs': ['/tmp:rw,nosuid,noexec,size=80m,uid=101,gid=101,mode=0700'],
         'networks': {'provider': {}, 'api': {'aliases': ['codexdentist-signing-gateway']}, 'recipient': {}},
         'volumes': [{'type': 'bind', 'source': './nginx.conf', 'target': '/etc/nginx/nginx.conf', 'read_only': True}] + [
@@ -69,19 +70,19 @@ def prepare():
         'certificateSha256': hashlib.sha256((ROOT / 'gateway.cert.pem').read_bytes()).hexdigest()}).encode())
 
 
-def installation(expected_template=None):
+def installation(expected_template=None, expected_configuration=None):
     if ROOT.is_symlink() or ROOT.stat().st_uid != 0 or ROOT.stat().st_mode & 0o077: raise ValueError('Private root-owned gateway installation required')
     pin = json.loads((ROOT / 'manifest.json').read_text())
     if pin.get('version') != 1 or pin.get('image') != IMAGE or pin.get('published') is not False or pin.get('coreConnected') is not False:
         raise ValueError('Reviewed private gateway stage required')
     expected_template = template() if expected_template is None else expected_template
-    if json.loads((ROOT / 'compose.json').read_text()) != configuration() or pin['configSha256'] != hashlib.sha256(expected_template).hexdigest() or pin['configSha256'] != hashlib.sha256((ROOT / 'nginx.conf').read_bytes()).hexdigest():
+    if json.loads((ROOT / 'compose.json').read_text()) != (configuration() if expected_configuration is None else expected_configuration) or pin['configSha256'] != hashlib.sha256(expected_template).hexdigest() or pin['configSha256'] != hashlib.sha256((ROOT / 'nginx.conf').read_bytes()).hexdigest():
         raise ValueError('Preserve changed gateway configuration')
     if pin['certificateSha256'] != hashlib.sha256((ROOT / 'gateway.cert.pem').read_bytes()).hexdigest(): raise ValueError('Gateway certificate identity differs')
 
 
-def status(expected_template=None):
-    installation(expected_template)
+def status(expected_template=None, expected_configuration=None):
+    installation(expected_template, expected_configuration)
     info = json.loads(run(['docker', 'inspect', PROJECT + '-proxy-1']))[0]; host = info['HostConfig']
     if not info['State']['Running'] or info['State'].get('Restarting') or info['Config']['Image'] != IMAGE or info['Config']['User'] != '101:101' or host.get('PortBindings') or not host['ReadonlyRootfs'] or host.get('Privileged'):
         raise ValueError('Gateway runtime isolation differs')
@@ -91,6 +92,9 @@ def status(expected_template=None):
         if json.loads(run(['docker', 'network', 'inspect', name]))[0]['Internal'] is not True: raise ValueError('Gateway networks must remain private')
     if host.get('LogConfig', {}).get('Type') != 'none' or 'ALL' not in (host.get('CapDrop') or []) or not any(value.startswith('no-new-privileges') for value in host.get('SecurityOpt', [])):
         raise ValueError('Gateway privacy/capability guard differs')
+    if (expected_configuration is None or 'ulimits' in expected_configuration['services']['proxy']) and not any(
+            row == {'Name': 'nofile', 'Soft': 4096, 'Hard': 4096} for row in host.get('Ulimits') or []):
+        raise ValueError('Gateway descriptor capacity differs')
     print('PASS private signing gateway: exact image, strict TLS API, recipient-only proxy and no public port/core connection.')
 
 
