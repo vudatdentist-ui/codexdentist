@@ -21,7 +21,7 @@ CONFIG = ['compose.json', 'manifest.json', 'keys.json', 'certificate.pass', 'sig
     'signing.cert.pem', 'signing.p12', 'license-cache.json']
 TRUST = ['callback-trust.cert.pem']
 BOOTSTRAP = ['bootstrap.intent.json', 'bootstrap.before.json', 'bootstrap.api-result.json',
-    'bootstrap.credentials.json', 'bootstrap.completed.json','webhook.intent.json','webhook.api-result.jsonl','webhook.bindings.json']
+    'bootstrap.credentials.json', 'bootstrap.completed.json'] + ['webhook.'+purpose+'.'+suffix for purpose in ['main','qa'] for suffix in ['intent.json','api-result.jsonl','bindings.json']]
 GATEWAY = ['gateway/compose.json', 'gateway/manifest.json', 'gateway/nginx.conf', 'gateway/gateway.cert.pem', 'gateway/gateway.key.pem']
 GATEWAY_ROOT = Path('/opt/codexdentist-owned-signing-gateway')
 RECIPIENT = ['recipient/' + name for name in ['compose.json', 'manifest.json', 'nginx.conf', 'router.json']]

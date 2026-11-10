@@ -187,11 +187,19 @@ def webhook_client(signing,value):
 
 
 def provision_webhooks(signing,bindings):
-    if len(bindings)!=2 or {row.get('purpose') for row in bindings}!={'main','qa'} or len({row.get('connectionId') for row in bindings})!=2 or len({row.get('secret') for row in bindings})!=2:
+    if not isinstance(bindings,list) or not 1<=len(bindings)<=2 or len({row.get('purpose') for row in bindings})!=len(bindings) or not {row.get('purpose') for row in bindings}<={'main','qa'} or len({row.get('connectionId') for row in bindings})!=len(bindings) or len({row.get('secret') for row in bindings})!=len(bindings):
         raise ValueError('Distinct main/QA core bindings required')
     for row in bindings:
         if set(row)!={'purpose','connectionId','secret'} or not re.fullmatch('[A-Za-z0-9_-]{8,160}',row['connectionId']) or not re.fullmatch('[a-f0-9]{64}',row['secret']):raise ValueError('Exact private webhook bindings required')
     directory=signing.ROOT;signing.installation(directory)
+    for row in bindings:
+        for suffix in ['intent.json','api-result.jsonl','bindings.json']:
+            if (directory/('webhook.'+row['purpose']+'.'+suffix)).exists():raise FileExistsError('Retained webhook intent/result requires review')
+        for purpose in {'main','qa'}-{row['purpose']}:
+            other=directory/('webhook.'+purpose+'.intent.json')
+            if other.exists():
+                previous=json.loads(other.read_text())
+                if previous['connectionId']==row['connectionId'] or previous['secret']==row['secret']:raise ValueError('Cross-owner webhook binding reuse denied')
     principals=json.loads((directory/'bootstrap.credentials.json').read_text())
     accounts=json.loads((directory/'bootstrap.intent.json').read_text())['accounts']
     intent=[]
@@ -199,18 +207,18 @@ def provision_webhooks(signing,bindings):
         selected=[v for v in principals if v['purpose']==row['purpose']];account=[v for v in accounts if v['purpose']==row['purpose']]
         if len(selected)!=1 or len(account)!=1:raise ValueError('Verified bootstrap identities required')
         intent.append({**row,'userId':selected[0]['userId'],'teamId':selected[0]['teamId'],'email':account[0]['email'],'password':account[0]['password']})
-    signing.private(directory/'webhook.intent.json',json.dumps(intent).encode())
+    for row in intent:signing.private(directory/('webhook.'+row['purpose']+'.intent.json'),json.dumps(row).encode())
     results=[]
-    with (directory/'webhook.api-result.jsonl').open('xb',buffering=0) as output:
-        os.chmod(directory/'webhook.api-result.jsonl',0o600)
-        for row in intent:
+    for row in intent:
+        with (directory/('webhook.'+row['purpose']+'.api-result.jsonl')).open('xb',buffering=0) as output:
+            os.chmod(output.name,0o600)
             accepted=webhook_client(signing,{**row,'action':'create'})
             output.write(json.dumps(accepted).encode()+b'\n');os.fsync(output.fileno())
             if accepted.get('pass') is not True:raise ValueError('Preserve partial webhook acknowledgement')
             checked=webhook_client(signing,{**row,'action':'inspect'})
             if checked!=accepted:raise ValueError('Webhook creation/ownership acceptance differs')
             results.append(accepted)
-    signing.private(directory/'webhook.bindings.json',json.dumps(results).encode())
+            signing.private(directory/('webhook.'+row['purpose']+'.bindings.json'),json.dumps(accepted).encode())
     print('PASS separate owned main/QA webhook creation through authenticated provider APIs; no event submitted.')
 
 

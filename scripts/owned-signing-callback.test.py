@@ -87,16 +87,18 @@ class CallbackBoundary(unittest.TestCase):
             signing=SimpleNamespace(ROOT=root,installation=lambda path:None,private=private)
             calls=[]
             def client(module,row):
-                self.assertTrue((root/'webhook.intent.json').is_file());calls.append(row)
+                self.assertTrue((root/('webhook.'+row['purpose']+'.intent.json')).is_file());calls.append(row)
                 return{'pass':True,'purpose':row['purpose'],'teamId':row['teamId'],'connectionId':row['connectionId'],'webhookId':'synthetic_'+row['purpose']}
             bindings=[{'purpose':purpose,'connectionId':'synthetic_connection_'+purpose,'secret':char*64} for purpose,char in [('main','a'),('qa','c')]]
             with patch.object(callback,'webhook_client',side_effect=client):
-                callback.provision_webhooks(signing,bindings)
+                callback.provision_webhooks(signing,[bindings[0]])
+                with self.assertRaises(ValueError):callback.provision_webhooks(signing,[{**bindings[1],'secret':bindings[0]['secret']}])
+                callback.provision_webhooks(signing,[bindings[1]])
                 self.assertEqual([row['action'] for row in calls],['create','inspect','create','inspect'])
                 self.assertEqual(len({row['teamId'] for row in calls}),2)
                 with self.assertRaises(FileExistsError):callback.provision_webhooks(signing,bindings)
                 self.assertEqual(len(calls),4,'A retained intent prevents creation replay')
-            self.assertEqual(len((root/'webhook.api-result.jsonl').read_text().splitlines()),2)
+            for purpose in ['main','qa']:self.assertEqual(len((root/('webhook.'+purpose+'.api-result.jsonl')).read_text().splitlines()),1)
 
 
 if __name__=='__main__':unittest.main()

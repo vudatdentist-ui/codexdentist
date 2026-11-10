@@ -671,8 +671,10 @@ five callback files and the optional provider public certificate; restore starts
 no app/callback/mail workers and checks actual UID access, key pairing and syntax.
 `owned-signing-webhook-client.cjs` uses the verified service signin/CSRF API and
 team-scoped webhook API, not direct provider/core table writes. The private caller
-must retain `webhook.intent.json`, per-create `webhook.api-result.jsonl` and final
-`webhook.bindings.json`; all are included in combined encrypted recovery. Only
+must retain each purpose's `webhook.<purpose>.intent.json`, per-create
+`webhook.<purpose>.api-result.jsonl` and final `webhook.<purpose>.bindings.json`;
+all are included in combined encrypted recovery. QA can be provisioned separately
+before the main tenant, with cross-purpose connection/secret reuse denied. Only
 `DOCUMENT_COMPLETED` and the exact internal connection callback URL are allowed.
 Preserve uncertain/partial results and inspect state instead of repeating create.
 The recipient `upgrade-capacity` action permits only the exact 256-to-1024
