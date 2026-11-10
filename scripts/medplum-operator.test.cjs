@@ -204,7 +204,7 @@ for (const scenario of ['rejection', 'invalid-token', 'malformed', 'readback-mis
 }
 
 test('real adapter loopback contract: OAuth Basic, project identity, conditional writes, lost response, conflicts and timeout', async () => {
-  const patients = new Map(); let mode = ''; let tokenHeader;
+  const patients = new Map(); let mode = ''; let tokenHeader; let timeoutSignal;
   const server = http.createServer(async (req, res) => {
     let body = ''; for await (const chunk of req) body += chunk;
     res.setHeader('Content-Type', 'application/json');
@@ -234,7 +234,14 @@ test('real adapter loopback contract: OAuth Basic, project identity, conditional
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const baseUrl = `http://127.0.0.1:${server.address().port}`;
   const adapter = load('src/integrations/medplum/client.ts', { '@/integrations/optional-http': {
-    optionalProviderFetch: (url, init) => { assert.equal(new URL(url).origin, baseUrl); return fetch(url, { ...init, signal: AbortSignal.timeout(100) }); },
+    optionalProviderFetch: (url, init) => {
+      assert.equal(new URL(url).origin, baseUrl);
+      // The deliberate hang keeps its short deadline. Healthy contract checks
+      // must not become CPU-scheduling benchmarks under parallel CI workers.
+      const signal=AbortSignal.timeout(mode==='timeout'?100:5000);
+      if(mode==='timeout')timeoutSignal=signal;
+      return fetch(url, { ...init, signal });
+    },
   } });
   const credentials = { ...secrets, baseUrl };
   const identity = { system: 'urn:synthetic', value: 'patient-a' };
@@ -244,8 +251,9 @@ test('real adapter loopback contract: OAuth Basic, project identity, conditional
     assert.equal(tokenHeader, `Basic ${Buffer.from('client-a:synthetic-secret').toString('base64')}`);
     mode = 'lost'; await assert.rejects(() => adapter.upsertMedplumPatient(credentials, patient, identity));
     mode = ''; await adapter.upsertMedplumPatient(credentials, patient, identity); assert.equal(patients.size, 1);
-    for (const value of ['conflict', 'auth', 'timeout']) {
-      mode = value; await assert.rejects(() => adapter.upsertMedplumPatient(credentials, patient, identity), /medplum-/);
+    for (const [value,code] of [['conflict','medplum-identity-conflict'],['auth','medplum-provider-rejected'],['timeout','medplum-provider-unavailable']]) {
+      mode = value; await assert.rejects(() => adapter.upsertMedplumPatient(credentials, patient, identity),error=>error.code===code);
     }
+    assert.equal(timeoutSignal.aborted,true);assert.equal(timeoutSignal.reason.name,'TimeoutError');
   } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); }
 });
