@@ -50,6 +50,20 @@ load/authentication; repeated drills must pass. Restored app/mail/BullMQ workers
 never start. Corrupted key/archive copies must fail before a restore starts.
 Keep the standalone provider ceremony and core consent/webhook/replay gates:
 private runtime readiness is not operational signing acceptance.
+Bootstrap changes also run `python3 scripts/owned-signing-bootstrap.test.py`,
+`node --test scripts/owned-signing-bootstrap-client.test.cjs` and
+`python3 scripts/owned-signing-seal.test.py`. Native CE acceptance must create
+and verify separate main/QA identities, exercise actual CSRF/signin/token APIs,
+reject a valid token substituted across their stored identities, close signup
+and restore account credentials alongside the provider database. Consume the
+pinned CE's actual `/verify-email/<token>` link. Backend capture reads send no
+app Origin/cookies/credentials; do not loosen Mailpit CORS to mask a protocol bug.
+Crypto verification must wait for authenticated decryption to finish before
+publishing proof, reject a modified authentication tag even when an outer
+checksum is replaced, and reject unauthenticated CMS/CBC. Native CI seals and
+verifies actual snapshot bytes with a synthetic recipient key kept only in its
+isolated private fixture. Real off-server verification uses the existing owner
+key only on the owned recovery computer and never writes decrypted archives.
 
 Mail activation regressions must deny duplicate SPF, a foreign persistent DKIM
 key, wrong forward/reverse identity, edited configuration, failed backup and

@@ -599,6 +599,38 @@ connect this standby to real patients. Bootstrap, publication, Vietnamese
 ceremony dates/timezone, core webhook/reconciliation and recipient delivery
 remain separate activation gates.
 
+`python3 scripts/owned-signing-bootstrap.py bootstrap` is a one-time private
+transition, before gateway/publication or any real envelope exists. It requires
+the exact four-service network and the two seeded placeholder accounts only,
+takes/restores a cold snapshot, then temporarily opens signup inside that
+isolated network. It creates two ordinary service identities with separate
+personal teams/API keys, using actual captured verification links and CSRF
+password signin. No real mailbox is contacted. Main and QA credentials remain
+in root-private `bootstrap.*.json` records; never print or upload them. Signup is
+closed again on success or failure, and `inspect` checks both APIs plus their
+stored user/team/hash ownership. A retained intent or partial acknowledgement
+blocks blind retries; review its state before recovery rather than replacing
+accounts or issuing more keys. The backup includes even partial bootstrap
+records so an uncertain acknowledgement is not lost. These service identities
+do not grant access to core patients until a separate tenant-bound activation.
+
+Encrypt a completed signing snapshot with `owned-signing-seal.py seal --snapshot
+<private-path> --recipient-cert <public-cert> --recipient-sha256 <exact-pin>`.
+It accepts only a completed isolated restore and the exact public recipient
+identity, uses authenticated CMS AES-256-GCM/RSA-OAEP-SHA256 and never takes a
+recipient private key. Transfer its `.cms` and `.cms.json` to the owned recovery
+computer, then run `verify --ciphertext <cms-path> --recipient-cert <cert>
+--recipient-sha256 <pin> --private-key <existing-local-key>` there. On Windows,
+pass the installed `--openssl` executable explicitly when it is not on PATH.
+Verification streams plaintext only in memory, checks all volume/private-key
+checksums, requires authenticated CMS and waits for its final tag before writing
+a small acceptance record. Keep the existing real recovery private key on the
+PC. The accepted recipient fingerprint is
+`E71F14965F2427ED87786E2ABFF66CB172F9D3E4747B310A81E78574E72D7C60`.
+The initial owned standby snapshot `20261110T023256Z-34bb70da` has passed that
+encrypted PC recovery; a fresh copy must include subsequently bootstrapped
+accounts before publication. Off-server transfer remains manual.
+
 Use **Settings → Tích hợp & AI → Documenso** to save the clinic's API Token and
 Webhook Secret in the same tenant-bound credential vault. In Documenso, register
 the displayed result URL with that secret and enable document-completion events.

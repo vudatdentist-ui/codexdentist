@@ -19,6 +19,8 @@ signing = importlib.util.module_from_spec(spec); spec.loader.exec_module(signing
 ROOT = signing.ROOT
 CONFIG = ['compose.json', 'manifest.json', 'keys.json', 'certificate.pass', 'signing.key.pem',
     'signing.cert.pem', 'signing.p12', 'license-cache.json']
+BOOTSTRAP = ['bootstrap.intent.json', 'bootstrap.before.json', 'bootstrap.api-result.json',
+    'bootstrap.credentials.json', 'bootstrap.completed.json']
 TREE = r'''const fs=require('fs'),path=require('path'),crypto=require('crypto'),rows=[];
 function walk(p){const s=fs.lstatSync(p);if(s.isSymbolicLink()||(!s.isFile()&&!s.isDirectory()))throw Error();
 rows.push([path.relative('/snapshot',p),s.isDirectory()?'directory':crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex'),s.size*(s.isFile()?1:0),s.uid,s.gid,s.mode&0o777]);
@@ -86,7 +88,7 @@ def backup():
         manifest['databaseCounts'] = counts(signing.PROJECT + '-database-1', password)
         for name in active:
             if name != 'app': signing.run(['docker', 'stop', '--time', '30', signing.PROJECT + '-' + name + '-1'])
-        for name in CONFIG:
+        for name in CONFIG + [name for name in BOOTSTRAP if (ROOT / name).exists()]:
             source = ROOT / name
             if source.is_symlink() or not source.is_file(): raise ValueError('Unsafe signing configuration')
             metadata = source.stat()
@@ -120,7 +122,8 @@ def validate_snapshot(snapshot):
     if snapshot.resolve() != snapshot or snapshot.parent != ROOT / 'backups' or snapshot.is_symlink() or snapshot.stat().st_uid != 0 or snapshot.stat().st_mode & 0o077:
         raise ValueError('Exact private signing snapshot required')
     manifest = json.loads((snapshot / 'backup-manifest.json').read_text())
-    if manifest.get('version') != 1 or manifest.get('images') != signing.IMAGES or set(manifest.get('files', {})) != set(CONFIG) or set(manifest.get('fileMetadata', {})) != set(CONFIG) or set(manifest.get('volumes', {})) != {'database', 'cache'}:
+    present = set(manifest.get('files', {}))
+    if manifest.get('version') != 1 or manifest.get('images') != signing.IMAGES or not set(CONFIG) <= present or not present <= set(CONFIG + BOOTSTRAP) or set(manifest.get('fileMetadata', {})) != present or set(manifest.get('volumes', {})) != {'database', 'cache'}:
         raise ValueError('Signing recovery manifest differs')
     for name, digest in manifest['files'].items():
         if (snapshot / name).is_symlink() or checksum(snapshot / name) != digest: raise ValueError('Signing configuration/key checksum differs')
