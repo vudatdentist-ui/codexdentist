@@ -61,6 +61,13 @@ These rules survive every refactor and integration.
 
 - Receipt collection, allocation, invoice issuance, refund/void, credit/unallocated balance, and service progress semantics remain separate concepts.
 - Ledger mutations that depend on current balances remain transactionally safe; existing Serializable/concurrency guarantees and database constraints are preserved.
+- Appointment creation acquires transaction-scoped PostgreSQL advisory locks for
+  its organization/provider and optional chair in a fixed order, then reads
+  overlaps with a fresh ReadCommitted snapshot. This serializes competing resource
+  reservations across clinics and preserves one winner plus a domain conflict.
+  Broad Serializable predicate locks previously exhausted retries under unrelated
+  concurrent workspace writes and leaked `P2034`; native four-workspace acceptance
+  reproduces that failure and verifies resource waiting, conflict and adjacency.
 - Partial invoices are not merged after issuance.
 - External payment providers may request or report a payment, but they never write Codexdentist billing tables directly.
 

@@ -2,6 +2,7 @@ const assert = require("node:assert/strict");
 const { randomUUID } = require("node:crypto");
 const { PrismaClient } = require("@prisma/client");
 const { PrismaPg } = require("@prisma/adapter-pg");
+const { Client } = require("pg");
 const { load } = require("./audit-source-loader.cjs");
 
 // These tests create and remove only a uniquely identified synthetic workspace.
@@ -60,6 +61,31 @@ async function main() {
     console.log("ok cross-clinic patient and revenue mutation denial");
     const base = { clinicId: clinic.id, patientId: patient.id, providerId: providers[0].id, chairId: chairs[0].id,
       startsAt: new Date("2035-01-01T01:00:00Z"), endsAt: new Date("2035-01-01T02:00:00Z"), reason: "Synthetic concurrency regression" };
+    const blocker = new Client({ connectionString: process.env.DATABASE_URL });
+    await blocker.connect(); let pending, waiting=false, blockedCount;
+    try {
+      await blocker.query('BEGIN');
+      const blockerPid = (await blocker.query('SELECT pg_backend_pid() AS pid')).rows[0].pid;
+      await blocker.query('SELECT pg_advisory_xact_lock(hashtextextended($1,0))', [`appointment/provider/${orgId}/${providers[0].id}`]);
+      pending = Promise.allSettled([scheduling.createAppointmentCommand(session,base),
+        scheduling.createAppointmentCommand(session,{...base,clinicId:clinicB.id,patientId:patientB.id,chairId:null})]);
+      for(let attempt=0;attempt<100;attempt++) {
+        const result=await blocker.query('SELECT EXISTS(SELECT 1 FROM pg_locks WHERE NOT granted AND $1=ANY(pg_blocking_pids(pid))) AS waiting',[blockerPid]);
+        if(result.rows[0].waiting){waiting=true;break;}
+        await new Promise(resolve=>setTimeout(resolve,10));
+      }
+      blockedCount=await prisma.appointment.count({where:{clinicId:{in:session.clinicIds}}});
+    } finally {
+      await blocker.query('ROLLBACK'); await blocker.end();
+      if(pending)await pending;
+    }
+    const lockedResults=await pending;
+    assert.ok(waiting,'Creating an appointment must wait for its provider resource before reading availability');
+    assert.equal(blockedCount,0,'No appointment can commit while its resource lock is held');
+    assert.equal(lockedResults.filter(row=>row.status==='fulfilled').length,1);
+    assert.equal(lockedResults.find(row=>row.status==='rejected').reason.code,'conflict');
+    await prisma.appointment.deleteMany({where:{clinicId:{in:session.clinicIds}}});
+    console.log('ok provider resource wait, fresh snapshot after unlock and cross-clinic conflict');
     for (const [label, second] of [
       ["same provider, different chairs", { ...base, chairId: chairs[1].id }],
       ["same chair, different providers", { ...base, providerId: providers[1].id }],

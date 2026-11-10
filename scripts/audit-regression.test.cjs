@@ -73,9 +73,12 @@ test("F2: even an existing allowlisted trial/demo owner never has platform acces
   assert.equal(superAdmin.isSuperAdminSession({ ...owner, isDemo: true }), false);
 });
 
-test("F3: appointment conflict lookup executes in the serializable transaction before insert", async () => {
+test("F3: resource locks precede the fresh appointment conflict snapshot and insert", async () => {
   const events = [];
-  const tx = { appointment: {
+  const tx = { $queryRawUnsafe: async (sql,resource) => {
+    assert.equal(sql,"SELECT pg_advisory_xact_lock(hashtextextended($1, 0))::text");
+    events.push(resource);
+  }, appointment: {
     findFirst: async () => { events.push("check"); return { id: "conflict" }; },
     create: async () => { throw new Error("must not create"); },
   } };
@@ -83,14 +86,14 @@ test("F3: appointment conflict lookup executes in the serializable transaction b
   const scheduling = load("src/lib/application/scheduling/commands.ts", {
     "@/lib/actions/permissions": actions, "@/lib/application/errors": errors,
     "@/lib/form-validation": {}, "@/lib/patient-access": { allowedClinicIds: () => ["A"] },
-    "@/lib/prisma": { prisma: Object.fromEntries(["clinic", "patient", "user", "chair"].map(key => [key, { findFirst: async () => ({ id: key }) }])) },
-    "@/lib/transaction": { runSerializableTransaction: async (fn) => { events.push("transaction"); return fn(tx); } },
+    "@/lib/prisma": { prisma: { ...Object.fromEntries(["clinic", "patient", "user", "chair"].map(key => [key, { findFirst: async () => ({ id: key }) }])),
+      $transaction: async (fn,options) => {assert.equal(options.isolationLevel,"ReadCommitted");events.push("transaction");return fn(tx);} } },
   });
   await assert.rejects(scheduling.createAppointmentCommand({ ...session, activeClinicId: "A" }, {
     clinicId: "A", patientId: "patient", providerId: "provider", chairId: "chair",
     startsAt: new Date(), endsAt: new Date(Date.now() + 60000), reason: "Test",
   }), (error) => error instanceof errors.ApplicationCommandError && error.code === "conflict");
-  assert.deepEqual(events, ["transaction", "check"]);
+  assert.deepEqual(events, ["transaction",`appointment/chair/${session.organizationId}/chair`,`appointment/provider/${session.organizationId}/provider`,"check"]);
 });
 
 test("F4: root password recovery serves tenants; wrong tenant and missing user keep generic response", async () => {

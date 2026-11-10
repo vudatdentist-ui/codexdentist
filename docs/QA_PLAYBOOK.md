@@ -3,6 +3,15 @@
 Last updated: 2026-11-10
 Status: ACTIVE
 
+Scheduling concurrency acceptance runs `NODE_ENV=test npm run test:audit-db`
+against an explicit disposable loopback PostgreSQL database. Four uniquely owned
+synthetic workspaces execute together. Each holds a real provider advisory lock,
+observes an actual waiting database session and proves no appointment commits
+before release; after release one booking wins and its cross-clinic competitor
+returns a domain conflict. Cover shared provider/chair races, adjacent slots,
+tenant denials and notification claims. Await all pending commands before fixture
+cleanup, including when the wait assertion fails; never delete another workspace.
+
 This playbook implements the closed-loop quality process defined in `docs/PROJECT_CONTEXT.md`:
 
 ```text

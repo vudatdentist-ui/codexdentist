@@ -6,7 +6,6 @@ import { allowedClinicIds } from "@/lib/patient-access";
 import type { AppRole } from "@/lib/permissions";
 import { prisma } from "@/lib/prisma";
 import type { AppSession } from "@/lib/session";
-import { runSerializableTransaction } from "@/lib/transaction";
 
 const schedulableProviderRoles: AppRole[] = ["DENTIST", "HYGIENIST", "CLINIC_MANAGER"];
 export type AppointmentStatus = "REQUESTED" | "CONFIRMED" | "ARRIVED" | "IN_CHAIR" | "COMPLETED" | "NO_SHOW";
@@ -49,7 +48,21 @@ export async function createAppointmentCommand(session: AppSession, input: {
   if (!clinic) throw new ApplicationCommandError("clinic-inactive");
   if (!patient || !provider || (input.chairId && !chair)) throw new ApplicationCommandError("invalid-relation");
 
-  return runSerializableTransaction(async (tx) => {
+  return prisma.$transaction(async (tx) => {
+    // Serialize only appointments sharing a provider/chair. SSI predicate locks
+    // on a broad overlap scan can exhaust retries because unrelated clinics or
+    // tenants are writing schedules. ReadCommitted gives the conflict read a
+    // fresh snapshot after these transaction-scoped locks have been acquired.
+    const resources = [
+      `appointment/provider/${session.organizationId}/${input.providerId}`,
+      ...(input.chairId ? [`appointment/chair/${session.organizationId}/${input.chairId}`] : []),
+    ].sort();
+    for (const resource of resources) {
+      await tx.$queryRawUnsafe(
+        "SELECT pg_advisory_xact_lock(hashtextextended($1, 0))::text",
+        resource,
+      );
+    }
     const conflict = await tx.appointment.findFirst({
       where: {
         status: { notIn: ["CANCELLED", "NO_SHOW"] },
@@ -83,7 +96,7 @@ export async function createAppointmentCommand(session: AppSession, input: {
       startsAt: input.startsAt.toISOString(),
     });
     return appointment;
-  });
+  }, { isolationLevel: "ReadCommitted" });
 }
 
 export async function updateAppointmentStatusCommand(session: AppSession, input: {
