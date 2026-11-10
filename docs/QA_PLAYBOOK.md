@@ -36,6 +36,17 @@ test outputs contain synthetic keys and must not be uploaded as public artifacts
 They must remain outside the source/build tree (CI uses `RUNNER_TEMP`); the
 operator rejects an in-tree destination. Never broaden their private permissions
 to let a build tool scan them.
+App transport cutovers additionally run `python3 scripts/owned-mail-app-cutover.test.py`:
+verify both existing YAML sequence styles, quote-preserving dotenv updates,
+complete resolved/runtime deltas, exact-image/private-volume preservation,
+read-only public CA forwarding and rollback that refuses concurrent edits. A
+successful SMTP submission is insufficient: for a specifically approved external
+test compare the actual inbox Message-ID/nonce and SPF/DKIM/DMARC result. Do not
+repeat a consumed one-message approval or send real credential/patient mail for
+QA. After configuration change, run independent go-live/readiness and compare the
+financial baseline; inspect actual owner mail Settings at 1440/390/320 without
+submitting another email. Password reset/consume/signin remains covered by the
+disposable full-app actual TLS gate, not by changing a real owner's password.
 
 Owned signing runtime changes require `python3 scripts/owned-signing-services.test.py`
 and the actual Linux gate `sudo -n python3 scripts/owned-signing-linux.py --source
