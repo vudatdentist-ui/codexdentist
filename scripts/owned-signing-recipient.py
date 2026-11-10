@@ -7,6 +7,7 @@ import json
 import os
 from pathlib import Path
 import re
+import subprocess
 import time
 import urllib.request
 import urllib.error
@@ -60,6 +61,8 @@ def router():
 
 def prepare():
     if ROOT.exists(): raise ValueError('Preserve existing recipient installation')
+    existing = subprocess.run(['docker', 'inspect', PROJECT + '-web-1'], capture_output=True)
+    if existing.returncode == 0: raise ValueError('Preserve existing recipient container without its installation')
     gateway.installation(); gateway.status()
     edge = json.loads(gateway.run(['docker', 'network', 'inspect', EDGE]))[0]
     if edge.get('Internal') is not (PROJECT != 'codexdentist-signing-recipient'): raise ValueError('Explicit existing proxy edge required')
@@ -152,7 +155,9 @@ def restored_snapshot(snapshot):
     recovery = recovery_module()
     manifest = recovery.validate_snapshot(snapshot)
     proof = json.loads((snapshot / 'restore-verified.json').read_text())
-    if proof.get('recipientConfigurationUsable') is not True or proof.get('appOrMailWorkersStarted') is not False:
+    required = ['allHashes', 'ownershipAndModes', 'applicationConfigurationUsable', 'databaseCounts',
+                'cacheAuthenticationAndAof', 'certificatePassphrase', 'gatewayConfigurationUsable', 'recipientConfigurationUsable']
+    if any(proof.get(name) is not True for name in required) or proof.get('appOrMailWorkersStarted') is not False:
         raise ValueError('Recipient recovery must precede publication')
     for name in recovery.RECIPIENT:
         if manifest['files'].get(name) != hashlib.sha256((ROOT / name.removeprefix('recipient/')).read_bytes()).hexdigest():

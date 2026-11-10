@@ -60,12 +60,14 @@ class RecipientBoundary(unittest.TestCase):
                 value = ('Synthetic current configuration ' + name).encode()
                 (root / name.removeprefix('recipient/')).write_bytes(value)
                 files[name] = hashlib.sha256(value).hexdigest()
-            proof = {'recipientConfigurationUsable': True, 'appOrMailWorkersStarted': False}
+            proof = {name: True for name in ['allHashes', 'ownershipAndModes', 'applicationConfigurationUsable',
+                'databaseCounts', 'cacheAuthenticationAndAof', 'certificatePassphrase', 'gatewayConfigurationUsable', 'recipientConfigurationUsable']}
+            proof['appOrMailWorkersStarted'] = False
             (snapshot / 'restore-verified.json').write_text(json.dumps(proof))
             recovery = SimpleNamespace(RECIPIENT=names, validate_snapshot=lambda path: {'files': files})
             with patch.object(recipient, 'ROOT', root), patch.object(recipient, 'recovery_module', return_value=recovery):
                 recipient.restored_snapshot(snapshot)
-                for wrong in [{**proof, 'recipientConfigurationUsable': False}, {**proof, 'appOrMailWorkersStarted': True}]:
+                for wrong in [{**proof, 'recipientConfigurationUsable': False}, {**proof, 'appOrMailWorkersStarted': True}, {**proof, 'databaseCounts': False}]:
                     (snapshot / 'restore-verified.json').write_text(json.dumps(wrong))
                     with self.assertRaises(ValueError): recipient.restored_snapshot(snapshot)
                 (snapshot / 'restore-verified.json').write_text(json.dumps(proof))

@@ -97,8 +97,6 @@ def exercise(directory, app_image=None):
             'separateRecipientProcessAndRecovery': True,
             'authenticatedCache': True, 'allHashesAndModes': True, 'databaseCounts': True, 'cacheAofRecovery': True,
             'corruptedKeysAndArchiveDenied': True, 'externalMailSent': False, 'coreAccess': False, 'published': False}
-        signing.private(directory / 'acceptance.json', json.dumps(proof).encode())
-        print(json.dumps(proof))
     finally:
         if (recipient.ROOT / 'compose.json').is_file():
             signing.run(['docker', 'compose', '--project-directory', str(recipient.ROOT), '-f', str(recipient.ROOT / 'compose.json'), 'down', '--remove-orphans'])
@@ -119,6 +117,10 @@ def exercise(directory, app_image=None):
                     info = json.loads(result.stdout)[0]
                     if info.get('Labels', {}).get('com.codexdentist.signing') != name: raise ValueError('Test volume ownership differs')
                     signing.run(['docker', 'volume', 'rm', volume])
+    # Success includes cleanup. A failed finally must never leave a misleading
+    # pass artifact while synthetic workers/volumes are still active.
+    signing.private(directory / 'acceptance.json', json.dumps(proof).encode())
+    print(json.dumps(proof))
 
 
 def main():

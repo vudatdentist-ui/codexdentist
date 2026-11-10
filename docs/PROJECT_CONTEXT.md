@@ -476,7 +476,8 @@ native acceptance passed on a fresh isolated CE stack, including both API owners
 TLS/route denials, repeated combined restoration, corruption denial and authenticated
 encrypted recovery. Owned snapshot `20261110T094026Z-f13bc1d7` preserves the upgraded
 DNS configuration and passed restoration plus authenticated PC recovery. Exact-head
-CI and public/core gates remain required; signing stays open.
+CI `42792874203` passed for PR #107, which merged as `953910c`; exact-main
+verification/deployment and public/core gates remain required; signing stays open.
 
 The next recipient operator separates the HTTP ceremony into its own unprivileged
 process. Its only bind is the allowlisted HTTP configuration: no API TLS listener,
@@ -488,8 +489,13 @@ The dedicated `sign.codexdentist.com` router disables access logs and tracing fo
 both HTTP/HTTPS without changing other routers. Publication requires the exact
 four-file recipient configuration in a completed combined restoration. Failure
 removes only its own unchanged router and restores its own manifest; foreign
-concurrent changes require review. Native acceptance and actual public-hostname
-ceremony are still pending; implementation alone does not activate core signing.
+concurrent changes require review. Fresh native proof `signing-recipient-proof-v2-20261110`
+passed its actual edge/port denials, repeated restoration, authenticated encryption
+and complete labelled cleanup. An initial cleanup variable collision was fixed;
+the gate now writes its final pass artifact only after cleanup succeeds. The owned
+frontend is staged with no public router, email or core connection. Exact-head CI,
+combined owned recovery and actual public-hostname ceremony remain required;
+implementation alone does not activate core signing.
 
 Next activation sequence: keep private API and public recipient frontends on
 separate processes/networks before attaching only the recipient frontend to the
