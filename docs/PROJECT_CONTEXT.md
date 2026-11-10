@@ -329,8 +329,8 @@ Issue #91 remains open for the remaining free-runtime cutovers, in order:
 2. Completed: durable private file storage on the existing VPS, checksummed
    relocation of the existing original, coordinated database/file restoration,
    encrypted off-server recovery copy and a verified nightly backup timer.
-3. Replace cloud email only after self-host SMTP, sender identity, credential-mail
-   recovery and delivery are verified. Novu in-app delivery is not email delivery.
+3. Completed: cloud email replaced by private self-host SMTP after sender DNS,
+   credential recovery, owned queue restoration and approved Gmail inbox acceptance.
 4. Activate the free self-host signing engine with synthetic protected PDFs and
    complete consent reconciliation. Existing Documenso UI/connector tests are not
    evidence that a real signing service is already running.
@@ -374,8 +374,25 @@ encryption, empty original queues, exact private configuration and signed TLS
 readiness. Only the SMTP service gained outbound networking. A connection from
 that namespace reached Gmail's MX on TCP 25 and received its SMTP banner, then
 quit without submitting mail. The encrypted snapshot also passed authenticated
-off-server decryption/checksums on the owned PC. External inbox acceptance and
-the application mail cutover remain open; production continues using Resend.
+off-server decryption/checksums on the owned PC. On 2026-11-10 the owner approved
+exactly one plain test email. It reached Gmail's Inbox in three seconds with the
+matching Message-ID/nonce; Gmail's original-message view confirms SPF, DKIM and
+DMARC PASS for the owned IP/selector. No patient data or authentication link was
+sent. The one-message authorization is consumed; do not send another under it.
+
+Production now uses `NOTIFICATION_DELIVERY_MODE=owned-mail` on the same verified
+`31210f1` image. The cutover snapshots/restores current database/files first,
+requires no in-flight old-provider email and compares resolved Compose before
+recreating only the core service. Only the private mail gateway network,
+read-only public CA and five controlled mail environment values change. Original
+Resend keys/configuration remain in private rollback custody. Independent go-live,
+signed live-mail readiness, all five app checks and public routes pass; the
+financial ledger is unchanged. Existing owner Settings shows the clinic mail
+server, correct sender and ready state at 1440/390/320px without submitting more
+mail. A failed pre-cutover comparison exercised exact rollback before activation;
+its evidence is retained. Further work remains under signing below, not SMTP
+transport activation. Inbox delivery to one approved Gmail account is evidence
+for that acceptance, not a promise about every future destination.
 
 Signing preflight also passed against actual Documenso 2.21.1 CE in a separate
 synthetic installation: the reviewed adapter created/distributed a PDF, the
@@ -419,10 +436,14 @@ creates separate main/QA identities through actual verification/signin/token
 APIs. It restores the exact closed configuration even on failure. A retained
 intent/partial acknowledgement prevents replay; API keys bind to their stored
 user/team/token hash, not merely a successful API response. Both identities have
-passed creation and authenticated API acceptance on fresh isolated CE. Rollout
-to the owned standby and a new encrypted recovery copy covering these account
-credentials remain pending. No public route, recipient email or core signing
-connection has been enabled.
+passed creation and authenticated API acceptance on fresh isolated CE, including
+cross-owner token substitution denial. PR #105 passed exact-head CI and merged
+as `65b7337`; its operator also bootstrapped both identities on the owned standby
+and verified the closed APIs. Fresh snapshot `20261110T085052Z-81c3706e` includes
+their private credentials, passed worker-free PostgreSQL/AOF/config restoration,
+and its encrypted copy passed authenticated recovery on the owned PC. No public
+route, recipient email or core signing connection has been enabled. Those
+publication and full-app ceremony/webhook/replay gates remain open.
 
 Local AI is deployed in `2face1e` (PR #95), with the production configuration
 cutover independently verified on 2026-11-09. The owned VPS has Ollama 0.40.15 and

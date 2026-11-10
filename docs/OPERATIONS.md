@@ -120,7 +120,7 @@ temporary cookie exports removed; existing user sessions/passwords were preserve
 
 ## Hosted Deployment
 
-Owned email (pending production activation): `scripts/owned-mail-services.py`
+Owned email (production active after accepted cutover): `scripts/owned-mail-services.py`
 prepares an explicit exact-release gateway image plus pinned Maddy 0.9.6 under
 `/opt/codexdentist-owned-mail`. `prepare --base-image codexdentist:<40-hex-SHA>
 --hostname <verified-outbound-hostname>` refuses an existing installation or
@@ -198,6 +198,38 @@ retained transition evidence blocks blind retries. Existing keys/volumes are
 never replaced or queues purged. The transition sends no mail and does not change
 core settings. Obtain explicit recipient approval before one external acceptance
 message, and verify its arrival separately before the app transport cutover.
+
+The accepted 2026-11-10 external test used exactly one owner-approved plain email
+and matched Gmail's Inbox, Message-ID/nonce and SPF/DKIM/DMARC PASS. Its root-private
+intent, submission and UI acceptance live under
+`/opt/codexdentist-owned-mail/owner-approved-test-20261110`; preserve them and never
+replay that exhausted authorization. Production now uses the owned transport;
+the original Resend credentials and inbound mail/DNS remain preserved.
+
+`owned-mail-app-cutover.py --sha <exact-deployed-revision>` reviews the one-time
+Resend-to-owned transition; `--apply` performs it. It acquires deployment and mail
+locks, requires the approved inbox acceptance, rejects in-flight email claims,
+backs up/restores current core database/files, then compares the entire resolved
+Compose configuration against the exact permitted mail-only delta. The current
+Compose 5.4 serialization includes empty `ipam` for an external network and omits
+default bind options; other output shapes fail for review rather than bypassing
+the full comparison. Both supported YAML sequence indentation styles preserve
+all original non-mail text. Only core is recreated, with no image change or job
+submission. Failed activation restores the exact old Compose/environment if they
+still belong to this operation; unexpected concurrent edits fail closed.
+The attention marker and private recovery files remain after failure. Review
+actual source/runtime/readiness before archiving only that operation's marker;
+do not rerun blindly or delete unrelated deployment evidence.
+
+The public CA mount is exactly
+`/opt/codexdentist-owned-mail/core-trust/gateway.cert.pem` →
+`/run/codexdentist-mail-ca.pem`, read-only, set through `NODE_EXTRA_CA_CERTS`
+before Node starts. Restore that public copy from the mail snapshot's gateway
+certificate, preserving its identity; no private TLS/DKIM/encryption key enters
+core. Independent verifier projections must use `runtime-public-ca.py` to forward
+only this exact read-only public mount. A foreign path, key, writable bind or
+volume is rejected. Keep ordinary TLS validation enabled. The independent
+root-owned go-live helper has this reviewed extension installed.
 
 ### Hostinger migration observed 2026-10-21
 
