@@ -19,20 +19,24 @@ signing = importlib.util.module_from_spec(spec); spec.loader.exec_module(signing
 ROOT = signing.ROOT
 CONFIG = ['compose.json', 'manifest.json', 'keys.json', 'certificate.pass', 'signing.key.pem',
     'signing.cert.pem', 'signing.p12', 'license-cache.json']
+TRUST = ['callback-trust.cert.pem']
 BOOTSTRAP = ['bootstrap.intent.json', 'bootstrap.before.json', 'bootstrap.api-result.json',
-    'bootstrap.credentials.json', 'bootstrap.completed.json']
+    'bootstrap.credentials.json', 'bootstrap.completed.json'] + ['webhook.'+purpose+'.'+suffix for purpose in ['main','qa'] for suffix in ['intent.json','api-result.jsonl','bindings.json']]
 GATEWAY = ['gateway/compose.json', 'gateway/manifest.json', 'gateway/nginx.conf', 'gateway/gateway.cert.pem', 'gateway/gateway.key.pem']
 GATEWAY_ROOT = Path('/opt/codexdentist-owned-signing-gateway')
 RECIPIENT = ['recipient/' + name for name in ['compose.json', 'manifest.json', 'nginx.conf', 'router.json']]
 RECIPIENT_ROOT = Path('/opt/codexdentist-signing-recipient')
+CALLBACK = ['callback/' + name for name in ['compose.json','manifest.json','nginx.conf','callback.key.pem','callback.cert.pem']]
+CALLBACK_ROOT = Path('/opt/codexdentist-signing-callback')
 GATEWAY_IMAGE = 'ghcr.io/nginx/nginx-unprivileged@sha256:e333a5b95605942b5e495645ee54fab02b112081de6dbe45d2ead3ef38e03e31'
 
 
 def config_owner(name):
+    if name.startswith('callback/'):return 0 if name.endswith(('compose.json','manifest.json')) else 101
     if name.startswith('recipient/'): return 101 if name.endswith('/nginx.conf') else 0
     if name.startswith('gateway/'):
         return 0 if name.endswith(('compose.json', 'manifest.json')) else 101
-    return 1001 if name in ['signing.p12', 'license-cache.json'] else 0
+    return 1001 if name in ['signing.p12', 'license-cache.json'] + TRUST else 0
 
 TREE = r'''const fs=require('fs'),path=require('path'),crypto=require('crypto'),rows=[];
 function walk(p){const s=fs.lstatSync(p);if(s.isSymbolicLink()||(!s.isFile()&&!s.isDirectory()))throw Error();
@@ -121,9 +125,14 @@ def backup_data():
                 raise ValueError('Preserve changed published recipient route before recovery')
             recipient_files = RECIPIENT
             (snapshot / 'recipient').mkdir(mode=0o700)
-        for name in CONFIG + [name for name in BOOTSTRAP if (ROOT / name).exists()] + gateway_files + recipient_files:
+        callback_files=[]
+        if CALLBACK_ROOT.exists():
+            if CALLBACK_ROOT.is_symlink() or CALLBACK_ROOT.stat().st_uid!=0 or CALLBACK_ROOT.stat().st_mode&0o077:raise ValueError('Private callback recovery required')
+            callback_files=CALLBACK;(snapshot/'callback').mkdir(mode=0o700)
+        for name in CONFIG + [name for name in TRUST + BOOTSTRAP if (ROOT / name).exists()] + gateway_files + recipient_files + callback_files:
             source = (GATEWAY_ROOT / name.removeprefix('gateway/') if name in GATEWAY else
-                      RECIPIENT_ROOT / name.removeprefix('recipient/') if name in RECIPIENT else ROOT / name)
+                      RECIPIENT_ROOT / name.removeprefix('recipient/') if name in RECIPIENT else
+                      CALLBACK_ROOT/name.removeprefix('callback/') if name in CALLBACK else ROOT / name)
             if source.is_symlink() or not source.is_file(): raise ValueError('Unsafe signing configuration')
             metadata = source.stat()
             owner = config_owner(name)
@@ -167,6 +176,10 @@ def backup():
             import fcntl
             lock = locks.enter_context((RECIPIENT_ROOT / 'operations.lock').open('a'))
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if CALLBACK_ROOT.exists():
+            if CALLBACK_ROOT.is_symlink() or CALLBACK_ROOT.stat().st_uid!=0 or CALLBACK_ROOT.stat().st_mode&0o077:raise ValueError('Private callback recovery required')
+            import fcntl
+            lock=locks.enter_context((CALLBACK_ROOT/'operations.lock').open('a'));fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         return backup_data()
 
 
@@ -175,7 +188,7 @@ def validate_snapshot(snapshot):
         raise ValueError('Exact private signing snapshot required')
     manifest = json.loads((snapshot / 'backup-manifest.json').read_text())
     present = set(manifest.get('files', {}))
-    if manifest.get('version') != 1 or manifest.get('images') != signing.IMAGES or not set(CONFIG) <= present or not present <= set(CONFIG + BOOTSTRAP + GATEWAY + RECIPIENT) or set(manifest.get('fileMetadata', {})) != present or set(manifest.get('volumes', {})) != {'database', 'cache'} or (present & set(GATEWAY) and not set(GATEWAY) <= present) or (present & set(RECIPIENT) and not set(RECIPIENT) <= present):
+    if manifest.get('version') != 1 or manifest.get('images') != signing.IMAGES or not set(CONFIG) <= present or not present <= set(CONFIG + TRUST + BOOTSTRAP + GATEWAY + RECIPIENT + CALLBACK) or set(manifest.get('fileMetadata', {})) != present or set(manifest.get('volumes', {})) != {'database', 'cache'} or (present & set(GATEWAY) and not set(GATEWAY) <= present) or (present & set(RECIPIENT) and not set(RECIPIENT) <= present) or (present & set(CALLBACK) and not set(CALLBACK)<=present):
         raise ValueError('Signing recovery manifest differs')
     for name, digest in manifest['files'].items():
         if (snapshot / name).is_symlink() or checksum(snapshot / name) != digest: raise ValueError('Signing configuration/key checksum differs')
@@ -190,6 +203,9 @@ def validate_snapshot(snapshot):
         directory = snapshot / 'recipient'
         if directory.is_symlink() or not directory.is_dir() or directory.stat().st_uid != 0 or directory.stat().st_mode & 0o077:
             raise ValueError('Private recipient snapshot directory required')
+    if present & set(CALLBACK):
+        directory=snapshot/'callback'
+        if directory.is_symlink() or not directory.is_dir() or directory.stat().st_uid!=0 or directory.stat().st_mode&0o077:raise ValueError('Private callback snapshot directory required')
     for name, record in manifest['volumes'].items():
         target = snapshot / (name + '.tar')
         if target.is_symlink() or checksum(target) != record['sha256']: raise ValueError('Signing archive checksum differs')
@@ -260,9 +276,19 @@ def configuration_probe(snapshot, metadata):
     # only on disposable copies and prove the actual app UID can use them.
     with tempfile.TemporaryDirectory(prefix='signing-config-restore-') as temporary:
         restored = Path(temporary)
-        for name in CONFIG:
+        for name in CONFIG + [name for name in TRUST if (snapshot / name).exists()]:
             shutil.copyfile(snapshot / name, restored / name)
             row = metadata[name]; os.chown(restored / name, row['uid'], row['gid']); (restored / name).chmod(row['mode'])
+        pin=json.loads((snapshot/'manifest.json').read_text())
+        if pin.get('callbackCertificateSha256') is not None:
+            certificate=restored/'callback-trust.cert.pem'
+            if not certificate.is_file() or checksum(certificate)!=pin['callbackCertificateSha256']:
+                raise ValueError('Restored provider callback trust differs')
+            signing.run(['openssl','x509','-in',str(certificate),'-noout','-checkend','0'])
+            signing.run(['docker','run','--rm','--network','none','--read-only','--user','1001:1001','--cap-drop','ALL',
+                '--mount','type=bind,source='+str(certificate)+',target=/proof/callback.cert.pem,readonly','--entrypoint','node',signing.IMAGES['app'],
+                '-e',"new(require('node:crypto').X509Certificate)(require('node:fs').readFileSync('/proof/callback.cert.pem'))"])
+        elif (restored/'callback-trust.cert.pem').exists():raise ValueError('Unexpected restored callback trust')
         signing.run(['docker', 'run', '--rm', '--network', 'none', '--read-only', '--user', '1001:1001',
             '--cap-drop', 'ALL', '--security-opt', 'no-new-privileges', '--memory', '128m', '--cpus', '0.5',
             '--mount', 'type=bind,source=' + str(restored / 'signing.p12') + ',target=/secrets/signing.p12,readonly',
@@ -315,12 +341,33 @@ def recipient_probe(snapshot):
             '--entrypoint', 'nginx', GATEWAY_IMAGE, '-t'])
 
 
+def callback_probe(snapshot):
+    spec=importlib.util.spec_from_file_location('restored_callback',Path(__file__).with_name('owned-signing-callback.py'))
+    callback=importlib.util.module_from_spec(spec);spec.loader.exec_module(callback)
+    directory=snapshot/'callback';config=json.loads((directory/'compose.json').read_text())
+    callback.PROJECT=config['name'];callback.PROVIDER_PROJECT=config['networks']['provider']['name'].removesuffix('_private')
+    pin=json.loads((directory/'manifest.json').read_text())
+    if config!=callback.configuration() or (directory/'nginx.conf').read_bytes()!=callback.template() or pin!={
+        'version':1,'image':GATEWAY_IMAGE,'coreConnected':False,'configSha256':checksum(directory/'nginx.conf'),
+        'certificateSha256':checksum(directory/'callback.cert.pem')}:raise ValueError('Restored callback configuration differs')
+    public=signing.run(['openssl','x509','-in',str(directory/'callback.cert.pem'),'-pubkey','-noout'])
+    if public!=signing.run(['openssl','pkey','-in',str(directory/'callback.key.pem'),'-pubout']):raise ValueError('Restored callback TLS identity differs')
+    with tempfile.TemporaryDirectory(prefix='signing-callback-restore-') as temporary:
+        root=Path(temporary);mounts=[]
+        for name,target in [('nginx.conf','/etc/nginx/nginx.conf'),('callback.key.pem','/secrets/callback.key.pem'),('callback.cert.pem','/secrets/callback.cert.pem')]:
+            shutil.copyfile(directory/name,root/name);os.chown(root/name,101,101);(root/name).chmod(0o600)
+            mounts+=['--mount','type=bind,source='+str(root/name)+',target='+target+',readonly']
+        signing.run(['docker','run','--rm','--network','none','--read-only','--user','101:101','--cap-drop','ALL',
+            '--tmpfs','/tmp:rw,nosuid,size=32m,uid=101,gid=101,mode=0700',*mounts,'--entrypoint','nginx',GATEWAY_IMAGE,'-t'])
+
+
 def drill(snapshot):
     manifest = validate_snapshot(snapshot)
     signing.run(['openssl', 'pkcs12', '-in', str(snapshot / 'signing.p12'), '-passin', 'file:' + str(snapshot / 'certificate.pass'), '-noout'])
     configuration_probe(snapshot, manifest['fileMetadata'])
     if set(GATEWAY) <= set(manifest['files']): gateway_probe(snapshot)
     if set(RECIPIENT) <= set(manifest['files']): recipient_probe(snapshot)
+    if set(CALLBACK)<=set(manifest['files']):callback_probe(snapshot)
     for name, record in manifest['volumes'].items():
         volume = 'codexdentist-signing-restore-' + uuid.uuid4().hex
         signing.run(['docker', 'volume', 'create', '--label', 'com.codexdentist.restore=' + volume, volume])
@@ -338,6 +385,7 @@ def drill(snapshot):
         'certificatePassphrase': True, 'appOrMailWorkersStarted': False}
     if set(GATEWAY) <= set(manifest['files']): proof['gatewayConfigurationUsable'] = True
     if set(RECIPIENT) <= set(manifest['files']): proof['recipientConfigurationUsable'] = True
+    if set(CALLBACK)<=set(manifest['files']):proof['callbackConfigurationUsable']=True
     proof = json.dumps(proof).encode()
     target = snapshot / 'restore-verified.json'
     if target.exists():

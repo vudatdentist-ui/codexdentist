@@ -59,10 +59,11 @@ def seal(snapshot, recipient, pin, openssl):
         raise ValueError('Gateway key/configuration recovery must pass too')
     if set(recovery.RECIPIENT) <= set(manifest['files']) and proof.get('recipientConfigurationUsable') is not True:
         raise ValueError('Recipient configuration recovery must pass too')
+    if set(recovery.CALLBACK)<=set(manifest['files']) and proof.get('callbackConfigurationUsable') is not True:raise ValueError('Callback configuration recovery must pass too')
     certificate(openssl, recipient, pin)
     allowed = set(manifest['files']) | {'database.tar', 'cache.tar', 'backup-manifest.json', 'restore-verified.json'}
     actual = {path.relative_to(snapshot).as_posix() for path in snapshot.rglob('*') if path.is_file()}
-    if actual != allowed or any(path.is_symlink() or not (path.is_file() or path.is_dir() and path in [snapshot / 'gateway', snapshot / 'recipient']) for path in snapshot.rglob('*')):
+    if actual != allowed or any(path.is_symlink() or not (path.is_file() or path.is_dir() and path in [snapshot / 'gateway', snapshot / 'recipient',snapshot/'callback']) for path in snapshot.rglob('*')):
         raise ValueError('Unexpected signing snapshot content; preserve for review')
     root = recovery.ROOT / 'sealed-snapshots'; root.mkdir(mode=0o700, exist_ok=True)
     target = root / (snapshot.name + '.cms'); partial = target.with_suffix('.cms.partial'); metadata = target.with_suffix('.cms.json')
@@ -135,7 +136,7 @@ def verify(target, recipient, private_key, pin, openssl):
     if total != metadata['plaintextBytes'] or digest.hexdigest() != metadata['plaintextTarSha256'] or not manifest or not proof:
         raise ValueError('Recovered signing archive differs')
     recovery = recovery_module(); present = set(manifest.get('files', {}))
-    if manifest.get('version') != 1 or manifest.get('images') != metadata['images'] or manifest['images'] != recovery.signing.IMAGES or set(manifest.get('volumes', {})) != {'database', 'cache'} or not set(recovery.CONFIG) <= present or not present <= set(recovery.CONFIG + recovery.BOOTSTRAP + recovery.GATEWAY + recovery.RECIPIENT) or (present & set(recovery.GATEWAY) and not set(recovery.GATEWAY) <= present) or (present & set(recovery.RECIPIENT) and not set(recovery.RECIPIENT) <= present):
+    if manifest.get('version') != 1 or manifest.get('images') != metadata['images'] or manifest['images'] != recovery.signing.IMAGES or set(manifest.get('volumes', {})) != {'database', 'cache'} or not set(recovery.CONFIG) <= present or not present <= set(recovery.CONFIG + recovery.TRUST + recovery.BOOTSTRAP + recovery.GATEWAY + recovery.RECIPIENT + recovery.CALLBACK) or (present & set(recovery.GATEWAY) and not set(recovery.GATEWAY) <= present) or (present & set(recovery.RECIPIENT) and not set(recovery.RECIPIENT) <= present) or (present & set(recovery.CALLBACK) and not set(recovery.CALLBACK)<=present):
         raise ValueError('Recovered signing manifest differs')
     if set(hashes) != present | {'database.tar', 'cache.tar', 'backup-manifest.json', 'restore-verified.json'}:
         raise ValueError('Recovered signing files differ')
@@ -154,6 +155,7 @@ def verify(target, recipient, private_key, pin, openssl):
         raise ValueError('Gateway recovery acceptance missing')
     if present & set(recovery.RECIPIENT) and proof.get('recipientConfigurationUsable') is not True:
         raise ValueError('Recipient recovery acceptance missing')
+    if present&set(recovery.CALLBACK) and proof.get('callbackConfigurationUsable') is not True:raise ValueError('Callback recovery acceptance missing')
     accepted = {'pass': True, 'authenticatedDecryption': True, 'allVolumeAndPrivateKeyChecksums': True,
         'plaintextStoredOnDisk': False, 'snapshot': metadata['snapshot']}
     destination = target.with_suffix('.restore-proof.json')

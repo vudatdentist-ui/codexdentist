@@ -19,7 +19,7 @@ class SigningRecoveryEncryption(unittest.TestCase):
         cls.openssl = shutil.which('openssl') or str(Path('C:/Program Files/Git/mingw64/bin/openssl.exe'))
         if not Path(cls.openssl).is_file(): raise RuntimeError('Installed OpenSSL is required; do not skip recovery verification')
 
-    def fixture(self, root, gateway=None, recipient=None):
+    def fixture(self, root, gateway=None, recipient=None, callback=None):
         key, cert = root / 'synthetic.key.pem', root / 'synthetic.cert.pem'
         subprocess.run([self.openssl, 'req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-sha256', '-days', '1',
             '-subj', '/CN=Synthetic recovery unit fixture', '-keyout', str(key), '-out', str(cert)], check=True, capture_output=True)
@@ -32,6 +32,10 @@ class SigningRecoveryEncryption(unittest.TestCase):
         if recipient:
             names = recovery.RECIPIENT[:-1] if recipient == 'partial' else recovery.RECIPIENT
             files.update({name: ('Synthetic private recipient fixture ' + name).encode() for name in names})
+        if callback:
+            names=recovery.CALLBACK[:-1] if callback=='partial' else recovery.CALLBACK
+            files.update({name:('Synthetic private callback fixture '+name).encode() for name in names})
+            files['callback-trust.cert.pem']=b'Synthetic provider public certificate fixture'
         volumes = {name: ('Synthetic archive fixture ' + name).encode() for name in ['database', 'cache']}
         manifest = {'version': 1, 'images': recovery.signing.IMAGES, 'files': {name: hashlib.sha256(value).hexdigest() for name, value in files.items()},
             'fileMetadata': {name: {'uid': recovery.config_owner(name), 'gid': recovery.config_owner(name), 'mode': 0o600} for name in files},
@@ -43,6 +47,7 @@ class SigningRecoveryEncryption(unittest.TestCase):
         proof['appOrMailWorkersStarted'] = False
         if gateway: proof['gatewayConfigurationUsable'] = True
         if recipient and recipient != 'missing-proof': proof['recipientConfigurationUsable'] = True
+        if callback and callback!='missing-proof':proof['callbackConfigurationUsable']=True
         files['restore-verified.json'] = json.dumps(proof).encode()
         snapshot = '20261110T000000Z-a1b2c3d4'; source = io.BytesIO()
         with tarfile.open(fileobj=source, mode='w') as archive:
@@ -107,6 +112,15 @@ class SigningRecoveryEncryption(unittest.TestCase):
                 if stage == 'complete': seal.verify(target, cert, key, pin, self.openssl)
                 else:
                     with self.assertRaises(ValueError): seal.verify(target, cert, key, pin, self.openssl)
+                    self.assertFalse(target.with_suffix('.restore-proof.json').exists())
+
+    def test_callback_recovery_requires_complete_identity_trust_and_restore_proof(self):
+        for stage in ['complete','partial','missing-proof']:
+            with self.subTest(stage=stage),tempfile.TemporaryDirectory() as temporary:
+                target,cert,key,pin,metadata=self.fixture(Path(temporary),callback=stage)
+                if stage=='complete':seal.verify(target,cert,key,pin,self.openssl)
+                else:
+                    with self.assertRaises(ValueError):seal.verify(target,cert,key,pin,self.openssl)
                     self.assertFalse(target.with_suffix('.restore-proof.json').exists())
 
 
