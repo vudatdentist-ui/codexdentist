@@ -148,14 +148,15 @@ and rejection of a bad signature; no message was sent. Public-only sender DNS
 values are in `/opt/codexdentist-owned-mail/sender-dns-records.json`. Browser
 access became available on 2026-11-10: the existing single SPF record and new
 DKIM TXT selector were saved through Cloudflare and both exact values verified
-against public DNS. Existing inbound MX/mail records were preserved. External
-recipient acceptance and the app transport switch remain separate gates.
+against public DNS. Existing inbound MX/mail records were preserved. The later
+approved external recipient acceptance and app transport switch are recorded
+below; the original standby proof remains historical and must not be replayed.
 
 `codexdentist-mail-backup.timer` is enabled daily at 19:40 UTC with up to five
 minutes jitter, after its manual backup/restore/encryption acceptance. Reviewed
 operators and source hashes live under `/opt/codexdentist-owned-mail/operators`;
 `last-verified-backup.json` points to the last verified private snapshot and CMS
-archive. Snapshot `20261109T162221Z-a0ed7baa` passed both volume restores and
+archive. Post-cutover snapshot `20261110T085642Z-2d52bd3f` passed both volume restores and
 public-recipient encryption using the existing recovery certificate. Its encrypted
 copy is on the owner's PC under the private backup `snapshots/owned-mail`
 directory, with an authenticated in-memory decryption/hash proof. No plaintext
@@ -882,8 +883,9 @@ apply. Review and install deployer changes explicitly outside the release checko
 Optional payOS, Documenso and Orthanc/OHIF stay disabled without real configuration.
 Private OHIF/PACS access must enforce study authorization independently of knowing
 a viewer URL; desktop/mobile integration evidence must be collected before enabling it.
-Production notification readiness accepts configured Resend email or validated
-HTTPS webhook delivery. Unsupported channels must never be reported as sent.
+Production notification readiness accepts the signed live owned-mail gateway,
+configured Resend email or validated HTTPS webhook delivery. Current email uses
+owned-mail. Unsupported channels must never be reported as sent.
 
 Run before connecting real patient data:
 

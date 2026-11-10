@@ -6,6 +6,8 @@ from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('gateway', Path(__file__).with_name('owned-signing-gateway.py'))
 gateway = importlib.util.module_from_spec(spec); spec.loader.exec_module(gateway)
+spec = importlib.util.spec_from_file_location('gateway_recovery', Path(__file__).with_name('owned-signing-backup.py'))
+recovery = importlib.util.module_from_spec(spec); spec.loader.exec_module(recovery)
 
 
 class SigningGateway(unittest.TestCase):
@@ -35,6 +37,13 @@ class SigningGateway(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary, patch.object(gateway, 'ROOT', Path(temporary)), patch.object(gateway, 'run') as run:
             with self.assertRaises(ValueError): gateway.prepare()
             run.assert_not_called()
+
+    def test_runtime_and_recovery_share_the_exact_gateway_identity_and_private_ownership(self):
+        self.assertEqual(gateway.IMAGE, recovery.GATEWAY_IMAGE)
+        self.assertEqual(set(recovery.GATEWAY), {'gateway/' + name for name in
+            ['compose.json', 'manifest.json', 'nginx.conf', 'gateway.key.pem', 'gateway.cert.pem']})
+        for name in recovery.GATEWAY:
+            self.assertEqual(recovery.config_owner(name), 0 if name.endswith(('compose.json', 'manifest.json')) else 101)
 
 
 if __name__ == '__main__': unittest.main()

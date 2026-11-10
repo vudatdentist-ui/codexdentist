@@ -312,8 +312,8 @@ authenticated `SENT` evidence. No real patient message or transfer was sent.
 The financial audit is identical before/after deployment with zero mismatches.
 A real bank
 receiving account is an owner-entered clinic setting; never substitute the test
-account. Existing cloud mail/AI/file configuration remains preserved pending a
-verified free migration; its current billing plan is not established.
+account. AI, private files and email now use the verified owned runtimes described
+below; previous cloud credentials/original files remain private rollback custody.
 Chatwoot's public staff login has separate HTTPS browser/API origins and was
 rendered at 1440/390/320px. Publication additionally proves the installation form
 is closed; an account API response alone is insufficient. Main and synthetic
@@ -483,8 +483,8 @@ rollback. Exact-main push CI, core backup/restore, go-live/readiness, effective
 runtime inference, owner UI and unchanged financial audit pass. The independent
 production inference used only synthetic data and made no database writes.
 Model cache snapshot `20261109T121524Z-bcfd9e53` passed isolated restoration with
-matching SHA-256 for every file and the pinned model metadata. Mail remains Resend
-until its own verified SMTP cutover; private files now use the owned volume below.
+matching SHA-256 for every file and the pinned model metadata. Email has completed
+its separate owned SMTP cutover; private files use the owned volume below.
 
 Durable private filesystem storage is deployed in `88a6244` (PR #97), with exact
 main CI `42630373297` passing. Production writes to `local` on the private named
