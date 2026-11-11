@@ -73,6 +73,10 @@ mounts remain denied. Attachment tests do not prove tenant activation.
 `python3 scripts/owned-signing-retire-qa.test.py` checks that retirement removes
 only the accepted synthetic callback alias and preserves its database/files;
 production, mail-enabled, foreign-image/network/project and replayed stages deny.
+The Documenso adapter regression requires an explicit disabled reminder payload
+for owned deployments while preserving independent account defaults. Native CE
+envelope acceptance must read back that policy and prove `nextReminderAt=null`;
+a parsed payload alone does not prove upstream scheduling behavior.
 
 `python3 scripts/owned-mail-attachments.test.py` checks the exact MIME size and
 buffering delta and denies changes to sender, TLS, keys, mounts, images, ports

@@ -30,7 +30,7 @@ NETWORKS = {'owned_signing_api': 'codexdentist-owned-signing-gateway_api',
     'owned_signing_callback_core': 'codexdentist-signing-callback_core'}
 ALIAS = 'codexdentist-signing-core'
 UPDATES = {'DOCUMENSO_DEFAULT_BASE_URL': 'https://codexdentist-signing-gateway:3443/api/v2',
-    'DOCUMENSO_SEND_OWNER_EMAILS': 'false', 'NODE_EXTRA_CA_CERTS': trust.SERVICE_TARGET}
+    'DOCUMENSO_SEND_OWNER_EMAILS': 'false', 'DOCUMENSO_AUTOMATIC_REMINDERS': 'false', 'NODE_EXTRA_CA_CERTS': trust.SERVICE_TARGET}
 
 
 def compose_text(text):
@@ -117,6 +117,9 @@ def cutover(sha, apply=False):
     # Activation follows, rather than reinterprets, existing clinical requests.
     query = '''const{Pool}=require('pg');const p=new Pool({connectionString:process.env.DATABASE_URL,max:1});(async()=>{try{const r=await p.query(`SELECT count(*)::int n FROM "IntegrationConnection" WHERE provider='documenso'`);if(r.rows[0].n!==0)throw Error()}finally{await p.end()}})().catch(()=>process.exit(1));'''
     mail.run(['docker', 'exec', CONTAINER, 'node', '-e', query])
+    source = ROOT / 'releases' / sha
+    if mail.run(['git', '-C', str(source), 'rev-parse', 'HEAD']).decode().strip() != sha or mail.run(['git', '-C', str(source), 'status', '--porcelain']).strip() or 'DOCUMENSO_AUTOMATIC_REMINDERS' not in (source / 'src/app/api/integrations/documenso/connection-secrets.ts').read_text():
+        raise ValueError('The exact deployed source must support the reviewed automatic-reminder policy')
     smtp.signing.status(SIGNING); smtp.signing.health(SIGNING); smtp.smtp_network(True)
     accepted = json.loads((SIGNING / 'smtp.completed.json').read_text())
     if accepted.get('pass') is not True or accepted.get('globalAndQaMailCaptured') is not True:

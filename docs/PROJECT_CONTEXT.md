@@ -612,6 +612,14 @@ database/file/CMS/replay check. Its database, files and evidence remain preserve
 the stopped core container and future Compose callback alias have been removed.
 The production core still has no signing vault binding. Attachment also requires
 the actual MTA's accepted PDF-size boundary, not only successful SMTP greeting.
+Queue review found seven normal periodic sweeps in the actual
+`documenso:documenso-jobs` namespace. The default `bull:` prefix was an invalid
+oracle and its empty result must not be used as readiness evidence. Owned main
+has no envelopes, while old QA work remains captured. Provider organization
+defaults enable 5-day/2-day reminders; `DOCUMENSO_AUTOMATIC_REMINDERS=false`
+therefore explicitly disables first/repeated reminders in each new app envelope
+until an operator policy is approved. Independent provider installations retain
+their defaults. Attachment requires deployed source that supports this policy.
 
 SMTP audit found that CE completion emails attach the signed PDF, exceeding
 the original 96KB credential-email MTA limit even for the accepted synthetic

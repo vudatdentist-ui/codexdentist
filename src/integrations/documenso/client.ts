@@ -7,6 +7,7 @@ export type DocumensoSecrets = {
   webhookSecret: string;
   baseUrl: string;
   sendOwnerEmails?: boolean;
+  automaticReminders?: boolean;
 };
 
 export type DocumensoSigningRequest = {
@@ -80,6 +81,10 @@ export async function createDocumensoSigningEnvelope(
       ...(input.redirectUrl ? { redirectUrl: input.redirectUrl } : {}),
       subject: "Vui lòng ký xác nhận tài liệu",
       message: "Vui lòng xem lại và ký tài liệu được gửi từ phòng khám.",
+      ...(secrets.automaticReminders === false ? { reminderSettings: {
+        sendAfter: { disabled: true },
+        repeatEvery: { disabled: true },
+      } } : {}),
       ...(secrets.sendOwnerEmails === false ? { emailSettings: {
         recipientSigned: false,
         ownerDocumentCompleted: false,

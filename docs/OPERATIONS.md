@@ -606,6 +606,12 @@ alias. Retire the accepted QA fixture deliberately before attaching the real
 core alias; never allow both cores to resolve as `codexdentist-signing-core`.
 It also requires the accepted same-image MTA attachment transition and a fresh
 strict-TLS SMTP size/oversize probe, which submits no message.
+The deployed source must include `DOCUMENSO_AUTOMATIC_REMINDERS`; attachment sets
+it to false, overriding upstream organization defaults per new app envelope.
+Do not enable automatic patient reminders without an explicit operator policy.
+Review the provider's actual `documenso:documenso-jobs` queue namespace, not the
+default BullMQ prefix. Periodic sweeps are distinct from queued recipient mail.
+Old QA metadata remains captured and is not rewritten as part of attachment.
 `owned-signing-retire-qa.py` first reruns actual read-only core/provider/PDF
 acceptance; `--apply` stops only the manifest-pinned synthetic project, removes
 its stopped core container and removes the callback alias from its future
