@@ -55,6 +55,20 @@ def probe_limit():
         raise ValueError('Actual MTA attachment size boundary differs')
 
 
+def require_accepted():
+    pin = json.loads((mail.ROOT / 'manifest.json').read_text())
+    revision = pin.get('configRevision', '')
+    if not re.fullmatch('[a-f0-9]{40}', revision): raise ValueError('Accepted attachment-capable SMTP revision required')
+    activation.validate_stage(mail.ROOT, pin)
+    record = mail.ROOT / ('attachment-upgrade-' + revision[:12]) / 'accepted.json'
+    if record.is_symlink() or not record.is_file(): raise ValueError('Accepted MTA attachment transition required')
+    proof = json.loads(record.read_text())
+    if any(proof.get(key) is not True for key in ['pass', 'sameImagesAndPrivateMounts', 'gatewayRequestLimitUnchanged',
+            'privateDiskBuffering', 'actualSmtpSizeAndDenialVerified', 'noMessageSent']):
+        raise ValueError('Complete MTA attachment acceptance required')
+    probe_limit()
+
+
 def upgrade(sha, apply=False):
     if not re.fullmatch('[a-f0-9]{40}', sha): raise ValueError('Reviewed exact configuration revision required')
     source = activation.RELEASES / sha
