@@ -1,13 +1,29 @@
 import importlib.util
 import json
 from pathlib import Path
+import tempfile
 import unittest
+from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('attachments', Path(__file__).with_name('owned-mail-attachments.py'))
 attachments = importlib.util.module_from_spec(spec); spec.loader.exec_module(attachments)
 
 
 class BoundedSignedPdfMail(unittest.TestCase):
+    def test_signing_activation_requires_complete_attachment_acceptance_and_actual_smtp_probe(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); revision = 'a' * 40
+            (root / 'manifest.json').write_text(json.dumps({'configRevision': revision}))
+            state = root / ('attachment-upgrade-' + revision[:12]); state.mkdir(); record = state / 'accepted.json'
+            keys = ['pass', 'sameImagesAndPrivateMounts', 'gatewayRequestLimitUnchanged', 'privateDiskBuffering', 'actualSmtpSizeAndDenialVerified', 'noMessageSent']
+            with patch.object(attachments.mail, 'ROOT', root), patch.object(attachments.activation, 'validate_stage'), patch.object(attachments, 'probe_limit') as probe:
+                with self.assertRaises(ValueError): attachments.require_accepted()
+                for key in keys:
+                    record.write_text(json.dumps({name: name != key for name in keys}))
+                    with self.assertRaises(ValueError): attachments.require_accepted()
+                probe.assert_not_called()
+                record.write_text(json.dumps(dict.fromkeys(keys, True))); attachments.require_accepted(); probe.assert_called_once()
+
     def test_recreated_container_may_only_change_generated_hostname_and_network_endpoint_values(self):
         before = {'Id': 'old-container', 'Image': 'same-image', 'Config': {'Hostname': 'old-id', 'Env': ['preserved=secret'], 'User': '1000:1000', 'Labels': {'com.docker.compose.replace': 'older-container'}},
             'HostConfig': {'ReadonlyRootfs': True, 'Mounts': ['private-preserved'], 'PortBindings': {}},

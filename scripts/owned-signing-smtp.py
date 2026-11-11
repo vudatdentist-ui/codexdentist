@@ -174,7 +174,12 @@ def main():
     with (signing.ROOT / 'operations.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         if args.action == 'prepare-admin': prepare_admin()
-        elif args.action == 'enable': enable()
+        elif args.action == 'enable':
+            attachments = load('smtp_attachment_boundary', 'owned-mail-attachments.py')
+            with (MAIL_ROOT / 'operations.lock').open('a') as mail_lock:
+                fcntl.flock(mail_lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                attachments.require_accepted()
+                enable()
         else:
             signing.status(signing.ROOT); signing.health(signing.ROOT); smtp_network(True); client(admin_input(signing.ROOT, 'inspect'))
             print('PASS encrypted main-only SMTP and separate ordinary main/QA provider identities.')
