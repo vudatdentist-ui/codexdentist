@@ -47,6 +47,14 @@ def same_runtime(before, after):
         raise ValueError('MTA image, mounts, ports, limits, networks or credentials changed')
 
 
+def probe_limit():
+    source = Path(__file__).with_name('owned-mail-smtp-size.cjs').read_text()
+    source += "\nmodule.exports.probe({host:'codexdentist-mail-smtp',ca:require('node:fs').readFileSync('/secrets/smtp.cert.pem')}).then(r=>console.log(JSON.stringify(r))).catch(()=>process.exitCode=1);"
+    value = json.loads(mail.run(['docker', 'exec', mail.PROJECT + '-gateway-1', 'node', '-e', source]))
+    if value != {'pass': True, 'smtpMaxBytes': 80 * 1024 * 1024, 'declaredOversizeDenied': True, 'messageSubmitted': False}:
+        raise ValueError('Actual MTA attachment size boundary differs')
+
+
 def upgrade(sha, apply=False):
     if not re.fullmatch('[a-f0-9]{40}', sha): raise ValueError('Reviewed exact configuration revision required')
     source = activation.RELEASES / sha
@@ -80,7 +88,7 @@ def upgrade(sha, apply=False):
         'up', '-d', '--no-deps', '--force-recreate', '--pull', 'never', 'smtp'])
     try:
         replace(directory / 'maddy.conf', proposed); replace(directory / 'manifest.json', proposed_manifest); recreate()
-        activation.validate_stage(directory, json.loads(proposed_manifest)); activation.ready(directory, pin)
+        activation.validate_stage(directory, json.loads(proposed_manifest)); activation.ready(directory, pin); probe_limit()
         after = json.loads(mail.run(['docker', 'inspect', mail.PROJECT + '-smtp-1']))[0]
         same_runtime(identities['smtp'], after)
         gateway = json.loads(mail.run(['docker', 'inspect', mail.PROJECT + '-gateway-1']))[0]
@@ -92,7 +100,7 @@ def upgrade(sha, apply=False):
         mail.write_private(state / 'rolled-back.json', json.dumps({'pass': True, 'previousConfigurationRestored': True}).encode())
         raise
     mail.write_private(state / 'accepted.json', json.dumps({'pass': True, 'sameImagesAndPrivateMounts': True,
-        'gatewayRequestLimitUnchanged': True, 'privateDiskBuffering': True, 'noMessageSent': True}).encode())
+        'gatewayRequestLimitUnchanged': True, 'privateDiskBuffering': True, 'actualSmtpSizeAndDenialVerified': True, 'noMessageSent': True}).encode())
     print('PASS attachment-capable bounded MTA; same images/keys/routes, private disk buffering and no message sent.')
 
 
