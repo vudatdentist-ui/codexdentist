@@ -599,6 +599,34 @@ until the owner supplies and verifies their actual credentials.
 
 ## Documenso operator setup
 
+Before enabling main signing SMTP, use `owned-mail-attachments.py --sha
+<clean-reviewed-release>` to review the exact MTA size/buffering transition;
+`--apply` cold-backs-up/restores first and recreates only the same-image MTA.
+It preserves sender/DNS/TLS/queue policy and the gateway's 64KB request limit.
+MIME is bounded at 80MB to accommodate the existing 50MB PDF ceiling after base64;
+bodies above 1MB use private `/data/buffer` under the existing owned mail volume.
+`configRevision` pins only this configuration separately from the preserved
+gateway image revision. Retain transition originals, acceptance/rollback records
+and the resulting combined encrypted mail recovery; do not send another real
+test under the consumed one-email approval.
+
+`owned-signing-smtp.py prepare-admin|enable|inspect` is the reviewed staged
+main-only mail operator. Run under the provider operations lock with a fresh
+cold backup/restore before each transition; retained intents/results require
+inspection, not replay. A new private admin receives captured verification,
+then the documented self-host admin role grant. Ordinary main/QA roles and
+tokens remain separate. The main provider organization alone receives an
+encrypted SMTP transport for `codexdentist-mail-smtp:2465` over strict TLS.
+Only the provider app joins `codexdentist-owned-mail_smtp`; database, cache and
+capture remain private. Mount public callback/SMTP certificates read-only in
+the exact combined trust bundle. Global and QA email stays captured, including
+old synthetic jobs. Preserve admin/transport intents, acknowledgements and
+trust in the combined provider recovery. Acceptance uses SMTP verify only;
+it does not authorize another real test email. Set
+`DOCUMENSO_SEND_OWNER_EMAILS=false` for owned headless accounts before real
+patient sends so internal owner copies do not target the service mailbox.
+Keep the default true for normal independently managed signing accounts.
+
 The private gateway operator is `owned-signing-gateway.py prepare|up|status|probe`
 at `/opt/codexdentist-owned-signing-gateway`. It pins unprivileged Nginx by digest,
 uses a distinct TLS key/certificate, internal API/recipient networks and the

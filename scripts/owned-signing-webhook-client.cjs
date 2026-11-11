@@ -14,7 +14,7 @@ async function run(raw){
   if(!['create','inspect'].includes(input.action)||process.env.NEXT_PUBLIC_WEBAPP_URL!=='https://sign.codexdentist.com'||
      process.env.NEXT_PUBLIC_DISABLE_SIGNUP!=='true'||process.env.NEXT_PRIVATE_SMTP_HOST!=='capture'||
      process.env.NEXT_PRIVATE_WEBHOOK_SSRF_BYPASS_HOSTS!=='codexdentist-signing-callback'||
-     process.env.NODE_EXTRA_CA_CERTS!=='/secrets/callback-trust.cert.pem')throw Error('Verified captured-mail callback stage required');
+     !['/secrets/callback-trust.cert.pem','/secrets/provider-trust.cert.pem'].includes(process.env.NODE_EXTRA_CA_CERTS))throw Error('Verified captured-mail callback stage required');
   const database=new URL(process.env.NEXT_PRIVATE_DATABASE_URL);
   if(database.hostname!=='database'||database.pathname!=='/signing')throw Error('Private provider database required');
   const {PrismaClient}=require('@prisma/client');const prisma=new PrismaClient();const jar=new Map();

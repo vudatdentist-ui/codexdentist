@@ -12,10 +12,12 @@ export async function documensoConnectionSecrets(connection: IntegrationConnecti
   if (connection.secretRef === "vault:v1") {
     const secrets = await readIntegrationSecrets(db, { organizationId: connection.organizationId, connectionId: connection.id, provider: "documenso" });
     if (!secrets?.apiToken || !secrets.webhookSecret) throw new IntegrationConfigurationError("documenso-credential-missing", "Connection credentials are unavailable");
-    return { apiToken: secrets.apiToken, webhookSecret: secrets.webhookSecret, baseUrl: documensoBaseUrl() };
+    return { apiToken: secrets.apiToken, webhookSecret: secrets.webhookSecret, baseUrl: documensoBaseUrl(),
+      sendOwnerEmails: process.env.DOCUMENSO_SEND_OWNER_EMAILS !== "false" };
   }
   if (process.env.DOCUMENSO_DEFAULT_ORGANIZATION_ID !== connection.organizationId) {
     throw new IntegrationConfigurationError("documenso-connection-not-configured", "Signing account scope is not configured");
   }
-  return resolveDocumensoConnectionSecrets(connection.secretRef);
+  return { ...resolveDocumensoConnectionSecrets(connection.secretRef),
+    sendOwnerEmails: process.env.DOCUMENSO_SEND_OWNER_EMAILS !== "false" };
 }

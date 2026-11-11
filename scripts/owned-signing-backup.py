@@ -19,9 +19,10 @@ signing = importlib.util.module_from_spec(spec); spec.loader.exec_module(signing
 ROOT = signing.ROOT
 CONFIG = ['compose.json', 'manifest.json', 'keys.json', 'certificate.pass', 'signing.key.pem',
     'signing.cert.pem', 'signing.p12', 'license-cache.json']
-TRUST = ['callback-trust.cert.pem']
+TRUST = ['callback-trust.cert.pem', 'smtp-trust.cert.pem', 'provider-trust.cert.pem']
 BOOTSTRAP = ['bootstrap.intent.json', 'bootstrap.before.json', 'bootstrap.api-result.json',
-    'bootstrap.credentials.json', 'bootstrap.completed.json'] + ['webhook.'+purpose+'.'+suffix for purpose in ['main','qa'] for suffix in ['intent.json','api-result.jsonl','bindings.json']]
+    'bootstrap.credentials.json', 'bootstrap.completed.json', 'smtp-admin.intent.json', 'smtp-admin.api-result.json',
+    'smtp-admin.completed.json', 'smtp.intent.json', 'smtp.api-result.json', 'smtp.completed.json'] + ['webhook.'+purpose+'.'+suffix for purpose in ['main','qa'] for suffix in ['intent.json','api-result.jsonl','bindings.json']]
 GATEWAY = ['gateway/compose.json', 'gateway/manifest.json', 'gateway/nginx.conf', 'gateway/gateway.cert.pem', 'gateway/gateway.key.pem']
 GATEWAY_ROOT = Path('/opt/codexdentist-owned-signing-gateway')
 RECIPIENT = ['recipient/' + name for name in ['compose.json', 'manifest.json', 'nginx.conf', 'router.json']]
@@ -280,6 +281,9 @@ def configuration_probe(snapshot, metadata):
             shutil.copyfile(snapshot / name, restored / name)
             row = metadata[name]; os.chown(restored / name, row['uid'], row['gid']); (restored / name).chmod(row['mode'])
         pin=json.loads((snapshot/'manifest.json').read_text())
+        # Validate exact trust bundle and stage composition on the restored
+        # copies, without starting a producer or releasing queued email.
+        signing.installation(restored)
         if pin.get('callbackCertificateSha256') is not None:
             certificate=restored/'callback-trust.cert.pem'
             if not certificate.is_file() or checksum(certificate)!=pin['callbackCertificateSha256']:

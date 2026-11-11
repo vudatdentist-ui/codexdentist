@@ -126,7 +126,9 @@ def main():
     if json.loads((directory/'compose.json').read_text())!=expected:
         raise ValueError('Prepared configuration changed; requires a separately reviewed activation')
     if args.action=='up':
-        source=Path('/opt/codexdentist-deploy/releases')/pin['revision']
+        config_revision=pin.get('configRevision',pin['revision'])
+        if not re.fullmatch('[a-f0-9]{40}',config_revision):raise ValueError('Exact reviewed SMTP configuration revision required')
+        source=Path('/opt/codexdentist-deploy/releases')/config_revision
         original=(source/'scripts/owned-mail/maddy.conf').read_text()
         if hashlib.sha256(original.encode()).hexdigest()!=pin['sourceConfigSha256'] or (directory/'maddy.conf').read_text()!=original.replace('hostname mail.codexdentist.com','hostname '+pin['outboundHostname']):
             raise ValueError('Preserve changed SMTP configuration for review')

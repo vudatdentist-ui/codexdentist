@@ -11,6 +11,20 @@ test('new signing envelopes explicitly use Vietnamese calendar presentation and 
   await client.createDocumensoSigningEnvelope({baseUrl:'https://sign.example.test/api/v2',apiToken:'synthetic',webhookSecret:'synthetic'},
     {externalId:'synthetic',title:'Synthetic PDF',pdfBytes:Buffer.from('%PDF-1.4\nSynthetic only'),fileName:'synthetic.pdf',recipientEmail:'synthetic@example.test',recipientName:'Synthetic signer'});
   assert.equal(payload.meta.timezone,'Asia/Ho_Chi_Minh');assert.equal(payload.meta.dateFormat,'dd/MM/yyyy HH:mm');
+  assert.equal(payload.meta.emailSettings,undefined);
+});
+
+test('explicit service-account policy suppresses owner copies while preserving recipient invitation/completion defaults', async () => {
+  let payload;
+  const client=load('src/integrations/documenso/client.ts',{}, {Response,FormData,Blob,fetch:async(url,init)=>{
+    if(url.endsWith('/envelope/create')){payload=JSON.parse(init.body.get('payload'));return Response.json({id:'synthetic-envelope'});}
+    return Response.json({id:'synthetic-envelope',recipients:[]});
+  }});
+  await client.createDocumensoSigningEnvelope({baseUrl:'https://sign.example.test/api/v2',apiToken:'synthetic',webhookSecret:'synthetic',sendOwnerEmails:false},
+    {externalId:'synthetic',title:'Synthetic PDF',pdfBytes:Buffer.from('%PDF-1.4\nSynthetic only'),fileName:'synthetic.pdf',recipientEmail:'synthetic@example.test',recipientName:'Synthetic signer'});
+  assert.deepEqual(payload.meta.emailSettings,{recipientSigned:false,ownerDocumentCompleted:false,ownerRecipientExpired:false,ownerDocumentCreated:false});
+  assert.equal('recipientSigningRequest' in payload.meta.emailSettings,false);
+  assert.equal('documentCompleted' in payload.meta.emailSettings,false);
 });
 
 test('signed PDF import rejects a foreign completed envelope before downloading any file', async () => {

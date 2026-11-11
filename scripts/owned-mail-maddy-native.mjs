@@ -9,7 +9,7 @@ import nodemailer from 'nodemailer';
 import { ownedMailFixture } from './owned-mail-fixture.mjs';
 assert.equal(process.env.OWNED_MAIL_NATIVE_TEST,'true');
 const {load}=createRequire(import.meta.url)('./audit-source-loader.cjs');
-const fixture=await ownedMailFixture({from:'no-reply@codexdentist.com',storeRoot:'/accept'});
+const fixture=await ownedMailFixture({from:'no-reply@codexdentist.com',storeRoot:'/accept',smtpMaxBytes:80*1024*1024});
 let relay;
 try {
   execFileSync('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=codexdentist-mail-smtp',
@@ -56,6 +56,22 @@ try {
   await client.deliverOwnedMail(settings,input);assert.equal(fixture.messages.length,1);
   await assert.rejects(relay.sendMail({from:'spoof@example.test',to:input.recipient,text:'Synthetic rejected sender'}));
   assert.equal(fixture.messages.length,1);
-  await writeFile('/accept/result.json',JSON.stringify({pass:true,realMta:true,privateTls:true,dkimCryptographicallyVerified:true,headerTamperRejected:true,exactlyOneMessage:true,spoofSenderRejected:true,externalNetwork:false}),{mode:0o600});
+  // Completed signing mail contains the PDF. A tiny credential-email limit
+  // previously rejected even our 271859-byte synthetic signed document.
+  const attachment=Buffer.alloc(1024*1024,0x20);attachment.write('%PDF-1.4\nSynthetic signed copy - no patient data\n');
+  await relay.sendMail({from:fixture.from,to:'synthetic-signed-copy@example.test',subject:'Synthetic signing completion',
+    text:'Synthetic completed PDF only.',attachments:[{filename:'synthetic-signed.pdf',content:attachment,contentType:'application/pdf'}]});
+  for(let i=0;i<100&&fixture.messages.length<2;i++)await new Promise(resolve=>setTimeout(resolve,100));
+  assert.equal(fixture.messages.length,2);const completed=fixture.messages[1];
+  assert.deepEqual(completed.recipients,['synthetic-signed-copy@example.test']);
+  const boundary=completed.body.match(/boundary="([^"\r\n]+)"/)?.[1];assert.ok(boundary);
+  const part=completed.body.split('--'+boundary).find(value=>/Content-Type: application\/pdf/i.test(value));assert.ok(part);
+  const encoded=part.slice(part.indexOf('\r\n\r\n')+4).trim();
+  assert.ok(Buffer.from(encoded,'base64').equals(attachment),'Actual MTA preserves the complete PDF attachment');
+  // Check the advertised bound and rejection without allocating an 80MB body.
+  const sizeProof=await createRequire(import.meta.url)('./owned-mail-smtp-size.cjs').probe({host:'127.0.0.1',ca:await readFile('/accept/smtp.cert.pem')});
+  assert.equal(sizeProof.pass,true);assert.equal(sizeProof.declaredOversizeDenied,true);assert.equal(sizeProof.messageSubmitted,false);
+  await writeFile('/accept/result.json',JSON.stringify({pass:true,realMta:true,privateTls:true,dkimCryptographicallyVerified:true,headerTamperRejected:true,
+    exactlyOneGatewayMessage:true,signingPdfAttachmentVerified:true,smtpDeclaredOversizeDenied:true,smtpMaxBytes:sizeProof.smtpMaxBytes,spoofSenderRejected:true,externalNetwork:false}),{mode:0o600});
   console.log('PASS actual pinned Maddy: private TLS, durable queue, cryptographically verified DKIM, sender restriction, no idempotent replay and no external network.');
 }finally{relay?.close();await fixture.close();}

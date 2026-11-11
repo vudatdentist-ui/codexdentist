@@ -583,6 +583,31 @@ or use a real patient/credential email for QA. Verify the final same-image core
 network/CA cutover, scoped consent/webhook/import/replay behavior and backup timer
 before closing signing. Other VPS applications and inbound mail remain preserved.
 
+The next SMTP stage is implemented but not yet accepted on the owned runtime.
+`owned-signing-smtp.py` creates a dedicated private instance administrator by
+captured API signup/verification and the documented self-host role grant; main
+and QA stay ordinary separate users. It configures one encrypted main-only SMTP
+transport through CE admin APIs, preserving all organization limits/flags and
+suppressing configuration notifications. Global/QA transport stays captured.
+Only the provider app joins the existing internal owned-mail SMTP network with
+an exact read-only callback/SMTP public CA bundle. Intents and partial API
+acknowledgements prevent blind replay. Recovery includes these records and trust.
+No acceptance command sends an external message. Native CE tests must prove
+main/QA routing against an isolated TLS receiver before owned activation.
+`DOCUMENSO_SEND_OWNER_EMAILS=false` explicitly suppresses service-account owner
+copies without changing recipient invitation or completed-document defaults;
+normal installations retain their existing owner-copy behavior.
+
+SMTP audit found that CE completion emails attach the signed PDF, exceeding
+the original 96KB credential-email MTA limit even for the accepted synthetic
+document. The staged MTA transition permits bounded 80MB MIME messages (the core
+PDF download ceiling is 50MB), spilling bodies above 1MB to private disk instead
+of RAM. The signed HTTP notification gateway retains its 64KB request limit.
+Real pinned-MTA acceptance must deliver and compare a 1MB synthetic PDF and deny
+an advertised oversized message before this transition is accepted. The operator
+changes only size/buffering in the same MTA image and preserves queue, DNS,
+sender, TLS keys, gateway image and all other policy. No external test is sent.
+
 Local AI is deployed in `2face1e` (PR #95), with the production configuration
 cutover independently verified on 2026-11-09. The owned VPS has Ollama 0.40.15 and
 Qwen3 4B pinned by image/model digests. Runtime has no published port or external

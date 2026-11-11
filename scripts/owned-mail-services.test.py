@@ -134,6 +134,7 @@ class OwnedMailDeployment(unittest.TestCase):
         self.assertNotIn('tcp://0.0.0.0:25',text);self.assertNotIn('imap ',text)
         self.assertIn('source no-reply@codexdentist.com',text);self.assertIn('Sender not permitted',text)
         self.assertIn('requiretls_override no',text);self.assertIn('min_tls_level encrypted',text)
+        self.assertIn('max_message_size 80M',text);self.assertIn('buffer auto 1M /data/buffer',text)
 
     def test_backup_failure_restarts_every_previously_active_worker(self):
         for restart_failure in [False,True]:

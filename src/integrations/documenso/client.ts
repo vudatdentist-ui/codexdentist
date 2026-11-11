@@ -6,6 +6,7 @@ export type DocumensoSecrets = {
   apiToken: string;
   webhookSecret: string;
   baseUrl: string;
+  sendOwnerEmails?: boolean;
 };
 
 export type DocumensoSigningRequest = {
@@ -79,6 +80,12 @@ export async function createDocumensoSigningEnvelope(
       ...(input.redirectUrl ? { redirectUrl: input.redirectUrl } : {}),
       subject: "Vui lòng ký xác nhận tài liệu",
       message: "Vui lòng xem lại và ký tài liệu được gửi từ phòng khám.",
+      ...(secrets.sendOwnerEmails === false ? { emailSettings: {
+        recipientSigned: false,
+        ownerDocumentCompleted: false,
+        ownerRecipientExpired: false,
+        ownerDocumentCreated: false,
+      } } : {}),
     },
   };
   const form = new FormData();
