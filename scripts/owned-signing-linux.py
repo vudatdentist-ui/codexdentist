@@ -77,6 +77,8 @@ def exercise(directory, app_image=None):
         callback.enable_provider(signing,recovery)
         callback.provision_webhooks(signing,[{'purpose':purpose,'connectionId':'synthetic_'+purpose+'_'+uuid.uuid4().hex,
             'secret':__import__('secrets').token_hex(32)} for purpose in ['main','qa']])
+        rotated = callback.rebind_qa_webhook(signing, 'synthetic_qa_rotated_' + uuid.uuid4().hex, __import__('secrets').token_hex(32))
+        if rotated.get('pass') is not True: raise ValueError('Actual QA webhook migration failed')
         smtp_proof = smtp.exercise(load, signing, recovery, bootstrap, gateway, callback, directory)
         snapshot = recovery.backup(); recovery.drill(snapshot); recovery.drill(snapshot)
         # Synthetic recipient keys belong only to this private test namespace;
@@ -101,6 +103,7 @@ def exercise(directory, app_image=None):
         signing.status(directory); signing.health(directory)
         proof = {'pass': True, 'images': signing.IMAGES, 'closedSignupApi': True, 'privateRestart': True,
             **smtp_proof,
+            'qaWebhookRotatedInPlace': True,
             'separateVerifiedMainAndQaApis': True,
             'crossOwnerApiTokenSubstitutionDenied': True,
             'encryptedRecoveryAndAuthenticatedDecryption': True,

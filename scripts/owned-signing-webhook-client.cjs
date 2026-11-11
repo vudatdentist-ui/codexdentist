@@ -11,13 +11,14 @@ function binding(input){
 
 async function run(raw){
   const input=binding(raw);
-  if(!['create','inspect'].includes(input.action)||process.env.NEXT_PUBLIC_WEBAPP_URL!=='https://sign.codexdentist.com'||
+  if(!['create','inspect','rebind-qa'].includes(input.action)||process.env.NEXT_PUBLIC_WEBAPP_URL!=='https://sign.codexdentist.com'||
      process.env.NEXT_PUBLIC_DISABLE_SIGNUP!=='true'||process.env.NEXT_PRIVATE_SMTP_HOST!=='capture'||
      process.env.NEXT_PRIVATE_WEBHOOK_SSRF_BYPASS_HOSTS!=='codexdentist-signing-callback'||
      !['/secrets/callback-trust.cert.pem','/secrets/provider-trust.cert.pem'].includes(process.env.NODE_EXTRA_CA_CERTS))throw Error('Verified captured-mail callback stage required');
   const database=new URL(process.env.NEXT_PRIVATE_DATABASE_URL);
   if(database.hostname!=='database'||database.pathname!=='/signing')throw Error('Private provider database required');
   const {PrismaClient}=require('@prisma/client');const prisma=new PrismaClient();const jar=new Map();
+  const events=['DOCUMENT_COMPLETED'];
   async function request(path,{method='GET',body,team=false}={}){
     const url='http://localhost:3000'+path;
     const response=await fetch(url,{method,redirect:'error',signal:AbortSignal.timeout(15000),
@@ -33,22 +34,37 @@ async function run(raw){
     const user=await prisma.user.findUniqueOrThrow({where:{id:input.userId},select:{email:true,disabled:true}});
     if(user.email!==input.email||user.disabled)throw Error('Owned webhook principal mismatch');
     const existing=await prisma.webhook.findMany({where:{teamId:input.teamId}});
+    function matches(row,expected){
+      return row.webhookUrl===expected.url&&row.userId===expected.userId&&row.secret===expected.secret&&
+        row.enabled===true&&JSON.stringify(row.eventTriggers)===JSON.stringify(events);
+    }
     if(input.action==='inspect'){
-      const selected=existing.filter(row=>row.webhookUrl===input.url&&row.userId===input.userId&&row.secret===input.secret&&row.enabled===true&&
-        JSON.stringify(row.eventTriggers)===JSON.stringify(['DOCUMENT_COMPLETED']));
+      const selected=existing.filter(row=>matches(row,input));
       if(selected.length!==1||existing.length!==1)throw Error('Exact owned webhook unavailable');
       return{pass:true,purpose:input.purpose,webhookId:selected[0].id,teamId:input.teamId,connectionId:input.connectionId};
     }
-    if(existing.length!==0)throw Error('Preserve existing provider webhooks');
+    const prior=input.action==='rebind-qa'?previousQaBinding(input):null;
+    if(prior){
+      if(existing.length!==1||existing[0].id!==prior.webhookId||!matches(existing[0],prior))throw Error('Exact historical QA webhook required');
+    }else if(existing.length!==0)throw Error('Preserve existing provider webhooks');
     const csrf=await request('/api/auth/csrf');if(csrf.status!==200||typeof csrf.value?.csrfToken!=='string')throw Error('Private webhook CSRF unavailable');
     const login=await request('/api/auth/email-password/authorize',{method:'POST',body:{email:input.email,password:input.password,csrfToken:csrf.value.csrfToken}});
     if(login.status!==201)throw Error('Private service signin failed');
-    const created=await request('/api/trpc/webhook.createWebhook',{method:'POST',team:true,body:{json:{webhookUrl:input.url,
-      secret:input.secret,enabled:true,eventTriggers:['DOCUMENT_COMPLETED']}}});
+    const procedure=prior?'editWebhook':'createWebhook';
+    const created=await request('/api/trpc/webhook.'+procedure,{method:'POST',team:true,body:{json:{webhookUrl:input.url,
+      secret:input.secret,enabled:true,eventTriggers:events,...(prior?{id:prior.webhookId}:{})}}});
     const row=created.value?.result?.data?.json;
-    if(created.status!==200||typeof row?.id!=='string'||row.webhookUrl!==input.url||row.teamId!==input.teamId||row.userId!==input.userId)throw Error('Private webhook creation unacknowledged');
+    if(created.status!==200||typeof row?.id!=='string'||(prior&&row.id!==prior.webhookId)||row.webhookUrl!==input.url||
+      row.teamId!==input.teamId||!matches(row,input))throw Error('Private webhook write unacknowledged');
     return{pass:true,purpose:input.purpose,webhookId:row.id,teamId:input.teamId,connectionId:input.connectionId};
   }finally{await prisma.$disconnect()}
 }
 
-module.exports={binding,run};
+function previousQaBinding(input){
+  const previous=input.previous;
+  if(input.purpose!=='qa'||!previous||!/^[A-Za-z0-9_-]{8,160}$/.test(previous.webhookId||'')||
+      previous.connectionId===input.connectionId||previous.secret===input.secret)throw Error('New QA connection and secret required');
+  return binding({...input,connectionId:previous.connectionId,secret:previous.secret,webhookId:previous.webhookId});
+}
+
+module.exports={binding,previousQaBinding,run};

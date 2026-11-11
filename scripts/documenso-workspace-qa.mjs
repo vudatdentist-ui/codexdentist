@@ -56,6 +56,15 @@ try {
     await page.screenshot({ path: `${output}/settings-unconfigured-${width}.png` });
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2));
   }
+  const staged = await page.request.post('/api/integrations/documenso/settings', {
+    headers: { origin: base }, data: { action: 'save-disabled', clinicId: null, credentials },
+  });
+  assert.equal(staged.status(), 200);
+  const stagedConnection = (await staged.json()).connections.find(value => value.clinicId === null);
+  assert.equal(stagedConnection.configured, true);
+  assert.equal(stagedConnection.enabled, false);
+  await page.reload({ waitUntil: 'networkidle' });
+  await settings.getByRole('button', { name: 'Bật kết nối', exact: true }).waitFor();
   await settings.getByLabel('API Token', { exact: true }).fill(credentials.apiToken);
   await settings.getByLabel('Webhook Secret', { exact: true }).fill(credentials.webhookSecret);
   await settings.getByRole('button', { name: 'Lưu kết nối', exact: true }).click();
@@ -64,6 +73,8 @@ try {
   const config = await (await page.request.get('/api/integrations/documenso/settings')).json();
   for (const value of Object.values(credentials)) assert.ok(!JSON.stringify(config).includes(value));
   const connection = config.connections.find(value => value.clinicId === null);
+  assert.equal(connection.id, stagedConnection.id);
+  assert.equal(connection.enabled, true);
   const cipher = await prisma.$queryRawUnsafe('SELECT ciphertext FROM "IntegrationCredential" WHERE "connectionId"=$1', connection.id);
   for (const value of Object.values(credentials)) assert.ok(!JSON.stringify(cipher).includes(value));
   if (!productionUI) {

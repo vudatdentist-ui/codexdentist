@@ -30,9 +30,9 @@ export async function saveDocumensoSettings(session: AppSession, body: Record<st
       (typeof clinicId !== "string" || !accessibleClinicIds(session).includes(clinicId))) documensoFail("integration-clinic-forbidden", 403);
   if (clinicId !== null && typeof clinicId !== "string") documensoFail("integration-clinic-forbidden", 403);
   const action = body.action;
-  if (!["save", "enable", "disable"].includes(String(action))) documensoFail("documenso-input-invalid");
+  if (!["save", "save-disabled", "enable", "disable"].includes(String(action))) documensoFail("documenso-input-invalid");
   let credentials: Record<string, string> | null = null;
-  if (action === "save") {
+  if (action === "save" || action === "save-disabled") {
     if (!body.credentials || typeof body.credentials !== "object" || Array.isArray(body.credentials)) documensoFail("documenso-input-invalid");
     credentials = {};
     for (const name of ["apiToken", "webhookSecret"]) {
@@ -49,7 +49,8 @@ export async function saveDocumensoSettings(session: AppSession, body: Record<st
     if (current && action !== "enable" && await hasActiveDocumensoRequests(tx, session.organizationId, current.id)) documensoFail("documenso-ceremonies-unresolved", 409);
     if (!current && !credentials) documensoFail("documenso-connection-not-configured", 409);
     const connection = await upsertIntegrationConnection(tx, { organizationId: session.organizationId, clinicId,
-      provider: "documenso", status: action === "disable" ? "DISABLED" : "ACTIVE", capabilities: { signing: true, webhooks: true },
+      provider: "documenso", status: action === "disable" || action === "save-disabled" ? "DISABLED" : "ACTIVE",
+      capabilities: { signing: true, webhooks: true },
       ...(credentials ? { secretRef: "vault:v1", lastVerifiedAt: null, metadata: { configuredByUserId: session.userId } } : {}) });
     if (credentials) await writeIntegrationSecrets(tx, { organizationId: session.organizationId, connectionId: connection.id, provider: "documenso" }, credentials);
     await tx.auditLog.create({ data: { organizationId: session.organizationId, actorId: session.userId,

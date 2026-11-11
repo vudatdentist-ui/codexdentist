@@ -222,6 +222,43 @@ def provision_webhooks(signing,bindings):
     print('PASS separate owned main/QA webhook creation through authenticated provider APIs; no event submitted.')
 
 
+def rebind_qa_webhook(signing, connection_id, secret):
+    """Preserve the synthetic webhook and history while rotating its endpoint."""
+    if not re.fullmatch('[A-Za-z0-9_-]{8,160}', connection_id) or not re.fullmatch('[a-f0-9]{64}', secret):
+        raise ValueError('Exact QA connection and generated secret required')
+    directory = signing.ROOT
+    signing.installation(directory)
+    original = json.loads((directory / 'webhook.qa.intent.json').read_text())
+    acknowledged = json.loads((directory / 'webhook.qa.bindings.json').read_text())
+    for key in ['connectionId', 'teamId']:
+        if original[key] != acknowledged[key]: raise ValueError('Prior QA acknowledgement differs')
+    if original['purpose'] != 'qa' or acknowledged.get('purpose') != 'qa' or acknowledged.get('pass') is not True:
+        raise ValueError('Prior QA binding required')
+    if original['connectionId'] == connection_id or original['secret'] == secret:
+        raise ValueError('QA endpoint and secret must both rotate')
+    main = directory / 'webhook.main.intent.json'
+    if main.exists():
+        other = json.loads(main.read_text())
+        if other['connectionId'] == connection_id or other['secret'] == secret:
+            raise ValueError('Cross-owner webhook binding reuse denied')
+    intent = {**original, 'connectionId': connection_id, 'secret': secret,
+        'previous': {'connectionId': original['connectionId'], 'secret': original['secret'], 'webhookId': acknowledged['webhookId']}}
+    path = directory / 'webhook.qa-rebind.intent.json'
+    result = directory / 'webhook.qa-rebind.api-result.jsonl'
+    bindings = directory / 'webhook.qa-rebind.bindings.json'
+    if any(target.exists() for target in [path, result, bindings]):
+        raise FileExistsError('Retained QA rebind evidence requires inspection')
+    signing.private(path, json.dumps(intent).encode())
+    with result.open('xb', buffering=0) as output:
+        os.chmod(output.name, 0o600)
+        accepted = webhook_client(signing, {**intent, 'action': 'rebind-qa'})
+        output.write(json.dumps(accepted).encode() + b'\n'); os.fsync(output.fileno())
+    if accepted != {**acknowledged, 'connectionId': connection_id} or webhook_client(signing, {**intent, 'action': 'inspect'}) != accepted:
+        raise ValueError('QA webhook rebind postcondition differs')
+    signing.private(bindings, json.dumps(accepted).encode())
+    return accepted
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('action',choices=['prepare','up','status','enable-provider']);args=parser.parse_args()
     if not hasattr(os,'geteuid') or os.geteuid()!=0:raise ValueError('Root-owned callback operator required')
