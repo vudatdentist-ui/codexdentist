@@ -30,7 +30,9 @@ export async function saveDocumensoSettings(session: AppSession, body: Record<st
       (typeof clinicId !== "string" || !accessibleClinicIds(session).includes(clinicId))) documensoFail("integration-clinic-forbidden", 403);
   if (clinicId !== null && typeof clinicId !== "string") documensoFail("integration-clinic-forbidden", 403);
   const action = body.action;
-  if (!["save", "save-disabled", "enable", "disable"].includes(String(action))) documensoFail("documenso-input-invalid");
+  if (typeof action !== "string" || !["save", "save-disabled", "enable", "disable"].includes(action)) {
+    documensoFail("documenso-input-invalid");
+  }
   let credentials: Record<string, string> | null = null;
   if (action === "save" || action === "save-disabled") {
     if (!body.credentials || typeof body.credentials !== "object" || Array.isArray(body.credentials)) documensoFail("documenso-input-invalid");
