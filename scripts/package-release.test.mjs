@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { dirname, join, relative } from "node:path";
@@ -69,6 +69,7 @@ test("excludes environments, patient storage, backups, QA output, dependencies a
     "node_modules/private.txt", ".git/config", "coverage/report.json",
     "test-results/trace.zip", "playwright-report/index.html", ".tmp/upload.bin",
     ".next/cache/private.bin", "src/debug.log", "scripts/tsconfig.tsbuildinfo",
+    "scripts/__pycache__/operator.cpython-312.pyc", "scripts/operator.pyc", "scripts/operator.pyo",
   ];
   for (const path of excluded) put(root, path, "private fixture");
   const output = join(root, "release.tar.gz");
@@ -78,6 +79,19 @@ test("excludes environments, patient storage, backups, QA output, dependencies a
     assert.equal(existsSync(join(extracted, path)), false, path);
     assert.equal(readFileSync(join(root, path), "utf8"), "private fixture", path);
   }
+});
+
+test("excludes unreadable privileged Python import caches before traversing release inputs", (t) => {
+  const root = fixture(t), cache = join(root, "scripts", "__pycache__");
+  put(root, "scripts/__pycache__/operator.cpython-312.pyc", "privileged disposable bytecode");
+  chmodSync(cache, 0o000);
+  try {
+    const output = join(root, "release.tar.gz");
+    packageRelease({ sourceDir: root, outputPath: output, sha });
+    const extracted = unpack(root, output);
+    assert.equal(existsSync(join(extracted, "scripts", "__pycache__")), false);
+    assert.equal(readFileSync(join(extracted, "scripts", "fixture.mjs"), "utf8"), required["scripts/fixture.mjs"]);
+  } finally { chmodSync(cache, 0o700); }
 });
 
 test("rejects absent or empty build artifacts and keeps the previous release", (t) => {

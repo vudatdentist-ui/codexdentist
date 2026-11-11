@@ -14,7 +14,7 @@ const runtimeEntries = [
 ];
 const excludedNames = new Set([
   ".git", "node_modules", ".tmp", "storage", "backups", "output",
-  "coverage", "playwright-report", "test-results",
+  "coverage", "playwright-report", "test-results", "__pycache__",
 ]);
 const manifestName = ".codexdentist-release-sha";
 
@@ -22,7 +22,7 @@ function excluded(path) {
   const parts = path.split(sep);
   return parts.some((part) => excludedNames.has(part) || /^\.env(?:\.|$)/.test(part))
     || (parts[0] === ".next" && parts[1] === "cache")
-    || /\.(?:log|tsbuildinfo)$/.test(path);
+    || /\.(?:log|tsbuildinfo|pyc|pyo)$/.test(path);
 }
 
 function requireRegularFile(root, path, nonempty = false) {
