@@ -28,6 +28,16 @@ class AppMailCutover(unittest.TestCase):
             if kind == 'missing': changed['Mounts'] = []
             with self.subTest(kind=kind), self.assertRaises(ValueError): trust.public_ca_arguments(changed)
 
+    def test_verifier_accepts_only_reviewed_readonly_combined_mail_and_signing_ca(self):
+        current = {'Config': {'Env': ['NODE_EXTRA_CA_CERTS=' + trust.SERVICE_TARGET]},
+            'Mounts': [{'Type': 'bind', 'Source': trust.SERVICE_SOURCE, 'Destination': trust.SERVICE_TARGET, 'RW': False}]}
+        self.assertEqual(trust.public_ca_arguments(current), ['--mount',
+            'type=bind,source=' + trust.SERVICE_SOURCE + ',target=' + trust.SERVICE_TARGET + ',readonly'])
+        for update in [{'Source': trust.SOURCE}, {'Source': '/opt/codexdentist-owned-signing-gateway/gateway.key.pem'},
+                {'RW': True}, {'Type': 'volume'}]:
+            changed = json.loads(json.dumps(current)); changed['Mounts'][0].update(update)
+            with self.assertRaises(ValueError): trust.public_ca_arguments(changed)
+
     def test_compose_patch_preserves_other_apps_and_durable_volume(self):
         original = '''services:
   other:

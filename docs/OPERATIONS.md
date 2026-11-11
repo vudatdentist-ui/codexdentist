@@ -599,6 +599,36 @@ until the owner supplies and verifies their actual credentials.
 
 ## Documenso operator setup
 
+After owned SMTP acceptance, `owned-signing-app-cutover.py --sha <deployed-sha>`
+reviews the same-image core attachment; `--apply` performs its backed-up cutover.
+It refuses existing core signing connections and any retained synthetic callback
+alias. Retire the accepted QA fixture deliberately before attaching the real
+core alias; never allow both cores to resolve as `codexdentist-signing-core`.
+It also requires the accepted same-image MTA attachment transition and a fresh
+strict-TLS SMTP size/oversize probe, which submits no message.
+The deployed source must include `DOCUMENSO_AUTOMATIC_REMINDERS`; attachment sets
+it to false, overriding upstream organization defaults per new app envelope.
+Do not enable automatic patient reminders without an explicit operator policy.
+Review the provider's actual `documenso:documenso-jobs` queue namespace, not the
+default BullMQ prefix. Periodic sweeps are distinct from queued recipient mail.
+Old QA metadata remains captured and is not rewritten as part of attachment.
+`owned-signing-retire-qa.py` first reruns actual read-only core/provider/PDF
+acceptance; `--apply` stops only the manifest-pinned synthetic project, removes
+its stopped core container and removes the callback alias from its future
+Compose configuration. Database/files, stopped database/UI containers, prior
+configuration and all evidence remain private and preserved. Retained retirement
+intent blocks blind replay. It cannot target production or a different project.
+The core joins only the existing internal API/callback networks and mounts
+`/opt/codexdentist-owned-signing/core-trust/provider-gateways.cert.pem` read-only
+at `/run/codexdentist-service-cas.pem`. This derived public bundle contains the
+existing mail gateway and signing gateway certificates. Keep the original mail
+CA mount, image, secrets, data mounts and unrelated services intact. The updated
+independent go-live helper forwards only this exact public bundle or the prior
+mail-only certificate. Install its reviewed helper pair before the transition.
+Successful attachment still has zero tenant vault bindings. Configure separate
+main/test encrypted settings and scoped provider webhooks afterward, verify them
+in the real app and complete coordinated recovery before declaring activation.
+
 Before enabling main signing SMTP, use `owned-mail-attachments.py --sha
 <clean-reviewed-release>` to review the exact MTA size/buffering transition;
 `--apply` cold-backs-up/restores first and recreates only the same-image MTA.
@@ -609,6 +639,14 @@ bodies above 1MB use private `/data/buffer` under the existing owned mail volume
 gateway image revision. Retain transition originals, acceptance/rollback records
 and the resulting combined encrypted mail recovery; do not send another real
 test under the consumed one-email approval.
+Preserve `/opt/codexdentist-owned-mail/attachment-upgrade-833f150342fa`: the first
+attempt restored the old limit after a trace-label comparison failed. Do not
+replay that retained transition. The corrected operator accepts Compose's
+service-instance trace only with exact project/service/instance/container-name
+and unchanged image/environment/mount/network checks. Review a fresh canonical
+configuration revision for the next attempt. Update mail backup operators to
+the acknowledgement-aware version before accepting the new MIME configuration;
+the active transition records must survive worker-free restoration and sealing.
 
 `owned-signing-smtp.py prepare-admin|enable|inspect` is the reviewed staged
 main-only mail operator. Run under the provider operations lock with a fresh

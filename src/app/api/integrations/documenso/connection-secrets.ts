@@ -13,11 +13,13 @@ export async function documensoConnectionSecrets(connection: IntegrationConnecti
     const secrets = await readIntegrationSecrets(db, { organizationId: connection.organizationId, connectionId: connection.id, provider: "documenso" });
     if (!secrets?.apiToken || !secrets.webhookSecret) throw new IntegrationConfigurationError("documenso-credential-missing", "Connection credentials are unavailable");
     return { apiToken: secrets.apiToken, webhookSecret: secrets.webhookSecret, baseUrl: documensoBaseUrl(),
-      sendOwnerEmails: process.env.DOCUMENSO_SEND_OWNER_EMAILS !== "false" };
+      sendOwnerEmails: process.env.DOCUMENSO_SEND_OWNER_EMAILS !== "false",
+      automaticReminders: process.env.DOCUMENSO_AUTOMATIC_REMINDERS !== "false" };
   }
   if (process.env.DOCUMENSO_DEFAULT_ORGANIZATION_ID !== connection.organizationId) {
     throw new IntegrationConfigurationError("documenso-connection-not-configured", "Signing account scope is not configured");
   }
   return { ...resolveDocumensoConnectionSecrets(connection.secretRef),
-    sendOwnerEmails: process.env.DOCUMENSO_SEND_OWNER_EMAILS !== "false" };
+    sendOwnerEmails: process.env.DOCUMENSO_SEND_OWNER_EMAILS !== "false",
+    automaticReminders: process.env.DOCUMENSO_AUTOMATIC_REMINDERS !== "false" };
 }

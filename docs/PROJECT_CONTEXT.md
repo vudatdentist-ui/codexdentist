@@ -598,6 +598,29 @@ main/QA routing against an isolated TLS receiver before owned activation.
 copies without changing recipient invitation or completed-document defaults;
 normal installations retain their existing owner-copy behavior.
 
+The following app-attachment operator is staged separately. It requires accepted
+main-only SMTP, zero existing core Documenso connections and retirement of the
+synthetic QA core's callback alias before production joins the private API and
+callback networks. It compares resolved Compose and actual runtime against an
+exact allowed delta: private signing URL, owner-copy policy, two internal networks
+and a public mail/signing CA bundle. Image, auth/job/vault secrets, durable files,
+old mail mount and other services must remain unchanged. It creates no consent,
+vault binding or email. Tenant settings/webhooks and final recovery acceptance
+remain subsequent requirements; staging this operator does not activate signing.
+The accepted synthetic core was retired on 2026-11-11 after a fresh complete
+database/file/CMS/replay check. Its database, files and evidence remain preserved;
+the stopped core container and future Compose callback alias have been removed.
+The production core still has no signing vault binding. Attachment also requires
+the actual MTA's accepted PDF-size boundary, not only successful SMTP greeting.
+Queue review found seven normal periodic sweeps in the actual
+`documenso:documenso-jobs` namespace. The default `bull:` prefix was an invalid
+oracle and its empty result must not be used as readiness evidence. Owned main
+has no envelopes, while old QA work remains captured. Provider organization
+defaults enable 5-day/2-day reminders; `DOCUMENSO_AUTOMATIC_REMINDERS=false`
+therefore explicitly disables first/repeated reminders in each new app envelope
+until an operator policy is approved. Independent provider installations retain
+their defaults. Attachment requires deployed source that supports this policy.
+
 SMTP audit found that CE completion emails attach the signed PDF, exceeding
 the original 96KB credential-email MTA limit even for the accepted synthetic
 document. The staged MTA transition permits bounded 80MB MIME messages (the core
@@ -607,6 +630,14 @@ Real pinned-MTA acceptance must deliver and compare a 1MB synthetic PDF and deny
 an advertised oversized message before this transition is accepted. The operator
 changes only size/buffering in the same MTA image and preserves queue, DNS,
 sender, TLS keys, gateway image and all other policy. No external test is sent.
+The first owned MTA attempt restored the original configuration because the
+recreation guard incorrectly expected Docker's trace label to contain a prior
+container ID. Current Compose emits `smtp-1`. The guard now verifies exact
+project/service/instance/name plus unchanged functional configuration and permits
+both observed trace forms; an actual disposable Compose recreation is required
+as a regression gate. The rolled-back attempt remains preserved. Active MIME
+transition acknowledgements and private diagnostic snapshots must accompany
+mail backup/restore so a recovered installation can prove its activation state.
 
 Local AI is deployed in `2face1e` (PR #95), with the production configuration
 cutover independently verified on 2026-11-09. The owned VPS has Ollama 0.40.15 and

@@ -38,9 +38,13 @@ def replace(path, data):
 
 
 def same_runtime(before, after):
+    for row in [before, after]:
+        labels = row['Config'].get('Labels', {})
+        if row.get('Name') != '/' + mail.PROJECT + '-smtp-1' or labels.get('com.docker.compose.project') != mail.PROJECT or labels.get('com.docker.compose.service') != 'smtp' or labels.get('com.docker.compose.container-number') != '1':
+            raise ValueError('Exact owned MTA project/service/container identity required')
     old_config = json.loads(json.dumps({key: value for key, value in before['Config'].items() if key != 'Hostname'}))
     new_config = json.loads(json.dumps({key: value for key, value in after['Config'].items() if key != 'Hostname'}))
-    if new_config.get('Labels', {}).get('com.docker.compose.replace') != before['Id']:
+    if new_config.get('Labels', {}).get('com.docker.compose.replace') not in [before['Id'], 'smtp-1']:
         raise ValueError('Exact prior MTA container replacement identity required')
     for config in [old_config, new_config]: config.get('Labels', {}).pop('com.docker.compose.replace', None)
     if after['Image'] != before['Image'] or after['HostConfig'] != before['HostConfig'] or old_config != new_config or set(after['NetworkSettings']['Networks']) != set(before['NetworkSettings']['Networks']):
@@ -97,6 +101,7 @@ def upgrade(sha, apply=False):
     state.mkdir(mode=0o700)
     for name, data in [('maddy.before.conf', before), ('manifest.before.json', before_manifest),
             ('intent.json', json.dumps({'sha': sha, 'snapshotBefore': str(snapshot)}).encode())]: mail.write_private(state / name, data)
+    mail.write_private(state / 'runtime.before.json', json.dumps(identities['smtp']).encode())
     proposed_manifest = json.dumps({**pin, 'configRevision': sha, 'sourceConfigSha256': hashlib.sha256(original.encode()).hexdigest()}).encode()
     def recreate(): mail.run(['docker', 'compose', '--project-directory', str(directory), '-f', str(directory / 'compose.json'),
         'up', '-d', '--no-deps', '--force-recreate', '--pull', 'never', 'smtp'])
@@ -104,6 +109,7 @@ def upgrade(sha, apply=False):
         replace(directory / 'maddy.conf', proposed); replace(directory / 'manifest.json', proposed_manifest); recreate()
         activation.validate_stage(directory, json.loads(proposed_manifest)); activation.ready(directory, pin); probe_limit()
         after = json.loads(mail.run(['docker', 'inspect', mail.PROJECT + '-smtp-1']))[0]
+        mail.write_private(state / 'runtime.after.json', json.dumps(after).encode())
         same_runtime(identities['smtp'], after)
         gateway = json.loads(mail.run(['docker', 'inspect', mail.PROJECT + '-gateway-1']))[0]
         if gateway['Id'] != identities['gateway']['Id']: raise ValueError('Unrelated gateway was recreated')

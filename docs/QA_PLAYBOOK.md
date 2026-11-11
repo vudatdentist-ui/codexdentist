@@ -64,11 +64,31 @@ also creates a dedicated admin, configures encrypted main-only SMTP and sends
 synthetic main/QA envelopes to a private TLS receiver/capture respectively.
 It denies an untrusted SMTP certificate and cold-restores the resulting trust
 and provider configuration without starting workers. No public mail is sent.
+`python3 scripts/owned-signing-app-cutover.test.py` also checks the subsequent
+attachment's exact resolved/runtime delta, duplicate callback alias denial and
+preservation of image, secrets, storage and other applications. Public CA tests
+in `owned-mail-app-cutover.test.py` cover both legacy mail-only and the explicit
+combined mail/signing trust mount; arbitrary paths, private keys and writable
+mounts remain denied. Attachment tests do not prove tenant activation.
+`python3 scripts/owned-signing-retire-qa.test.py` checks that retirement removes
+only the accepted synthetic callback alias and preserves its database/files;
+production, mail-enabled, foreign-image/network/project and replayed stages deny.
+The Documenso adapter regression requires an explicit disabled reminder payload
+for owned deployments while preserving independent account defaults. Native CE
+envelope acceptance must read back that policy and prove `nextReminderAt=null`;
+a parsed payload alone does not prove upstream scheduling behavior.
+
 `python3 scripts/owned-mail-attachments.test.py` checks the exact MIME size and
 buffering delta and denies changes to sender, TLS, keys, mounts, images, ports
 and networks. The existing real-Maddy Linux gate additionally delivers a 1MB
 synthetic signed PDF, compares its complete bytes and rejects declared SMTP
 oversize without allocating a large body; its outbound sink stays networkless.
+Run `sudo -n python3 scripts/owned-mail-runtime-linux.py --image codexdentist:ci
+--output "$RUNNER_TEMP/codexdentist-mail-runtime"` for actual Compose recreation.
+Trace labels are diagnostic metadata, not sole ownership proof; exact project,
+service, instance, name, image, configuration and networks must still match.
+Mail recovery tests require active attachment acknowledgement/originals in the
+snapshot and reject partial or rolled-back transitions before stopping workers.
 The runtime gate additionally requires the actual Linux gate
 `sudo -n python3 scripts/owned-signing-linux.py --source
 "$PWD" --output "$RUNNER_TEMP/codexdentist-owned-signing"`. Use a fresh private
