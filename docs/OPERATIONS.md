@@ -639,6 +639,14 @@ bodies above 1MB use private `/data/buffer` under the existing owned mail volume
 gateway image revision. Retain transition originals, acceptance/rollback records
 and the resulting combined encrypted mail recovery; do not send another real
 test under the consumed one-email approval.
+Preserve `/opt/codexdentist-owned-mail/attachment-upgrade-833f150342fa`: the first
+attempt restored the old limit after a trace-label comparison failed. Do not
+replay that retained transition. The corrected operator accepts Compose's
+service-instance trace only with exact project/service/instance/container-name
+and unchanged image/environment/mount/network checks. Review a fresh canonical
+configuration revision for the next attempt. Update mail backup operators to
+the acknowledgement-aware version before accepting the new MIME configuration;
+the active transition records must survive worker-free restoration and sealing.
 
 `owned-signing-smtp.py prepare-admin|enable|inspect` is the reviewed staged
 main-only mail operator. Run under the provider operations lock with a fresh

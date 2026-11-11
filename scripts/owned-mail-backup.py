@@ -5,6 +5,7 @@ import datetime
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -25,8 +26,24 @@ def validate_snapshot(snapshot):
         raise ValueError('Exact private mail snapshot required')
 
 
+def attachment_records(directory, pin):
+    revision = pin.get('configRevision')
+    if revision is None: return []
+    if not isinstance(revision, str) or not re.fullmatch('[a-f0-9]{40}', revision): raise ValueError('Exact attachment configuration revision required')
+    prefix = 'attachment-upgrade-' + revision[:12]
+    root = directory / prefix
+    if root.is_symlink() or not root.is_dir(): raise ValueError('Private accepted attachment records required')
+    names = ['accepted.json', 'intent.json', 'maddy.before.conf', 'manifest.before.json']
+    if any((root / name).is_symlink() or not (root / name).is_file() for name in names): raise ValueError('Complete attachment recovery records required')
+    proof = json.loads((root / 'accepted.json').read_text())
+    if proof.get('pass') is not True or proof.get('actualSmtpSizeAndDenialVerified') is not True or (root / 'rolled-back.json').exists():
+        raise ValueError('Accepted live attachment transition required')
+    return [prefix + '/' + name for name in names + [name for name in ['runtime.before.json', 'runtime.after.json'] if (root / name).is_file()]]
+
+
 def backup():
-    pin=json.loads((ROOT/'manifest.json').read_text());services={name:inspect('container',PROJECT+'-'+name+'-1')for name in ['gateway','smtp']}
+    pin=json.loads((ROOT/'manifest.json').read_text());transition=attachment_records(ROOT,pin)
+    services={name:inspect('container',PROJECT+'-'+name+'-1')for name in ['gateway','smtp']}
     if services['gateway']['Image']!=pin['gatewayImage'] or services['smtp']['Config']['Image']!=pin['smtpImage']:
         raise ValueError('Running mail image differs from its installation pin')
     for name in ['gateway-data','smtp-data']:
@@ -39,9 +56,10 @@ def backup():
     try:
         # Stop producers first, then the MTA; never stop the clinic application.
         for name in active:files.run(['docker','stop','--time','30',PROJECT+'-'+name+'-1'])
-        for name in ['compose.json','maddy.conf','manifest.json']:
+        for name in ['compose.json','maddy.conf','manifest.json'] + transition:
             source=ROOT/name
             if source.is_symlink()or not source.is_file():raise ValueError('Unsafe private mail configuration')
+            (snapshot/name).parent.mkdir(mode=0o700,parents=True,exist_ok=True)
             shutil.copyfile(source,snapshot/name);(snapshot/name).chmod(0o600)
         if (ROOT/'secrets').is_symlink()or not(ROOT/'secrets').is_dir():raise ValueError('Unsafe private mail secrets')
         shutil.copytree(ROOT/'secrets',snapshot/'secrets',symlinks=True)
@@ -78,6 +96,10 @@ def drill(snapshot):
         raise ValueError('Mail restore manifest differs')
     for name in ['compose.json','maddy.conf','manifest.json','secrets/encryption.key','secrets/signing.secret']:
         if name not in manifest['files']:raise ValueError('Missing mail configuration/key checksum')
+    restored_pin=json.loads((snapshot/'manifest.json').read_text())
+    if restored_pin.get('configRevision') is not None:
+        for name in attachment_records(snapshot, restored_pin):
+            if name not in manifest['files']:raise ValueError('Attachment recovery acknowledgement missing from checksums')
     for name,digest in manifest['files'].items():
         relative=Path(name)
         if relative.is_absolute()or '..'in relative.parts or (snapshot/relative).is_symlink()or files.checksum(snapshot/relative)!=digest:

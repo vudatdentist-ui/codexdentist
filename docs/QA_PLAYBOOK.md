@@ -83,6 +83,12 @@ buffering delta and denies changes to sender, TLS, keys, mounts, images, ports
 and networks. The existing real-Maddy Linux gate additionally delivers a 1MB
 synthetic signed PDF, compares its complete bytes and rejects declared SMTP
 oversize without allocating a large body; its outbound sink stays networkless.
+Run `sudo -n python3 scripts/owned-mail-runtime-linux.py --image codexdentist:ci
+--output "$RUNNER_TEMP/codexdentist-mail-runtime"` for actual Compose recreation.
+Trace labels are diagnostic metadata, not sole ownership proof; exact project,
+service, instance, name, image, configuration and networks must still match.
+Mail recovery tests require active attachment acknowledgement/originals in the
+snapshot and reject partial or rolled-back transitions before stopping workers.
 The runtime gate additionally requires the actual Linux gate
 `sudo -n python3 scripts/owned-signing-linux.py --source
 "$PWD" --output "$RUNNER_TEMP/codexdentist-owned-signing"`. Use a fresh private

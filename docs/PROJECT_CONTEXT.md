@@ -630,6 +630,14 @@ Real pinned-MTA acceptance must deliver and compare a 1MB synthetic PDF and deny
 an advertised oversized message before this transition is accepted. The operator
 changes only size/buffering in the same MTA image and preserves queue, DNS,
 sender, TLS keys, gateway image and all other policy. No external test is sent.
+The first owned MTA attempt restored the original configuration because the
+recreation guard incorrectly expected Docker's trace label to contain a prior
+container ID. Current Compose emits `smtp-1`. The guard now verifies exact
+project/service/instance/name plus unchanged functional configuration and permits
+both observed trace forms; an actual disposable Compose recreation is required
+as a regression gate. The rolled-back attempt remains preserved. Active MIME
+transition acknowledgements and private diagnostic snapshots must accompany
+mail backup/restore so a recovered installation can prove its activation state.
 
 Local AI is deployed in `2face1e` (PR #95), with the production configuration
 cutover independently verified on 2026-11-09. The owned VPS has Ollama 0.40.15 and

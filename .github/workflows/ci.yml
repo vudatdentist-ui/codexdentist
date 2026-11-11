@@ -286,6 +286,8 @@ jobs:
         run: docker build --network none --build-arg BASE_IMAGE=codexdentist:ci -f scripts/owned-mail/Dockerfile -t codexdentist-mail-gateway:ci .
       - name: Real pinned MTA, DKIM and private mail restore
         run: sudo -n python3 scripts/owned-mail-linux.py --image codexdentist:ci --source "$PWD" --output "$RUNNER_TEMP/codexdentist-owned-mail"
+      - name: Actual Compose mail replacement metadata
+        run: sudo -n python3 scripts/owned-mail-runtime-linux.py --image codexdentist:ci --output "$RUNNER_TEMP/codexdentist-mail-runtime"
       - name: Real pinned signing CE, closed signup and private recovery
         run: sudo -n python3 scripts/owned-signing-linux.py --source "$PWD" --output "$RUNNER_TEMP/codexdentist-owned-signing" --image codexdentist:ci
       - name: Private signing callback TLS and path boundary
