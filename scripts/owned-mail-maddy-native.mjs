@@ -5,11 +5,12 @@ import { readFile, writeFile, chmod } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { createHash, createPublicKey, verify } from 'node:crypto';
 import { createRequire } from 'node:module';
+import { connect as tlsConnect } from 'node:tls';
 import nodemailer from 'nodemailer';
 import { ownedMailFixture } from './owned-mail-fixture.mjs';
 assert.equal(process.env.OWNED_MAIL_NATIVE_TEST,'true');
 const {load}=createRequire(import.meta.url)('./audit-source-loader.cjs');
-const fixture=await ownedMailFixture({from:'no-reply@codexdentist.com',storeRoot:'/accept'});
+const fixture=await ownedMailFixture({from:'no-reply@codexdentist.com',storeRoot:'/accept',smtpMaxBytes:80*1024*1024});
 let relay;
 try {
   execFileSync('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-days','1','-subj','/CN=codexdentist-mail-smtp',
@@ -56,6 +57,33 @@ try {
   await client.deliverOwnedMail(settings,input);assert.equal(fixture.messages.length,1);
   await assert.rejects(relay.sendMail({from:'spoof@example.test',to:input.recipient,text:'Synthetic rejected sender'}));
   assert.equal(fixture.messages.length,1);
-  await writeFile('/accept/result.json',JSON.stringify({pass:true,realMta:true,privateTls:true,dkimCryptographicallyVerified:true,headerTamperRejected:true,exactlyOneMessage:true,spoofSenderRejected:true,externalNetwork:false}),{mode:0o600});
+  // Completed signing mail contains the PDF. A tiny credential-email limit
+  // previously rejected even our 271859-byte synthetic signed document.
+  const attachment=Buffer.alloc(1024*1024,0x20);attachment.write('%PDF-1.4\nSynthetic signed copy - no patient data\n');
+  await relay.sendMail({from:fixture.from,to:'synthetic-signed-copy@example.test',subject:'Synthetic signing completion',
+    text:'Synthetic completed PDF only.',attachments:[{filename:'synthetic-signed.pdf',content:attachment,contentType:'application/pdf'}]});
+  for(let i=0;i<100&&fixture.messages.length<2;i++)await new Promise(resolve=>setTimeout(resolve,100));
+  assert.equal(fixture.messages.length,2);const completed=fixture.messages[1];
+  assert.deepEqual(completed.recipients,['synthetic-signed-copy@example.test']);
+  const boundary=completed.body.match(/boundary="([^"\r\n]+)"/)?.[1];assert.ok(boundary);
+  const part=completed.body.split('--'+boundary).find(value=>/Content-Type: application\/pdf/i.test(value));assert.ok(part);
+  const encoded=part.slice(part.indexOf('\r\n\r\n')+4).trim();
+  assert.ok(Buffer.from(encoded,'base64').equals(attachment),'Actual MTA preserves the complete PDF attachment');
+  // Check the advertised bound and rejection without allocating an 80MB body.
+  const socket=tlsConnect({host:'127.0.0.1',port:2465,ca:await readFile('/accept/smtp.cert.pem'),servername:'codexdentist-mail-smtp',rejectUnauthorized:true});
+  let buffered='',waiter;
+  socket.setEncoding('utf8');socket.setTimeout(5000,()=>socket.destroy(Error('Synthetic SMTP boundary timeout')));
+  const response=()=>new Promise((resolve,reject)=>{waiter={resolve,reject};drain();});
+  function drain(){const match=buffered.match(/(?:^|\r\n)\d{3} [^\r\n]*\r\n/);if(waiter&&match){const end=match.index+match[0].length,value=buffered.slice(0,end);buffered=buffered.slice(end);const current=waiter;waiter=null;current.resolve(value);}}
+  socket.on('data',chunk=>{buffered+=chunk;drain();});socket.on('error',error=>{waiter?.reject(error);waiter=null;});
+  let advertised;
+  try{
+    assert.match(await response(),/^220 /);socket.write('EHLO synthetic.example.test\r\n');const hello=await response();
+    advertised=Number(hello.match(/250[- ]SIZE (\d+)/)?.[1]);
+    assert.ok(advertised>=Math.ceil(50*1024*1024*4/3)+1024*1024&&advertised<=80*1024*1024);
+    socket.write('MAIL FROM:<no-reply@codexdentist.com> SIZE='+(advertised+1)+'\r\n');assert.match(await response(),/^5\d\d /);
+  }finally{socket.destroy();}
+  await writeFile('/accept/result.json',JSON.stringify({pass:true,realMta:true,privateTls:true,dkimCryptographicallyVerified:true,headerTamperRejected:true,
+    exactlyOneGatewayMessage:true,signingPdfAttachmentVerified:true,smtpDeclaredOversizeDenied:true,smtpMaxBytes:advertised,spoofSenderRejected:true,externalNetwork:false}),{mode:0o600});
   console.log('PASS actual pinned Maddy: private TLS, durable queue, cryptographically verified DKIM, sender restriction, no idempotent replay and no external network.');
 }finally{relay?.close();await fixture.close();}

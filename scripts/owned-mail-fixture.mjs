@@ -11,7 +11,8 @@ import assert from 'node:assert/strict';
 import { openMailStore } from './owned-mail/store.mjs';
 import { createOwnedMailService } from './owned-mail/service.mjs';
 
-export async function ownedMailFixture({from='no-reply@example.test',storeRoot}={}){
+export async function ownedMailFixture({from='no-reply@example.test',storeRoot,smtpMaxBytes=65536}={}){
+  assert.ok(Number.isSafeInteger(smtpMaxBytes)&&smtpMaxBytes>=65536&&smtpMaxBytes<=80*1024*1024);
   const base=await mkdtemp(path.join(os.tmpdir(),'codexdentist-mail-tls-'));
   const openssl=process.platform==='win32'?'C:/Program Files/Git/usr/bin/openssl.exe':'openssl';
   const keyPath=path.join(base,'tls.key'),certPath=path.join(base,'tls.cert');
@@ -32,7 +33,7 @@ export async function ownedMailFixture({from='no-reply@example.test',storeRoot}=
           socket.write('250 queued synthetic-only\r\n');continue;
         }
         const command=line.split(' ',1)[0].toUpperCase();
-        if(command==='EHLO'||command==='HELO'){verifications++;socket.write('250-localhost\r\n250 SIZE 65536\r\n');}
+        if(command==='EHLO'||command==='HELO'){verifications++;socket.write('250-localhost\r\n250 SIZE '+smtpMaxBytes+'\r\n');}
         else if(command==='MAIL'){recipients=[];body='';socket.write('250 sender accepted\r\n');}
         else if(command==='RCPT'){
           const address=line.match(/<([^>]+)>/)?.[1];

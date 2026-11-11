@@ -598,6 +598,16 @@ main/QA routing against an isolated TLS receiver before owned activation.
 copies without changing recipient invitation or completed-document defaults;
 normal installations retain their existing owner-copy behavior.
 
+SMTP audit found that CE completion emails attach the signed PDF, exceeding
+the original 96KB credential-email MTA limit even for the accepted synthetic
+document. The staged MTA transition permits bounded 80MB MIME messages (the core
+PDF download ceiling is 50MB), spilling bodies above 1MB to private disk instead
+of RAM. The signed HTTP notification gateway retains its 64KB request limit.
+Real pinned-MTA acceptance must deliver and compare a 1MB synthetic PDF and deny
+an advertised oversized message before this transition is accepted. The operator
+changes only size/buffering in the same MTA image and preserves queue, DNS,
+sender, TLS keys, gateway image and all other policy. No external test is sent.
+
 Local AI is deployed in `2face1e` (PR #95), with the production configuration
 cutover independently verified on 2026-11-09. The owned VPS has Ollama 0.40.15 and
 Qwen3 4B pinned by image/model digests. Runtime has no published port or external

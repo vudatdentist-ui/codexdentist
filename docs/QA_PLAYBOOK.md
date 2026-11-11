@@ -64,6 +64,11 @@ also creates a dedicated admin, configures encrypted main-only SMTP and sends
 synthetic main/QA envelopes to a private TLS receiver/capture respectively.
 It denies an untrusted SMTP certificate and cold-restores the resulting trust
 and provider configuration without starting workers. No public mail is sent.
+`python3 scripts/owned-mail-attachments.test.py` checks the exact MIME size and
+buffering delta and denies changes to sender, TLS, keys, mounts, images, ports
+and networks. The existing real-Maddy Linux gate additionally delivers a 1MB
+synthetic signed PDF, compares its complete bytes and rejects declared SMTP
+oversize without allocating a large body; its outbound sink stays networkless.
 The runtime gate additionally requires the actual Linux gate
 `sudo -n python3 scripts/owned-signing-linux.py --source
 "$PWD" --output "$RUNNER_TEMP/codexdentist-owned-signing"`. Use a fresh private

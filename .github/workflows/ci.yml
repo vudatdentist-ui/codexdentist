@@ -82,7 +82,7 @@ jobs:
       - name: Private signing runtime and recovery contracts
         run: python3 scripts/owned-signing-services.test.py && python3 scripts/owned-signing-bootstrap.test.py && node --test scripts/owned-signing-bootstrap-client.test.cjs scripts/owned-signing-webhook-client.test.cjs && python3 scripts/owned-signing-seal.test.py && python3 scripts/owned-signing-gateway.test.py && python3 scripts/owned-signing-recipient.test.py && python3 scripts/owned-signing-callback.test.py && python3 scripts/owned-signing-core-acceptance.test.py
       - name: Main-only owned signing SMTP contracts
-        run: python3 scripts/owned-signing-smtp.test.py && node --test scripts/owned-signing-smtp-client.test.cjs
+        run: python3 scripts/owned-signing-smtp.test.py && python3 scripts/owned-mail-attachments.test.py && node --test scripts/owned-signing-smtp-client.test.cjs
       - name: Native owned email delivery and uncertainty races
         run: npm run test:owned-mail-db
         env:
