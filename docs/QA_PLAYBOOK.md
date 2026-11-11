@@ -70,6 +70,10 @@ preservation of image, secrets, storage and other applications. Public CA tests
 in `owned-mail-app-cutover.test.py` cover both legacy mail-only and the explicit
 combined mail/signing trust mount; arbitrary paths, private keys and writable
 mounts remain denied. Attachment tests do not prove tenant activation.
+The full-app Documenso browser gate stages encrypted settings while disabled,
+reloads the settings screen, and verifies the same connection ID when activated.
+The native CE gate rotates a synthetic QA webhook in place, reads the exact
+acknowledged result back and restores a snapshot containing both bindings.
 `python3 scripts/owned-signing-retire-qa.test.py` checks that retirement removes
 only the accepted synthetic callback alias and preserves its database/files;
 production, mail-enabled, foreign-image/network/project and replayed stages deny.

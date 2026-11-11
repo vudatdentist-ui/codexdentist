@@ -247,6 +247,27 @@ test('settings denies demo, patient and inaccessible or organization scope befor
   const h = fixture(); await assert.rejects(h.save({ clinicId: 'other' }), { code: 'integration-clinic-forbidden' }); assert.equal(h.counts.writes, 0);
 });
 
+test('staged credentials remain disabled until a separate enable operation', async () => {
+  const h = fixture({ configured: false });
+  const staged = await h.save({ action: 'save-disabled' });
+  assert.equal(staged.connections[0].configured, true);
+  assert.equal(staged.connections[0].enabled, false);
+  assert.equal(staged.connections[0].verifiedAt, null);
+  assert.match(h.ciphertext(), /^v1\./);
+  assert.equal(h.calls.length, 0);
+  const sealed = h.ciphertext();
+  const enabled = await h.settings.saveDocumensoSettings(h.session, { action: 'enable', clinicId: 'clinic' });
+  assert.equal(enabled.connections[0].enabled, true);
+  assert.equal(h.ciphertext(), sealed);
+});
+
+test('rejects non-string actions before writing the signing connection', async () => {
+  const h = fixture();
+  await assert.rejects(h.save({ action: ['save-disabled'] }), { code: 'documenso-input-invalid' });
+  assert.equal(h.counts.writes, 0);
+  assert.equal(h.connection().status, 'ACTIVE');
+});
+
 test('attach preserves other attachments, returns eligible sources, then send/reload/replay owns one ceremony', async () => {
   const h = fixture(); h.form.attachments = ['https://example.test/retained-reference'];
   assert.equal((await h.post({ action: 'attach-source' })).status, 200);

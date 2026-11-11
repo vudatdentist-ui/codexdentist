@@ -628,6 +628,13 @@ mail-only certificate. Install its reviewed helper pair before the transition.
 Successful attachment still has zero tenant vault bindings. Configure separate
 main/test encrypted settings and scoped provider webhooks afterward, verify them
 in the real app and complete coordinated recovery before declaring activation.
+For the owned migration, use the authenticated settings API with
+`action: save-disabled` to seal each tenant's keys while keeping signing off.
+Create the main webhook for its new connection. Rebind the QA webhook only
+against its exact retained synthetic acknowledgement, rotating the endpoint and
+secret in place and preserving its provider ID and delivery history. Its old and
+new acknowledgements belong in signing recovery. Enable each core connection
+after confirming the provider's stored URL, secret, team and event selection.
 
 Before enabling main signing SMTP, use `owned-mail-attachments.py --sha
 <clean-reviewed-release>` to review the exact MTA size/buffering transition;
