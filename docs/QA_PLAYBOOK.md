@@ -113,6 +113,18 @@ separate main/QA completion webhooks through the actual authenticated APIs, pres
 their intent/acknowledgements with recovery, and perform no synthetic event delivery
 to a production core. Actual core authorization, reconciliation and replay require
 the later full-app fixture, not the small transport receiver.
+The actual owned full-app gate now includes encrypted settings, protected source,
+real CE envelope/anonymous HTTPS signature, actual provider completion/resends,
+signed-file import and exact-once Journey/audit state in a fresh isolated core.
+Run `python3 scripts/owned-signing-core-acceptance.test.py` for verifier negative
+cases, then run its read-only acceptance operator against that live private
+fixture. Inspect signed/stored UI at 1440/390/320 and download through owner auth;
+foreign and anonymous download must fail. Verify stored/downloaded checksum, CMS
+against the owned certificate and tamper denial. When a core-created ceremony
+has a return URL, expect an anonymous signer to reach core login; do not mistake
+that redirect for failed signature or re-create/re-sign the envelope. Compare
+actual provider and core state before retrying any action. Keep production core
+binding and owned SMTP acceptance separate from this disposable full-app gate.
 Bootstrap changes also run `python3 scripts/owned-signing-bootstrap.test.py`,
 `node --test scripts/owned-signing-bootstrap-client.test.cjs` and
 `python3 scripts/owned-signing-seal.test.py`. Native CE acceptance must create

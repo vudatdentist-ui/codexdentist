@@ -677,6 +677,28 @@ all are included in combined encrypted recovery. QA can be provisioned separatel
 before the main tenant, with cross-purpose connection/secret reuse denied. Only
 `DOCUMENT_COMPLETED` and the exact internal connection callback URL are allowed.
 Preserve uncertain/partial results and inspect state instead of repeating create.
+
+Actual owned core acceptance uses `/opt/codexdentist-signing-core-qa`: an isolated
+production-build core, fresh private PostgreSQL/files/auth keys, notifications
+disabled and no copied production data. Its private callback network points only
+to this synthetic core; the production core is still unattached. Browser access
+uses an owned SSH tunnel to the private HTTPS frontend, with the exact QA public
+certificate/SPKI trusted by the test process only. No global browser/OS trust or
+application TLS verification is disabled. The QA core explicitly trusts only
+`codexdentist.com` in `TRUSTED_APP_HOSTS` for the fixed callback Host; its UI origin
+remains loopback HTTPS and other hostname checks stay enforced.
+
+`python3 scripts/owned-signing-core-acceptance.py` is a read-only acceptance check
+for that exact live synthetic fixture. It rejects foreign/mutated scope, missing
+provider completion, duplicate domain writes, missing replay deliveries, changed
+stored bytes or invalid/tampered CMS. It requires three real successful provider
+calls and processed core events, with one signed file/Journey/audit. Proof is kept
+privately at `full-core-acceptance.json`; no keys, payloads or signing URLs are
+printed. UI/crypto proof and inspected 1440/390/320 signed-state screenshots remain
+separate evidence. The provider's authenticated resend API supplies replay events;
+no webhook is fabricated into production records. Preserve fixture credentials,
+provider intent and uncertain acknowledgements; retire only its labelled test
+resources after final acceptance and keep QA delivery captured during SMTP work.
 The recipient `upgrade-capacity` action permits only the exact 256-to-1024
 worker-connection and 4096 descriptor-limit transition in both proxy configurations.
 It takes provider/gateway/recipient locks, preserves six original files, recreates
