@@ -607,6 +607,11 @@ and a public mail/signing CA bundle. Image, auth/job/vault secrets, durable file
 old mail mount and other services must remain unchanged. It creates no consent,
 vault binding or email. Tenant settings/webhooks and final recovery acceptance
 remain subsequent requirements; staging this operator does not activate signing.
+The accepted synthetic core was retired on 2026-11-11 after a fresh complete
+database/file/CMS/replay check. Its database, files and evidence remain preserved;
+the stopped core container and future Compose callback alias have been removed.
+The production core still has no signing vault binding. Attachment also requires
+the actual MTA's accepted PDF-size boundary, not only successful SMTP greeting.
 
 SMTP audit found that CE completion emails attach the signed PDF, exceeding
 the original 96KB credential-email MTA limit even for the accepted synthetic

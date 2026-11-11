@@ -604,6 +604,8 @@ reviews the same-image core attachment; `--apply` performs its backed-up cutover
 It refuses existing core signing connections and any retained synthetic callback
 alias. Retire the accepted QA fixture deliberately before attaching the real
 core alias; never allow both cores to resolve as `codexdentist-signing-core`.
+It also requires the accepted same-image MTA attachment transition and a fresh
+strict-TLS SMTP size/oversize probe, which submits no message.
 `owned-signing-retire-qa.py` first reruns actual read-only core/provider/PDF
 acceptance; `--apply` stops only the manifest-pinned synthetic project, removes
 its stopped core container and removes the callback alias from its future
