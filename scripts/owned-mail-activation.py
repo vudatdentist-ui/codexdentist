@@ -78,7 +78,9 @@ def validate_stage(directory,pin):
         raise ValueError('Reviewed immutable mail installation required')
     if json.loads((directory/'compose.json').read_text())!=mail.configuration(pin['gatewayImage'],pin['outboundEnabled']):
         raise ValueError('Preserve changed mail configuration for review')
-    original=(RELEASES/pin['revision']/'scripts/owned-mail/maddy.conf').read_text()
+    config_revision=pin.get('configRevision',pin['revision'])
+    if not re.fullmatch('[a-f0-9]{40}',config_revision):raise ValueError('Exact reviewed SMTP configuration revision required')
+    original=(RELEASES/config_revision/'scripts/owned-mail/maddy.conf').read_text()
     if hashlib.sha256(original.encode()).hexdigest()!=pin['sourceConfigSha256']or(directory/'maddy.conf').read_text()!=original.replace('hostname mail.codexdentist.com','hostname '+pin['outboundHostname']):
         raise ValueError('SMTP source configuration differs')
 

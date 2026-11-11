@@ -73,6 +73,12 @@ mounts remain denied. Attachment tests do not prove tenant activation.
 `python3 scripts/owned-signing-retire-qa.test.py` checks that retirement removes
 only the accepted synthetic callback alias and preserves its database/files;
 production, mail-enabled, foreign-image/network/project and replayed stages deny.
+
+`python3 scripts/owned-mail-attachments.test.py` checks the exact MIME size and
+buffering delta and denies changes to sender, TLS, keys, mounts, images, ports
+and networks. The existing real-Maddy Linux gate additionally delivers a 1MB
+synthetic signed PDF, compares its complete bytes and rejects declared SMTP
+oversize without allocating a large body; its outbound sink stays networkless.
 The runtime gate additionally requires the actual Linux gate
 `sudo -n python3 scripts/owned-signing-linux.py --source
 "$PWD" --output "$RUNNER_TEMP/codexdentist-owned-signing"`. Use a fresh private

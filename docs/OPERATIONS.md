@@ -621,6 +621,17 @@ Successful attachment still has zero tenant vault bindings. Configure separate
 main/test encrypted settings and scoped provider webhooks afterward, verify them
 in the real app and complete coordinated recovery before declaring activation.
 
+Before enabling main signing SMTP, use `owned-mail-attachments.py --sha
+<clean-reviewed-release>` to review the exact MTA size/buffering transition;
+`--apply` cold-backs-up/restores first and recreates only the same-image MTA.
+It preserves sender/DNS/TLS/queue policy and the gateway's 64KB request limit.
+MIME is bounded at 80MB to accommodate the existing 50MB PDF ceiling after base64;
+bodies above 1MB use private `/data/buffer` under the existing owned mail volume.
+`configRevision` pins only this configuration separately from the preserved
+gateway image revision. Retain transition originals, acceptance/rollback records
+and the resulting combined encrypted mail recovery; do not send another real
+test under the consumed one-email approval.
+
 `owned-signing-smtp.py prepare-admin|enable|inspect` is the reviewed staged
 main-only mail operator. Run under the provider operations lock with a fresh
 cold backup/restore before each transition; retained intents/results require
