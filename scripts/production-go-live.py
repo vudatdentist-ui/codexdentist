@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Independent check under the exact app UID, image, environment and data mount."""
 import json
+import importlib.util
 import os
 from pathlib import Path
 import re
@@ -11,6 +12,8 @@ import tarfile
 
 ROOT = Path('/opt/codexdentist-deploy')
 CONTAINER = 'namecheap-migration-codexdentist-1'
+spec = importlib.util.spec_from_file_location('public_ca', Path(__file__).with_name('runtime-public-ca.py'))
+public_ca = importlib.util.module_from_spec(spec); spec.loader.exec_module(public_ca)
 
 
 def command(current, source, sha):
@@ -33,6 +36,7 @@ def command(current, source, sha):
         args += ['--mount', f'type=volume,source={mounts[0]["Name"]},target={root},volume-nocopy']
     for relative in ['scripts', 'docs', 'src', '.gitignore']:
         args += ['--mount', f'type=bind,source={source / relative},target=/app/{relative},readonly']
+    args += public_ca.public_ca_arguments(current)
     return args + ['--entrypoint', 'node', current['Image'], 'scripts/go-live-check.mjs'], ('\n'.join(environment) + '\n').encode()
 
 

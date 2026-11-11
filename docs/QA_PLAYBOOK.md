@@ -64,6 +64,12 @@ also creates a dedicated admin, configures encrypted main-only SMTP and sends
 synthetic main/QA envelopes to a private TLS receiver/capture respectively.
 It denies an untrusted SMTP certificate and cold-restores the resulting trust
 and provider configuration without starting workers. No public mail is sent.
+`python3 scripts/owned-signing-app-cutover.test.py` also checks the subsequent
+attachment's exact resolved/runtime delta, duplicate callback alias denial and
+preservation of image, secrets, storage and other applications. Public CA tests
+in `owned-mail-app-cutover.test.py` cover both legacy mail-only and the explicit
+combined mail/signing trust mount; arbitrary paths, private keys and writable
+mounts remain denied. Attachment tests do not prove tenant activation.
 The runtime gate additionally requires the actual Linux gate
 `sudo -n python3 scripts/owned-signing-linux.py --source
 "$PWD" --output "$RUNNER_TEMP/codexdentist-owned-signing"`. Use a fresh private

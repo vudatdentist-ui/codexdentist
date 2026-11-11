@@ -598,6 +598,16 @@ main/QA routing against an isolated TLS receiver before owned activation.
 copies without changing recipient invitation or completed-document defaults;
 normal installations retain their existing owner-copy behavior.
 
+The following app-attachment operator is staged separately. It requires accepted
+main-only SMTP, zero existing core Documenso connections and retirement of the
+synthetic QA core's callback alias before production joins the private API and
+callback networks. It compares resolved Compose and actual runtime against an
+exact allowed delta: private signing URL, owner-copy policy, two internal networks
+and a public mail/signing CA bundle. Image, auth/job/vault secrets, durable files,
+old mail mount and other services must remain unchanged. It creates no consent,
+vault binding or email. Tenant settings/webhooks and final recovery acceptance
+remain subsequent requirements; staging this operator does not activate signing.
+
 Local AI is deployed in `2face1e` (PR #95), with the production configuration
 cutover independently verified on 2026-11-09. The owned VPS has Ollama 0.40.15 and
 Qwen3 4B pinned by image/model digests. Runtime has no published port or external

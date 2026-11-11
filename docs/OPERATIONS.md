@@ -599,6 +599,22 @@ until the owner supplies and verifies their actual credentials.
 
 ## Documenso operator setup
 
+After owned SMTP acceptance, `owned-signing-app-cutover.py --sha <deployed-sha>`
+reviews the same-image core attachment; `--apply` performs its backed-up cutover.
+It refuses existing core signing connections and any retained synthetic callback
+alias. Retire the accepted QA fixture deliberately before attaching the real
+core alias; never allow both cores to resolve as `codexdentist-signing-core`.
+The core joins only the existing internal API/callback networks and mounts
+`/opt/codexdentist-owned-signing/core-trust/provider-gateways.cert.pem` read-only
+at `/run/codexdentist-service-cas.pem`. This derived public bundle contains the
+existing mail gateway and signing gateway certificates. Keep the original mail
+CA mount, image, secrets, data mounts and unrelated services intact. The updated
+independent go-live helper forwards only this exact public bundle or the prior
+mail-only certificate. Install its reviewed helper pair before the transition.
+Successful attachment still has zero tenant vault bindings. Configure separate
+main/test encrypted settings and scoped provider webhooks afterward, verify them
+in the real app and complete coordinated recovery before declaring activation.
+
 `owned-signing-smtp.py prepare-admin|enable|inspect` is the reviewed staged
 main-only mail operator. Run under the provider operations lock with a fresh
 cold backup/restore before each transition; retained intents/results require
