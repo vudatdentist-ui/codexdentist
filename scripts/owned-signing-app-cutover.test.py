@@ -1,6 +1,7 @@
 import importlib.util
 import json
 from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import patch
 
@@ -9,6 +10,25 @@ cutover = importlib.util.module_from_spec(spec); spec.loader.exec_module(cutover
 
 
 class PrivateSigningAttachment(unittest.TestCase):
+    def test_attention_or_existing_core_connections_block_before_provider_reads_or_configuration_writes(self):
+        for stage in ['attention', 'existing-connection']:
+            with tempfile.TemporaryDirectory() as directory:
+                root = Path(directory); sha = 'a' * 40
+                (root / 'current.json').write_text(json.dumps({'sha': sha}))
+                if stage == 'attention': (root / 'needs-attention.json').write_text('preserve-foreign-operation')
+                before = {'Config': {'Labels': {'org.opencontainers.image.revision': sha}, 'Env': [
+                    'NOTIFICATION_DELIVERY_MODE=owned-mail', 'NODE_EXTRA_CA_CERTS=' + cutover.trust.TARGET]}}
+                calls = []
+                def run(args):
+                    calls.append(args)
+                    if args[:2] == ['docker', 'inspect']: return json.dumps([before]).encode()
+                    raise ValueError('Synthetic existing signing connection')
+                with patch.object(cutover, 'ROOT', root), patch.object(cutover.mail, 'run', side_effect=run), patch.object(cutover.smtp.signing, 'status') as provider:
+                    with self.assertRaises(ValueError): cutover.cutover(sha, True)
+                    provider.assert_not_called()
+                    self.assertEqual(len(calls), 0 if stage == 'attention' else 2)
+                if stage == 'attention': self.assertEqual((root / 'needs-attention.json').read_text(), 'preserve-foreign-operation')
+
     def test_compose_patch_converts_existing_sequence_without_changing_other_services_or_mounts(self):
         before = '''services:
   other:

@@ -20,6 +20,7 @@ def load(name, filename):
 mail = load('signing_app_mail', 'owned-mail-app-cutover.py')
 trust = load('signing_app_trust', 'runtime-public-ca.py')
 smtp = load('signing_app_smtp', 'owned-signing-smtp.py')
+attachments = load('signing_app_attachments', 'owned-mail-attachments.py')
 ROOT = mail.ROOT
 SIGNING = Path('/opt/codexdentist-owned-signing')
 GATEWAY = Path('/opt/codexdentist-owned-signing-gateway')
@@ -120,6 +121,7 @@ def cutover(sha, apply=False):
     accepted = json.loads((SIGNING / 'smtp.completed.json').read_text())
     if accepted.get('pass') is not True or accepted.get('globalAndQaMailCaptured') is not True:
         raise ValueError('Accepted main-only SMTP with QA capture required')
+    attachments.require_accepted()
     smtp.client(smtp.admin_input(SIGNING, 'inspect'))
     callback_alias_available()
     for name in NETWORKS.values():
