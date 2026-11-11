@@ -70,6 +70,9 @@ preservation of image, secrets, storage and other applications. Public CA tests
 in `owned-mail-app-cutover.test.py` cover both legacy mail-only and the explicit
 combined mail/signing trust mount; arbitrary paths, private keys and writable
 mounts remain denied. Attachment tests do not prove tenant activation.
+`python3 scripts/owned-signing-retire-qa.test.py` checks that retirement removes
+only the accepted synthetic callback alias and preserves its database/files;
+production, mail-enabled, foreign-image/network/project and replayed stages deny.
 The runtime gate additionally requires the actual Linux gate
 `sudo -n python3 scripts/owned-signing-linux.py --source
 "$PWD" --output "$RUNNER_TEMP/codexdentist-owned-signing"`. Use a fresh private

@@ -604,6 +604,12 @@ reviews the same-image core attachment; `--apply` performs its backed-up cutover
 It refuses existing core signing connections and any retained synthetic callback
 alias. Retire the accepted QA fixture deliberately before attaching the real
 core alias; never allow both cores to resolve as `codexdentist-signing-core`.
+`owned-signing-retire-qa.py` first reruns actual read-only core/provider/PDF
+acceptance; `--apply` stops only the manifest-pinned synthetic project, removes
+its stopped core container and removes the callback alias from its future
+Compose configuration. Database/files, stopped database/UI containers, prior
+configuration and all evidence remain private and preserved. Retained retirement
+intent blocks blind replay. It cannot target production or a different project.
 The core joins only the existing internal API/callback networks and mounts
 `/opt/codexdentist-owned-signing/core-trust/provider-gateways.cert.pem` read-only
 at `/run/codexdentist-service-cas.pem`. This derived public bundle contains the

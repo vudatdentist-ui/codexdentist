@@ -84,7 +84,7 @@ jobs:
       - name: Main-only owned signing SMTP contracts
         run: python3 scripts/owned-signing-smtp.test.py && node --test scripts/owned-signing-smtp-client.test.cjs
       - name: Private signing app attachment and public CA contracts
-        run: python3 scripts/owned-signing-app-cutover.test.py
+        run: python3 scripts/owned-signing-app-cutover.test.py && python3 scripts/owned-signing-retire-qa.test.py
       - name: Native owned email delivery and uncertainty races
         run: npm run test:owned-mail-db
         env:
