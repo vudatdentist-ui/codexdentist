@@ -1,3 +1,4 @@
+import { headingText } from "./qa-heading.mjs";
 import { workspaceStories } from "../src/workspaces/workspace-story.ts";
 import {
   enabledMigrationRoutes,
@@ -9,15 +10,13 @@ const baseUrl = process.env.SMOKE_BASE_URL ?? "http://127.0.0.1:3000";
 const email = process.env.SMOKE_EMAIL ?? "owner@nhavista.vn";
 const password = process.env.SMOKE_PASSWORD ?? process.env.SMOKE_USER_PASSWORD ?? "CodexSmoke2026!";
 
-const defaultRoutes = [
-  "dashboard", "schedule", "patients", "journey", "billing", "accounting", "services", "staff", "crm", "inventory", "pharmacy", "forms", "learning", "employee-app", "reports", "community", "patient-app", "settings",
-];
+const defaultRoutes = Object.keys(workspaceStories);
 const configuredRoutes = (process.env.SMOKE_ROUTES ? process.env.SMOKE_ROUTES.split(",") : defaultRoutes).map((route) => route.trim().replace(/^\/+/, "")).filter(Boolean);
 const migrationRoutes = enabledMigrationRoutes(process.env.SMOKE_MIGRATION_ROUTES, "SMOKE_MIGRATION_ROUTES").map((route) => route.replace(/^\/+/, ""));
 const routes = [...new Set([...configuredRoutes, ...migrationRoutes])];
 const routeMarkers = Object.fromEntries(Object.entries(workspaceStories).map(([route, story]) => [route, Object.values(story.title)]));
-routeMarkers.clinical = [...routeMarkers.clinical, ...routeMarkers.journey];
-routeMarkers.treatment = [...routeMarkers.treatment, ...routeMarkers.journey];
+routeMarkers.clinical = routeMarkers.journey;
+routeMarkers.treatment = routeMarkers.journey;
 // The opt-in patient-detail route retains its own migration contract.
 routeMarkers["patients/[patientId]"] = ["Patient 360", "Hồ sơ bệnh nhân 360"];
 const expectedHeaders = {
@@ -47,7 +46,7 @@ async function main() {
     if (response.status !== 200) throw new Error(`/${resolvedRoute} returned HTTP ${response.status}.`);
     if (html.includes("Runtime Error")) throw new Error(`/${resolvedRoute} rendered a runtime error.`);
     const markers = routeMarkers[route];
-    const heading = html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]?.replace(/<[^>]+>/g, "") ?? "";
+    const heading = headingText(html);
     const markerSurface = route.includes("[") ? html : heading;
     if (markers && !markers.some((marker) => markerSurface.includes(marker))) throw new Error(`/${resolvedRoute} did not include expected heading "${markers.join('" or "')}".`);
     assertSecurityHeaders(response, `/${resolvedRoute}`);

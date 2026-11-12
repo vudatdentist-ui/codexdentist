@@ -782,7 +782,7 @@ requests and public health/denials. It preserves certificate identity and the
 dedicated router. Probe failure restores exact originals; concurrent changes fail
 closed with evidence retained. Never infer capacity from a serial readiness check.
 
-Owned signing is active on production `93eedc9`. Both ordinary owner accounts
+Owned signing activation was accepted on production `93eedc9`. Both ordinary owner accounts
 have distinct organization-wide encrypted connections and provider teams.
 Main uses `vudat.dentist@gmail.com` in `phuongthao`; test uses
 `tester@codexdentist.com` in its separate organization. Open
