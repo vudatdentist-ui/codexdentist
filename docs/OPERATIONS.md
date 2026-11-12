@@ -751,18 +751,20 @@ before the main tenant, with cross-purpose connection/secret reuse denied. Only
 `DOCUMENT_COMPLETED` and the exact internal connection callback URL are allowed.
 Preserve uncertain/partial results and inspect state instead of repeating create.
 
-Actual owned core acceptance uses `/opt/codexdentist-signing-core-qa`: an isolated
-production-build core, fresh private PostgreSQL/files/auth keys, notifications
-disabled and no copied production data. Its private callback network points only
-to this synthetic core; the production core is still unattached. Browser access
-uses an owned SSH tunnel to the private HTTPS frontend, with the exact QA public
-certificate/SPKI trusted by the test process only. No global browser/OS trust or
+Historical owned core acceptance is retained at
+`/opt/codexdentist-signing-core-qa`. Its isolated production-build core used fresh
+private PostgreSQL/files/auth keys, disabled notifications and synthetic records.
+That core is retired and its callback alias removed. The production core now
+owns the live callback alias. Future synthetic fixtures require their own
+distinct callback network/alias. Historical browser acceptance used an owned SSH
+tunnel to the private HTTPS frontend, with the exact QA public certificate/SPKI
+trusted by the test process only. No global browser/OS trust or
 application TLS verification is disabled. The QA core explicitly trusts only
 `codexdentist.com` in `TRUSTED_APP_HOSTS` for the fixed callback Host; its UI origin
 remains loopback HTTPS and other hostname checks stay enforced.
 
 `python3 scripts/owned-signing-core-acceptance.py` is a read-only acceptance check
-for that exact live synthetic fixture. It rejects foreign/mutated scope, missing
+while that exact synthetic fixture is running. It rejects foreign/mutated scope, missing
 provider completion, duplicate domain writes, missing replay deliveries, changed
 stored bytes or invalid/tampered CMS. It requires three real successful provider
 calls and processed core events, with one signed file/Journey/audit. Proof is kept
@@ -780,6 +782,82 @@ requests and public health/denials. It preserves certificate identity and the
 dedicated router. Probe failure restores exact originals; concurrent changes fail
 closed with evidence retained. Never infer capacity from a serial readiness check.
 
+Owned signing is active on production `93eedc9`. Both ordinary owner accounts
+have distinct organization-wide encrypted connections and provider teams.
+Main uses `vudat.dentist@gmail.com` in `phuongthao`; test uses
+`tester@codexdentist.com` in its separate organization. Open
+**Settings → Tích hợp & AI → Documenso** to inspect the connection, then
+**Biểu mẫu & đồng thuận → Ký qua Documenso** for the patient workflow. Existing
+configured credentials are hidden. The notification timestamp records a callback
+with a valid secret and event. Envelope lookup, inbox processing and signed-PDF
+reconciliation occur afterwards and have separate outcomes. An eventless probe
+leaves that timestamp unchanged.
+
+Production uses private API `https://codexdentist-signing-gateway:3443/api/v2`,
+callback alias `codexdentist-signing-core`, and the read-only public CA bundle at
+`/opt/codexdentist-owned-signing/core-trust/provider-gateways.cert.pem`.
+Reconstruct that bundle from the exact owned mail gateway certificate followed
+by the signing API gateway certificate. Verify its SHA-256 against the recovery
+record before restoring its mount at `/run/codexdentist-service-cas.pem`.
+`NODE_EXTRA_CA_CERTS` points there. Preserve the old mail-only mount for existing
+restoration paths. Both app networks are internal. Provider main-only SMTP uses
+the owned MTA; global/test transport remains captured.
+`DOCUMENSO_SEND_OWNER_EMAILS=false` and
+`DOCUMENSO_AUTOMATIC_REMINDERS=false` apply to new app envelopes.
+
+Tenant activation was staged through the authenticated settings command
+`save-disabled` after current core/file and provider restore drills. That command
+writes the normal encrypted vault entry with status DISABLED. The ordinary
+owner Save action retains its existing active-save behavior. Both connection
+IDs/secrets were configured through the provider APIs before Enable. The main
+hook was created once and the prior test hook was updated in place. Preserve
+the root-private activation intent/receipts at
+`/opt/codexdentist-deploy/signing-binding-ops-20261111/activation` and
+`webhook.main.*`, `webhook.qa.*`, `webhook.qa-rebind.*` under the provider root.
+Never replay a retained intent or replace a provider hook after an uncertain
+acknowledgement. Inspect the actual connection, credential and provider hook.
+The operator's compensating disable uses the ordinary app command, which
+refuses disabling an unresolved real ceremony.
+
+On 2026-11-12 a process inventory included cache authentication command arguments
+in technical output. All four affected owned cache credentials were replaced,
+including their consumers, with old-key rejection and preserved images, networks,
+volumes and ports verified. Current Documenso API/callback, authenticated
+Chatwoot/Medplum and Novu database/workflow-queue health pass. Private rotation
+intents and accepted receipts stay under
+`/opt/codexdentist-deploy/signing-binding-ops-20261111/cache-rotation`.
+Diagnostic inventories must select PID, parent, elapsed time, state and command
+name. Do not print full process arguments, environment arrays or raw container
+inspection. Filter those inside the process before emitting approved fields.
+
+Post-activation recovery is accepted for core
+`20261112T032939Z-periodic-93eedc9290fe`, signing
+`20261112T033007Z-4d83230a`, and rotated optional services
+`20261112T033116Z-e8f432b6`. Their encrypted copies and authenticated
+`.restore-proof.json` receipts are on the owned PC under
+`C:\Users\Admin\.codex\private\codexdentist-backups\snapshots`.
+Core restoration includes database, protected files and the public gateway CA
+bundle. Signing restoration includes the main/test webhook records and current
+cache credentials. Optional restoration checks both PostgreSQL stores, MongoDB
+counts and every archived volume/private-configuration checksum.
+
+`codexdentist-signing-backup.service` runs the root-private wrapper at
+`/opt/codexdentist-owned-signing/operators/signing-nightly-backup.py`, pinned to
+reviewed source `93eedc9290fe03c2b5533b9d8eb368aaa3c466a2`. Keep that exact release
+available until a reviewed operator upgrade replaces the pin. Its manual run
+passed cold backup, isolated restore and public-recipient encryption before
+`codexdentist-signing-backup.timer` was enabled. The timer runs at 19:50 UTC
+(02:50 Asia/Ho_Chi_Minh), with up to five minutes jitter and persistence.
+Core and mail timers retain 19:30/19:40 UTC respectively. Inspect service
+`Result`, the next timer trigger, root-private logs and
+`/opt/codexdentist-owned-signing/last-verified-backup.json` after failures.
+A failed backup/seal keeps its source and partial evidence for recovery.
+Off-server transfer remains manual; the nightly service has no recipient
+private key. The three timers produce separate service snapshots. Match
+core/provider signing references when selecting a pair for coordinated recovery.
+Do not start restored notification/signing workers until those references and
+the original delivery/reconciliation state have been reviewed.
+
 Owned CE runtime: `scripts/owned-signing-services.py prepare|up|status` uses
 `/opt/codexdentist-owned-signing`, pinned Documenso 2.21.1 CE and independent
 PostgreSQL/Valkey volumes/keys. Pull the exact `IMAGES` references in the script
@@ -788,7 +866,7 @@ installation directories or volumes. It creates a local PKCS#12 signing
 certificate, not a qualified/trusted public signing identity. Preserve its
 private key, passphrase, app encryption keys and database together.
 
-This stage deliberately has no public port, external network, core database
+Initial preparation creates no public port, external network, core database
 connection or outgoing mail. Signup is disabled; mail stays in an isolated
 capture service until separately reviewed activation. The app runs as UID 1001,
 Valkey as its pinned UID 999/GID 1000, with private AOF files and no capability
@@ -870,8 +948,8 @@ and voiding. Definitive initial rejection permits credential repair and manual
 completion/void. The signed result is imported through protected file staging;
 invalid PDFs and failed imports stay retryable without completing consent.
 Only reconciled provider results display as electronically signed. Manual
-completion and its supporting documents retain their own labels. Configure and
-accept the real Documenso account separately before sending real patient data.
+completion and its supporting documents retain their own labels. For an independent installation, configure and accept its own provider
+connection before sending real patient data.
 
 ## Orthanc credential scope
 
