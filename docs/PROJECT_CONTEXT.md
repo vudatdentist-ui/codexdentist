@@ -1,6 +1,6 @@
 # Codexdentist Canonical Product Context
 
-Last updated: 2026-11-10
+Last updated: 2026-11-12
 Status: ACTIVE / CANONICAL
 
 > This file replaces every previous product direction, refactor queue, migration-route plan, and architecture context. Git history is an archive, not an active instruction source. Do not revive an older plan merely because it appears in a previous commit, chat, issue, or deleted document.
@@ -78,6 +78,18 @@ These rules survive every refactor and integration.
   reproduces that failure and verifies resource waiting, conflict and adjacency.
 - Partial invoices are not merged after issuance.
 - External payment providers may request or report a payment, but they never write Codexdentist billing tables directly.
+
+Dashboard "Doanh thu từ đầu tháng" / "Production (month to date)" shares Reports'
+UTC+7 period and gross invoice calculation: sum `Invoice.amount` by creation date
+from the month's first day through today, excluding only `VOID` (including
+`DRAFT`). Inclusive day endpoints cover `23:59:59.999` and exclude next-day
+midnight. Custom report dates must be real UTC+7 calendar dates; invalid inputs
+retain their independent default fallback before range normalization.
+Refunds change Payments/paid balances, not this production value.
+Receivables retain full invoice history. Dashboard's daily cash collection sums
+gross Receipts by `receivedAt`, excluding `credit_balance` applications as Reports
+does; it is not refund-net cash flow. Financial totals follow the authorized
+clinics and selected chain, even when other clinic workspaces are unloaded.
 
 Financial adjustment decision (2026-11-05): receipt amounts and allocations remain
 gross historical collections; cash refunds are negative Payments with versioned
@@ -543,8 +555,19 @@ The acceptance below includes the deployed runtime and its user interface.
 | Imaging and native operations | Orthanc/OHIF and the existing native lab/sterilization flows are deployed. Real synthetic DICOM and owner UI acceptance passed at 1440/390/320. | Preserve study-authorized viewer/DICOMweb access, unavailable-provider behavior and tenant/clinic denials. |
 | Communication/interoperability | Chatwoot, self-hosted Novu in-app delivery and one-way Medplum export are enabled for the main organization with separate provider accounts/projects. | Opaque scoped identities, safe retries/uncertainty and disabled-provider fallback remain enforced. Outbound patient jobs require an operator policy. |
 | Operational rollout | `93eedc9` passed exact-main CI `42953758831`, backup/restore, public readiness and independent financial/login-mapping checks. | Read the running image label and `/opt/codexdentist-deploy/current.json` for every subsequent release. Off-server snapshot transfer is manual. |
-| Workspace audit | The remaining PR #50 cleanup uses direct screen titles and simplified auth panels. Dashboard chain selection now reuses its authorized summaries; real two-chain browser coverage verifies narrowed local totals and explicit global scope. | Complete the rendered-UI, current-head CI and release gates before closing the superseded PR. |
-| Dashboard financial follow-up (#117) | The visible production metric still lacks its canonical read aggregate when clinic workspaces are unloaded. | Reuse Billing/Reports semantics, prove a nonzero financial fixture and verify clinic/chain scope before release. |
+| Workspace audit | PR #118 superseded #50 and is deployed as `3925f43` after exact-main CI `43175710736`, restore, actual owner UI and independent financial/login checks. Titles, auth and authorized chain selection passed desktop and mobile acceptance. | Both original audit PRs are closed. Preserve patient-selection, chain and authentication regression coverage. |
+| Dashboard financial follow-up (#117 / PR #119) | Dashboard and Reports share UTC+7 MTD invoice production; Dashboard cash totals exclude internal credit applications. Eleven focused regressions and independent review passed. Disposable PostgreSQL plus normal owner/manager sign-in reproduced zero versus 620,000 before the fix, then verified equal totals, chains 320,000/300,000, manager 250,000 and role denial at 1440/390/320px. Financial row hashes stayed unchanged. | Issue #117 records the final exact-main CI, deployed SHA, restore and read-only acceptance. Require those gates before closing it. |
+| Dependency hardening (PR #119, superseding #114) | A lock-only XML-builder update removes the vulnerable transitive parser. Isolated clean install, normal production build, full and production dependency audits (zero advisories), private-file regressions and independent dependency review passed. | The combined release must pass fresh CI/container/hosted boot and production acceptance. Keep Prisma CLI/client/adapter upgrades aligned; broad bot groups #73/#77 and artifact-action #52/#53 are separate maintenance. |
+
+Roadmap review (2026-11-12): phases 0–6 meet their exit criteria, and phase 7 has
+the accepted `3925f43` release baseline. The final product-defect follow-up is
+#117/PR #119; its issue and release acceptance record carry terminal status, not
+an inferred deployment from a merge. Independent review found no additional
+required product scope. After that acceptance, continue ordinary maintenance or
+new owner requirements rather than reopening the completed integration queue.
+Merchant activation, automatic outbound patient jobs and retention deletion stay
+explicit operator choices. Nightly encrypted snapshots remain enabled; off-server
+transfer remains manual. These choices do not require a paid service.
 
 Credential decision: a dedicated IntegrationCredential stores authenticated
 encryption envelopes, never raw keys in connection metadata, audit or client

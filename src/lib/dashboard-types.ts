@@ -23,6 +23,7 @@ export type DashboardClinicSummary = {
   inChair: number;
   completed: number;
   utilization: number;
+  production: number;
   collectedToday: number;
 };
 

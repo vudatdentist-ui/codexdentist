@@ -2,7 +2,9 @@ import "server-only";
 
 import { clinics as demoClinics, formatVnd } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
+import { invoiceProductionByClinic, resolveReportPeriod } from "@/domains/revenue/reporting";
 import { assertDemoFallbackAllowed } from "@/lib/runtime-guards";
+import { getClinicScope } from "@/lib/tenant-scope";
 import type { DashboardWorkspace } from "@/lib/dashboard-types";
 import type { AppSession } from "@/lib/session";
 
@@ -10,13 +12,15 @@ export async function getDashboardWorkspace(
   session: AppSession,
 ): Promise<DashboardWorkspace> {
   try {
-    const clinicIds = allowedClinicIds(session);
+    const clinicScope = getClinicScope(session);
+    const clinicIds = clinicScope.clinicId.in;
+    const now = new Date();
+    const productionPeriod = resolveReportPeriod({}, now);
     const today = new Intl.DateTimeFormat("en-CA", {
       timeZone: "Asia/Ho_Chi_Minh",
-    }).format(new Date());
+    }).format(now);
     const dayStart = new Date(`${today}T00:00:00+07:00`);
-    const dayEnd = new Date(`${today}T23:59:59+07:00`);
-    const now = new Date();
+    const dayEnd = new Date(`${today}T23:59:59.999+07:00`);
 
     const [
       clinics,
@@ -101,9 +105,9 @@ export async function getDashboardWorkspace(
       }),
       prisma.receipt.findMany({
         where: {
-          organizationId: session.organizationId,
-          clinicId: {
-            in: clinicIds,
+          ...clinicScope,
+          method: {
+            not: "credit_balance",
           },
           receivedAt: {
             gte: dayStart,
@@ -117,14 +121,14 @@ export async function getDashboardWorkspace(
       }),
       prisma.invoice.findMany({
         where: {
-          clinicId: {
-            in: clinicIds,
-          },
+          ...clinicScope,
           patient: {
             organizationId: session.organizationId,
           },
         },
         select: {
+          clinicId: true,
+          createdAt: true,
           amount: true,
           paidAmount: true,
           dueDate: true,
@@ -254,6 +258,7 @@ export async function getDashboardWorkspace(
       }),
     ]);
 
+    const production = invoiceProductionByClinic(invoices, productionPeriod);
     const chairCount = chairs.length;
     const activeAppointments = appointments.filter((appointment) =>
       ["ARRIVED", "IN_CHAIR"].includes(appointment.status),
@@ -363,6 +368,7 @@ export async function getDashboardWorkspace(
           inChair: clinicAppointments.filter((appointment) => appointment.status === "IN_CHAIR").length,
           completed: clinicAppointments.filter((appointment) => appointment.status === "COMPLETED").length,
           utilization: Math.min(100, Math.round((clinicActive / Math.max(clinicChairs, 1)) * 100)),
+          production: production.get(clinic.id) ?? 0,
           collectedToday: receipts
             .filter((receipt) => receipt.clinicId === clinic.id)
             .reduce((total, receipt) => total + Number(receipt.amount), 0),
@@ -424,7 +430,7 @@ export async function getDashboardWorkspace(
 }
 
 function demoDashboardWorkspace(session: AppSession): DashboardWorkspace {
-  const allowedIds = new Set(session.clinicIds);
+  const allowedIds = new Set(getClinicScope(session).clinicId.in);
   const clinics = demoClinics.filter((clinic) => allowedIds.has(clinic.id));
   const todayVisits = clinics.reduce((total, clinic) => total + clinic.todayVisits, 0);
   const collection = clinics.reduce((total, clinic) => total + clinic.collection, 0);
@@ -459,16 +465,13 @@ function demoDashboardWorkspace(session: AppSession): DashboardWorkspace {
       inChair: 0,
       completed: 0,
       utilization: clinic.utilization,
+      production: clinic.production,
       collectedToday: clinic.collection,
     })),
     risks: [],
     providerLoads: [],
     appointments: [],
   };
-}
-
-function allowedClinicIds(session: AppSession) {
-  return session.activeClinicId ? [session.activeClinicId] : session.clinicIds;
 }
 
 function vietnamTime(date: Date) {

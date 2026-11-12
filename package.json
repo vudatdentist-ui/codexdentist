@@ -95,7 +95,7 @@
     "browser:landing": "node scripts/landing-page-qa.mjs",
     "test:workspace": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --experimental-strip-types --experimental-loader ./scripts/ts-alias-loader.mjs --test scripts/workspace-story.test.mjs scripts/workspace-controls.test.mjs scripts/patient-workspace.test.mjs scripts/patient-keyboard.test.mjs",
     "fonts:assets": "node scripts/fetch-font-assets.mjs",
-    "test:audit": "node --test scripts/audit-regression.test.cjs scripts/shared-login.test.cjs scripts/integration-boundaries.test.cjs scripts/provider-webhook-regression.test.cjs scripts/provider-consent-regression.test.cjs scripts/notification-provider.test.cjs scripts/notification-readiness.test.mjs scripts/financial-ledger-regression.test.cjs scripts/billing-boundary.test.cjs scripts/outbox-clock-regression.test.cjs scripts/orthanc-credential-scope.test.cjs",
+    "test:audit": "node --test scripts/audit-regression.test.cjs scripts/shared-login.test.cjs scripts/integration-boundaries.test.cjs scripts/provider-webhook-regression.test.cjs scripts/provider-consent-regression.test.cjs scripts/notification-provider.test.cjs scripts/notification-readiness.test.mjs scripts/financial-ledger-regression.test.cjs scripts/billing-boundary.test.cjs scripts/dashboard-production.test.cjs scripts/outbox-clock-regression.test.cjs scripts/orthanc-credential-scope.test.cjs",
     "test:audit-db": "node scripts/audit-concurrency-stress.cjs",
     "test:maintainability": "node --test scripts/maintainability-regression.test.cjs && node scripts/maintainability-check.mjs",
     "test:maintainability-db": "node scripts/maintainability-database.cjs",
