@@ -57,6 +57,23 @@ financial baseline; inspect actual owner mail Settings at 1440/390/320 without
 submitting another email. Password reset/consume/signin remains covered by the
 disposable full-app actual TLS gate, not by changing a real owner's password.
 
+Production tenant activation must stage both encrypted bindings disabled, inspect
+the two provider hooks, then enable them through the normal scoped settings API.
+Check both owner scopes, both API credentials, actual provider-to-core strict TLS,
+and denial of the other tenant's callback secret. An eventless callback may prove
+authentication rejection/acceptance, but cannot prove consent reconciliation or
+advance the valid-notification timestamp. Use the separately accepted synthetic
+full-app ceremony for signed-PDF/import/replay evidence. Inspect both production
+Settings panels at 1440/390/320 with blank secret fields and persistent enabled
+state after reload. Revoke only generated short-lived review sessions.
+
+Diagnostic output must omit command arguments and environment values. If a
+credential appears in technical output, replace that exact credential and its
+consumers, verify rejection of the prior value, and take a fresh restored,
+encrypted recovery copy. Preserve affected images, volume identities, network/
+port boundaries and unrelated credentials. Authenticated consumer health must
+pass after the change; a running container alone is insufficient.
+
 Owned signing runtime changes require `python3 scripts/owned-signing-services.test.py`
 and `python3 scripts/owned-signing-smtp.test.py` plus
 `node --test scripts/owned-signing-smtp-client.test.cjs`. The native CE gate

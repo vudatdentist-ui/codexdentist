@@ -328,7 +328,8 @@ accounts now use distinct ordinary service agents, with real cross-account
 requests denied in both directions. The installation administrator's token is
 not exported as an application credential.
 
-Issue #91 remains open for the remaining free-runtime cutovers, in order:
+Issue #91 acceptance now covers the free runtimes below. Record the final
+operational evidence and close the issue after the documentation review.
 
 1. Completed: cloud AI replaced by a resource-bounded private local model;
    structured Vietnamese operational drafts are verified in the app, with no cloud
@@ -338,9 +339,9 @@ Issue #91 remains open for the remaining free-runtime cutovers, in order:
    encrypted off-server recovery copy and a verified nightly backup timer.
 3. Completed: cloud email replaced by private self-host SMTP after sender DNS,
    credential recovery, owned queue restoration and approved Gmail inbox acceptance.
-4. Activate the free self-host signing engine with synthetic protected PDFs and
-   complete consent reconciliation. Existing Documenso UI/connector tests are not
-   evidence that a real signing service is already running.
+4. Completed: self-host signing and both real tenant bindings, actual synthetic
+   consent/PDF reconciliation, production settings, encrypted off-server recovery
+   and the verified nightly signing backup service/timer.
 
 Signing activation audit: signed-result import must verify the provider's returned
 envelope ID before downloading any item. Provider requests reject redirects,
@@ -348,7 +349,7 @@ JSON responses are bounded to 64 KiB, and raw provider failure text is excluded
 from application errors. These checks preserve the existing ceremony reservation,
 protected-file staging and consent reconciliation; they do not activate signing.
 
-Owned email implementation is in progress: `owned-mail` is an opt-in transport,
+Owned email is deployed: `owned-mail` is an opt-in transport,
 with private HTTPS/HMAC, a separately encrypted SQLite idempotency journal and
 TLS submission to the owned SMTP service. Existing notification records remain
 canonical. A lost acknowledgement keeps PROCESSING and only authenticated,
@@ -387,8 +388,7 @@ matching Message-ID/nonce; Gmail's original-message view confirms SPF, DKIM and
 DMARC PASS for the owned IP/selector. No patient data or authentication link was
 sent. The one-message authorization is consumed; do not send another under it.
 
-Production now uses `NOTIFICATION_DELIVERY_MODE=owned-mail` on the same verified
-`31210f1` image. The cutover snapshots/restores current database/files first,
+Production uses `NOTIFICATION_DELIVERY_MODE=owned-mail`. The cutover snapshots/restores current database/files first,
 requires no in-flight old-provider email and compares resolved Compose before
 recreating only the core service. Only the private mail gateway network,
 read-only public CA and five controlled mail environment values change. Original
@@ -405,239 +405,71 @@ fresh backup/restore, independent go-live/readiness and unchanged ledger. The
 post-cutover mail snapshot `20261110T085642Z-2d52bd3f` passed authenticated encrypted
 PC recovery, including the existing mail receipt/journal state.
 
-Signing preflight also passed against actual Documenso 2.21.1 CE in a separate
-synthetic installation: the reviewed adapter created/distributed a PDF, the
-browser inserted a signature and completed it, and the adapter downloaded the
-sealed result. Its CMS signature verifies against the owned test certificate;
-tampered bytes fail verification. Completed screens were inspected at desktop
-and phone sizes. SMTP stayed in a private capture service with no external
-network, paid key or patient data. Those four QA services were stopped afterwards;
-their private proof/volumes are retained. This is not operational activation:
-owned deployment/recovery, explicit Vietnamese date/time presentation, minimal
-provider logging, core webhook/reconciliation and real recipient delivery remain
-part of the signing gate after mail is accepted.
+Owned signing runs Documenso 2.21.1 CE on the existing VPS with separate
+PostgreSQL/Valkey volumes and keys. Public recipients use
+`https://sign.codexdentist.com`; app API and provider callbacks use separate
+strict-TLS internal gateways. Both gateways allow only the required paths,
+methods and signing procedures. The public process has no provider credentials
+or private key. Signup, administrator routes, API-key APIs, batching and foreign
+origins are denied. Runtime request/job logs are disabled to keep recipient
+addresses and signing tokens out of persistent logs. Both recipient proxies
+passed 220 concurrent static requests and the actual cold phone ceremony.
 
-The separate owned signing standby now runs pinned CE with its own database,
-Valkey and internal mail capture, closed signup and no public route/core access.
-Actual health validates both database and certificate; a valid signup request
-must return `SIGNUP_DISABLED`. Runtime logs are disabled because upstream job
-errors can contain recipient addresses/tokens. Valkey runs directly as its
-image's unprivileged UID: restart acceptance found that the root entrypoint
-could not traverse its private AOF directory with capabilities dropped. The fix
-preserves permissions and adds authenticated PING/restart checks; Docker's
-`Running=true` while restarting cannot satisfy status. Cold snapshot
-`20261110T022102Z-26de05ec` restored all bytes/ownership/modes, every PostgreSQL
-table count, Valkey AOF/authentication and the certificate passphrase without
-starting restored application, mail or job workers. This remains a private
-standby, not activation of consent signing. Service-account provisioning,
-recipient publication and core ceremony/webhook acceptance remain separate gates.
+The production core attachment was accepted on `f2c7504`, preserving its image,
+auth/vault/job secrets, durable files, old mail mount and unrelated services.
+It adds only the internal signing API/callback networks, exact public CA bundle
+and reviewed signing policy. Main-only encrypted SMTP is active through the
+owned MTA. Global/QA mail remains captured. Service-account owner copies and
+automatic reminders are disabled for new app envelopes. The MTA accepts bounded
+80 MiB MIME messages and spills bodies above 1 MiB to private disk; the core
+signed-PDF ceiling remains 50 MiB and the notification HTTP boundary stays 64 KiB.
+Actual pinned-MTA acceptance delivered/checksummed a synthetic PDF and denied
+an oversized declaration before recipient submission. An initial failed Compose
+recreation guard was fixed and retested; its rollback evidence is retained.
 
-The private foundation is merged in PR #104 and deployed as `31210f1` after
-exact-main CI `42746106360`, core backup/restore, independent go-live/readiness
-and unchanged ledger. Snapshot `20261110T023256Z-34bb70da` additionally verifies
-restored deployment configuration ownership and actual app-UID key/cache access.
-Its CMS AES-256-GCM/RSA-OAEP-SHA256 copy is on the owned PC; authenticated
-decryption verified every volume/configuration/key checksum in memory. The real
-recipient private key remains only on that PC. Off-server transfer is manual.
+PR #115 is merged and deployed as `93eedc9` after exact-main CI
+`42953758831`. Production readiness, all 58 migrations, public routes and the
+financial/login-mapping comparison pass. On 2026-11-12, both real organizations
+received separate API credentials and callback secrets through their ordinary
+owner-scoped settings API and encrypted tenant vault. Credentials were first
+saved disabled, both provider hooks were installed/inspected, then both
+connections were enabled. Main belongs to `vudat.dentist@gmail.com` in
+`phuongthao`; QA belongs to `tester@codexdentist.com` in its distinct organization.
+The existing QA hook was updated in place, preserving its provider identity and
+history. Direct provider-to-core TLS probes reject the other tenant's secret.
+Their eventless accepted-authentication probe creates no clinical event and
+does not set the UI's valid-signing-notification timestamp.
 
-`owned-signing-bootstrap.py` implements the next private stage: it requires only
-the two seeded CE placeholder users and zero envelopes, snapshots/restores first,
-temporarily permits signup only within the four-service internal network, then
-creates separate main/QA identities through actual verification/signin/token
-APIs. It restores the exact closed configuration even on failure. A retained
-intent/partial acknowledgement prevents replay; API keys bind to their stored
-user/team/token hash, not merely a successful API response. Both identities have
-passed creation and authenticated API acceptance on fresh isolated CE, including
-cross-owner token substitution denial. PR #105 passed exact-head CI and merged
-as `65b7337`; its operator also bootstrapped both identities on the owned standby
-and verified the closed APIs. Fresh snapshot `20261110T085052Z-81c3706e` includes
-their private credentials, passed worker-free PostgreSQL/AOF/config restoration,
-and its encrypted copy passed authenticated recovery on the owned PC. No public
-route, recipient email or core signing connection has been enabled. Those
-publication and full-app ceremony/webhook/replay gates remain open.
+Full clinical behavior was accepted earlier in a separate production-build core
+with its own database/files/auth keys and disabled notifications. A synthetic
+protected PDF was signed anonymously on the actual public hostname. Three real
+provider deliveries produced three processed inbox events and exactly one stored
+signed PDF, Journey comment and reconciliation audit. Source/result references
+and patient/clinic/organization scope matched; foreign and anonymous downloads
+were denied. The stored PDF's CMS verifies against the owned signing certificate;
+tampering fails verification. Final signed/stored UI passed at 1440/390/320.
+The synthetic core is retired with its database, files, restoration and replay
+evidence preserved. Its former callback alias was removed before attaching the
+production core. The installation uses a locally generated signing certificate.
 
-The next signing gateway is implemented and running privately: pinned
-unprivileged Nginx exposes a strict-TLS API listener only on an internal network
-and a separate recipient surface. Recipient routes allow required assets,
-read-only session status and token-scoped PDF retrieval, plus enumerated signing
-procedures; admin/signup/signin/API-key/bulk-API and batched-procedure smuggling
-are denied. Access/error logs are disabled to keep signing tokens out of logs.
-Actual TLS/API/route-denial probes pass. No published port, external network,
-public router or core connection has been enabled.
-
-A synthetic QA ceremony used the reviewed adapter through the TLS gateway,
-inserted/completed a browser signature and downloaded the sealed PDF. Its CMS
-verifies against the owned certificate and tampered bytes fail; its stored
-metadata is explicitly `Asia/Ho_Chi_Minh` and `dd/MM/yyyy HH:mm`. Final exact
-"Everyone has signed" screens were inspected at 1440/390/320. Browser QA used a
-temporary private loopback origin through an SSH tunnel because the real hostname
-is not published; the exact original provider Compose/origin was restored and
-the tunnel closed afterwards. This does not satisfy public-hostname or core
-consent/webhook acceptance. Owned snapshot `20261110T092919Z-9bd9f71b` also passed
-combined provider/gateway key/configuration recovery and authenticated encrypted
-PC custody. The initial fresh gateway fixture exposed a generated 64-character
-upstream DNS label; using the scoped Compose `app` alias fixes that failure without
-changing TLS or the isolated provider network. The reviewed private upgrade
-preserves exact previous files and refuses unrelated/concurrent edits. Final
-native acceptance passed on a fresh isolated CE stack, including both API owners,
-TLS/route denials, repeated combined restoration, corruption denial and authenticated
-encrypted recovery. Owned snapshot `20261110T094026Z-f13bc1d7` preserves the upgraded
-DNS configuration and passed restoration plus authenticated PC recovery. Exact-head
-CI `42792874203` passed for PR #107, which merged as `953910c`; exact-main
-CI `42795772883` and deployed `953910c` passed independent production go-live and
-unchanged financial/login-mapping baseline; public/core gates remain required.
-
-The next recipient operator separates the HTTP ceremony into its own unprivileged
-process. Its only bind is the allowlisted HTTP configuration: no API TLS listener,
-private key, provider credentials or host port. Only this process may join the
-existing proxy edge; the private API gateway retains internal-only networks.
-It reaches the existing allowlisted recipient listener on its isolated ceremony
-network and never joins the provider's application/database network directly.
-The dedicated `sign.codexdentist.com` router disables access logs and tracing for
-both HTTP/HTTPS without changing other routers. Publication requires the exact
-four-file recipient configuration in a completed combined restoration. Failure
-removes only its own unchanged router and restores its own manifest; foreign
-concurrent changes require review. Fresh native proof `signing-recipient-proof-v2-20261110`
-passed its actual edge/port denials, repeated restoration, authenticated encryption
-and complete labelled cleanup. An initial cleanup variable collision was fixed;
-the gate now writes its final pass artifact only after cleanup succeeds. The owned
-frontend was snapshotted/restored in `20261110T100815Z-d96d5c29`, then its encrypted
-copy passed authenticated recovery on the owned PC before publication. Its exact
-HTTPS router now passes health/admin/API-denial probes. A synthetic `.test` QA
-envelope completed from a 390-wide browser on the real HTTPS hostname, with final
-1440/390/320 screens inspected, zero browser/request errors and exact completed
-status. The 243317-byte PDF's CMS verifies against the owned certificate; changed
-signed bytes fail. No external email or core clinical record was involved.
-
-Actual phone cold-load QA exposed insufficient proxy connection capacity: 220
-concurrent static requests produced resets with 256 worker connections. Both
-proxies now use 1024 connections and explicit 4096 file-descriptor limits. A
-reviewed exact-config upgrade preserves TLS identity/router and both original
-configurations, rolls back failed probes and refuses foreign changes. A 220-way
-static regression probe plus the complete real phone ceremony pass after the fix.
-The Linux gate includes that load check and final pass evidence follows cleanup.
-PR #108 passed exact-head CI `42826092701` and merged as `14d80a1`; exact-main CI
-`42829500299`, deployment, independent go-live/readiness and unchanged financial/
-login-mapping baseline pass. Upgraded snapshot `20261110T133748Z-50c69196` passed
-combined restoration and authenticated PC recovery. Production core binding,
-owned signing SMTP and final operational acceptance remain open.
-
-The next core-connection stage now implements a separate internal TLS callback
-boundary. It accepts only POST to the existing connection-scoped Documenso
-webhook route, forwards the provider's secret header unchanged for core validation,
-and denies other paths/methods without logging bodies or URLs. It has no public
-route, core/database credentials or provider key mounts. Actual isolated Nginx
-transport acceptance passes strict TLS, unknown-CA rejection, path/method denials
-and preserved secret headers; its small HTTP receiver is explicitly a transport
-fixture, not full core reconciliation evidence. Read-only Nginx startup initially
-exposed default FastCGI/temp paths; all temporary paths now use the bounded tmpfs.
-
-Provider callback trust is an explicit reviewed stage: only the callback hostname
-is exempted from upstream private-address webhook rejection, and only its public
-certificate is mounted read-only for Node TLS. SMTP remains captured, networks and
-signup remain private/closed, and core bindings are not enabled by this change.
-The transition takes a cold snapshot/restoration first, retains exact originals,
-rolls back failed probes and preserves concurrent edits. Recovery includes the
-callback identity/configuration and app-readable public trust with checksums,
-networkless syntax/identity proof and authenticated encryption. Combined real CE
-acceptance passed on the exact reviewed source, including actual provider TLS and
-both scoped webhook APIs. PR #109 passed exact-head CI `42830111055`, merged as
-`54677ce` and passed exact-main CI `42833629842`. The owned callback/trust is staged;
-production core attachment and signing SMTP remain disabled/captured respectively.
-The provisioning client creates only completion webhooks through the existing
-owned service accounts' authenticated APIs, with distinct main/QA teams, connection
-IDs and secrets. It records intent before any call and durable acknowledgements
-after each create, verifies exact stored ownership, and refuses creation replay.
-Its callback origin/path is fixed internally; no arbitrary outbound URL or real
-owner password enters this operator. These bindings remain synthetic in native
-acceptance until a separate core cutover validates the actual tenant connections.
-
-Actual full-app acceptance now also passes on a separate production-build core
-with its own fresh PostgreSQL/files/auth keys and disabled core notifications.
-The app saved its real encrypted QA provider credentials, attached a protected
-synthetic PDF and created one real envelope through the private TLS API. An
-anonymous phone signer completed it on the real HTTPS recipient hostname. Core
-redirect metadata returns an anonymous signer to login; that expected navigation
-is distinct from the standalone ceremony's final completion screen.
-
-The real provider callback initially failed against the isolated core's hostname
-guard. Explicitly trusting only the callback's fixed `codexdentist.com` Host in
-that QA core preserved hostname validation. Actual authenticated provider resend
-then delivered successfully. Two further provider resends produced three processed
-core events with exactly one signed file, Journey comment and reconciliation
-audit. The app displayed signed/stored state at 1440/390/320; owner PDF download
-passed, while foreign/anonymous access failed. The 271859-byte stored PDF's owned
-certificate CMS verifies and changed signed bytes fail. This proves actual owned
-service integration in a disposable core, not activation of real clinic records.
-`owned-signing-core-acceptance.py` independently rechecks both live databases,
-stored bytes, reference/scope/replay counts and CMS integrity without mutating them.
-Owned snapshot `20261110T145109Z-da1c5fa0` also preserves callback TLS identity,
-provider trust and the QA webhook intent/acknowledgements; combined worker-free
-restoration and authenticated encrypted recovery on the owned PC pass.
-
-Remaining activation sequence: preserve combined encrypted recovery, configure
-verified owned SMTP with QA capture kept separate, and bind main/test provider
-accounts to the real organizations through their encrypted core settings. Review
-pending/captured jobs before any SMTP transition; never release old synthetic jobs
-or use a real patient/credential email for QA. Verify the final same-image core
-network/CA cutover, scoped consent/webhook/import/replay behavior and backup timer
-before closing signing. Other VPS applications and inbound mail remain preserved.
-
-The next SMTP stage is implemented but not yet accepted on the owned runtime.
-`owned-signing-smtp.py` creates a dedicated private instance administrator by
-captured API signup/verification and the documented self-host role grant; main
-and QA stay ordinary separate users. It configures one encrypted main-only SMTP
-transport through CE admin APIs, preserving all organization limits/flags and
-suppressing configuration notifications. Global/QA transport stays captured.
-Only the provider app joins the existing internal owned-mail SMTP network with
-an exact read-only callback/SMTP public CA bundle. Intents and partial API
-acknowledgements prevent blind replay. Recovery includes these records and trust.
-No acceptance command sends an external message. Native CE tests must prove
-main/QA routing against an isolated TLS receiver before owned activation.
-`DOCUMENSO_SEND_OWNER_EMAILS=false` explicitly suppresses service-account owner
-copies without changing recipient invitation or completed-document defaults;
-normal installations retain their existing owner-copy behavior.
-
-The following app-attachment operator is staged separately. It requires accepted
-main-only SMTP, zero existing core Documenso connections and retirement of the
-synthetic QA core's callback alias before production joins the private API and
-callback networks. It compares resolved Compose and actual runtime against an
-exact allowed delta: private signing URL, owner-copy policy, two internal networks
-and a public mail/signing CA bundle. Image, auth/job/vault secrets, durable files,
-old mail mount and other services must remain unchanged. It creates no consent,
-vault binding or email. Tenant settings/webhooks and final recovery acceptance
-remain subsequent requirements; staging this operator does not activate signing.
-The accepted synthetic core was retired on 2026-11-11 after a fresh complete
-database/file/CMS/replay check. Its database, files and evidence remain preserved;
-the stopped core container and future Compose callback alias have been removed.
-The production core still has no signing vault binding. Attachment also requires
-the actual MTA's accepted PDF-size boundary, not only successful SMTP greeting.
-Queue review found seven normal periodic sweeps in the actual
-`documenso:documenso-jobs` namespace. The default `bull:` prefix was an invalid
-oracle and its empty result must not be used as readiness evidence. Owned main
-has no envelopes, while old QA work remains captured. Provider organization
-defaults enable 5-day/2-day reminders; `DOCUMENSO_AUTOMATIC_REMINDERS=false`
-therefore explicitly disables first/repeated reminders in each new app envelope
-until an operator policy is approved. Independent provider installations retain
-their defaults. Attachment requires deployed source that supports this policy.
-
-SMTP audit found that CE completion emails attach the signed PDF, exceeding
-the original 96KB credential-email MTA limit even for the accepted synthetic
-document. The staged MTA transition permits bounded 80MB MIME messages (the core
-PDF download ceiling is 50MB), spilling bodies above 1MB to private disk instead
-of RAM. The signed HTTP notification gateway retains its 64KB request limit.
-Real pinned-MTA acceptance must deliver and compare a 1MB synthetic PDF and deny
-an advertised oversized message before this transition is accepted. The operator
-changes only size/buffering in the same MTA image and preserves queue, DNS,
-sender, TLS keys, gateway image and all other policy. No external test is sent.
-The first owned MTA attempt restored the original configuration because the
-recreation guard incorrectly expected Docker's trace label to contain a prior
-container ID. Current Compose emits `smtp-1`. The guard now verifies exact
-project/service/instance/name plus unchanged functional configuration and permits
-both observed trace forms; an actual disposable Compose recreation is required
-as a regression gate. The rolled-back attempt remains preserved. Active MIME
-transition acknowledgements and private diagnostic snapshots must accompany
-mail backup/restore so a recovered installation can prove its activation state.
+Provider backups preserve both volumes, app encryption/signing keys, API
+principals, main/QA webhook intent/acknowledgements, SMTP configuration and
+gateway/recipient/callback configuration plus public trust. Restores check all
+checksums, ownership/modes, PostgreSQL counts, authenticated Valkey AOF,
+PKCS#12 passphrase and networkless gateway syntax. Restored app, mail and job
+workers stay stopped. Authenticated CMS recovery is verified on the owned PC
+with the recipient private key kept there. Production settings rendered correctly
+for both owners at 1440/390/320; no real consent or external email was created
+during activation. Post-activation core snapshot
+`20261112T032939Z-periodic-93eedc9290fe` and signing snapshot
+`20261112T033007Z-4d83230a` passed isolated restores and authenticated PC
+decryption. Core recovery includes both gateway public CAs; provider recovery
+includes the activated main/test webhooks and current cache key. The signing
+backup service ran successfully before its nightly 19:50 UTC timer was enabled.
+The financial and owner/test login-mapping audit still matches the pre-activation
+baseline. Optional-service cache credentials also changed after a diagnostic
+exposure. Their new snapshot `20261112T033116Z-e8f432b6` passed isolated restore
+and authenticated PC recovery with all volume/private-configuration checksums.
 
 Local AI is deployed in `2face1e` (PR #95), with the production configuration
 cutover independently verified on 2026-11-09. The owned VPS has Ollama 0.40.15 and
@@ -686,24 +518,24 @@ Snapshot `20261109T142337Z-periodic-88a6244b84d8` passed separate database and
 file-volume restoration. Its encrypted copy was downloaded to the owned PC and
 authenticated/decrypted in memory, checking every private file and dump archive
 without writing plaintext patient data there. The root-owned nightly timer is
-enabled only after that complete acceptance. Next: free SMTP with authenticated
-sender/DNS and credential recovery, then real self-hosted consent signing.
+enabled after that complete acceptance. The free SMTP and self-hosted signing
+cutovers have also completed their runtime/recovery acceptance above.
 
-### Current delivery plan — 2026-11-05
+### Current delivery plan — 2026-11-12
 
-User-facing completion loop: plan a complete operational path, implement it,
-exercise the real app, independently audit/fix/retest, then choose the next gap.
-An integration with API handlers but no discoverable configuration and staff
-workflow is **partial**, even when its backend tests pass. Do not report it as a
-completed application feature.
+User-facing completion follows the complete operational path through implementation,
+actual app tests, independent audit/fixes, exact-main deployment and recovery.
+The acceptance below includes the deployed runtime and its user interface.
 
-| Workstream | Current state | Required operational acceptance |
+| Workstream | Current state | Operational contract |
 | --- | --- | --- |
-| payOS operator workflow (#78, PR #79) | Implemented and re-audited; native and rendered app gates cover the operational path. Real merchant activation awaits owner credentials. | Tenant/clinic-owned encrypted credentials; signed webhook setup; invoice QR/link/history; lost-response retry and exact-once receipts; negative scope tests; production UI plus full local app browser gates at 1440/390/320px. Verify release separately from implementation. |
-| payOS terminal recovery (#86) | Explicit signed provider-status checks extend the deployed operator path. | Only confirmed CANCELLED/EXPIRED requests with zero paid amount may retire their QR and release credential replacement. Paid/partial/unknown/unverified observations never settle or clear uncertainty; concurrent settlements and retired requests remain durable. |
-| Documenso operator workflow (#80, PR #82) | Settings and consent signing UI implemented and re-audited; native, full-app and production UI gates pass locally. Real service activation awaits operator credentials. | Tenant-owned encrypted keys; eligible protected PDF attachment; recipient-bound send/resume; durable status; signed file with reconciliation provenance; scope/demo/race/failed-import/replay gates. Verify current exact-main CI and deployment marker before claiming rollout. |
-| Imaging and native operations | Lab/sterilization UI has local/CI evidence; live PACS remains unconfigured. | Preserve verified native flows; separately configure and accept an actual private PACS/viewer before enabling it. |
-| Operational rollout | Read the running image revision and `/opt/codexdentist-deploy/current.json`; issue #78/#80 carries verified rollout evidence. Core fallback `d80318c` was independently verified; #71/#75 resolved. | Exact-main CI, backup/restore/runtime grant/candidate/public checks after each release; provider live acceptance requires real operator credentials. |
+| Offline bank transfer | Free NAPAS QR and manual Revenue reconciliation are deployed. The owner supplies the real receiving account in Settings. | A QR alone never proves payment. Manual receipts retain ordinary permissions, ledger invariants and scope. |
+| Legacy payOS | The reviewed connector, merchant UI and terminal recovery remain available. Merchant activation is outside the owner's free-runtime choice. | Preserve existing history and uncertain/paid orders. Signed reconciliation, version fencing and exactly-once receipt rules remain required if an owner separately configures a merchant. |
+| Documenso | Owned CE, public recipient ceremony, private app/callback TLS, main-only SMTP and both encrypted tenant bindings are active on `93eedc9`. Actual synthetic signing/import/replay and production Settings passed. | Preserve source/recipient reservation and signing provenance. Core/provider recovery copies are authenticated on the owned PC; nightly signing backup is enabled. |
+| Imaging and native operations | Orthanc/OHIF and the existing native lab/sterilization flows are deployed. Real synthetic DICOM and owner UI acceptance passed at 1440/390/320. | Preserve study-authorized viewer/DICOMweb access, unavailable-provider behavior and tenant/clinic denials. |
+| Communication/interoperability | Chatwoot, self-hosted Novu in-app delivery and one-way Medplum export are enabled for the main organization with separate provider accounts/projects. | Opaque scoped identities, safe retries/uncertainty and disabled-provider fallback remain enforced. Outbound patient jobs require an operator policy. |
+| Operational rollout | `93eedc9` passed exact-main CI `42953758831`, backup/restore, public readiness and independent financial/login-mapping checks. | Read the running image label and `/opt/codexdentist-deploy/current.json` for every subsequent release. Off-server snapshot transfer is manual. |
+| Next product audit | Review the pending patient-workspace PR #50 against current main and the existing app before carrying forward any missing behavior. | Preserve real clinical/financial state, test current entry points and complete the same rendered-UI/release gates. |
 
 Credential decision: a dedicated IntegrationCredential stores authenticated
 encryption envelopes, never raw keys in connection metadata, audit or client
@@ -777,8 +609,8 @@ public/authenticated readiness passed. No unresolved attention marker remains.
 PR #76 deployed as `d80318c` closes #75: URL, editable record, topbar and AI context
 agree on the authorized patient; changing patients clears unsent drafts/actions.
 Its focused tests, real navigation/browser review and verified release passed.
-Optional live providers and application-job activation
-remain separate operator configuration; see `OPERATIONS.md`.
+The configured live provider acceptance is recorded above. Application-job
+activation remains a separate operator policy; see `OPERATIONS.md`.
 Recovered migration history: `20260516090000_source_commission` has
 ledger checksum `578975509b6eede77797d42ece4d3f93ee5635c8b218abb4894b7191537efae7`
 but release SQL checksum `d31229374b52e7a29228b90fe34afbb9d664a9acdee31c530a3a3288f068ba9b`.
@@ -787,7 +619,8 @@ line. Normalizing line endings makes it byte-equivalent to Git's SQL. Readiness
 and go-live use the archived original bytes to verify this one historical variant;
 any SQL edit, unrelated name or unknown checksum still fails. The production ledger
 and historical migration files remain unchanged. See issue #69.
-Live payOS/Documenso/PACS acceptance remains pending operator-owned credentials.
+Documenso/PACS live acceptance is recorded above. Optional payOS merchants
+retain their separate credential and signed-verification requirements.
 The production audit isolated two invoice/payment mismatches to exact historical
 seed fixtures in the test tenant, distinct from the main tenant. Issue #71 is
 closed after the reviewed, backed-up correction and independent reconciliation.
