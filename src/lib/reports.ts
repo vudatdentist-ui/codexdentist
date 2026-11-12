@@ -3,6 +3,7 @@ import "server-only";
 
 import { clinics as demoClinics, formatVnd } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
+import { invoiceProductionByClinic, resolveReportPeriod } from "@/domains/revenue/reporting";
 import { assertDemoFallbackAllowed } from "@/lib/runtime-guards";
 import type {
   ClinicReport,
@@ -30,19 +31,11 @@ export async function getReportsWorkspace(
       options.clinicId && allowedIds.includes(options.clinicId)
         ? [options.clinicId]
         : allowedIds;
-    const todayKey = vietnamDateKey(new Date());
-    const currentMonth = todayKey.slice(0, 7);
-    const requestedStart = parseVietnamDateKey(options.from);
-    const requestedEnd = parseVietnamDateKey(options.to);
-    const fromKey = requestedStart ?? `${currentMonth}-01`;
-    const toKey = requestedEnd ?? todayKey;
-    const normalizedFromKey = fromKey <= toKey ? fromKey : toKey;
-    const normalizedToKey = fromKey <= toKey ? toKey : fromKey;
-    const periodStart = new Date(`${normalizedFromKey}T00:00:00+07:00`);
-    const periodEnd = new Date(`${normalizedToKey}T23:59:59+07:00`);
+    const now = new Date();
+    const period = resolveReportPeriod(options, now);
+    const { from: normalizedFromKey, to: normalizedToKey, start: periodStart, end: periodEnd } = period;
     const trendStart = startOfVietnamDay(addDays(periodEnd, -6));
     const appointmentStart = periodStart < trendStart ? periodStart : trendStart;
-    const now = new Date();
 
     const [
       dbClinics,
@@ -84,6 +77,7 @@ export async function getReportsWorkspace(
       }),
       prisma.invoice.findMany({
         where: {
+          organizationId: session.organizationId,
           clinicId: {
             in: clinicIds,
           },
@@ -333,14 +327,12 @@ export async function getReportsWorkspace(
       isWithin(patient.createdAt, periodStart, periodEnd),
     );
     const actualReceipts = receipts.filter((receipt) => receipt.method !== "credit_balance");
+    const productionByClinic = invoiceProductionByClinic(invoices, period);
 
     const clinicReports: ClinicReport[] = dbClinics.map((clinic) => {
-      const clinicInvoices = periodInvoices.filter(
-        (invoice) => invoice.status !== "VOID" && invoice.clinicId === clinic.id,
-      );
       const clinicAllInvoices = invoices.filter((invoice) => invoice.clinicId === clinic.id);
       const clinicReceipts = actualReceipts.filter((receipt) => receipt.clinicId === clinic.id);
-      const production = sumNumbers(clinicInvoices.map((invoice) => Number(invoice.amount)));
+      const production = productionByClinic.get(clinic.id) ?? 0;
       const collection = sumNumbers(clinicReceipts.map((receipt) => Number(receipt.amount)));
       const openBalance = clinicAllInvoices
         .filter((invoice) => invoice.status !== "PAID" && invoice.status !== "VOID")
@@ -889,20 +881,6 @@ function ensureReportSourceItem(
 
   sources.set(source, current);
   return current;
-}
-
-function parseVietnamDateKey(value: string | null | undefined) {
-  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
-    return null;
-  }
-
-  const date = new Date(`${value}T00:00:00+07:00`);
-
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  return value;
 }
 
 function isWithin(date: Date, start: Date, end: Date) {

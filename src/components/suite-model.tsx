@@ -177,7 +177,7 @@ export function useDentalSuiteModel({ activeView, staffDirectory = [], accountin
                 doctors: clinic.providers,
                 todayVisits: clinic.todayAppointments,
                 utilization: clinic.utilization,
-                production: 0,
+                production: clinic.production,
                 collection: clinic.collectedToday,
                 pendingClaims: 0,
             })) ??

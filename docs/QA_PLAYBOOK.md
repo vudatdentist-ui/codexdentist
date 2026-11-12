@@ -1,6 +1,6 @@
 # Codexdentist QA Playbook
 
-Last updated: 2026-11-10
+Last updated: 2026-11-12
 Status: ACTIVE
 
 Scheduling concurrency acceptance runs `NODE_ENV=test npm run test:audit-db`
@@ -723,6 +723,19 @@ unchanged values. Cleanup restores only matching fixture assignments, deletes
 only its own chains and disconnects even after failure. An absent selector fails
 the test. Keep ordinary native-dialog, patient-selection, storage-denial and
 keyboard checks in the existing browser suite.
+
+Dashboard financial reads (#117) run `node --test scripts/dashboard-production.test.cjs`
+(also included in `test:audit`). The source-loader tests replace only I/O and
+exercise the real Dashboard/Reports loaders, suite mapping and bilingual metric
+markup: nonzero prior-day UTC+7 MTD production, DRAFT/non-VOID invoices, inclusive
+final-millisecond invoices/receipts and next-day-midnight exclusion, calendar
+round-trip validation (invalid/valid leap days), valid custom/reversed ranges and
+independent invalid-input fallbacks, full-history receivables, gross receipts versus refunds/deposits/credit
+applications, clinic/tenant/empty scope and chain selection without other loaded
+workspaces. Preserve assignment-aware Dashboard role access. Before release,
+independently verify these reads against disposable PostgreSQL and exercise both
+chain totals plus the explicit MTD label at 1440/390/320px in the running app.
+Source/markup checks do not replace database or rendered-browser evidence.
 
 `test:workspace` also covers patient matching, composition/modifier keyboard handling,
 and denied/quota-limited browser storage. `browser:qa` runs
