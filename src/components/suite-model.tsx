@@ -167,12 +167,27 @@ export function useDentalSuiteModel({ activeView, staffDirectory = [], accountin
                 collection: 0,
                 pendingClaims: 0,
             })) ??
+            dashboardWorkspace?.clinicSummaries.map((clinic) => ({
+                id: clinic.clinicId,
+                chainId: clinic.chainId,
+                chainName: clinic.chainName,
+                name: clinic.name,
+                city: clinic.city,
+                chairs: clinic.chairs,
+                doctors: clinic.providers,
+                todayVisits: clinic.todayAppointments,
+                utilization: clinic.utilization,
+                production: 0,
+                collection: clinic.collectedToday,
+                pendingClaims: 0,
+            })) ??
             sessionClinics;
         return clinicSource.filter((clinic) => allowedClinicIds.has(clinic.id));
     }, [
         patientWorkspace?.clinics,
         scheduleWorkspace?.clinics,
         settingsWorkspace?.clinics,
+        dashboardWorkspace?.clinicSummaries,
         session.clinicIds,
         sessionClinics,
     ]);

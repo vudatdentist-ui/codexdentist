@@ -4,12 +4,17 @@ import { readFileSync, existsSync } from 'node:fs';
 import { workspaceStories, workspaceNavigation, visibleWorkspaceNavigation, normalizeWorkspaceSearch, viewFromPath } from '../src/workspaces/workspace-story.ts';
 import { summarizeClinicDay } from '../src/workspaces/clinic-day.ts';
 import { accessibleViews, viewRoutes } from '../src/lib/permissions.ts';
+import { headingText } from './qa-heading.mjs';
 
-test('every route has a complete bilingual story without changing route keys', () => {
+test('every route has complete bilingual functional titles without changing route keys', () => {
   assert.deepEqual(Object.keys(workspaceStories).sort(), Object.keys(viewRoutes).sort());
-  for (const story of Object.values(workspaceStories)) for (const field of ['label','title','purpose']) for (const language of ['vi','en']) assert.ok(story[field][language].trim().length > 0);
+  for (const story of Object.values(workspaceStories)) for (const language of ['vi','en']) {
+    assert.ok(story.label[language].trim().length > 0);
+    assert.equal(story.title[language], story.label[language]);
+  }
 });
 test('navigation contains each direct destination once; clinical aliases remain in care journey', () => {
+  assert.deepEqual(workspaceNavigation.map(group => group.chapter), ['day', 'care', 'practice', 'team']);
   const views = workspaceNavigation.flatMap(group => group.views);
   assert.equal(new Set(views).size, views.length);
   assert.deepEqual([...views, 'clinical', 'treatment'].sort(), Object.keys(viewRoutes).sort());
@@ -52,4 +57,13 @@ test('package scripts reference existing repository files', () => {
       assert.ok(existsSync(new URL(match[0], root)), `${name}: ${match[0]}`);
     }
   }
+});
+
+test('route smoke reads the visible h1 text including escaped symbols, not body labels', () => {
+  assert.equal(headingText('<h1 id="workspace-content">People &amp; payroll</h1>'), 'People & payroll');
+  assert.equal(headingText('<h1><span>Forms</span> &#38; consent</h1>'), 'Forms & consent');
+  assert.equal(headingText('<h1>&lt;Record&gt; &quot;A&quot; &#x27;B&#39;</h1>'), '<Record> "A" \'B\'');
+  assert.equal(headingText('<h1>&amp;lt;</h1>'), '&lt;');
+  assert.equal(headingText('<h1>Unrelated</h1><nav>People &amp; payroll</nav>'), 'Unrelated');
+  assert.equal(headingText('<nav>People &amp; payroll</nav>'), '');
 });

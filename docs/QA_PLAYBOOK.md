@@ -709,6 +709,21 @@ The font gate uses Chromium's actual glyph-to-font report for composed and decom
 
 Operational modal surfaces must use `OperationalDialog`/`WorkspaceDialog`, not a div with `aria-modal`. `WorkspaceTabs` preserves each module's existing selection handlers while supplying roving focus and arrow/Home/End navigation. The associated source guards and keyboard unit checks run with `test:workspace`; real-browser checks remain the interaction evidence. Keep section numbers distinct from clinical stages and preserve the independent odontogram snapshots.
 
+Workspace route smoke covers every key in `workspaceStories`, including Imaging,
+Lab, Sterilization and the Clinical/Treatment Journey aliases. Compare the decoded
+visible h1 against its bilingual functional title. Retain route security headers
+and authenticated billing/payroll export/print checks.
+
+The Dashboard chain regression in `workspace-narrative-qa.mjs` requires an explicit
+loopback PostgreSQL URL and `NODE_ENV=test`. It creates two unique synthetic
+chains, temporarily assigns two existing owner-accessible seeded clinics, then
+requires the actual selector and checks both selected-chain summaries/details
+against the clinic cards. Global task/risk/staff panels retain explicit scope and
+unchanged values. Cleanup restores only matching fixture assignments, deletes
+only its own chains and disconnects even after failure. An absent selector fails
+the test. Keep ordinary native-dialog, patient-selection, storage-denial and
+keyboard checks in the existing browser suite.
+
 `test:workspace` also covers patient matching, composition/modifier keyboard handling,
 and denied/quota-limited browser storage. `browser:qa` runs
 `scripts/workspace-interaction-qa.mjs` only against a disposable loopback test app:

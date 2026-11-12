@@ -1,9 +1,15 @@
 import { loginForBrowserAudit } from './browser-login.mjs';
 import assert from 'node:assert/strict';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { chromium } from 'playwright';
+import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
 
 const base = process.env.BROWSER_QA_BASE_URL ?? 'http://127.0.0.1:3000';
+if (process.env.NODE_ENV !== 'test' || !['127.0.0.1', 'localhost', '[::1]'].includes(new URL(base).hostname)) {
+  throw new Error('Narrative QA requires a disposable loopback test installation.');
+}
 const output = 'output/workspace-qa';
 const browser = await chromium.launch();
 const results = [];
@@ -50,6 +56,8 @@ try {
     assert.equal(await page.locator('.narrative-day').count(),1);
   });
   await test('Vietnamese search, current destination and empty navigation state', async () => {
+    assert.deepEqual(await page.locator('.workspace-desktop-navigation .story-nav-chapter h2').allTextContents(),
+      ['Ngày làm việc', 'Hành trình chăm sóc', 'Vận hành phòng khám', 'Cùng đội ngũ']);
     const search=page.locator('.workspace-desktop-navigation input[type=search]');
     await search.fill('ho so');
     assert.equal(await page.locator('.workspace-desktop-navigation .story-nav-link').count(),1);
@@ -60,13 +68,134 @@ try {
     assert.equal(await page.locator('.workspace-desktop-navigation [aria-current=page]').getAttribute('href'),'/dashboard');
     await shot('desktop-dashboard-vi');
   });
+  await test('Dashboard global panels keep explicit scope when a chain is selected', async () => {
+    const url = process.env.DATABASE_URL && new URL(process.env.DATABASE_URL);
+    if (!url || !['postgres:', 'postgresql:'].includes(url.protocol) ||
+        !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) ||
+        [...url.searchParams.keys()].some(key => /^(host|hostaddr|database|dbname|port|service)$/i.test(key))) {
+      throw new Error('Dashboard chain fixture requires an explicit disposable loopback database.');
+    }
+    const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: url.toString() }) });
+    const token = randomUUID();
+    const chainIds = [`narrative-chain-${token}-a`, `narrative-chain-${token}-b`];
+    let fixtureClinics = [];
+    const headings = [
+      'Công việc · Tất cả phòng khám bạn được truy cập',
+      'Lưu ý · Tất cả phòng khám bạn được truy cập',
+      'Lịch hẹn đội ngũ · Tất cả phòng khám bạn được truy cập',
+    ];
+    const chain = page.locator('.topbar-chain-field select');
+    try {
+      fixtureClinics = await prisma.$transaction(async tx => {
+        const owner = await tx.user.findFirstOrThrow({
+          where: { email: process.env.BROWSER_QA_EMAIL ?? 'owner@nhavista.vn', active: true, role: 'OWNER' },
+          select: { organizationId: true, roleAssignments: { where: { active: true }, select: { role: true, clinicId: true, organizationId: true } } },
+        });
+        assert.ok(!owner.roleAssignments.length || owner.roleAssignments.some(assignment =>
+          assignment.role === 'OWNER' && assignment.clinicId === null && assignment.organizationId === owner.organizationId),
+        'The fixture requires an owner with organization-wide clinic access');
+        const clinics = await tx.clinic.findMany({
+          where: { id: { in: ['hcm-q1', 'hn-tayho'] }, organizationId: owner.organizationId, active: true },
+          select: { id: true, name: true, organizationId: true, chainId: true }, orderBy: { id: 'asc' },
+        });
+        assert.equal(clinics.length, 2, 'The fixture requires two existing owner-accessible seeded clinics');
+        await tx.chain.createMany({ data: chainIds.map((id, index) => ({
+          id, organizationId: owner.organizationId, name: `Narrative QA ${token} ${index + 1}`, active: true,
+        })) });
+        for (const [index, clinic] of clinics.entries()) {
+          const assigned = await tx.clinic.updateMany({
+            where: { id: clinic.id, organizationId: clinic.organizationId, chainId: clinic.chainId },
+            data: { chainId: chainIds[index] },
+          });
+          assert.equal(assigned.count, 1, 'The original clinic assignment must still match');
+        }
+        return clinics;
+      });
+      await page.reload();
+      await settled();
+      for (const name of headings) await page.getByRole('heading', {name, exact:true}).waitFor();
+      await chain.waitFor({state:'visible'});
+      await chain.selectOption('all');
+      await settled();
+      for (const id of chainIds) assert.equal(await chain.locator('option').evaluateAll((options, value) =>
+        options.filter(option => option.value === value).length, id), 1);
+      const details = page.locator('.day-review-details');
+      await details.locator('summary').click();
+      const clinicNames = details.locator('.day-clinic-list article strong');
+      const allClinicNames = await clinicNames.allTextContents();
+      for (const clinic of fixtureClinics) assert.ok(allClinicNames.includes(clinic.name));
+      const globalPanels = page.locator('.day-task-list, .day-risk-list, .dashboard-provider-list');
+      const before = await globalPanels.allTextContents();
+      assert.equal(before.length, 3);
+      const allPulse = await page.locator('.day-pulse dd').allTextContents();
+      const allCollected = await page.locator('.day-financial-summary dd').first().innerText();
+      for (const [index, clinic] of fixtureClinics.entries()) {
+        await chain.selectOption('all');
+        await settled();
+        const clinicCard = details.locator('article').filter({has: page.getByText(clinic.name, {exact:true})});
+        const [visits, inChair, collected] = await clinicCard.locator('dd').allTextContents();
+        assert.ok(visits !== undefined && inChair !== undefined && collected !== undefined);
+        await chain.selectOption(chainIds[index]);
+        await settled();
+        assert.equal(await chain.inputValue(), chainIds[index]);
+        assert.deepEqual(await clinicNames.allTextContents(), [clinic.name], 'Selected chain must narrow clinic details');
+        assert.equal(await page.locator('.day-pulse dd').nth(0).innerText(), visits);
+        assert.equal(await page.locator('.day-pulse dd').nth(1).innerText(), inChair);
+        assert.equal(await page.locator('.day-financial-summary dd').first().innerText(), collected);
+        for (const name of headings) await page.getByRole('heading', {name, exact:true}).waitFor();
+        assert.equal(await page.locator('.day-review-grid .panel-header-action').innerText(), 'Đang xử lý / tổng');
+        assert.deepEqual(await globalPanels.allTextContents(), before);
+        await shot(`desktop-dashboard-selected-chain-${index + 1}`);
+        await page.setViewportSize({width:320,height:844});
+        const selectorBounds = await chain.evaluate(node => {
+          const rect = node.getBoundingClientRect();
+          return {left:rect.left,right:rect.right,width:rect.width,height:rect.height,viewport:innerWidth};
+        });
+        assert.ok(selectorBounds.left >= 0 && selectorBounds.right <= selectorBounds.viewport + 1);
+        assert.ok(selectorBounds.width >= 100 && selectorBounds.height >= 40);
+        await shot(`mobile-dashboard-selected-chain-${index + 1}`);
+        await page.setViewportSize({width:1440,height:900});
+      }
+      await chain.selectOption('all');
+      await settled();
+      assert.deepEqual(await clinicNames.allTextContents(), allClinicNames);
+      assert.deepEqual(await page.locator('.day-pulse dd').allTextContents(), allPulse);
+      assert.equal(await page.locator('.day-financial-summary dd').first().innerText(), allCollected);
+    } finally {
+      try {
+        if (await chain.count()) await chain.selectOption('all');
+      } finally {
+        try {
+          if (fixtureClinics.length) await prisma.$transaction(async tx => {
+            for (const [index, clinic] of fixtureClinics.entries()) {
+              const restored = await tx.clinic.updateMany({
+                where: { id: clinic.id, organizationId: clinic.organizationId, chainId: chainIds[index] },
+                data: { chainId: clinic.chainId },
+              });
+              assert.equal(restored.count, 1, 'Refusing to overwrite a concurrently changed clinic assignment');
+            }
+            const removed = await tx.chain.deleteMany({ where: {
+              id: { in: chainIds }, organizationId: fixtureClinics[0].organizationId,
+            } });
+            assert.equal(removed.count, 2, 'Only the two fixture-owned chains must be removed');
+          });
+        } finally {
+          await prisma.$disconnect();
+        }
+      }
+      await page.reload();
+      await settled();
+    }
+  });
   await test('English language, document language and persisted preference', async () => {
     await page.locator('.language-switch').getByRole('button',{name:'EN',exact:true}).click();
     await page.waitForFunction(() => document.documentElement.lang === 'en');
-    assert.equal(await page.locator('h1').innerText(),'The working day');
+    assert.deepEqual(await page.locator('.workspace-desktop-navigation .story-nav-chapter h2').allTextContents(),
+      ['The working day', 'Continuity of care', 'The practice', 'The team']);
+    assert.equal(await page.locator('h1').innerText(),'Today');
     await shot('desktop-dashboard-en');
     await page.reload(); await settled();
-    assert.equal(await page.locator('h1').innerText(),'The working day');
+    assert.equal(await page.locator('h1').innerText(),'Today');
   });
   await test('Notification modal, read-state, filters and compose fields', async () => {
     const trigger=page.getByRole('button',{name:'Notifications and tasks',exact:true});
@@ -136,7 +265,7 @@ try {
     await page.waitForURL(url => url.pathname === '/journey' && url.searchParams.get('patientId') === id);
     await page.locator('.patient-chart').waitFor({state:'visible'});
     await settled();
-    assert.equal(await page.locator('h1').innerText(),'One record, the whole journey');
+    assert.equal(await page.locator('h1').innerText(),'Care journey');
     assert.equal(await page.locator('.workspace-desktop-navigation [aria-current=page]').getAttribute('href'),'/journey');
     assert.equal(new URL(page.url()).searchParams.get('patientId'),id);
     await shot('desktop-journey-selected');

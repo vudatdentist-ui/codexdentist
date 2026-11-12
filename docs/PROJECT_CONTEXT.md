@@ -31,6 +31,14 @@ Primary product goals:
 - Simple self-host deployment for a clinic while allowing optional external services when they add clear value.
 - Vietnamese-first operational UX; architecture and infrastructure details must not leak into normal staff workflow copy.
 
+Workspace titles use direct Vietnamese/English screen names. Page and section
+headings omit slogans, repeated purpose subtitles and decorative chapter numbers.
+Retain scope labels, error/recovery states, operational values and signup terms
+where they affect a user's interpretation or action. Dashboard appointment and
+clinic-detail totals follow the selected chain; task, risk and staff-load panels
+explicitly identify their full accessible-clinic scope. Dashboard chain choices
+come from its authorized clinic summaries when other workspaces are unloaded.
+
 PostgreSQL remains the canonical transactional store for Codexdentist core business state.
 
 ## 3. Non-Negotiable Invariants
@@ -328,8 +336,8 @@ accounts now use distinct ordinary service agents, with real cross-account
 requests denied in both directions. The installation administrator's token is
 not exported as an application credential.
 
-Issue #91 acceptance now covers the free runtimes below. Record the final
-operational evidence and close the issue after the documentation review.
+Issue #91 is closed after the free-runtime acceptance below and the independent
+documentation review merged in PR #116.
 
 1. Completed: cloud AI replaced by a resource-bounded private local model;
    structured Vietnamese operational drafts are verified in the app, with no cloud
@@ -535,7 +543,8 @@ The acceptance below includes the deployed runtime and its user interface.
 | Imaging and native operations | Orthanc/OHIF and the existing native lab/sterilization flows are deployed. Real synthetic DICOM and owner UI acceptance passed at 1440/390/320. | Preserve study-authorized viewer/DICOMweb access, unavailable-provider behavior and tenant/clinic denials. |
 | Communication/interoperability | Chatwoot, self-hosted Novu in-app delivery and one-way Medplum export are enabled for the main organization with separate provider accounts/projects. | Opaque scoped identities, safe retries/uncertainty and disabled-provider fallback remain enforced. Outbound patient jobs require an operator policy. |
 | Operational rollout | `93eedc9` passed exact-main CI `42953758831`, backup/restore, public readiness and independent financial/login-mapping checks. | Read the running image label and `/opt/codexdentist-deploy/current.json` for every subsequent release. Off-server snapshot transfer is manual. |
-| Next product audit | Review the pending patient-workspace PR #50 against current main and the existing app before carrying forward any missing behavior. | Preserve real clinical/financial state, test current entry points and complete the same rendered-UI/release gates. |
+| Workspace audit | The remaining PR #50 cleanup uses direct screen titles and simplified auth panels. Dashboard chain selection now reuses its authorized summaries; real two-chain browser coverage verifies narrowed local totals and explicit global scope. | Complete the rendered-UI, current-head CI and release gates before closing the superseded PR. |
+| Dashboard financial follow-up (#117) | The visible production metric still lacks its canonical read aggregate when clinic workspaces are unloaded. | Reuse Billing/Reports semantics, prove a nonzero financial fixture and verify clinic/chain scope before release. |
 
 Credential decision: a dedicated IntegrationCredential stores authenticated
 encryption envelopes, never raw keys in connection metadata, audit or client
