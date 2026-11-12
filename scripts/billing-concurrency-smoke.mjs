@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "@prisma/client";
+import sourceLoader from "./audit-source-loader.cjs";
 
 const connectionString =
   process.env.DATABASE_URL ??
@@ -8,6 +9,10 @@ const connectionString =
 const ownerEmail = process.env.BILLING_CONCURRENCY_OWNER_EMAIL ?? "owner@nhavista.vn";
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString }),
+});
+// Exercise the same structured conflict handling and bounded backoff as the app.
+const { runSerializableTransaction } = sourceLoader.load("src/lib/transaction.ts", {
+  "@/lib/prisma": { prisma },
 });
 
 async function main() {
@@ -18,10 +23,14 @@ async function main() {
   const fixture = await createFixture();
 
   try {
-    await Promise.all([
+    const outcomes = await Promise.allSettled([
       applyPayment(fixture, fixture.amount),
       applyPayment(fixture, fixture.amount),
     ]);
+    // A rejected writer must not race fixture deletion with the remaining writer.
+    for (const outcome of outcomes) {
+      if (outcome.status === "rejected") throw outcome.reason;
+    }
 
     const invoice = await prisma.invoice.findUniqueOrThrow({
       where: {
@@ -63,100 +72,88 @@ async function main() {
 }
 
 async function applyPayment(fixture, amount) {
-  for (let attempt = 1; attempt <= 3; attempt += 1) {
-    try {
-      await prisma.$transaction(
-        async (tx) => {
-          const invoice = await tx.invoice.findUniqueOrThrow({
-            where: {
-              id: fixture.invoiceId,
-            },
-          });
-          const balance = Math.max(
-            Number(invoice.amount) - Number(invoice.paidAmount),
-            0,
-          );
-          const allocatedAmount = Math.min(amount, balance);
-          const unallocatedAmount = amount - allocatedAmount;
-          const receipt = await tx.receipt.create({
-            data: {
-              organizationId: fixture.organizationId,
-              clinicId: fixture.clinicId,
-              patientId: fixture.patientId,
-              receiptNo: `QA-RCT-${randomUUID()}`,
-              amount,
-              allocatedAmount,
-              unallocatedAmount,
-              method: "cash",
-              reference: fixture.invoiceNo,
-            },
-          });
-
-          if (allocatedAmount > 0) {
-            await tx.payment.create({
-              data: {
-                invoiceId: fixture.invoiceId,
-                amount: allocatedAmount,
-                method: "cash",
-                reference: receipt.receiptNo,
-              },
-            });
-            await tx.receiptAllocation.create({
-              data: {
-                organizationId: fixture.organizationId,
-                clinicId: fixture.clinicId,
-                patientId: fixture.patientId,
-                receiptId: receipt.id,
-                invoiceId: fixture.invoiceId,
-                amount: allocatedAmount,
-              },
-            });
-          }
-
-          if (unallocatedAmount > 0) {
-            await tx.patientCreditBalance.upsert({
-              where: {
-                patientId: fixture.patientId,
-              },
-              update: {
-                amount: {
-                  increment: unallocatedAmount,
-                },
-              },
-              create: {
-                organizationId: fixture.organizationId,
-                clinicId: fixture.clinicId,
-                patientId: fixture.patientId,
-                amount: unallocatedAmount,
-              },
-            });
-          }
-
-          const nextPaid = Math.min(
-            Number(invoice.paidAmount) + allocatedAmount,
-            Number(invoice.amount),
-          );
-          await tx.invoice.update({
-            where: {
-              id: fixture.invoiceId,
-            },
-            data: {
-              paidAmount: nextPaid,
-              status: nextPaid >= Number(invoice.amount) ? "PAID" : "PARTIAL",
-            },
-          });
+  await runSerializableTransaction(
+    async (tx) => {
+      const invoice = await tx.invoice.findUniqueOrThrow({
+        where: {
+          id: fixture.invoiceId,
         },
-        {
-          isolationLevel: "Serializable",
-        },
+      });
+      const balance = Math.max(
+        Number(invoice.amount) - Number(invoice.paidAmount),
+        0,
       );
-      return;
-    } catch (error) {
-      if (error?.code !== "P2034" || attempt === 3) {
-        throw error;
+      const allocatedAmount = Math.min(amount, balance);
+      const unallocatedAmount = amount - allocatedAmount;
+      const receipt = await tx.receipt.create({
+        data: {
+          organizationId: fixture.organizationId,
+          clinicId: fixture.clinicId,
+          patientId: fixture.patientId,
+          receiptNo: `QA-RCT-${randomUUID()}`,
+          amount,
+          allocatedAmount,
+          unallocatedAmount,
+          method: "cash",
+          reference: fixture.invoiceNo,
+        },
+      });
+
+      if (allocatedAmount > 0) {
+        await tx.payment.create({
+          data: {
+            invoiceId: fixture.invoiceId,
+            amount: allocatedAmount,
+            method: "cash",
+            reference: receipt.receiptNo,
+          },
+        });
+        await tx.receiptAllocation.create({
+          data: {
+            organizationId: fixture.organizationId,
+            clinicId: fixture.clinicId,
+            patientId: fixture.patientId,
+            receiptId: receipt.id,
+            invoiceId: fixture.invoiceId,
+            amount: allocatedAmount,
+          },
+        });
       }
-    }
-  }
+
+      if (unallocatedAmount > 0) {
+        await tx.patientCreditBalance.upsert({
+          where: {
+            patientId: fixture.patientId,
+          },
+          update: {
+            amount: {
+              increment: unallocatedAmount,
+            },
+          },
+          create: {
+            organizationId: fixture.organizationId,
+            clinicId: fixture.clinicId,
+            patientId: fixture.patientId,
+            amount: unallocatedAmount,
+          },
+        });
+      }
+
+      const nextPaid = Math.min(
+        Number(invoice.paidAmount) + allocatedAmount,
+        Number(invoice.amount),
+      );
+      await tx.invoice.update({
+        where: {
+          id: fixture.invoiceId,
+        },
+        data: {
+          paidAmount: nextPaid,
+          status: nextPaid >= Number(invoice.amount) ? "PAID" : "PARTIAL",
+        },
+      });
+    },
+  );
 }
 
 async function createFixture() {

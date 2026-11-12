@@ -736,6 +736,10 @@ workspaces. Preserve assignment-aware Dashboard role access. Before release,
 independently verify these reads against disposable PostgreSQL and exercise both
 chain totals plus the explicit MTD label at 1440/390/320px in the running app.
 Source/markup checks do not replace database or rendered-browser evidence.
+The legacy billing concurrency smoke uses the app's bounded serializable retry
+helper, including backoff and structured adapter conflicts. Await both writers
+before fixture cleanup, including failures; a separate immediate retry loop can
+exhaust before the other transaction commits and obscure the financial assertions.
 
 `test:workspace` also covers patient matching, composition/modifier keyboard handling,
 and denied/quota-limited browser storage. `browser:qa` runs
