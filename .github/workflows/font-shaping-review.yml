@@ -60,7 +60,7 @@ jobs:
           console.log(JSON.stringify({manifest,results},null,2));
           if(results.some(result=>!result.pass)) process.exitCode=1;
           JS
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: vietnamese-font-shaping
