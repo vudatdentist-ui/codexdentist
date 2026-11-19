@@ -61,6 +61,8 @@ These rules survive every refactor and integration.
 
 - Journey remains the patient-centered longitudinal clinical workspace and timeline.
 - Odontogram uses standard FDI codes and versioned snapshots with independent clinical stages.
+- Applying the active condition to the same tooth surface again clears it, with
+  the same undo history as explicit clearing. A different condition replaces it.
 - Temporary treatment selection must remain separate from persisted clinical chart state.
 - Clinical write permissions, revision conflict handling, immutable history, and tenant/clinic isolation must not weaken.
 - Refactoring presentation code must not opportunistically redesign clinical semantics.

@@ -683,6 +683,11 @@ Automated tests do not replace these targeted observations when the correspondin
 
 - Journey opens the intended patient and preserves chronological clinical history.
 - Odontogram FDI mapping, stage independence, revision conflict behavior, multi-selection, and treatment-target separation remain intact.
+- `odontogram-surface-toggle-qa.mjs` runs in `browser:qa` against the public chart
+  with fresh browser storage. At 1440/390/320px it verifies repeat click/tap and
+  Enter/Space clear the active surface condition, neighbouring faces survive,
+  chart/inspector state agrees, a different condition replaces the prior one,
+  Undo restores a cleared face, and both marking and clearing survive reload.
 - Billing receipts, allocations, partial invoices, refunds and unallocated credit reconcile after refresh and concurrent operations.
 - Protected patient files cannot be fetched by another organization, inaccessible clinic, or unrelated patient portal account.
 - Staff/role administration cannot demote/disable protected equal-or-higher authority incorrectly and preserves at least one active owner.
