@@ -1,7 +1,13 @@
 # Codexdentist QA Playbook
 
-Last updated: 2026-11-12
+Last updated: 2026-11-20
 Status: ACTIVE
+
+Nightly CI keeps the same dependency audit thresholds as release CI. Its audit
+reads current advisory data, so a previously green commit can fail after a new
+advisory is published. The Effect override addresses GHSA-7589-6fvf-x4pw through
+the supported 3.x security patch. `effect-security.test.cjs` checks valid template
+decoding and bounded rejection of hostile input in a disposable subprocess.
 
 Scheduling concurrency acceptance runs `NODE_ENV=test npm run test:audit-db`
 against an explicit disposable loopback PostgreSQL database. Four uniquely owned
